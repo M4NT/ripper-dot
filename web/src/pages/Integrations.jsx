@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 
-/** Integrações agora são abas de Configurações; este endereço antigo só redireciona. */
+/** Rota legada: integrações vivem no Marketplace e em Conectores. */
 export default function Integrations() {
-  useEffect(() => { location.replace('#/settings/models'); }, []);
+  useEffect(() => { location.replace('#/marketplace'); }, []);
   return null;
 }

@@ -18,6 +18,17 @@ import { runClaude, runCodex, systemPrompt } from './lib/providers.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
 import { canUseFile, selectSpeakers, routineDue, mayFallback, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent } from './lib/agent-flow.mjs';
 import { newHookToken, verifySignature, eventMeta } from './lib/hooks.mjs';
+import { recordUsage, usageSummary } from './lib/usage.mjs';
+
+function settingsForMcp(s, mcpSession) {
+  if (!mcpSession) return s;
+  const disabled = new Set(mcpSession.disabledPlugins || []);
+  return {
+    ...s,
+    plugins: (s.plugins || []).map(p => ({ ...p, enabled: disabled.has(p.name) ? false : p.enabled !== false })),
+    claude: { ...s.claude, useConnectors: mcpSession.claudeConnectors === false ? false : !!s.claude.useConnectors }
+  };
+}
 
 const db = load();
 for (const a of db.approvals || []) if (a.status === 'pending') { a.status = 'expired'; a.decidedAt = Date.now(); }
@@ -223,8 +234,8 @@ async function syncLocalFiles(agent, chat) {
   }
 }
 
-async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0 }, emit) {
-  const s = db.settings;
+async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0, mcpSession }, emit) {
+  const s = settingsForMcp(db.settings, mcpSession);
   const name = id => db.agents.find(a => a.id === id)?.name || 'Outro agente';
   // Em grupo, a fala dos colegas chega rotulada com o nome de quem falou.
   const label = m => m.role === 'assistant' && m.agentId && m.agentId !== agent.id ? { role: 'user', content: `[${name(m.agentId)} disse]: ${m.content}` } : m;
@@ -348,6 +359,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
       const gen = MODELS[m].provider === 'codex' ? runCodex({ ...args, cwd: sandboxDir(agent), ctx }) : runClaude({ ...args, model: m, ctx });
       for await (const ev of gen) { if (ev.text) { attempt += ev.text; out += ev.text; } if (ev.tool) steps.push({ tool: ev.tool, detail: ev.detail, at: Date.now() }); emit(ev); }
       push({ model: m, effort });
+      recordUsage(db, m, { charsIn: (text?.length || 0) + (prompt?.length || 0), charsOut: out.length });
       break;
     } catch (e) {
       if (signal?.aborted) { push({ model: m, stopped: true }); break; }
@@ -358,7 +370,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
   }
 }
 
-async function chat({ chat, text, fileIds, signal }, emit) {
+async function chat({ chat, text, fileIds, signal, mcpSession }, emit) {
   chat.messages.push({ id: id(), role: 'user', content: text, files: fileIds?.length ? fileIds : undefined, at: Date.now() });
   const members = groupMembers(chat, db.agents);
   const group = members.length > 1 ? members : null;
@@ -371,7 +383,7 @@ async function chat({ chat, text, fileIds, signal }, emit) {
     await syncLocalFiles(agent, chat);
     const extra = await attachments(agent, chat, fileIds);
     const before = chat.messages.length;
-    await turn({ agent, chat, text, prompt: extra.text ? `${text}\n\n${extra.text}` : text, images: extra.images, signal, group }, emit);
+    await turn({ agent, chat, text, prompt: extra.text ? `${text}\n\n${extra.text}` : text, images: extra.images, signal, group, mcpSession }, emit);
     const reply = chat.messages.length > before ? chat.messages.at(-1) : null;
     if (group && reply && isPass(reply.content)) { chat.messages.pop(); emit({ passed: agent.id }); }
     else if (group && reply) { const next = floor.afterReply(agent, reply.content); if (next.length) emit({ delegated: next.map(a => a.id) }); }
@@ -412,7 +424,8 @@ const routes = [
   ['GET', /^\/api\/state$/, () => ({
     settings: redact(db.settings), agents: db.agents, models: MODELS, templates: TEMPLATES, categories: CATEGORIES,
     chats: db.chats.map(summary), routines: db.routines.map(({ hookSecret, ...r }) => ({ ...r, hasSecret: !!hookSecret })),
-    files: db.files.map(({ path, ...f }) => f), memoriesCount: db.memories.length, pendingInbox: db.messages.filter(m => m.status === 'queued' || m.status === 'delivering').reduce((o, m) => (o[m.originChatId] = (o[m.originChatId] || 0) + 1, o), {}), approvals: db.approvals.filter(a => a.status === 'pending').map(approvalView), artifacts: db.artifacts.map(({ content, ...a }) => ({ ...a, size: content.length })), skills: db.skills, memoriesByAgent: db.memories.reduce((o, x) => (o[x.agentId] = (o[x.agentId] || 0) + 1, o), {}), projects: db.projects
+    files: db.files.map(({ path, ...f }) => f), memoriesCount: db.memories.length, pendingInbox: db.messages.filter(m => m.status === 'queued' || m.status === 'delivering').reduce((o, m) => (o[m.originChatId] = (o[m.originChatId] || 0) + 1, o), {}), approvals: db.approvals.filter(a => a.status === 'pending').map(approvalView), artifacts: db.artifacts.map(({ content, ...a }) => ({ ...a, size: content.length })),     skills: db.skills, memoriesByAgent: db.memories.reduce((o, x) => (o[x.agentId] = (o[x.agentId] || 0) + 1, o), {}), projects: db.projects,
+    usage: usageSummary(db)
   })],
   ['PUT', /^\/api\/settings$/, async req => {
     const b = await body(req), s = db.settings;
@@ -614,7 +627,7 @@ const routes = [
     // Modelo e esforço ficam gravados na conversa ('agent' = usar o padrão de cada agente).
     if (b.model) c.model = b.model === 'agent' ? undefined : b.model;
     if (b.effort) c.effort = b.effort;
-    try { await chat({ chat: c, text, fileIds, signal: ac.signal }, emit); }
+    try { await chat({ chat: c, text, fileIds, signal: ac.signal, mcpSession: b.mcpSession }, emit); }
     finally { clearInterval(ping); activeChats.delete(c.id); save(); }
     emit({ done: true, title: c.title }); res.end();
     return undefined;

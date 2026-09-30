@@ -5,6 +5,7 @@ import { AgentAvatar, Icon, Menu, Dialog } from '../ui.jsx';
 import { useApp } from '../app.jsx';
 import AgentCard, { NewAgentCard } from '../agentCard.jsx';
 import Composer from '../composer.jsx';
+import { sessionPayload } from '../marketplace/sessionMcp.js';
 
 const TEMPLATE_ICON = { Pesquisa: 'search', Dados: 'data', Operações: 'bolt', Atendimento: 'chat', Marketing: 'edit', Vendas: 'agents', Produtividade: 'clock' };
 
@@ -89,7 +90,7 @@ export default function Home() {
 
   function start({ text, fileIds }) {
     // A conversa nasce na tela de chat; a mensagem vai junto.
-    sessionStorage.setItem('ripper.pending', JSON.stringify({ agentId: current.id, text, fileIds, ...choice }));
+    sessionStorage.setItem('ripper.pending', JSON.stringify({ agentId: current.id, text, fileIds, ...choice, mcpSession: sessionPayload() }));
     go(`/a/${current.id}`);
   }
 

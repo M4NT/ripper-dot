@@ -5,6 +5,7 @@ import { markdown, closeOpen } from '../markdown.js';
 import { AgentAvatar, Icon, Menu, MenuItem, StatusDot, useConfirm, EmptyState } from '../ui.jsx';
 import { useApp } from '../app.jsx';
 import Composer, { uploadFile } from '../composer.jsx';
+import { sessionPayload } from '../marketplace/sessionMcp.js';
 import { effortLabel } from '../modelPicker.jsx';
 import FileThumb from '../fileThumb.jsx';
 import ChatPanel from '../chatPanel.jsx';
@@ -214,7 +215,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   const onScroll = () => { const el = scroller.current; stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120; };
   useEffect(() => { if (stick.current) scroller.current?.scrollTo({ top: 1e9 }); }, [chat?.messages.length, live?.content, live?.steps?.length]);
 
-  async function send({ text, fileIds = [], previews }, forceChoice) {
+  async function send({ text, fileIds = [], previews, mcpSession }, forceChoice) {
     const use = forceChoice || choice;
     if (ctrl.current || !agent) return;
     const userMsg = { id: 'u' + Date.now(), role: 'user', content: text, files: fileIds, previews, at: Date.now() };
@@ -227,7 +228,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
     const flush = () => { if (pending) return; pending = true; requestAnimationFrame(() => { pending = false; if (!finished) setLive({ ...building, steps: [...building.steps] }); }); };
     try {
       const res = await fetch('/api/chat', { method: 'POST', signal: ac.signal, headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ agentId: agent.id, agentIds: isGroup ? memberIds : undefined, projectId, chatId: cid, text, fileIds, model: use.model, effort: use.effort }) });
+        body: JSON.stringify({ agentId: agent.id, agentIds: isGroup ? memberIds : undefined, projectId, chatId: cid, text, fileIds, model: use.model, effort: use.effort, mcpSession: mcpSession || sessionPayload() }) });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `Erro ${res.status}`);
       const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
       let buf = '';
