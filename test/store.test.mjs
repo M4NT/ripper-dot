@@ -42,6 +42,20 @@ test('flush persiste alterações com gravação atômica (tmp + rename)', () =>
     assert.equal(existsSync(join(dir, 'db.json.tmp')), false);
   }));
 
+test('flush serializado sob save() rápido não deixa db.json inválido', () =>
+  withDataDir(async ({ load, flush, save }, dir) => {
+    const db = load();
+    for (let i = 0; i < 40; i++) {
+      db.settings.name = `n${i}`;
+      save();
+      flush();
+    }
+    const parsed = JSON.parse(readFileSync(join(dir, 'db.json'), 'utf8'));
+    assert.equal(parsed.settings.name, 'n39');
+    assert.equal(parsed.schemaVersion, 2);
+    assert.equal(existsSync(join(dir, 'db.json.tmp')), false);
+  }));
+
 test('migração v1 faz backup e normaliza schemaVersion', () =>
   withDataDir(async ({ load, _resetStoreForTests }, dir) => {
     writeFileSync(join(dir, 'db.json'), JSON.stringify({
