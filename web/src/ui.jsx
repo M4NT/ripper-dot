@@ -211,14 +211,15 @@ function useDismiss(open, close, refs) {
   }, [open]);
 }
 
-export function Menu({ trigger, children, align = 'left', className = '' }) {
+export function Menu({ trigger, children, align = 'left', className = '', onOpenChange }) {
   const [open, setOpen] = useState(false);
   const anchor = useRef(null), pop = useRef(null);
   const pos = useFloating(open, anchor, align);
   useDismiss(open, () => setOpen(false), [anchor, pop]);
+  const toggle = () => setOpen(o => { const next = !o; onOpenChange?.(next); return next; });
   return (
     <div className={'menu-wrap ' + className} ref={anchor}>
-      {trigger({ open, toggle: () => setOpen(o => !o) })}
+      {trigger({ open, toggle })}
       {open && pos && createPortal(
         <div ref={pop} className={`menu floating ${className}-pop`} style={pos} role="menu"
           onClick={e => e.target.closest('[role=menuitem]') && setOpen(false)}>{children}</div>,

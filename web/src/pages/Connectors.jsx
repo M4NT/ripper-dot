@@ -4,6 +4,7 @@ import { go, useRoute } from '../lib.js';
 import { Icon, Menu, MenuItem } from '../ui.jsx';
 import HubShell from '../marketplace/HubShell.jsx';
 import BrandIcon from '../marketplace/BrandIcon.jsx';
+import CustomConnectorModal from '../marketplace/CustomConnectorModal.jsx';
 import { listMyConnectors } from '../marketplace/state.js';
 
 function RowIcon({ id }) {
@@ -44,32 +45,36 @@ function Mine({ settings }) {
 }
 
 export default function Connectors() {
-  const { S } = useApp();
+  const { S, refresh } = useApp();
   const { parts } = useRoute();
   const tab = parts[1] === 'discover' ? 'discover' : 'mine';
   const [q, setQ] = useState('');
+  const [customOpen, setCustomOpen] = useState(false);
   useEffect(() => { if (tab === 'discover') go('/marketplace/discover'); }, [tab]);
   if (tab === 'discover') return null;
 
   return (
-    <HubShell
-      title="Conectores"
-      tabs={[['mine', 'Meus'], ['discover', 'Descobrir']]}
-      tab={tab}
-      onTab={k => { if (k === 'discover') go('/marketplace/discover'); else go('/connectors'); }}
-      search={q}
-      onSearch={setQ}
-      searchPlaceholder="Pesquisar conectores"
-      actions={
-        <Menu align="right" trigger={({ toggle }) => (
-          <button type="button" className="btn btn-primary btn-sm" onClick={toggle}><Icon name="plus" size={14} /> Adicionar <Icon name="down" size={14} /></button>
-        )}>
-          <MenuItem icon="plug" onClick={() => go('/settings/plugins')}>Adicionar conector personalizado</MenuItem>
-          <MenuItem icon="store" onClick={() => go('/marketplace/discover')}>Descobrir no Marketplace</MenuItem>
-        </Menu>
-      }
-    >
-      <Mine settings={S.settings} />
-    </HubShell>
+    <>
+      <HubShell
+        title="Conectores"
+        tabs={[['mine', 'Meus'], ['discover', 'Descobrir']]}
+        tab={tab}
+        onTab={k => { if (k === 'discover') go('/marketplace/discover'); else go('/connectors'); }}
+        search={q}
+        onSearch={setQ}
+        searchPlaceholder="Pesquisar conectores"
+        actions={
+          <Menu align="right" trigger={({ toggle }) => (
+            <button type="button" className="btn btn-primary btn-sm" onClick={toggle}><Icon name="plus" size={14} /> Adicionar <Icon name="down" size={14} /></button>
+          )}>
+            <MenuItem icon="plug" onClick={() => setCustomOpen(true)}>Adicionar conector personalizado</MenuItem>
+            <MenuItem icon="store" onClick={() => go('/marketplace/discover')}>Descobrir no Marketplace</MenuItem>
+          </Menu>
+        }
+      >
+        <Mine settings={S.settings} />
+      </HubShell>
+      <CustomConnectorModal open={customOpen} onClose={() => setCustomOpen(false)} onSaved={refresh} />
+    </>
   );
 }

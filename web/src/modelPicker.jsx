@@ -39,7 +39,7 @@ export function EffortScale({ value, onChange, model }) {
 }
 
 /** Seletor único de modelo + esforço, usado no campo de mensagem. */
-export default function ModelPicker({ value, onChange, group }) {
+export default function ModelPicker({ value, onChange, group, chatId }) {
   const { S } = useApp();
   const models = [...(group ? [['agent', { label: 'Padrão de cada agente' }]] : []), ...Object.entries(S.models)];
   const label = value.model === 'agent' ? 'Padrão dos agentes' : value.model === 'auto' ? 'Ripper Auto' : (S.models[value.model]?.label.replace('Claude ', '') || value.model);
@@ -69,7 +69,7 @@ export default function ModelPicker({ value, onChange, group }) {
         </>}
       </div>
     </Menu>
-    <ModelUsage />
+    <ModelUsage chatId={chatId} />
     </div>
   );
 }

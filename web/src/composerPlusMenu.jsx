@@ -29,7 +29,11 @@ function SubMenu({ items, anchor, onClose }) {
     const place = () => {
       const r = anchor?.getBoundingClientRect();
       if (!r) return;
-      setPos({ position: 'fixed', left: r.right + 4, top: r.top, zIndex: 1001, minWidth: 260 });
+      const estH = 320;
+      const openUp = r.bottom + estH > innerHeight - 12;
+      setPos(openUp
+        ? { position: 'fixed', left: r.right + 4, bottom: innerHeight - r.top + 4, zIndex: 1001, minWidth: 260, maxHeight: 'min(420px, 60vh)', overflowY: 'auto' }
+        : { position: 'fixed', left: r.right + 4, top: r.top, zIndex: 1001, minWidth: 260, maxHeight: 'min(420px, 60vh)', overflowY: 'auto' });
     };
     place();
     addEventListener('resize', place);

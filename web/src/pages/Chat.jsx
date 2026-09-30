@@ -229,7 +229,12 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
     try {
       const res = await fetch('/api/chat', { method: 'POST', signal: ac.signal, headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ agentId: agent.id, agentIds: isGroup ? memberIds : undefined, projectId, chatId: cid, text, fileIds, model: use.model, effort: use.effort, mcpSession: mcpSession || sessionPayload() }) });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `Erro ${res.status}`);
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        const msg = errBody.error || `Erro ${res.status}`;
+        if (res.status === 429) throw new Error(msg);
+        throw new Error(msg);
+      }
       const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
       let buf = '';
       for (;;) {

@@ -15,7 +15,7 @@ export const PLUGIN_CATALOG = [
   { id: 'aws-location', name: 'Amazon Location Service', author: 'Amazon', icon: 'aws', desc: 'Mapas, rotas e geolocalização.', forYou: true },
   { id: 'appwrite', name: 'Appwrite', author: 'Appwrite', icon: 'appwrite', desc: 'Backend como serviço: auth, DB e storage.', forYou: true },
   { id: 'gmail-plugin', name: 'Gmail', author: 'Google', icon: 'gmail', desc: 'Ler e enviar e-mail nos agentes.', featured: true },
-  { id: 'google-calendar', name: 'Google Calendar', author: 'Google', icon: 'gmail', desc: 'Eventos e disponibilidade.', featured: true },
+  { id: 'google-calendar', name: 'Google Calendar', author: 'Google', icon: 'google-calendar', desc: 'Eventos e disponibilidade.', featured: true },
   { id: 'google-drive-plugin', name: 'Google Drive', author: 'Google', icon: 'google-drive', desc: 'Arquivos e pastas compartilhadas.', featured: true },
   { id: 'granola', name: 'Granola', author: 'Granola', icon: 'notion', desc: 'Notas de reunião e resumos.', featured: true }
 ];
@@ -30,18 +30,99 @@ export const BOT_CATALOG = [
 export const CONNECTOR_DISCOVER = [
   { id: 'google-drive', name: 'Google Drive', author: 'Google', icon: 'google-drive', desc: 'Pesquise, leia e envie arquivos na hora.', verified: true, pluginId: 'google-drive-plugin' },
   { id: 'gmail', name: 'Gmail', author: 'Google', icon: 'gmail', desc: 'Caixa de entrada e envio de mensagens.', verified: true, pluginId: 'gmail-plugin' },
-  { id: 'google-calendar', name: 'Google Calendar', author: 'Google', icon: 'gmail', desc: 'Agenda e convites.', verified: true, pluginId: 'google-calendar' },
-  { id: 'canva', name: 'Canva', author: 'Canva', icon: 'figma', desc: 'Designs e exportação de mídia.', verified: true },
-  { id: 'microsoft-365', name: 'Microsoft 365', author: 'Anthropic', icon: 'notion', desc: 'Outlook, Teams e arquivos OneDrive.', verified: true },
+  { id: 'google-calendar', name: 'Google Calendar', author: 'Google', icon: 'google-calendar', desc: 'Agenda e convites.', verified: true, pluginId: 'google-calendar' },
+  { id: 'canva', name: 'Canva', author: 'Canva', icon: 'canva', desc: 'Designs e exportação de mídia.', verified: true },
+  { id: 'microsoft-365', name: 'Microsoft 365', author: 'Microsoft', icon: 'microsoft', desc: 'Outlook, Teams e arquivos OneDrive.', verified: true },
   { id: 'notion', name: 'Notion', author: 'Notion', icon: 'notion', desc: 'Páginas, bases e tarefas.', verified: true },
   { id: 'figma', name: 'Figma', author: 'Figma', icon: 'figma', desc: 'Arquivos, frames e comentários.', verified: true },
   { id: 'slack', name: 'Slack', author: 'Slack', icon: 'slack', desc: 'Canais, mensagens e busca.', verified: true },
-  { id: 'hubspot', name: 'HubSpot', author: 'HubSpot', icon: 'finance', desc: 'CRM e contatos.', verified: true },
-  { id: 'asana', name: 'Asana', author: 'Asana', icon: 'linear', desc: 'Projetos e tarefas.', verified: true },
+  { id: 'hubspot', name: 'HubSpot', author: 'HubSpot', icon: 'hubspot', desc: 'CRM e contatos.', verified: true },
+  { id: 'asana', name: 'Asana', author: 'Asana', icon: 'asana', desc: 'Projetos e tarefas.', verified: true },
   { id: 'linear', name: 'Linear', author: 'Linear', icon: 'linear', desc: 'Issues e ciclos de engenharia.', verified: true, pluginId: 'linear',
     mcp: { name: 'linear', type: 'stdio', command: 'npx', args: ['-y', '@modelcontextprotocol/server-linear'] } },
-  { id: 'monday', name: 'monday.com', author: 'monday.com', icon: 'notion', desc: 'Quadros e automações.', verified: true }
+  { id: 'monday', name: 'monday.com', author: 'monday.com', icon: 'monday', desc: 'Quadros e automações.', verified: true }
 ];
+
+const GOOGLE_DRIVE_TOOLS = ['copy_file', 'get_file_permissions', 'share_file', 'create_file', 'list_recent_files', 'trash_file', 'download_file_content', 'read_file_content', 'update_file', 'get_file_metadata', 'search_files'];
+
+const DETAIL = {
+  'google-drive': {
+    tagline: 'Pesquise, leia e envie arquivos na hora',
+    body: 'Conecte o Google Drive para buscar documentos, ler conteúdo, enviar arquivos e analisar dados com seus agentes — sem sair do Ripper.',
+    tools: GOOGLE_DRIVE_TOOLS,
+    connectorUrl: 'https://drivemcp.googleapis.com/mcp/v1',
+    kind: 'connector'
+  },
+  gmail: {
+    tagline: 'Caixa de entrada e envio na hora',
+    body: 'Leia threads, rascunhe respostas e envie e-mails pelos agentes com contexto da conversa.',
+    tools: ['list_messages', 'read_message', 'send_message', 'search_mail', 'list_labels'],
+    connectorUrl: 'https://gmailmcp.googleapis.com/mcp/v1',
+    kind: 'connector'
+  },
+  slack: {
+    tagline: 'Canais, mensagens e busca',
+    body: 'Publique updates, leia canais e pesquise histórico do Slack nos fluxos dos agentes.',
+    tools: ['post_message', 'list_channels', 'search_messages', 'read_thread'],
+    connectorUrl: 'https://slackmcp.example.com/mcp/v1',
+    kind: 'connector'
+  },
+  vercel: {
+    tagline: 'Deploy, logs e domínios',
+    body: 'Gerencie projetos Vercel, variáveis de ambiente, deployments e observabilidade via MCP.',
+    tools: ['list_projects', 'get_deployment', 'create_deployment', 'list_domains'],
+    connectorUrl: 'stdio://@vercel/mcp-server',
+    kind: 'plugin'
+  },
+  github: {
+    tagline: 'Issues, PRs e repositórios',
+    body: 'Integre GitHub para revisar PRs, issues e CI direto nos agentes.',
+    tools: ['search_repositories', 'create_issue', 'list_pull_requests', 'merge_pull_request'],
+    connectorUrl: 'stdio://@modelcontextprotocol/server-github',
+    kind: 'plugin'
+  }
+};
+
+/** Item unificado para a tela de detalhe antes de instalar. */
+export function marketplaceDetail(id) {
+  const connector = CONNECTOR_DISCOVER.find(c => c.id === id);
+  const plugin = PLUGIN_CATALOG.find(p => p.id === id || p.id === connector?.pluginId);
+  const base = connector || plugin;
+  if (!base) return null;
+  const extra = DETAIL[connector?.id || id] || {};
+  const tools = extra.tools || (plugin?.skills ? ['use_skill', 'list_skills'] : ['connect', 'list_tools']);
+  return {
+    id: connector?.id || plugin.id,
+    installId: plugin?.id || connector?.pluginId || connector?.id,
+    name: base.name,
+    author: base.author,
+    icon: base.icon,
+    verified: base.verified !== false,
+    tagline: extra.tagline || base.desc,
+    body: extra.body || base.desc,
+    tools,
+    connectorUrl: extra.connectorUrl || (plugin?.mcp?.type === 'http' ? plugin.mcp.url : plugin?.mcp ? `stdio://${plugin.mcp.command}` : '—'),
+    mcp: connector?.mcp || plugin?.mcp,
+    pluginId: connector?.pluginId || plugin?.id,
+    kind: extra.kind || (plugin ? 'plugin' : 'connector')
+  };
+}
+
+export function allMarketplaceProducts() {
+  const seen = new Set();
+  const out = [];
+  for (const p of PLUGIN_CATALOG) {
+    if (seen.has(p.id)) continue;
+    seen.add(p.id);
+    out.push({ ...p, productType: 'plugin' });
+  }
+  for (const c of CONNECTOR_DISCOVER) {
+    if (seen.has(c.id)) continue;
+    seen.add(c.id);
+    out.push({ ...c, productType: 'connector' });
+  }
+  return out;
+}
 
 export const PARTNER_SKILLS = [
   { id: 'docs', name: 'docs', provider: 'Vercel', desc: 'por Vercel · Documentação e guias de produto.' },

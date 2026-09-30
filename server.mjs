@@ -18,7 +18,8 @@ import { runClaude, runCodex, systemPrompt } from './lib/providers.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
 import { canUseFile, selectSpeakers, routineDue, mayFallback, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent } from './lib/agent-flow.mjs';
 import { newHookToken, verifySignature, eventMeta } from './lib/hooks.mjs';
-import { recordUsage, usageSummary } from './lib/usage.mjs';
+import { recordUsage, usageSummary, accountLimits, contextBreakdown, checkSendQuota, compactChat } from './lib/usage.mjs';
+import { verifyMcpServer } from './lib/mcp-probe.mjs';
 
 function settingsForMcp(s, mcpSession) {
   if (!mcpSession) return s;
@@ -341,6 +342,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
   const model = (chat.model && chat.model in MODELS ? chat.model : null) || agent.model || s.defaultModel;
   const effort = (chat.effort && chat.effort !== 'auto' ? chat.effort : null) || agent.effort || 'auto';
   const pick = model === 'auto' ? await route(text, history, s, { effort }) : { model, by: 'manual' };
+  const routedBy = pick.by;
   // Sem o CLI do Codex instalado, o Auto nunca o escolhe (evita uma falha e um desvio a cada pedido de código).
   if (pick.model === 'codex' && !(await codexInstalled)) pick.model = 'claude-sonnet-5-5';
   emit({ route: { ...pick, effort } });
@@ -359,7 +361,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
       const gen = MODELS[m].provider === 'codex' ? runCodex({ ...args, cwd: sandboxDir(agent), ctx }) : runClaude({ ...args, model: m, ctx });
       for await (const ev of gen) { if (ev.text) { attempt += ev.text; out += ev.text; } if (ev.tool) steps.push({ tool: ev.tool, detail: ev.detail, at: Date.now() }); emit(ev); }
       push({ model: m, effort });
-      recordUsage(db, m, { charsIn: (text?.length || 0) + (prompt?.length || 0), charsOut: out.length });
+      recordUsage(db, m, { charsIn: (text?.length || 0) + (prompt?.length || 0), charsOut: out.length, routedBy });
       break;
     } catch (e) {
       if (signal?.aborted) { push({ model: m, stopped: true }); break; }
@@ -425,8 +427,29 @@ const routes = [
     settings: redact(db.settings), agents: db.agents, models: MODELS, templates: TEMPLATES, categories: CATEGORIES,
     chats: db.chats.map(summary), routines: db.routines.map(({ hookSecret, ...r }) => ({ ...r, hasSecret: !!hookSecret })),
     files: db.files.map(({ path, ...f }) => f), memoriesCount: db.memories.length, pendingInbox: db.messages.filter(m => m.status === 'queued' || m.status === 'delivering').reduce((o, m) => (o[m.originChatId] = (o[m.originChatId] || 0) + 1, o), {}), approvals: db.approvals.filter(a => a.status === 'pending').map(approvalView), artifacts: db.artifacts.map(({ content, ...a }) => ({ ...a, size: content.length })),     skills: db.skills, memoriesByAgent: db.memories.reduce((o, x) => (o[x.agentId] = (o[x.agentId] || 0) + 1, o), {}), projects: db.projects,
-    usage: usageSummary(db)
+    usage: usageSummary(db),
+    limits: accountLimits(db, db.settings)
   })],
+  ['GET', /^\/api\/usage\/limits$/, () => accountLimits(db, db.settings)],
+  ['GET', /^\/api\/usage\/context$/, (req, _, url) => {
+    const chatId = url.searchParams.get('chatId') || undefined;
+    const mcpToolCount = +(url.searchParams.get('mcpTools') || 0) || (db.settings.plugins?.length || 0) * 8;
+    const skillCount = db.skills?.length || 0;
+    return contextBreakdown(db, db.settings, { chatId, mcpToolCount, skillCount });
+  }],
+  ['POST', /^\/api\/usage\/compact$/, async req => {
+    const b = await body(req);
+    if (!b.chatId) throw new HttpError(400, 'Informe chatId.');
+    const out = compactChat(db, b.chatId);
+    if (!out.ok) throw new HttpError(404, 'Conversa não encontrada.');
+    save();
+    return out;
+  }],
+  ['POST', /^\/api\/mcp\/verify$/, async req => {
+    const b = await body(req);
+    if (!b.url || !/^https:\/\//.test(String(b.url))) throw new HttpError(400, 'URL HTTPS do servidor MCP é obrigatória.');
+    return verifyMcpServer(b.url);
+  }],
   ['PUT', /^\/api\/settings$/, async req => {
     const b = await body(req), s = db.settings;
     if (typeof b.name === 'string') s.name = b.name.slice(0, 80);
@@ -440,9 +463,20 @@ const routes = [
     if (b.chatgpt) s.chatgpt = { useConnectedApps: !!b.chatgpt.useConnectedApps };
     if (b.computer) s.computer = { mode: ['boat', 'docker', 'local', 'off'].includes(b.computer.mode) ? b.computer.mode : s.computer.mode, vmSize: ['small', 'default', 'large'].includes(b.computer.vmSize) ? b.computer.vmSize : 'default', idleStopMinutes: Math.max(1, Math.min(1440, +b.computer.idleStopMinutes || 10)), boatApiKey: b.computer.boatApiKey === '••••' ? s.computer.boatApiKey : String(b.computer.boatApiKey || ''), allowLocalCommands: b.computer.allowLocalCommands === true, dockerImage: /^[\w./:-]{1,120}$/.test(b.computer.dockerImage || '') ? b.computer.dockerImage : (s.computer.dockerImage || 'node:22-bookworm') };
     if (b.julia?.url && /^https?:\/\//.test(b.julia.url)) s.julia = { url: b.julia.url };
-    if (Array.isArray(b.plugins)) s.plugins = b.plugins.filter(p => p?.name && /^[\w-]{1,40}$/.test(p.name)).map(p => p.type === 'http'
-      ? { name: p.name, type: 'http', url: String(p.url), enabled: p.enabled !== false }
-      : { name: p.name, type: 'stdio', command: String(p.command), args: (p.args || []).map(String), enabled: p.enabled !== false });
+    if (Array.isArray(b.plugins)) s.plugins = b.plugins.filter(p => p?.name && /^[\w-]{1,40}$/.test(p.name)).map(p => {
+      const prev = s.plugins.find(x => x.name === p.name);
+      const auth = p.auth && typeof p.auth === 'object' ? {
+        mode: ['oauth_now', 'oauth_lazy', 'none'].includes(p.auth.mode) ? p.auth.mode : 'oauth_lazy',
+        oauthClient: ['published', 'dcr', 'custom'].includes(p.auth.oauthClient) ? p.auth.oauthClient : 'published',
+        clientId: String(p.auth.clientId || '').slice(0, 200),
+        clientSecret: p.auth.clientSecret === '••••' ? (prev?.auth?.clientSecret || '') : String(p.auth.clientSecret || '').slice(0, 500),
+        headers: Array.isArray(p.auth.headers) ? p.auth.headers.slice(0, 4).map(h => ({ name: String(h.name || '').slice(0, 80), value: String(h.value || '').slice(0, 500) })).filter(h => h.name) : undefined
+      } : prev?.auth;
+      const hdr = Array.isArray(p.headers) ? Object.fromEntries(p.headers.slice(0, 4).filter(h => h?.name).map(h => [String(h.name).slice(0, 80), String(h.value || '').slice(0, 500)])) : p.headers;
+      return p.type === 'http'
+        ? { name: p.name, type: 'http', url: String(p.url), enabled: p.enabled !== false, ...(auth ? { auth } : {}), ...(hdr ? { headers: hdr } : {}) }
+        : { name: p.name, type: 'stdio', command: String(p.command), args: (p.args || []).map(String), enabled: p.enabled !== false };
+    });
     save(); return redact(s);
   }],
   ['GET', /^\/api\/artifacts\/([\w-]+)$/, (req, [aid]) => db.artifacts.find(a => a.id === aid) || (() => { throw new HttpError(404, 'Artefato não encontrado.'); })()],
@@ -615,6 +649,8 @@ const routes = [
       db.chats.unshift(c);
     }
     if (activeChats.has(c.id)) throw new HttpError(409, 'Esta conversa já está respondendo. Aguarde ou interrompa a resposta atual.');
+    const quota = checkSendQuota(db);
+    if (quota.blocked) throw new HttpError(429, quota.userMessage);
     activeChats.add(c.id);
     const fileIds = (b.fileIds || []).filter(fid => db.files.some(f => f.id === fid && agentIds.some(a => canUseFile(f, { id: a }, c))));
     for (const fid of fileIds) { const f = db.files.find(x => x.id === fid); if (f && !f.chatId) f.chatId = c.id; }
