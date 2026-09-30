@@ -84,4 +84,19 @@ npm test
 
 Os testes da Julia usam mocks HTTP — não exigem PyTorch nem download do Hugging Face.
 
+## Uso, contexto e cotas (sem números fictícios)
+
+O painel de uso no chat mostra **somente** o que o Ripper mede ou o que você configurar no servidor:
+
+| Sinal | Disponível? |
+| --- | --- |
+| Caracteres/tokens estimados por conversa (mensagens, prompt do agente, conectores MCP) | Sim — estimativa local (~4 chars/token) |
+| Respostas por modelo (`recordUsage`) | Sim |
+| Fatura ou % de plano Anthropic/OpenAI | **Não** — não há API pública de assinatura para esta instalação |
+| Barras “5 h / semanal” estilo Claude | Só se você definir `RIPPER_LIMIT_5H_CHARS` e/ou `RIPPER_LIMIT_WEEK_CHARS` (cotas **Ripper**, não do provedor) |
+| Créditos na nuvem | Só se `RIPPER_CLOUD_CREDITS_USD` estiver definido; `RIPPER_CLOUD_CREDITS_USED` opcional |
+| Bloqueio por cota do provedor | Quando a API devolve rate limit/429; o último evento aparece no painel (`db.usage.providers`) |
+
+Variáveis opcionais: `RIPPER_PLAN_NAME` (rótulo, não altera fatura), `RIPPER_CLOUD_CREDITS_*`, `RIPPER_LIMIT_*`.
+
 Os dados locais ficam em `data/`, que não é enviado ao Git. Ao expor o servidor na rede, configure `RIPPER_TOKEN`. O modo de comandos locais exige ativação explícita em Integrações.

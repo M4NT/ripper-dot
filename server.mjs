@@ -18,7 +18,8 @@ import { runClaude, runCodex, systemPrompt } from './lib/providers.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
 import { canUseFile, selectSpeakers, routineDue, mayFallback, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent } from './lib/agent-flow.mjs';
 import { newHookToken, verifySignature, eventMeta } from './lib/hooks.mjs';
-import { recordUsage, usageSummary, accountLimits, contextBreakdown, checkSendQuota, compactChat } from './lib/usage.mjs';
+import { recordUsage, usageSummary, accountLimits, contextBreakdown, checkSendQuota, compactChat, parseProviderLimitFromError, recordProviderSignal } from './lib/usage.mjs';
+import { ripperBuiltinSchemaChars, listRipperBuiltinToolNames } from './lib/ripper-builtin-tools.mjs';
 import { verifyMcpServer } from './lib/mcp-probe.mjs';
 
 function settingsForMcp(s, mcpSession) {
@@ -365,6 +366,13 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
       break;
     } catch (e) {
       if (signal?.aborted) { push({ model: m, stopped: true }); break; }
+      const prov = MODELS[m].provider;
+      const limitSig = parseProviderLimitFromError(e);
+      if (limitSig) {
+        recordProviderSignal(db, prov, limitSig);
+        save();
+        emit({ quota: { provider: prov, ...limitSig } });
+      }
       emit({ warn: `${MODELS[m].label} falhou: ${e.message}` });
       if (!mayFallback(attempt, m === order.at(-1))) { push({ model: m, error: e.message }); break; }
       emit({ handoff: order[1] });
@@ -433,9 +441,27 @@ const routes = [
   ['GET', /^\/api\/usage\/limits$/, () => accountLimits(db, db.settings)],
   ['GET', /^\/api\/usage\/context$/, (req, _, url) => {
     const chatId = url.searchParams.get('chatId') || undefined;
-    const mcpToolCount = +(url.searchParams.get('mcpTools') || 0) || (db.settings.plugins?.length || 0) * 8;
-    const skillCount = db.skills?.length || 0;
-    return contextBreakdown(db, db.settings, { chatId, mcpToolCount, skillCount });
+    const chat = chatId && db.chats.find(c => c.id === chatId);
+    const agentId = chat?.agentId || chat?.agentIds?.[0];
+    const agent = agentId ? db.agents.find(a => a.id === agentId) : null;
+    const memories = agent ? db.memories.filter(m => m.agentId === agent.id && m.tier === 'profile') : [];
+    const skills = chat ? visibleSkills(chat) : [];
+    const skillsListChars = skills.reduce((n, k) => n + String(k.name).length + String(k.description || '').length, 0);
+    const plugins = (db.settings.plugins || []).filter(p => p.enabled !== false);
+    const pluginsChars = plugins.reduce((n, p) => n + JSON.stringify({ name: p.name, type: p.type, url: p.url, command: p.command }).length, 0);
+    const members = chat ? groupMembers(chat, db.agents) : [];
+    const groupContextChars = members.length > 1
+      ? members.reduce((n, a) => n + String(a.name).length + String(a.description || '').length, 0) : 0;
+    const measures = {
+      systemChars: agent ? systemPrompt(agent, db.settings, memories).length : 0,
+      skillsListChars,
+      pluginsChars,
+      mcpPluginCount: plugins.length,
+      builtinToolCount: agent ? listRipperBuiltinToolNames(agent, db.settings).length : 0,
+      builtinSchemaChars: agent ? ripperBuiltinSchemaChars(agent, db.settings) : 0,
+      groupContextChars
+    };
+    return contextBreakdown(db, db.settings, { chatId, measures });
   }],
   ['POST', /^\/api\/usage\/compact$/, async req => {
     const b = await body(req);
