@@ -345,7 +345,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
       const providerSystem = MODELS[m].provider === 'codex' && s.computer.mode !== 'local'
         ? `${system}\n\nNesta execução do Codex, o computador está em modo somente leitura; não prometa executar comandos nem acessar a VM Boat.` : system;
       const args = { agent, effort, prompt, images, history, system: providerSystem, settings: s, signal };
-      const gen = MODELS[m].provider === 'codex' ? runCodex({ ...args, cwd: sandboxDir(agent) }) : runClaude({ ...args, model: m, ctx });
+      const gen = MODELS[m].provider === 'codex' ? runCodex({ ...args, cwd: sandboxDir(agent), ctx }) : runClaude({ ...args, model: m, ctx });
       for await (const ev of gen) { if (ev.text) { attempt += ev.text; out += ev.text; } if (ev.tool) steps.push({ tool: ev.tool, detail: ev.detail, at: Date.now() }); emit(ev); }
       push({ model: m, effort });
       break;
