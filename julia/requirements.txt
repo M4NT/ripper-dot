@@ -1,0 +1,10 @@
+# Sidecar HTTP (julia/serve.py). Python 3.11+.
+# Depois instale o runtime Julia 1 do Hugging Face (uma vez):
+#   python -m pip install -r julia/requirements.txt
+#   python -c "from huggingface_hub import snapshot_download; snapshot_download('SupersonicLabs/Julia-1', local_dir='julia/Julia-1')"
+#   python -m pip install -e julia/Julia-1
+huggingface_hub==0.29.1
+numpy==1.26.4
+safetensors==0.5.3
+torch==2.6.0
+transformers==5.0.0

@@ -11,7 +11,7 @@ import { route, classifySpeaker, MODELS, EFFORTS } from './lib/router.mjs';
 import { computerFor } from './lib/boat.mjs';
 import { dockerAvailable, imageStatus, ensureImage, hostnameOf } from './lib/docker.mjs';
 import { needsApproval, ApprovalGate } from './lib/approvals.mjs';
-import { juliaOnline, juliaChoose, RISK_OPTIONS, NOTIFY_OPTIONS } from './lib/julia.mjs';
+import { juliaOnline, juliaChoose, juliaStatus, RISK_OPTIONS, NOTIFY_OPTIONS } from './lib/julia.mjs';
 import { checkSend, dueMessages, threadKey, inboxPrompt } from './lib/inbox.mjs';
 import { browserFor, browserRisk } from './lib/browser.mjs';
 import { runClaude, runCodex, systemPrompt } from './lib/providers.mjs';
@@ -454,7 +454,10 @@ const routes = [
     k.updatedAt = Date.now(); save(); return k;
   }],
   ['DELETE', /^\/api\/skills\/([\w-]+)$/, (req, [kid]) => { db.skills = db.skills.filter(k => k.id !== kid); save(); return {}; }],
-  ['GET', /^\/api\/julia\/status$/, async () => ({ online: await juliaOnline(db.settings), url: db.settings.julia.url })],
+  ['GET', /^\/api\/julia\/status$/, async () => {
+    const online = await juliaOnline(db.settings);
+    return { online, url: db.settings.julia.url, reason: online ? 'ok' : (juliaStatus.reason || 'offline') };
+  }],
   ['GET', /^\/api\/computer\/docker$/, async () => ({ version: await dockerAvailable(), image: await imageStatus() })],
   ['POST', /^\/api\/computer\/image$/, async () => { ensureImage().catch(e => console.error('imagem', e.message)); return { image: await imageStatus() }; }],
   ['GET', /^\/api\/agents\/([\w-]+)\/vnc$/, async (req, [aid]) => {

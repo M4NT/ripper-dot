@@ -11,6 +11,7 @@
     "dev:server": "node --watch server.mjs",
     "dev:web": "vite",
     "julia": "python julia/serve.py",
+    "julia:dry": "python julia/serve.py --dry-run",
     "prod": "vite build && node server.mjs"
   },
   "dependencies": {
