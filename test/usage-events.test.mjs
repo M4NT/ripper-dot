@@ -78,3 +78,31 @@ test('ring buffer mantém no máximo USAGE_EVENTS_MAX eventos', () =>
     }
     assert.equal(countUsageEvents(), USAGE_EVENTS_MAX);
   }));
+
+test('usage.sqlite abre com WAL e busy_timeout', () =>
+  withUsageDataDir(async () => {
+    const { getUsageEventsSqlitePragmas, appendUsageEvent } = await import('../lib/usage-events.mjs');
+    appendUsageEvent({ at: Date.now(), model: 'codex', charsIn: 1, charsOut: 0 });
+    const pragmas = getUsageEventsSqlitePragmas();
+    assert.equal(pragmas.journalMode, 'wal');
+    assert.equal(pragmas.synchronous, 1);
+    assert.equal(pragmas.busyTimeout, 5000);
+  }));
+
+test('appendUsageEvent concorrente não corrompe nem perde além do ring', () =>
+  withUsageDataDir(async () => {
+    const { appendUsageEvent, countUsageEvents, listAllUsageEvents, USAGE_EVENTS_MAX } = await import('../lib/usage-events.mjs');
+    const base = Date.now();
+    const total = 120;
+    await Promise.all(Array.from({ length: total }, (_, i) =>
+      Promise.resolve().then(() =>
+        appendUsageEvent({ at: base + i, model: 'codex', charsIn: i, charsOut: 0 })
+      )
+    ));
+    const expected = Math.min(total, USAGE_EVENTS_MAX);
+    assert.equal(countUsageEvents(), expected);
+    const events = listAllUsageEvents();
+    assert.equal(events.length, expected);
+    const ids = new Set(events.map(e => e.charsIn));
+    assert.equal(ids.size, expected);
+  }));
