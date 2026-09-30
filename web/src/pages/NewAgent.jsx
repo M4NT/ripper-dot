@@ -73,11 +73,11 @@ export default function NewAgent() {
           <Section n="1" title="Comece por um modelo" hint="Um ponto de partida preenche tudo. Dá para mudar qualquer coisa depois.">
             <div className="na-templates">
               <button type="button" className={`na-tpl ${!v.templateId ? 'on' : ''}`} onClick={() => applyTemplate(null)}>
-                <span className="na-tpl-ico"><Icon name="plus" size={18} /></span><b>Do zero</b>
+                <span className="na-tpl-ico"><Icon name="plus" size={18} /></span><span className="na-tpl-text"><b>Do zero</b><small>Em branco</small></span>
               </button>
               {S.templates.map(t => (
                 <button type="button" key={t.id} className={`na-tpl ${v.templateId === t.id ? 'on' : ''}`} onClick={() => applyTemplate(t)} title={t.description}>
-                  <BotAvatar type={t.avatar.type} size={30} paused interactive={false} theme={dark ? 'dark' : 'light'} /><b>{t.name}</b>
+                  <BotAvatar type={t.avatar.type} size={30} paused interactive={false} theme={dark ? 'dark' : 'light'} /><span className="na-tpl-text"><b>{t.name}</b><small>{t.category}</small></span>
                 </button>
               ))}
             </div>
@@ -162,7 +162,7 @@ export default function NewAgent() {
         <aside className="na-preview" aria-label="Prévia do agente">
           <p className="na-label">Prévia</p>
           <div className="na-card">
-            <div className="na-card-stage"><AgentAvatar agent={{ ...v, status: 'online' }} size={112} interactive /></div>
+            <div className="na-card-stage"><AgentAvatar agent={{ ...v, status: 'online' }} size={112} interactive animate /></div>
             <h3>{v.name || 'Sem nome'}</h3>
             <p>{v.description || 'Descreva o que ele faz.'}</p>
             <div className="na-card-tools">

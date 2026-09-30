@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useApp } from '../app.jsx';
 import { AgentAvatar, Icon, EmptyState, useConfirm, Select } from '../ui.jsx';
 import { api, fmtAgo } from '../lib.js';
+import ChatRow from '../chatRow.jsx';
 
 export default function Chats() {
   const { S, agent, refresh, toast } = useApp();
@@ -38,21 +39,7 @@ export default function Chats() {
       {groups.map(([g, list]) => (
         <section key={g} className="chat-group">
           <h2 className="group-label">{g}</h2>
-          <ul className="chat-rows">
-            {list.map(c => {
-              const a = agent(c.agentId);
-              return (
-                <li key={c.id}>
-                  <a href={`#/c/${c.id}`} className="chat-row">
-                    {a ? <AgentAvatar agent={a} size={32} /> : <span className="initial"><Icon name="chat" size={16} /></span>}
-                    <span className="chat-row-text"><b>{c.routineId && <Icon name="clock" size={14} />}{c.title}</b><small>{a?.name || 'Agente excluído'} · {c.preview || 'Sem mensagens'}</small></span>
-                    <time>{fmtAgo(c.updatedAt || c.createdAt)}</time>
-                  </a>
-                  <button className="icon-btn sm row-del" onClick={() => remove(c)} aria-label={`Apagar ${c.title}`}><Icon name="trash" size={16} /></button>
-                </li>
-              );
-            })}
-          </ul>
+          <ul className="crows">{list.map(ch => <ChatRow key={ch.id} c={ch} showProject />)}</ul>
         </section>
       ))}
       {confirmNode}

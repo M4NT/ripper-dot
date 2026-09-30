@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../app.jsx';
 import { api, go, useRoute, fmtSize, fmtAgo } from '../lib.js';
-import { AgentAvatar, Icon, Segmented, StatusDot, EmptyState, useConfirm, Select } from '../ui.jsx';
+import { AgentAvatar, Icon, Segmented, StatusDot, EmptyState, useConfirm, Select, Switch } from '../ui.jsx';
 import { Basics, Behavior, Tools, Appearance, ModelPick } from '../agentForm.jsx';
 import { uploadFile } from '../composer.jsx';
 
@@ -35,32 +35,48 @@ function Knowledge({ agent }) {
 
 function Routines({ agent }) {
   const { S, refresh, toast } = useApp();
-  const [f, setF] = useState({ name: '', prompt: '', kind: 'daily', when: '08:00', weekday: '' });
+  const blank = { name: '', prompt: '', kind: 'daily', when: '08:00', weekday: '', quiet: true, secret: '' };
+  const [f, setF] = useState(blank);
   const list = S.routines.filter(r => r.agentId === agent.id);
   const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const hookUrl = r => `${location.origin}/api/hooks/${r.hookToken}`;
+  const STATUS = { running: 'Em andamento', succeeded: 'Com novidade', failed: 'Falhou', quiet: 'Sem novidade (silenciosa)', never: 'Ainda não rodou' };
   async function add() {
     if (!f.prompt.trim()) return toast('Diga o que a rotina deve fazer.', 'error');
-    await api('/api/routines', { method: 'POST', body: { agentId: agent.id, name: f.name || 'Rotina', prompt: f.prompt, ...(f.kind === 'every' ? { everyMinutes: +f.when || 60 } : { dailyAt: f.when, weekday: f.weekday === '' ? undefined : +f.weekday }) } });
-    setF({ name: '', prompt: '', kind: 'daily', when: '08:00', weekday: '' }); refresh(); toast('Rotina criada');
+    const when = f.kind === 'webhook' ? { trigger: 'webhook', hookSecret: f.secret || undefined }
+      : f.kind === 'every' ? { everyMinutes: +f.when || 60 } : { dailyAt: f.when, weekday: f.weekday === '' ? undefined : +f.weekday };
+    await api('/api/routines', { method: 'POST', body: { agentId: agent.id, name: f.name || 'Rotina', prompt: f.prompt, quiet: f.quiet, ...when } });
+    setF(blank); refresh(); toast(f.kind === 'webhook' ? 'Rotina criada. Copie o endereço do webhook na lista.' : 'Rotina criada');
   }
   return <>
-    <p className="muted">Rotinas deixam {agent.name} agir sozinho num horário. Cada execução abre uma conversa nova.{agent.status === 'paused' && ' Com o agente pausado, elas não rodam.'}</p>
+    <p className="muted">Rotinas acordam {agent.name} num horário ou quando chega um evento (GitHub, formulário, qualquer sistema). Com “só avisar se houver novidade”, execuções sem resultado relevante não deixam conversa.{agent.status === 'paused' && ' Com o agente pausado, elas não rodam.'}</p>
     {list.length > 0 && <ul className="rows">{list.map(r => (
-      <li key={r.id} className="row-item"><span className="thumb file-ico"><Icon name="clock" size={18} /></span>
-        <div className="row-main"><b>{r.name}</b><small>{r.everyMinutes ? `A cada ${r.everyMinutes} min` : `${r.weekday != null ? days[r.weekday] + ', ' : 'Todo dia, '}${r.dailyAt}`} · {r.prompt}</small>{r.lastRun > 0 && <small>Última execução: {fmtAgo(r.lastRun)} · {{ running: 'Em andamento', succeeded: 'Concluída', failed: 'Falhou' }[r.lastStatus] || 'Sem resultado'}{r.lastError ? ` · ${r.lastError}` : ''}</small>}</div>
-        <button type="button" className="icon-btn sm" aria-label={`Remover ${r.name}`} onClick={() => api(`/api/routines/${r.id}`, { method: 'DELETE' }).then(refresh)}><Icon name="trash" size={16} /></button></li>
+      <li key={r.id} className="row-item routine-row">
+        <span className="thumb file-ico"><Icon name={r.trigger === 'webhook' ? 'plug' : 'clock'} size={18} /></span>
+        <div className="row-main">
+          <b>{r.name}{r.quiet !== false && <span className="tag">só novidades</span>}</b>
+          <small>{r.trigger === 'webhook' ? `Quando chegar um evento${r.hasSecret ? ' · assinatura verificada' : ''}` : r.everyMinutes ? `A cada ${r.everyMinutes} min` : `${r.weekday != null ? days[r.weekday] + ', ' : 'Todo dia, '}${r.dailyAt}`} · {r.prompt}</small>
+          {r.trigger === 'webhook' && (
+            <div className="hook-url"><code>{hookUrl(r)}</code><button type="button" className="btn btn-sm" onClick={() => { navigator.clipboard.writeText(hookUrl(r)); toast('Endereço copiado'); }}><Icon name="copy" size={13} />Copiar</button></div>
+          )}
+          {r.lastRun > 0 && <small>Última execução: {fmtAgo(r.lastRun)} · {STATUS[r.lastStatus] || 'Sem resultado'}{r.lastError ? ` · ${r.lastError}` : ''}{r.lastChatId && r.lastStatus !== 'quiet' && <> · <a className="link" href={`#/c/${r.lastChatId}`}>ver resultado</a></>}</small>}
+        </div>
+        <button type="button" className="icon-btn sm" aria-label={`Remover ${r.name}`} onClick={() => api(`/api/routines/${r.id}`, { method: 'DELETE' }).then(refresh)}><Icon name="trash" size={16} /></button>
+      </li>
     ))}</ul>}
     <div className="card-form">
       <h3 className="sub">Nova rotina</h3>
-      <label className="field">Nome<input value={f.name} onChange={e => setF({ ...f, name: e.target.value })} placeholder="Resumo de IA" /></label>
-      <label className="field">O que fazer<textarea rows={3} value={f.prompt} onChange={e => setF({ ...f, prompt: e.target.value })} placeholder="Pesquise as notícias de IA de hoje e me mande um resumo." /></label>
-      <div className="row">
-        <Select label="Frequência" value={f.kind} onChange={kind => setF({ ...f, kind, when: kind === 'every' ? '60' : '08:00' })}
-          options={[{ value: 'daily', label: 'No horário' }, { value: 'every', label: 'A cada N minutos' }]} />
+      <label className="field">Nome<input value={f.name} onChange={e => setF({ ...f, name: e.target.value })} placeholder={f.kind === 'webhook' ? 'Revisar PRs' : 'Resumo de IA'} /></label>
+      <label className="field">O que fazer<textarea rows={3} value={f.prompt} onChange={e => setF({ ...f, prompt: e.target.value })} placeholder={f.kind === 'webhook' ? 'Leia o evento. Se for um PR novo, resuma as mudanças e aponte riscos.' : 'Pesquise as notícias de IA de hoje e me mande um resumo.'} /></label>
+      <div className="row wrap-row">
+        <Select label="Quando" value={f.kind} onChange={kind => setF({ ...f, kind, when: kind === 'every' ? '60' : '08:00' })}
+          options={[{ value: 'daily', label: 'No horário', icon: <Icon name="clock" size={15} /> }, { value: 'every', label: 'A cada N minutos', icon: <Icon name="retry" size={15} /> }, { value: 'webhook', label: 'Quando chegar um evento', hint: 'Webhook: GitHub, formulários, qualquer sistema', icon: <Icon name="plug" size={15} /> }]} />
         {f.kind === 'daily' && <Select label="Dia" value={f.weekday} onChange={weekday => setF({ ...f, weekday })}
           options={[{ value: '', label: 'Todo dia' }, ...days.map((d, i) => ({ value: String(i), label: d }))]} />}
-        <input className="input narrow-input" type={f.kind === 'daily' ? 'time' : 'number'} min={5} value={f.when} onChange={e => setF({ ...f, when: e.target.value })} aria-label={f.kind === 'daily' ? 'Horário' : 'Minutos'} />
+        {f.kind !== 'webhook' && <input className="input narrow-input" type={f.kind === 'daily' ? 'time' : 'number'} min={5} value={f.when} onChange={e => setF({ ...f, when: e.target.value })} aria-label={f.kind === 'daily' ? 'Horário' : 'Minutos'} />}
       </div>
+      {f.kind === 'webhook' && <label className="field">Segredo do webhook (opcional)<input value={f.secret} onChange={e => setF({ ...f, secret: e.target.value })} placeholder="O mesmo “Secret” configurado no GitHub" /><small>Com segredo, eventos sem a assinatura correta (X-Hub-Signature-256) são recusados.</small></label>}
+      <label className="switch-row"><span><b>Só avisar se houver novidade</b><small>Sem nada relevante, a execução não deixa conversa nem notificação.</small></span><Switch checked={f.quiet} onChange={quiet => setF({ ...f, quiet })} label="Só avisar se houver novidade" /></label>
       <button type="button" className="btn btn-primary" onClick={add}><Icon name="plus" size={16} />Criar rotina</button>
     </div>
   </>;
@@ -105,7 +121,7 @@ export default function AgentConfig({ id }) {
         <button className="btn btn-primary" disabled={!dirty || saving} onClick={save}>{saving ? 'Salvando…' : 'Salvar alterações'}</button>
       </header>
       <div className="config-hero">
-        <AgentAvatar agent={{ ...agent, ...v }} size={80} interactive />
+        <AgentAvatar agent={{ ...agent, ...v }} size={80} interactive animate />
         <div><h1>{v.name || 'Sem nome'}</h1><StatusDot status={v.status} /><p className="lede">{v.description || 'Sem descrição.'}</p></div>
       </div>
       <Segmented label="Seções" value={tab} onChange={setTab} items={TABS} className="seg-scroll config-tabs" />

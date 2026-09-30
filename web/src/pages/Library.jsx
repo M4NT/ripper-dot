@@ -4,11 +4,64 @@ import { AgentAvatar, Icon, Segmented, EmptyState } from '../ui.jsx';
 import { api, fmtSize, fmtAgo } from '../lib.js';
 
 import FileThumb from '../fileThumb.jsx';
+import { ArtifactList } from '../actions.jsx';
+import { SkillList } from '../skills.jsx';
 const isImage = t => /^image\/(png|jpe?g|webp|gif)$/.test(t);
+
+/** Memória em dois níveis: perfil (estável, sempre no contexto) e registro (datado, só o recente entra). */
+function MemoryTiers({ memories, setMemories }) {
+  const { agent, refresh, toast } = useApp();
+  const [tier, setTier] = useState('profile');
+  if (!memories) return <p className="muted pad">Carregando…</p>;
+  const tierOf = m => m.tier || 'profile';
+  const list = memories.filter(m => tierOf(m) === tier);
+  const move = async m => {
+    const to = tierOf(m) === 'profile' ? 'log' : 'profile';
+    await api(`/api/memories/${m.id}`, { method: 'PUT', body: { tier: to } });
+    setMemories(ms => ms.map(x => x.id === m.id ? { ...x, tier: to } : x));
+    toast(to === 'profile' ? 'Movida para o perfil' : 'Movida para o registro');
+  };
+  return <>
+    <div className="mem-head">
+      <Segmented label="Nível da memória" value={tier} onChange={setTier} size="sm" items={[['profile', 'Perfil', memories.filter(m => tierOf(m) === 'profile').length], ['log', 'Registro', memories.filter(m => m.tier === 'log').length]]} />
+      <p className="muted small">{tier === 'profile' ? 'Fatos estáveis sobre você. Entram em toda conversa.' : 'Anotações datadas do que aconteceu. Só as mais recentes entram no contexto (ajuste em Configurações → Memória).'}</p>
+    </div>
+    {list.length === 0 ? <EmptyState title={tier === 'profile' ? 'Nenhum fato no perfil' : 'Nenhum registro'} body="Diga “lembre que…” numa conversa com um agente que tenha memória ligada." /> :
+      <ul className="rows">{list.map(m => (
+        <li key={m.id} className="row-item">
+          <AgentAvatar agent={agent(m.agentId)} size={28} paused />
+          <div className="row-main"><b className="wrap">{m.text}</b><small>{agent(m.agentId)?.name} · {tier === 'log' ? new Date(m.createdAt).toLocaleDateString('pt-BR') : fmtAgo(m.createdAt)}</small></div>
+          <button className="btn btn-sm" onClick={() => move(m)} title={tier === 'profile' ? 'Virar anotação datada' : 'Tornar fato estável'}>{tier === 'profile' ? 'Mover p/ registro' : 'Mover p/ perfil'}</button>
+          <button className="icon-btn sm" aria-label="Esquecer" onClick={() => api(`/api/memories/${m.id}`, { method: 'DELETE' }).then(() => { setMemories(ms => ms.filter(x => x.id !== m.id)); refresh(); toast('Memória esquecida'); })}><Icon name="trash" size={16} /></button>
+        </li>
+      ))}</ul>}
+  </>;
+}
+
+const STATUS = { queued: 'Na fila', delivering: 'Entregando', delivered: 'Respondida', failed: 'Falhou' };
+const PRIO = { now: 'urgente', normal: 'normal', low: 'sem pressa' };
+function MessageLog() {
+  const { agent } = useApp();
+  const [list, setList] = useState(null);
+  useEffect(() => { const load = () => api('/api/messages').then(setList).catch(() => setList([])); load(); const t = setInterval(load, 5000); return () => clearInterval(t); }, []);
+  if (!list) return <p className="muted pad">Carregando…</p>;
+  if (!list.length) return <EmptyState title="Nenhuma mensagem entre agentes" body="Quando um agente pedir algo a um colega (send_message), a troca aparece aqui." />;
+  return (
+    <ul className="rows">{list.map(m => (
+      <li key={m.id} className="row-item msg-log">
+        <span className="msg-pair"><AgentAvatar agent={agent(m.from)} size={24} paused /><Icon name="arrowR" size={13} /><AgentAvatar agent={agent(m.to)} size={24} paused /></span>
+        <div className="row-main"><b>{m.fromName} → {m.toName}</b><small>{m.body}</small></div>
+        <span className={`tag msg-st ${m.status}`}>{STATUS[m.status] || m.status} · {PRIO[m.priority]}</span>
+        <small className="muted">{fmtAgo(m.createdAt)}</small>
+        {m.threadChatId && <a className="icon-btn sm" href={`#/c/${m.threadChatId}`} aria-label="Abrir a troca"><Icon name="chat" size={15} /></a>}
+      </li>
+    ))}</ul>
+  );
+}
 
 export default function Library() {
   const { S, agent, refresh, toast } = useApp();
-  const [tab, setTab] = useState('files');
+  const [tab, setTab] = useState('artifacts');
   const [memories, setMemories] = useState(null);
   useEffect(() => {
     if (tab !== 'memories') return;
@@ -20,8 +73,8 @@ export default function Library() {
 
   return (
     <div className="page narrow">
-      <header className="page-head"><div><h1>Biblioteca</h1><p className="lede">Tudo o que seus agentes guardam: arquivos, memórias e rotinas.</p></div></header>
-      <Segmented label="Seção" value={tab} onChange={setTab} items={[['files', 'Arquivos', files.length], ['memories', 'Memórias', S.memoriesCount], ['routines', 'Rotinas', routines.length]]} />
+      <header className="page-head"><div><h1>Biblioteca</h1><p className="lede">Tudo o que seus agentes guardam e compartilham: artefatos, skills, arquivos, memórias e rotinas.</p></div></header>
+      <Segmented label="Seção" value={tab} onChange={setTab} items={[['artifacts', 'Artefatos', S.artifacts.length], ['skills', 'Skills', S.skills.length], ['messages', 'Mensagens'], ['files', 'Arquivos', files.length], ['memories', 'Memórias', S.memoriesCount], ['routines', 'Rotinas', routines.length]]} className="seg-scroll" />
       <div className="library">
         {tab === 'files' && (files.length === 0 ? <EmptyState title="Nenhum arquivo" body="Anexe arquivos numa conversa: eles aparecem aqui e ficam no computador do agente." /> :
           <ul className="rows">{files.map(f => (
@@ -32,14 +85,10 @@ export default function Library() {
               <button className="icon-btn sm" aria-label={`Remover ${f.name}`} onClick={() => api(`/api/files/${f.id}`, { method: 'DELETE' }).then(() => { refresh(); toast('Arquivo removido'); })}><Icon name="trash" size={16} /></button>
             </li>
           ))}</ul>)}
-        {tab === 'memories' && (!memories ? <p className="muted pad">Carregando…</p> : memories.length === 0 ? <EmptyState title="Nenhuma memória" body="Diga “lembre que…” numa conversa com um agente que tenha memória ligada." /> :
-          <ul className="rows">{memories.map(m => (
-            <li key={m.id} className="row-item">
-              <AgentAvatar agent={agent(m.agentId)} size={28} />
-              <div className="row-main"><b className="wrap">{m.text}</b><small>{agent(m.agentId)?.name} · {fmtAgo(m.createdAt)}</small></div>
-              <button className="icon-btn sm" aria-label="Esquecer" onClick={() => api(`/api/memories/${m.id}`, { method: 'DELETE' }).then(() => { setMemories(ms => ms.filter(x => x.id !== m.id)); refresh(); toast('Memória esquecida'); })}><Icon name="trash" size={16} /></button>
-            </li>
-          ))}</ul>)}
+        {tab === 'memories' && <MemoryTiers memories={memories} setMemories={setMemories} />}
+        {tab === 'artifacts' && <ArtifactList items={S.artifacts} empty="Nenhum artefato ainda. Numa conversa, peça: “salve isso como artefato”." />}
+        {tab === 'skills' && <SkillList />}
+        {tab === 'messages' && <MessageLog />}
         {tab === 'routines' && (routines.length === 0 ? <EmptyState title="Nenhuma rotina" body="Crie nas configurações de um agente ou peça no chat: “todo dia às 9, me mande…”." /> :
           <ul className="rows">{routines.map(r => (
             <li key={r.id} className="row-item">

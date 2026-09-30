@@ -1,0 +1,3 @@
+# Scripts e Dockerfile rodam no Linux do contêiner: sempre LF.
+*.sh text eol=lf
+Dockerfile text eol=lf

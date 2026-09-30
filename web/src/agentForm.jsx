@@ -74,7 +74,7 @@ export function Tools({ v, set }) {
 export function Appearance({ v, set }) {
   const dark = useDark();
   return <>
-    <div className="appearance-stage"><AgentAvatar agent={{ ...v, status: 'online' }} size={120} interactive /></div>
+    <div className="appearance-stage"><AgentAvatar agent={{ ...v, status: 'online' }} size={120} interactive animate /></div>
     <div className="field"><span>Forma</span>
       <div className="avatar-grid" role="radiogroup" aria-label="Forma">
         {TYPES.map(t => (

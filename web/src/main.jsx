@@ -2,6 +2,8 @@ import { StrictMode, Component } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './app.jsx';
 import './styles.css';
+import { restoreWidths } from './resize.jsx';
+restoreWidths();
 
 // Última linha de defesa: um erro de tela nunca vira página em branco.
 class Guard extends Component {

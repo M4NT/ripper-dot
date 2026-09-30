@@ -4,6 +4,8 @@ import { api, go, fmtAgo, fmtSize } from '../lib.js';
 import { AgentAvatar, Icon, Segmented, EmptyState, useConfirm, StatusDot } from '../ui.jsx';
 import { AgentPicker } from './Projects.jsx';
 import { uploadFile } from '../composer.jsx';
+import ChatRow from '../chatRow.jsx';
+import { ArtifactList } from '../actions.jsx';
 
 export default function Project({ id }) {
   const { S, agent, refresh, toast } = useApp();
@@ -19,6 +21,7 @@ export default function Project({ id }) {
   const members = p.agentIds.map(agent).filter(Boolean);
   const chats = S.chats.filter(c => c.projectId === p.id).sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
   const files = S.files.filter(f => f.projectId === p.id);
+  const arts = S.artifacts.filter(a => a.projectId === p.id);
   const save = async patch => { try { await api(`/api/projects/${p.id}`, { method: 'PUT', body: patch }); await refresh(); } catch (e) { toast(e.message, 'error'); } };
   const startGroup = ids => ids.length < 2 ? toast('Escolha pelo menos dois agentes.', 'error') : go(`/p/${p.id}/new?agents=${ids.join(',')}`);
   const startSolo = aid => go(`/p/${p.id}/new?agents=${aid}`);
@@ -56,7 +59,7 @@ export default function Project({ id }) {
       </header>
 
       <Segmented label="Seções do projeto" value={tab} onChange={setTab} className="seg-scroll"
-        items={[['chats', 'Conversas', chats.length], ['team', 'Agentes', members.length], ['files', 'Arquivos', files.length], ['instructions', 'Instruções'], ['settings', 'Ajustes']]} />
+        items={[['chats', 'Conversas', chats.length], ['artifacts', 'Artefatos', arts.length], ['team', 'Agentes', members.length], ['files', 'Arquivos', files.length], ['instructions', 'Instruções'], ['settings', 'Ajustes']]} />
 
       <div className="project-body">
         {tab === 'chats' && <>
@@ -73,16 +76,12 @@ export default function Project({ id }) {
           )}
           {chats.length === 0
             ? <EmptyState title="Nenhuma conversa no projeto" body={members.length ? 'Fale com um agente sozinho ou com o time inteiro. Instruções e arquivos do projeto entram no contexto de todos.' : 'Adicione agentes ao projeto na aba Agentes.'} />
-            : <ul className="chat-rows">{chats.map(c => {
-              const ids = c.agentIds || [c.agentId];
-              return (
-                <li key={c.id}><a href={`#/c/${c.id}`} className="chat-row">
-                  <span className="avatar-stack">{ids.slice(0, 3).map(i => agent(i) && <AgentAvatar key={i} agent={agent(i)} size={24} paused />)}</span>
-                  <span className="chat-row-text"><b>{ids.length > 1 && <span className="tag">grupo</span>}{c.title}</b><small>{ids.map(i => agent(i)?.name).filter(Boolean).join(', ')} · {c.preview || 'Sem mensagens'}</small></span>
-                  <time>{fmtAgo(c.updatedAt || c.createdAt)}</time>
-                </a></li>
-              );
-            })}</ul>}
+            : <ul className="crows">{chats.map(c => <ChatRow key={c.id} c={c} />)}</ul>}
+        </>}
+
+        {tab === 'artifacts' && <>
+          <p className="muted">Entregas que os agentes salvaram neste projeto: roteiros, planos, textos finais. Todos os agentes do projeto podem ler e melhorar.</p>
+          <ArtifactList items={arts} empty="Nenhum artefato ainda. Numa conversa do projeto, peça: “salve isso como artefato”." />
         </>}
 
         {tab === 'team' && <>

@@ -60,6 +60,7 @@ export function fmtAgo(t) {
 /* ---------- ferramentas: rótulos humanos ---------- */
 export const TOOL_INFO = {
   web: { label: 'Pesquisa na web', icon: 'globe', desc: 'Busca e lê páginas, com as fontes.' },
+  browser: { label: 'Navegador', icon: 'compass', desc: 'Abre sites no computador dele; você vê a tela ao vivo. Precisa do modo Docker.' },
   computer: { label: 'Computador', icon: 'terminal', desc: 'VM própria: instala pacotes, roda código, compartilha links.' },
   memory: { label: 'Memória', icon: 'brain', desc: 'Guarda o que importa entre conversas.' },
   routines: { label: 'Rotinas', icon: 'clock', desc: 'Age sozinho em horários definidos.' },
@@ -68,10 +69,22 @@ export const TOOL_INFO = {
 };
 export const STEP_LABEL = {
   computer_exec: 'Rodando no computador', computer_share: 'Gerando link', WebSearch: 'Pesquisando na web', WebFetch: 'Lendo página',
-  remember: 'Guardando na memória', schedule_routine: 'Criando rotina'
+  remember: 'Guardando na memória', schedule_routine: 'Criando rotina',
+  browser_open: 'Abrindo página', browser_click: 'Clicando', browser_type: 'Digitando', browser_scroll: 'Rolando a página', browser_read: 'Lendo a página',
+  send_message: 'Mandando mensagem', save_artifact: 'Salvando artefato', read_artifact: 'Lendo artefato', use_skill: 'Usando skill', save_skill: 'Guardando skill'
 };
 export const TONES = [['direto', 'Direto'], ['amigavel', 'Amigável'], ['formal', 'Formal'], ['tecnico', 'Técnico']];
 
 /** Tema efetivo ('light' | 'dark'), reagindo a mudanças do atributo data-theme. */
 const themeSub = cb => { const mo = new MutationObserver(cb); mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] }); return () => mo.disconnect(); };
 export const useDark = () => useSyncExternalStore(themeSub, () => document.documentElement.dataset.theme === 'dark');
+
+/** Cor do nome de um agente, legível no fundo claro e no escuro. */
+export function nameColor(agent, palette) {
+  const c = agent?.avatar?.color || palette?.[agent?.avatar?.type];
+  const m = /^#?([0-9a-f]{6})$/i.exec(c || '');
+  if (!m) return 'var(--ink-2)';
+  const n = parseInt(m[1], 16), r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255;
+  const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  return lum > 0.72 || lum < 0.18 ? 'var(--ink-2)' : c;
+}

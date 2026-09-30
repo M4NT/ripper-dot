@@ -56,11 +56,17 @@ export function Icon({ name, size = 18, className = '', ...rest }) {
 
 /* ---------- avatar do agente (bot-avatars) ---------- */
 // Sombreamento "plastic" é por pixel: só vale a pena em avatares grandes. Os pequenos usam "smooth".
-export function AgentAvatar({ agent, size = 40, state, interactive = false, ...rest }) {
+export function AgentAvatar({ agent, size = 40, state, interactive = false, animate = false, paused, ...rest }) {
   if (!agent) return null;
   const st = state || (agent.status === 'paused' ? 'sleeping' : 'default');
-  return <BotAvatar type={agent.avatar?.type || 'circle'} color={agent.avatar?.color || undefined} face={agent.avatar?.face || 'eyes'}
-    size={size} state={st} interactive={interactive} shading={size >= 56 ? 'plastic' : 'smooth'} aria-label={`${agent.name}${st === 'working' ? ', trabalhando' : st === 'sleeping' ? ', pausado' : ''}`} {...rest} />;
+  const still = paused ?? !(st === 'working' || animate);
+  return (
+    <span className="av-box" style={{ width: size, height: size }}>
+      <BotAvatar type={agent.avatar?.type || 'circle'} color={agent.avatar?.color || undefined} face={agent.avatar?.face || 'eyes'}
+        size={size} state={st} interactive={interactive && !still} paused={still} shading={size >= 56 ? 'plastic' : 'smooth'}
+        aria-label={`${agent.name}${st === 'working' ? ', trabalhando' : st === 'sleeping' ? ', pausado' : ''}`} {...rest} />
+    </span>
+  );
 }
 
 /* ---------- abas com indicador líquido (liquid-gooey, efeito move) ---------- */

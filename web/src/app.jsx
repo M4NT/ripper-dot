@@ -1,8 +1,13 @@
 import { createContext, lazy as reactLazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
 import { api, go, useRoute, useTheme, useMediaQuery, fmtAgo, local } from './lib.js';
-import { Icon, AgentAvatar, ToastProvider, useToast, Dialog } from './ui.jsx';
+import { Icon, AgentAvatar, ToastProvider, useToast, Dialog, Menu, MenuItem } from './ui.jsx';
 import Home from './pages/Home.jsx';
+import { OverlayProvider } from './overlay.jsx';
+import ChatAvatar, { isGroupChat } from './chatAvatar.jsx';
+import { useChatMenu } from './actions.jsx';
+import { ApprovalTray } from './approvals.jsx';
+import { ResizeHandle } from './resize.jsx';
 import Chat from './pages/Chat.jsx';
 
 // Telas fora do caminho principal carregam sob demanda. Se o build mudou desde que a aba abriu,
@@ -29,7 +34,8 @@ export const useApp = () => useContext(Ctx);
 function Provider({ children }) {
   const [S, setS] = useState(null);
   const [error, setError] = useState(null);
-  const [busy, setBusy] = useState({}); // agentId -> true enquanto responde
+  const [busy, setBusy] = useState({}); // agentId -> true enquanto responde (em alguma conversa)
+  const [busyChats, setBusyChats] = useState({}); // chatId -> true: só esta conversa anima
   const toast = useToast();
   const refresh = useCallback(async () => {
     try { setS(await api('/api/state')); setError(null); }
@@ -39,10 +45,10 @@ function Provider({ children }) {
   // Rotinas criam conversas no servidor: atualiza ao voltar para a aba.
   useEffect(() => { const f = () => document.visibilityState === 'visible' && refresh(); document.addEventListener('visibilitychange', f); return () => document.removeEventListener('visibilitychange', f); }, [refresh]);
   const value = useMemo(() => S && {
-    S, refresh, toast, busy, setBusy,
+    S, refresh, toast, busy, setBusy, busyChats, setBusyChats,
     agent: id => S.agents.find(a => a.id === id),
     updateAgent: async (id, patch) => { const a = await api(`/api/agents/${id}`, { method: 'PUT', body: patch }); setS(s => ({ ...s, agents: s.agents.map(x => x.id === id ? a : x) })); return a; }
-  }, [S, refresh, toast, busy]);
+  }, [S, refresh, toast, busy, busyChats]);
   if (error && !S) return <Boot error={error} retry={refresh} />;
   if (!value) return <Boot />;
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
@@ -59,58 +65,22 @@ function Boot({ error, retry }) {
 
 const NAV = [
   ['', 'Início', 'home'],
-  ['chats', 'Conversas', 'chat'],
   ['projects', 'Projetos', 'folder'],
   ['agents', 'Agentes', 'agents'],
   ['explore', 'Explorar', 'compass'],
-  ['library', 'Biblioteca', 'book'],
-  null,
-  ['integrations', 'Integrações', 'cube'],
-  ['settings', 'Configurações', 'gear']
+  ['library', 'Biblioteca', 'book']
 ];
-
-/** Quem está na conversa aberta: um agente, ou vários (grupo). */
-function useChatAgents() {
-  const { S, agent } = useApp();
-  const { parts, query } = useRoute();
-  const [p0, p1, p2] = parts;
-  let ids = [];
-  if (p0 === 'c') { const c = S.chats.find(x => x.id === p1); if (c) ids = c.agentIds || [c.agentId]; }
-  else if (p0 === 'a') ids = [p1];
-  else if (p0 === 'p' && p2 === 'new') ids = (query.get('agents') || '').split(',').filter(Boolean);
-  return ids.map(agent).filter(Boolean);
-}
-
-/** A "tela" do agente na barra lateral: avatar vivo, nome, estado e atalho para configurar. */
-function SideAgent({ agents, collapsed }) {
-  const { busy } = useApp();
-  if (!agents.length) return null;
-  const group = agents.length > 1, a = agents[0];
-  const working = agents.some(x => busy[x.id]);
-  return (
-    <div className={`side-agent ${working ? 'working' : ''}`} title={collapsed ? agents.map(x => x.name).join(', ') : undefined}>
-      <div className="side-agent-stage">
-        {group
-          ? <span className="avatar-stack lg">{agents.slice(0, 3).map(x => <AgentAvatar key={x.id} agent={x} size={collapsed ? 26 : 52} state={busy[x.id] ? 'working' : undefined} />)}</span>
-          : <AgentAvatar agent={a} size={collapsed ? 36 : 84} state={working ? 'working' : undefined} interactive={!collapsed} />}
-      </div>
-      {!collapsed && <>
-        <b>{group ? 'Conversa em grupo' : a.name}</b>
-        <small>{working ? 'respondendo…' : group ? agents.map(x => x.name).join(', ') : a.description || a.category}</small>
-        {!group && <a href={`#/agents/${a.id}/settings`} className="side-agent-link"><Icon name="gear" size={14} />Configurar</a>}
-      </>}
-    </div>
-  );
-}
 
 function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollapse }) {
   const { S, agent, busy } = useApp();
   const { parts } = useRoute();
-  const section = parts[0] === 'c' ? 'chats' : parts[0] === 'new' ? 'agents' : parts[0] === 'p' ? 'projects' : parts[0] || '';
-  const recent = [...S.chats].sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt)).slice(0, 7);
-  const chatAgents = useChatAgents();
+  const chatMenu = useChatMenu();
+  const section = parts[0] === 'c' ? 'chat' : parts[0] === 'new' ? 'agents' : parts[0] === 'p' ? 'projects' : parts[0] || '';
+  const recent = [...S.chats].sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt)).slice(0, 12);
   return (
     <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
+      {onCollapse && <ResizeHandle side="left" cssVar="side-w" min={220} max={440} collapsed={collapsed} label="Largura da barra lateral"
+        onCollapse={() => !collapsed && onCollapse()} onExpand={() => collapsed && onCollapse()} />}
       <div className="brand-row">
         <a href="#/" className="brand" onClick={onNavigate} aria-label="Ripper, início">
           <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><rect width="32" height="32" rx="8" className="brand-bg" /><path d="M11 23V9h6.2a4.3 4.3 0 0 1 .9 8.5L22 23" className="brand-r" /></svg>
@@ -118,38 +88,51 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
         </a>
         {onCollapse && <button className="icon-btn sm collapse-btn" onClick={onCollapse} aria-label={collapsed ? 'Expandir barra lateral' : 'Recolher barra lateral'} title={collapsed ? 'Expandir (Ctrl B)' : 'Recolher (Ctrl B)'}><Icon name="sidebar" size={17} /></button>}
       </div>
-      <SideAgent agents={chatAgents} collapsed={collapsed} />
       <button className="side-search" onClick={onSearch} aria-label="Buscar"><Icon name="search" size={16} /><span>Buscar</span><kbd>Ctrl K</kbd></button>
       <nav className="nav" aria-label="Principal">
         {NAV.map((n, i) => n ? (
           <a key={n[0]} href={'#/' + n[0]} className={section === n[0] ? 'on' : ''} aria-current={section === n[0] ? 'page' : undefined} onClick={onNavigate} title={collapsed ? n[1] : undefined} aria-label={n[1]}>
             <Icon name={n[2]} /><span className="nav-label">{n[1]}</span>
-            {n[0] === 'chats' && <span className="count">{S.chats.length}</span>}
             {n[0] === 'projects' && S.projects.length > 0 && <span className="count">{S.projects.length}</span>}
           </a>
         ) : <hr key={i} />)}
+        {collapsed && <a href="#/chats" className={section === 'chats' ? 'on' : ''} onClick={onNavigate} title="Conversas" aria-label="Conversas"><Icon name="chat" /></a>}
       </nav>
       {!collapsed && recent.length > 0 && (
         <div className="recent">
-          <p className="side-label">Recentes</p>
+          <div className="side-label-row"><p className="side-label">Conversas</p><a href="#/chats" className={`side-all ${section === 'chats' ? 'on' : ''}`} onClick={onNavigate}>Ver todas<span>{S.chats.length}</span></a></div>
           {recent.map(c => {
-            const a = agent(c.agentId);
+            const group = isGroupChat(c);
             return (
-              <a key={c.id} href={`#/c/${c.id}`} className={`recent-item ${parts[1] === c.id ? 'on' : ''}`} onClick={onNavigate}>
-                <span className="recent-av">{a ? <AgentAvatar agent={a} size={22} state={busy[a.id] ? 'working' : undefined} paused={!busy[a.id]} /> : <Icon name="chat" size={16} />}</span>
-                <span className="recent-text"><b>{c.title}</b><small>{c.preview || 'Sem mensagens'}</small></span>
-                <time>{fmtAgo(c.updatedAt || c.createdAt)}</time>
+              <a key={c.id} href={`#/c/${c.id}`} className={`recent-item ${parts[1] === c.id ? 'on' : ''} ${group ? 'is-group' : ''} ${c.unread && parts[1] !== c.id ? 'unread' : ''} ${c.urgent && c.unread ? 'urgent' : ''}`} onClick={onNavigate}
+                onContextMenu={e => chatMenu(e, c)}>
+                <span className="recent-av"><ChatAvatar chat={c} size={24} /></span>
+                <span className="recent-text">
+                  <b>{c.title}</b>
+                  <small>{group && <span className="recent-group">Grupo · </span>}{c.preview || 'Sem mensagens'}</small>
+                </span>
+                {c.unread && parts[1] !== c.id ? <span className="unread-dot" title="Novidade de rotina" /> : <time>{fmtAgo(c.updatedAt || c.createdAt)}</time>}
               </a>
             );
           })}
         </div>
       )}
       <div className="side-foot">
-        <button className="icon-btn" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'}><Icon name={theme === 'dark' ? 'sun' : 'moon'} /></button>
-        <a href="#/settings" className="account" onClick={onNavigate}>
-          <span className="initial">{(S.settings.name || 'V')[0].toUpperCase()}</span>
-          <span>{S.settings.name || 'Você'}</span>
-        </a>
+        <Menu align="up" className="account-menu" trigger={({ toggle, open }) => (
+          <button className={`account ${['settings', 'integrations'].includes(section) ? 'on' : ''}`} onClick={toggle} aria-expanded={open} aria-haspopup="menu" title={collapsed ? 'Conta e configurações' : undefined}>
+            <span className="initial">{(S.settings.name || 'V')[0].toUpperCase()}</span>
+            <span className="account-name"><b>{S.settings.name || 'Você'}</b><small>Conta e configurações</small></span>
+            <Icon name="more" size={16} className="account-more" />
+          </button>
+        )}>
+          <div className="account-head"><span className="initial">{(S.settings.name || 'V')[0].toUpperCase()}</span><span><b>{S.settings.name || 'Você'}</b><small>{S.agents.length} agentes · {S.projects.length} projetos</small></span></div>
+          <MenuItem icon="gear" onClick={() => { onNavigate(); go('/settings'); }}>Configurações</MenuItem>
+          <MenuItem icon="cube" onClick={() => { onNavigate(); go('/settings/models'); }}>Modelos e computador<small className="menu-hint">Claude, Docker, plugins</small></MenuItem>
+          <MenuItem icon={theme === 'dark' ? 'sun' : 'moon'} onClick={toggleTheme}>Tema {theme === 'dark' ? 'claro' : 'escuro'}</MenuItem>
+          <hr className="menu-sep" />
+          <MenuItem icon="search" onClick={onSearch}>Buscar<kbd className="menu-kbd">Ctrl K</kbd></MenuItem>
+          <MenuItem icon="sidebar" onClick={onCollapse || undefined} disabled={!onCollapse}>{collapsed ? 'Expandir barra' : 'Recolher barra'}<kbd className="menu-kbd">Ctrl B</kbd></MenuItem>
+        </Menu>
       </div>
     </aside>
   );
@@ -234,7 +217,7 @@ function Shell() {
     p0 === 'explore' ? <Explore /> :
     p0 === 'library' ? <Library /> :
     p0 === 'integrations' ? <Integrations /> :
-    p0 === 'settings' ? <Settings theme={theme} toggleTheme={toggleTheme} /> :
+    p0 === 'settings' ? <Settings theme={theme} toggleTheme={toggleTheme} tab={p1} /> :
     <Home />;
 
   return (
@@ -252,11 +235,12 @@ function Shell() {
         )}
         <Suspense fallback={<div className="page-loading"><ThinkingOrb state="breathing" size={20} /></div>}>{page}</Suspense>
       </main>
+      <ApprovalTray />
       <Palette open={palette} onClose={() => setPalette(false)} toggleTheme={toggleTheme} />
     </div>
   );
 }
 
 export default function App() {
-  return <ToastProvider><Provider><Shell /></Provider></ToastProvider>;
+  return <ToastProvider><Provider><OverlayProvider><Shell /></OverlayProvider></Provider></ToastProvider>;
 }

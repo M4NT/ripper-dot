@@ -57,7 +57,7 @@ function HeroArt({ agent }) {
         <path d="M420 92 C 380 120, 330 150, 300 190" /><circle cx="420" cy="92" r="3" /><circle cx="352" cy="140" r="4" />
         <path d="M150 380 C 190 360, 210 330, 238 300" /><circle cx="150" cy="380" r="3" /><circle cx="210" cy="332" r="4" />
       </svg>
-      <div className="hero-bot"><AgentAvatar agent={{ ...agent, avatar: { ...agent.avatar, color: ink }, status: 'online' }} size={168} interactive /></div>
+      <div className="hero-bot"><AgentAvatar agent={{ ...agent, avatar: { ...agent.avatar, color: ink }, status: 'online' }} size={168} interactive animate /></div>
       {labels.map(([l, c]) => <span key={l} className={`hero-label ${c}`}>{l}</span>)}
     </div>
   );
