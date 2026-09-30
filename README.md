@@ -8,6 +8,21 @@ Aplicação local para criar agentes de IA, conversar individualmente ou em grup
 - `claude login` para usar a assinatura Claude, ou uma chave de API configurada na aplicação
 - `codex login` para usar o Codex
 
+## Claude e Codex: ferramentas Ripper
+
+Os agentes usam o mesmo conjunto de **ferramentas builtin** do Ripper (`remember`, `schedule_routine`, navegador, computador, artefatos, skills, `send_message`) quando o modelo e as permissões do agente permitem:
+
+| Capacidade | Claude (Agent SDK) | Codex (CLI `codex exec`) |
+| --- | --- | --- |
+| Ferramentas Ripper | MCP in-process `ripper` | MCP stdio `ripper` (ponte HTTP com o servidor Ripper) |
+| Plugins MCP stdio | Sim | Sim (`-c mcp_servers.*`) |
+| Plugins MCP HTTP | Sim | Sim (URL no config efêmero) |
+| WebSearch / WebFetch | Sim (ferramenta `web` do agente) | Não — use plugins MCP ou o Codex nativo |
+| Conectores Claude Code (`useConnectors`) | Sim | Não |
+| Shell no sandbox do Codex | — | Sim (`command_execution` no JSON); distinto do `computer_exec` Ripper em Docker/Boat |
+
+As definições e a lista de ferramentas permitidas são compartilhadas em `lib/ripper-builtin-tools.mjs` (`claudeAllowedTools` / spawn do Codex).
+
 ## Executar
 
 ```sh

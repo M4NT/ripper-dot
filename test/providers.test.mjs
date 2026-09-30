@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { claudeAllowedTools, buildCodexSpawnArgs, userMcp, buildClaudeQueryOptions } from '../lib/providers.mjs';
+import { fileURLToPath } from 'node:url';
+import {
+  claudeAllowedTools,
+  buildCodexSpawnArgs,
+  userMcp,
+  buildClaudeQueryOptions,
+  parseCodexJsonEvent,
+  describeRipperTool
+} from '../lib/providers.mjs';
+import { createRipperMcpBridge } from '../lib/ripper-mcp-bridge.mjs';
+import { ripperClaudeToolAllowlist } from '../lib/ripper-builtin-tools.mjs';
 
 const baseAgent = {
   id: 'a1',
@@ -30,6 +40,10 @@ test('claudeAllowedTools reflete ctx e plugins MCP', () => {
   assert.ok(!tools.some(t => t.includes('off-mcp')));
   assert.ok(tools.includes('WebSearch'));
   assert.ok(!tools.includes('mcp__ripper__browser_open'));
+  assert.deepEqual(
+    tools.filter(t => t.startsWith('mcp__ripper__')),
+    ripperClaudeToolAllowlist(baseAgent, ctx)
+  );
 });
 
 test('userMcp ignora plugins quando ferramenta plugins está desligada', () => {
@@ -37,13 +51,16 @@ test('userMcp ignora plugins quando ferramenta plugins está desligada', () => {
   assert.deepEqual(userMcp(agent, settings.plugins), {});
 });
 
-test('buildCodexSpawnArgs: sandbox read-only e MCP stdio na linha de comando', () => {
-  const args = buildCodexSpawnArgs({ agent: baseAgent, effort: 'high', settings, images: [{ path: '/tmp/x.png' }] });
+test('buildCodexSpawnArgs: sandbox read-only, MCP stdio/http e ripper builtin', () => {
+  const bridge = { url: 'http://127.0.0.1:9', token: 'tok' };
+  const args = buildCodexSpawnArgs({ agent: baseAgent, effort: 'high', settings, images: [{ path: '/tmp/x.png' }], ripperMcpBridge: bridge });
   assert.deepEqual(args.slice(0, 5), ['exec', '--json', '--skip-git-repo-check', '--sandbox', 'read-only']);
   assert.ok(args.includes('-c'));
   assert.ok(args.some(a => String(a).includes('mcp_servers.my-mcp.command')));
+  assert.ok(args.some(a => String(a).includes('mcp_servers.http-one.url')));
+  assert.ok(args.some(a => String(a).includes('mcp_servers.ripper.command')));
+  assert.ok(args.some(a => String(a).includes('RIPPER_MCP_BRIDGE_URL')));
   assert.ok(args.includes('/tmp/x.png'));
-  assert.ok(!args.some(a => String(a).includes('http-one')));
 });
 
 test('buildClaudeQueryOptions registra MCP ripper e conectores só com plugins', () => {
@@ -65,4 +82,34 @@ test('buildClaudeQueryOptions registra MCP ripper e conectores só com plugins',
   assert.deepEqual(opts.settingSources, ['user']);
   const allowed = claudeAllowedTools(agent, settings, ctx);
   assert.ok(allowed.includes('mcp__ripper__remember'));
+});
+
+test('parseCodexJsonEvent: mensagem, shell e mcp ripper', () => {
+  assert.deepEqual(parseCodexJsonEvent({ item: { type: 'agent_message', text: 'oi' } }), { text: 'oi' });
+  assert.deepEqual(
+    parseCodexJsonEvent({ type: 'item.started', item: { type: 'mcp_tool_call', server: 'ripper', tool: 'remember', arguments: { text: 'x' }, status: 'in_progress' } }),
+    describeRipperTool('remember', { text: 'x' })
+  );
+});
+
+test('createRipperMcpBridge executa remember sem Codex', async () => {
+  let saved;
+  const bridge = await createRipperMcpBridge(
+    { tools: ['memory'] },
+    { remember: (text, tier) => { saved = { text, tier }; } }
+  );
+  assert.ok(bridge);
+  const res = await fetch(`${bridge.url}/call`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${bridge.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ name: 'remember', arguments: { text: 'teste', tier: 'profile' } })
+  });
+  assert.equal(res.status, 200);
+  assert.deepEqual(saved, { text: 'teste', tier: 'profile' });
+  await bridge.close();
+});
+
+test('ripper mcp stdio script path resolve no repo', () => {
+  const script = fileURLToPath(new URL('../lib/ripper-mcp-stdio.mjs', import.meta.url));
+  assert.match(script, /ripper-mcp-stdio\.mjs$/);
 });

@@ -138,6 +138,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
           </Card>
           <Card title="ChatGPT" badge={<span className="tag">Codex</span>}>
             <Row title="Login" desc="Rode codex login uma vez nesta máquina. Sem o Codex instalado, o Ripper Auto usa só o Claude."><code className="inline-code">npm i -g @openai/codex</code></Row>
+            <Row title="Ferramentas Ripper" desc="Com o Codex, remember, artefatos, inbox e o resto do MCP ripper vão por stdio (como plugins). WebSearch do Claude e conectores claude.ai não existem no Codex; plugins HTTP MCP funcionam nos dois." />
             <Row title="Apps conectados do ChatGPT" desc="Quando houver suporte."><Switch checked={s.chatgpt.useConnectedApps} onChange={v => set('chatgpt.useConnectedApps', v)} label="Apps do ChatGPT" /></Row>
           </Card>
           <Card title="Ripper Auto" badge={<><MetalBadge theme={dark ? 'dark' : 'light'}>Julia 1</MetalBadge>{julia !== null && <span className={`tag ${julia ? 'tag-ok' : 'tag-warn'}`}>{julia ? 'no ar' : 'fora do ar'}</span>}</>} desc="A Julia 1 decide rápido e barato, antes do modelo grande: qual modelo usar, quem do time responde, se um comando é arriscado e se uma rotina deve notificar, silenciar ou escalar. Fora do ar, as regras de reserva decidem.">
