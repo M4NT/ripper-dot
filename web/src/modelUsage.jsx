@@ -91,10 +91,12 @@ export default function ModelUsage({ chatId }) {
   const r5 = lim?.ripperQuota?.rolling5h;
   const wk = lim?.ripperQuota?.weekly;
   const hasRipperQuota = r5?.configured || wk?.configured;
+  const claudeSub = lim?.claudeSubscription;
+  const claudeWin = claudeSub?.available ? claudeSub.windows : null;
   const ctxPct = ctx?.hasData ? ctx.pct : null;
   const ctxUsed = ctx?.usedTokens;
   const ctxLimit = ctx?.limitTokens ?? 1_000_000;
-  const ringPct = ctxPct ?? (r5?.configured ? r5.pct : null);
+  const ringPct = ctxPct ?? (claudeWin?.fiveHour?.pct != null ? claudeWin.fiveHour.pct : null) ?? (r5?.configured ? r5.pct : null);
 
   return (
     <Menu align="up" className="usage-menu" onOpenChange={loadDetail} trigger={({ toggle, open }) => (
@@ -142,6 +144,56 @@ export default function ModelUsage({ chatId }) {
           </p>
         )}
 
+        {claudeSub?.mode === 'subscription' && (
+          <section className="usage-julia">
+            <p className="pop-label">
+              Claude Pro/Max{claudeSub.subscriptionType ? ` (${claudeSub.subscriptionType})` : ''}
+              {claudeSub.fragile && <span className="muted small"> · endpoint OAuth (frágil)</span>}
+            </p>
+            {claudeWin?.fiveHour?.pct != null && (
+              <UsageBar
+                label="Janela de 5 horas (assinatura)"
+                pct={claudeWin.fiveHour.pct}
+                tone={claudeWin.fiveHour.pct >= 100 ? 'red' : claudeWin.fiveHour.pct >= 80 ? 'orange' : 'blue'}
+                resetLabel={claudeWin.fiveHour.resetLabel}
+              />
+            )}
+            {claudeWin?.sevenDay?.pct != null && (
+              <UsageBar
+                label="Semanal (assinatura)"
+                pct={claudeWin.sevenDay.pct}
+                tone={claudeWin.sevenDay.pct >= 90 ? 'orange' : 'blue'}
+                resetLabel={claudeWin.sevenDay.resetLabel}
+              />
+            )}
+            {claudeWin?.sevenDayOpus?.pct != null && (
+              <UsageBar
+                label="Semanal Opus"
+                pct={claudeWin.sevenDayOpus.pct}
+                tone="blue"
+                resetLabel={claudeWin.sevenDayOpus.resetLabel}
+              />
+            )}
+            {claudeSub.available && claudeWin?.extraUsage?.enabled && claudeWin.extraUsage.usedCreditsCents != null && (
+              <p className="small">
+                Uso extra: US$ {(claudeWin.extraUsage.usedCreditsCents / 100).toFixed(2)}
+                {claudeWin.extraUsage.monthlyLimitCents != null && claudeWin.extraUsage.monthlyLimitCents > 0
+                  ? ` de US$ ${(claudeWin.extraUsage.monthlyLimitCents / 100).toFixed(2)} (limite mensal)`
+                  : ''}
+              </p>
+            )}
+            {!claudeSub.available && claudeSub.hint && (
+              <p className="muted small usage-hint">{claudeSub.hint}</p>
+            )}
+            {claudeSub.available && claudeWin?.fiveHour?.pct == null && claudeWin?.sevenDay?.pct == null && (
+              <p className="muted small usage-hint">Login detectado, mas sem percentuais nesta leitura.</p>
+            )}
+          </section>
+        )}
+        {claudeSub?.mode === 'api_key' && (
+          <p className="muted small usage-hint">{claudeSub.hint}</p>
+        )}
+
         {hasRipperQuota ? (
           <>
             <p className="pop-label muted small">Cotas Ripper (configuradas no servidor)</p>
@@ -164,9 +216,9 @@ export default function ModelUsage({ chatId }) {
               />
             )}
           </>
-        ) : (
-          <p className="muted small usage-hint">Sem dados de uso do provedor ainda. Cotas locais do Ripper só aparecem se você definir RIPPER_LIMIT_5H_CHARS ou RIPPER_LIMIT_WEEK_CHARS no servidor.</p>
-        )}
+        ) : !claudeSub?.available && claudeSub?.mode !== 'api_key' ? (
+          <p className="muted small usage-hint">Sem cotas Ripper configuradas. Cotas Pro/Max aparecem com login do Claude Code; defina RIPPER_LIMIT_* para limites locais.</p>
+        ) : null}
 
         {lim?.providers?.length > 0 && (
           <section className="usage-julia">

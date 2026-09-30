@@ -19,6 +19,7 @@ import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
 import { canUseFile, selectSpeakers, routineDue, mayFallback, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent } from './lib/agent-flow.mjs';
 import { newHookToken, verifySignature, eventMeta } from './lib/hooks.mjs';
 import { recordUsage, usageSummary, accountLimits, contextBreakdown, checkSendQuota, compactChat, parseProviderLimitFromError, recordProviderSignal } from './lib/usage.mjs';
+import { refreshClaudeSubscriptionUsage } from './lib/claude-subscription-usage.mjs';
 import { ripperBuiltinSchemaChars, listRipperBuiltinToolNames } from './lib/ripper-builtin-tools.mjs';
 import { verifyMcpServer } from './lib/mcp-probe.mjs';
 
@@ -278,6 +279,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
     }
   }
   const ctx = {
+    db,
     computer,
     browser,
     remember: (t, tier = 'profile') => { if (s.memory) { db.memories.push({ id: id(), agentId: agent.id, text: t, tier: tier === 'log' ? 'log' : 'profile', createdAt: Date.now() }); save(); emit({ memory: t, tier }); } },
@@ -363,6 +365,9 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
       for await (const ev of gen) { if (ev.text) { attempt += ev.text; out += ev.text; } if (ev.tool) steps.push({ tool: ev.tool, detail: ev.detail, at: Date.now() }); emit(ev); }
       push({ model: m, effort });
       recordUsage(db, m, { charsIn: (text?.length || 0) + (prompt?.length || 0), charsOut: out.length, routedBy });
+      if (MODELS[m].provider === 'claude') {
+        refreshClaudeSubscriptionUsage(db, s).then(() => save()).catch(() => {});
+      }
       break;
     } catch (e) {
       if (signal?.aborted) { push({ model: m, stopped: true }); break; }
@@ -438,7 +443,11 @@ const routes = [
     usage: usageSummary(db),
     limits: accountLimits(db, db.settings)
   })],
-  ['GET', /^\/api\/usage\/limits$/, () => accountLimits(db, db.settings)],
+  ['GET', /^\/api\/usage\/limits$/, async () => {
+    await refreshClaudeSubscriptionUsage(db, db.settings).catch(() => {});
+    save();
+    return accountLimits(db, db.settings);
+  }],
   ['GET', /^\/api\/usage\/context$/, (req, _, url) => {
     const chatId = url.searchParams.get('chatId') || undefined;
     const chat = chatId && db.chats.find(c => c.id === chatId);

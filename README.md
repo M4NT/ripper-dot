@@ -92,11 +92,20 @@ O painel de uso no chat mostra **somente** o que o Ripper mede ou o que você co
 | --- | --- |
 | Caracteres/tokens estimados por conversa (mensagens, prompt do agente, conectores MCP) | Sim — estimativa local (~4 chars/token) |
 | Respostas por modelo (`recordUsage`) | Sim |
-| Fatura ou % de plano Anthropic/OpenAI | **Não** — não há API pública de assinatura para esta instalação |
-| Barras “5 h / semanal” estilo Claude | Só se você definir `RIPPER_LIMIT_5H_CHARS` e/ou `RIPPER_LIMIT_WEEK_CHARS` (cotas **Ripper**, não do provedor) |
+| Fatura Console Admin (sk-ant-admin) | **Não** — é billing de org/API, não barras Pro/Max do chat |
+| Barras Pro/Max (5 h / semanal) com login Claude Code | **Sim** — leitura via `GET /api/oauth/usage` (mesmo fluxo do Claude Code; **não documentado**, cache ~3 min) e/ou Agent SDK após cada resposta Claude |
+| Barras “5 h / semanal” locais Ripper | Só se você definir `RIPPER_LIMIT_5H_CHARS` e/ou `RIPPER_LIMIT_WEEK_CHARS` (cotas **Ripper**, não do provedor) |
+| Modo chave de API Anthropic | Uso local + erros 429; painel avisa que barras Pro/Max exigem login (`claude login`) |
 | Créditos na nuvem | Só se `RIPPER_CLOUD_CREDITS_USD` estiver definido; `RIPPER_CLOUD_CREDITS_USED` opcional |
 | Bloqueio por cota do provedor | Quando a API devolve rate limit/429; o último evento aparece no painel (`db.usage.providers`) |
 
 Variáveis opcionais: `RIPPER_PLAN_NAME` (rótulo, não altera fatura), `RIPPER_CLOUD_CREDITS_*`, `RIPPER_LIMIT_*`.
+
+### Uso Pro/Max (assinatura Claude Code)
+
+- **Estável o suficiente para UI:** erros de rate limit nas respostas, contadores locais do Ripper, janela de contexto medida no chat.
+- **Frágil / não oficial:** endpoint OAuth `api.anthropic.com/api/oauth/usage` (header `anthropic-beta: oauth-2025-04-20`), leitura somente de `~/.claude/.credentials.json` ou `CLAUDE_CODE_OAUTH_TOKEN`; o Ripper **não** grava nem renova tokens.
+- **Headers** `anthropic-ratelimit-unified-*` são persistidos quando aparecem em respostas HTTP capturadas.
+- **Agent SDK:** após cada turno Claude em modo assinatura, o Ripper tenta `usage_EXPERIMENTAL_*` (pode mudar entre versões do SDK).
 
 Os dados locais ficam em `data/`, que não é enviado ao Git. Ao expor o servidor na rede, configure `RIPPER_TOKEN`. O modo de comandos locais exige ativação explícita em Integrações.
