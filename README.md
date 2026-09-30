@@ -8,6 +8,21 @@ Aplicação local para criar agentes de IA, conversar individualmente ou em grup
 - `claude login` para usar a assinatura Claude, ou uma chave de API configurada na aplicação
 - `codex login` para usar o Codex
 
+## Claude e Codex: ferramentas Ripper
+
+Os agentes usam o mesmo conjunto de **ferramentas builtin** do Ripper (`remember`, `schedule_routine`, navegador, computador, artefatos, skills, `send_message`) quando o modelo e as permissões do agente permitem:
+
+| Capacidade | Claude (Agent SDK) | Codex (CLI `codex exec`) |
+| --- | --- | --- |
+| Ferramentas Ripper | MCP in-process `ripper` | MCP stdio `ripper` (ponte HTTP com o servidor Ripper) |
+| Plugins MCP stdio | Sim | Sim (`-c mcp_servers.*`) |
+| Plugins MCP HTTP | Sim | Sim (URL no config efêmero) |
+| WebSearch / WebFetch | Sim (ferramenta `web` do agente) | Não — use plugins MCP ou o Codex nativo |
+| Conectores Claude Code (`useConnectors`) | Sim | Não |
+| Shell no sandbox do Codex | — | Sim (`command_execution` no JSON); distinto do `computer_exec` Ripper em Docker/Boat |
+
+As definições e a lista de ferramentas permitidas são compartilhadas em `lib/ripper-builtin-tools.mjs` (`claudeAllowedTools` / spawn do Codex).
+
 ## Executar
 
 ```sh
@@ -16,12 +31,57 @@ npm run build
 npm start
 ```
 
-Acesse `http://127.0.0.1:3000`. Para desenvolvimento, rode `npm run dev:server` e `npm run dev:web` em terminais separados. O classificador opcional inicia com `npm run julia`.
+Acesse `http://127.0.0.1:3000`. Para desenvolvimento, rode `npm run dev:server` e `npm run dev:web` em terminais separados.
+
+## Julia 1 (classificador opcional)
+
+O Ripper funciona **sem** o sidecar Julia. Com ele no ar, o modo **Ripper Auto** e outras decisões rápidas (risco de comando, notificações de rotina, quem fala em grupo) usam o modelo [SupersonicLabs/Julia-1](https://huggingface.co/SupersonicLabs/Julia-1) em vez de só heurísticas.
+
+### Instalação (uma vez)
+
+Requer **Python 3.11+**.
+
+```sh
+python3 -m pip install -r julia/requirements.txt
+python3 -c "from huggingface_hub import snapshot_download; snapshot_download('SupersonicLabs/Julia-1', local_dir='julia/Julia-1')"
+python3 -m pip install -e julia/Julia-1
+```
+
+O download dos pesos (~550 MiB) fica em `julia/Julia-1/` (ignorado pelo Git).
+
+### Subir o sidecar
+
+```sh
+npm run julia
+```
+
+Por padrão escuta em `http://127.0.0.1:8765`. Variáveis úteis:
+
+| Variável | Padrão | Descrição |
+| --- | --- | --- |
+| `JULIA_MODEL` | `SupersonicLabs/Julia-1` | Id no Hugging Face (validado na subida) |
+| `JULIA_MODEL_PATH` | — | Caminho local (ex.: `julia/Julia-1`) em vez do id remoto |
+| `JULIA_PORT` | `8765` | Porta HTTP |
+| `JULIA_DEVICE` | `cpu` | `cpu` ou `cuda` |
+
+Para desenvolver sem baixar pesos: `npm run julia:dry` (respostas uniformes; só `/health` e contrato HTTP).
+
+Se o modelo ou o pacote Python estiver mal configurado, `julia/serve.py` **encerra na subida** com mensagem clara (não fica um processo “morto”).
+
+### Quando a Julia está fora do ar
+
+- O Ripper **continua**; roteamento automático, risco e notificações usam **regras de reserva** (palavras-chave e tamanho do texto).
+- O servidor registra avisos `[julia] fallback: <motivo>` no terminal.
+- Em **Configurações → Modelos**, o selo mostra “fora do ar”; `GET /api/julia/status` devolve `{ online, url, reason }`.
+
+Confira o endereço em Configurações (padrão `http://127.0.0.1:8765`) se mudou a porta.
 
 ## Testes
 
 ```sh
 npm test
 ```
+
+Os testes da Julia usam mocks HTTP — não exigem PyTorch nem download do Hugging Face.
 
 Os dados locais ficam em `data/`, que não é enviado ao Git. Ao expor o servidor na rede, configure `RIPPER_TOKEN`. O modo de comandos locais exige ativação explícita em Integrações.

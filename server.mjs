@@ -5,13 +5,13 @@ import { mkdirSync, existsSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { extname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { timingSafeEqual } from 'node:crypto';
+import { authed as checkAuth } from './lib/auth.mjs';
 import { load, save, id, newAgent, patchAgent, dataUrl } from './lib/store.mjs';
 import { route, classifySpeaker, MODELS, EFFORTS } from './lib/router.mjs';
 import { computerFor } from './lib/boat.mjs';
 import { dockerAvailable, imageStatus, ensureImage, hostnameOf } from './lib/docker.mjs';
 import { needsApproval, ApprovalGate } from './lib/approvals.mjs';
-import { juliaOnline, juliaChoose, RISK_OPTIONS, NOTIFY_OPTIONS } from './lib/julia.mjs';
+import { juliaOnline, juliaChoose, juliaStatus, RISK_OPTIONS, NOTIFY_OPTIONS } from './lib/julia.mjs';
 import { checkSend, dueMessages, threadKey, inboxPrompt } from './lib/inbox.mjs';
 import { browserFor, browserRisk } from './lib/browser.mjs';
 import { runClaude, runCodex, systemPrompt } from './lib/providers.mjs';
@@ -75,10 +75,7 @@ const activeChats = new Set();
 const syncedBoatFiles = new Set();
 
 function authed(req) {
-  if (!TOKEN) return true;
-  const got = (req.headers.authorization || '').replace(/^Bearer /, '') || /(?:^|;\s*)ripper_token=([^;]+)/.exec(req.headers.cookie || '')?.[1] || '';
-  const a = Buffer.from(decodeURIComponent(got)), b = Buffer.from(TOKEN);
-  return a.length === b.length && timingSafeEqual(a, b);
+  return checkAuth(req, TOKEN);
 }
 
 function patchProject(p, b) {
@@ -359,7 +356,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
       const providerSystem = MODELS[m].provider === 'codex' && s.computer.mode !== 'local'
         ? `${system}\n\nNesta execução do Codex, o computador está em modo somente leitura; não prometa executar comandos nem acessar a VM Boat.` : system;
       const args = { agent, effort, prompt, images, history, system: providerSystem, settings: s, signal };
-      const gen = MODELS[m].provider === 'codex' ? runCodex({ ...args, cwd: sandboxDir(agent) }) : runClaude({ ...args, model: m, ctx });
+      const gen = MODELS[m].provider === 'codex' ? runCodex({ ...args, cwd: sandboxDir(agent), ctx }) : runClaude({ ...args, model: m, ctx });
       for await (const ev of gen) { if (ev.text) { attempt += ev.text; out += ev.text; } if (ev.tool) steps.push({ tool: ev.tool, detail: ev.detail, at: Date.now() }); emit(ev); }
       push({ model: m, effort });
       recordUsage(db, m, { charsIn: (text?.length || 0) + (prompt?.length || 0), charsOut: out.length });
@@ -470,7 +467,10 @@ const routes = [
     k.updatedAt = Date.now(); save(); return k;
   }],
   ['DELETE', /^\/api\/skills\/([\w-]+)$/, (req, [kid]) => { db.skills = db.skills.filter(k => k.id !== kid); save(); return {}; }],
-  ['GET', /^\/api\/julia\/status$/, async () => ({ online: await juliaOnline(db.settings), url: db.settings.julia.url })],
+  ['GET', /^\/api\/julia\/status$/, async () => {
+    const online = await juliaOnline(db.settings);
+    return { online, url: db.settings.julia.url, reason: online ? 'ok' : (juliaStatus.reason || 'offline') };
+  }],
   ['GET', /^\/api\/computer\/docker$/, async () => ({ version: await dockerAvailable(), image: await imageStatus() })],
   ['POST', /^\/api\/computer\/image$/, async () => { ensureImage().catch(e => console.error('imagem', e.message)); return { image: await imageStatus() }; }],
   ['GET', /^\/api\/agents\/([\w-]+)\/vnc$/, async (req, [aid]) => {
