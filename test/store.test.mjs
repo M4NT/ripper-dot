@@ -28,7 +28,7 @@ test('load cria schema v2 e agente padrão quando não há db.json', () =>
     flush();
     const raw = JSON.parse(readFileSync(join(dir, 'db.json'), 'utf8'));
     assert.equal(raw.schemaVersion, 2);
-    assert.ok(existsSync(join(dir, '.lock')));
+    assert.ok(existsSync(join(dir, 'coord.sqlite')));
   }));
 
 test('flush persiste alterações com gravação atômica (tmp + rename)', () =>
@@ -87,12 +87,13 @@ test('db.json inválido lança ao carregar', () =>
     assert.throws(() => load(), /JSON|Unexpected token/);
   }));
 
-test('lock obsoleto (PID morto) é substituído pelo processo atual', () =>
+test('vários load no mesmo processo compartilham o cache em memória', () =>
   withDataDir(async ({ load }, dir) => {
-    writeFileSync(join(dir, '.lock'), '999999999');
-    const db = load();
-    assert.ok(db);
-    assert.equal(readFileSync(join(dir, '.lock'), 'utf8'), String(process.pid));
+    const a = load();
+    a.settings.name = 'Um';
+    const b = load();
+    assert.equal(b.settings.name, 'Um');
+    assert.ok(existsSync(join(dir, 'coord.sqlite')));
   }));
 
 test('patchAgent filtra campos e ferramentas desconhecidas', async () => {
