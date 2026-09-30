@@ -16,7 +16,8 @@ import { checkSend, dueMessages, threadKey, inboxPrompt } from './lib/inbox.mjs'
 import { browserFor, browserRisk } from './lib/browser.mjs';
 import { runClaude, runCodex, systemPrompt } from './lib/providers.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
-import { canUseFile, selectSpeakers, routineDue, mayFallback, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent } from './lib/agent-flow.mjs';
+import { canUseFile, selectSpeakers, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent } from './lib/agent-flow.mjs';
+import { providerAttemptOrder, runProviderAttemptLoop } from './lib/provider-turn.mjs';
 import { newHookToken, verifySignature, eventMeta } from './lib/hooks.mjs';
 import { recordUsage, usageSummary, accountLimits, contextBreakdown, checkSendQuota, compactChat, parseProviderLimitFromError, recordProviderSignal } from './lib/usage.mjs';
 import { refreshClaudeSubscriptionUsage } from './lib/claude-subscription-usage.mjs';
@@ -351,26 +352,32 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
   emit({ route: { ...pick, effort } });
 
   // Transferência automática: Claude falhou (limite/erro) → Codex, e vice-versa (se o Codex existir).
-  const order = MODELS[pick.model].provider === 'codex' ? [pick.model, 'claude-sonnet-5-5'] : (await codexInstalled) ? [pick.model, 'codex'] : [pick.model];
-  let out = '';
-  const steps = []; // ferramentas usadas (a aba Computador mostra os comandos)
-  const push = extra => chat.messages.push({ id: id(), role: 'assistant', agentId: agent.id, content: out, at: Date.now(), ...(steps.length ? { steps } : {}), ...extra });
-  for (const m of order) {
-    let attempt = '';
-    try {
+  const order = providerAttemptOrder(pick.model, await codexInstalled);
+  const push = (out, steps, extra) => chat.messages.push({
+    id: id(), role: 'assistant', agentId: agent.id, content: out, at: Date.now(),
+    ...(steps.length ? { steps } : {}), ...extra
+  });
+  await runProviderAttemptLoop({
+    order,
+    signal,
+    emit,
+    runModel: m => {
       const providerSystem = MODELS[m].provider === 'codex' && s.computer.mode !== 'local'
         ? `${system}\n\nNesta execução do Codex, o computador está em modo somente leitura; não prometa executar comandos nem acessar a VM Boat.` : system;
       const args = { agent, effort, prompt, images, history, system: providerSystem, settings: s, signal };
-      const gen = MODELS[m].provider === 'codex' ? runCodex({ ...args, cwd: sandboxDir(agent), ctx }) : runClaude({ ...args, model: m, ctx });
-      for await (const ev of gen) { if (ev.text) { attempt += ev.text; out += ev.text; } if (ev.tool) steps.push({ tool: ev.tool, detail: ev.detail, at: Date.now() }); emit(ev); }
-      push({ model: m, effort });
+      return MODELS[m].provider === 'codex'
+        ? runCodex({ ...args, cwd: sandboxDir(agent), ctx })
+        : runClaude({ ...args, model: m, ctx });
+    },
+    onSuccess: ({ model: m, out, steps }) => {
+      push(out, steps, { model: m, effort });
       recordUsage(db, m, { charsIn: (text?.length || 0) + (prompt?.length || 0), charsOut: out.length, routedBy });
       if (MODELS[m].provider === 'claude') {
         refreshClaudeSubscriptionUsage(db, s).then(() => save()).catch(() => {});
       }
-      break;
-    } catch (e) {
-      if (signal?.aborted) { push({ model: m, stopped: true }); break; }
+    },
+    onAttemptFailed: async ({ model: m, error: e, aborted, canFallback, out, steps }) => {
+      if (aborted) { push(out, steps, { model: m, stopped: true }); return; }
       const prov = MODELS[m].provider;
       const limitSig = parseProviderLimitFromError(e);
       if (limitSig) {
@@ -379,10 +386,9 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
         emit({ quota: { provider: prov, ...limitSig } });
       }
       emit({ warn: `${MODELS[m].label} falhou: ${e.message}` });
-      if (!mayFallback(attempt, m === order.at(-1))) { push({ model: m, error: e.message }); break; }
-      emit({ handoff: order[1] });
+      if (!canFallback) push(out, steps, { model: m, error: e.message });
     }
-  }
+  });
 }
 
 async function chat({ chat, text, fileIds, signal, mcpSession }, emit) {
