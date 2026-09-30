@@ -74,3 +74,13 @@ test('?token= define cookie e redireciona (sem auth header)', async () => {
     assert.match(r.headers.get('set-cookie') || '', /ripper_token=/);
   });
 });
+
+test('GET /api/usage/limits retorna agregado', async () => {
+  await withServer({}, async (base, token) => {
+    const r = await fetch(base + '/api/usage/limits', { headers: { authorization: `Bearer ${token}` } });
+    assert.equal(r.status, 200);
+    const body = await r.json();
+    assert.equal(body.source, 'local_aggregate');
+    assert.ok(body.rolling5h);
+  });
+});

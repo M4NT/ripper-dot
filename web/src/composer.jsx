@@ -153,7 +153,7 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
               <input ref={fileInput} type="file" multiple hidden accept="image/*,*/*" onChange={e => { addFiles([...e.target.files]); e.target.value = ''; }} />
               <input ref={folderInput} type="file" multiple hidden webkitdirectory="" directory="" onChange={pickFolder} />
               <div className="composer-chips">
-                {setChoice && <ModelPicker value={choice} onChange={setChoice} group={group} />}
+                {setChoice && <ModelPicker value={choice} onChange={setChoice} group={group} chatId={chatId} />}
               </div>
               <div className="grow" />
               {SpeechRec && (
