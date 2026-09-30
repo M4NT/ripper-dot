@@ -108,4 +108,4 @@ Variáveis opcionais: `RIPPER_PLAN_NAME` (rótulo, não altera fatura), `RIPPER_
 - **Headers** `anthropic-ratelimit-unified-*` são persistidos quando aparecem em respostas HTTP capturadas.
 - **Agent SDK:** após cada turno Claude em modo assinatura, o Ripper tenta `usage_EXPERIMENTAL_*` (pode mudar entre versões do SDK).
 
-Os dados locais ficam em `data/`, que não é enviado ao Git. Ao expor o servidor na rede, configure `RIPPER_TOKEN`. O modo de comandos locais exige ativação explícita em Integrações.
+Os dados locais ficam em `data/` (ou em `RIPPER_DATA`), que não é enviado ao Git. O estado principal continua em `db.json`; eventos de uso (`recordUsage`) vão para `usage.sqlite` no mesmo diretório (até ~800 eventos, para cotas locais 5 h/semanal sem inflar o JSON). Ao expor o servidor na rede, configure `RIPPER_TOKEN`. O modo de comandos locais exige ativação explícita em Integrações.
