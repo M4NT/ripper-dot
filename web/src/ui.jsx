@@ -48,7 +48,12 @@ const P = {
   data: 'M12 8c4.4 0 8-1.3 8-3s-3.6-3-8-3-8 1.3-8 3 3.6 3 8 3zM4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3',
   bolt: 'M13 2 4 14h7l-1 8 9-12h-7z',
   download: 'M12 3v12M7 10l5 5 5-5M5 21h14',
-  key: 'M15 7a4 4 0 1 1-3.9 4.9L3 20v1h3v-2h2v-2h2l1.1-1.1A4 4 0 0 1 15 7zM16 8h.01'
+  key: 'M15 7a4 4 0 1 1-3.9 4.9L3 20v1h3v-2h2v-2h2l1.1-1.1A4 4 0 0 1 15 7zM16 8h.01',
+  store: 'M6 3h12v4H6zM5 8h14v13H5zM9 12h6',
+  filter: 'M4 6h16M7 12h10M10 18h4',
+  sort: 'M8 9l4-4 4 4M16 15l-4 4-4-4',
+  upload: 'M12 16V8M8 12l4-4 4 4M4 20h16',
+  video: 'M15 10l5-3v10l-5-3zM4 6h8v12H4z'
 };
 export function Icon({ name, size = 18, className = '', ...rest }) {
   return <svg className={'icon ' + className} viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" {...rest}><path d={P[name]} /></svg>;

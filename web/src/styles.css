@@ -1138,3 +1138,74 @@ body.resizing iframe { pointer-events: none; }
 @media (max-width: 900px) { .resize-handle { display: none; } }
 
 .recent-item.urgent .unread-dot { background: var(--err); box-shadow: 0 0 0 3px color-mix(in srgb, var(--err) 25%, transparent); }
+
+/* ============ Marketplace · Conectores · Habilidades ============ */
+.link-btn { font-size: 13px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; padding: 4px 0; }
+.link-btn:hover { color: var(--ink); }
+.mp-page { max-width: 920px; margin: 0 auto; padding: 28px 32px 80px; animation: fade .3s var(--out); }
+.mp-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(200px, 320px) auto; gap: 16px; align-items: center; margin-bottom: 28px; }
+.mp-head h1 { font-size: clamp(26px, 3vw, 34px); font-weight: 500; }
+.mp-head-left { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; min-width: 0; }
+.mp-head-center { min-width: 0; }
+.mp-head-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.mp-tabs { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); }
+.mp-tabs button { padding: 6px 14px; border-radius: 8px; font-size: 13px; color: var(--muted); }
+.mp-tabs button.on { background: var(--chip); color: var(--ink); box-shadow: var(--shadow-1); }
+.mp-search { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); width: 100%; color: var(--muted); }
+.mp-search input { flex: 1; border: 0; outline: 0; background: none; min-width: 0; color: var(--ink); }
+.mp-installed { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); padding: 6px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); }
+.mp-installed:hover { border-color: var(--line-2); color: var(--ink); }
+.mp-installed-icons { display: flex; gap: 2px; }
+.mp-body { display: flex; flex-direction: column; gap: 32px; }
+.mp-section h2 { font-size: 15px; font-weight: 500; margin-bottom: 14px; }
+.mp-section h2.mp-sub { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: .06em; }
+.mp-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.mp-section-head h2 { margin: 0; }
+.mp-grid.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.mp-card { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 14px 16px; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+.mp-card small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.mp-card em { display: block; font-size: 12px; color: var(--faint); font-style: normal; margin-top: 4px; }
+.mp-card.bot { grid-template-columns: auto 1fr auto; }
+.mp-bot { width: 40px; height: 40px; border-radius: 50% 50% 50% 10%; }
+.mp-icon { flex: none; display: grid; place-items: center; border-radius: 10px; overflow: hidden; background: var(--chip); border: 1px solid var(--line); }
+.mp-icon img { width: 70%; height: 70%; object-fit: contain; }
+.mp-icon.line { color: var(--muted); }
+.mp-row { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 14px 16px; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); }
+.mp-row-text small { display: block; color: var(--muted); font-size: 12.5px; }
+.mp-row-text .mp-desc { margin-top: 4px; }
+.mp-status.ok { color: var(--ok); font-size: 13px; font-weight: 500; }
+.mp-show-all { margin-top: 12px; }
+.mp-discover-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.mp-discover-card { position: relative; padding: 16px; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); min-height: 140px; }
+.mp-discover-card h3 { font-size: 15px; display: flex; align-items: center; gap: 6px; margin: 10px 0 6px; }
+.mp-discover-card p { font-size: 13px; color: var(--muted); line-height: 1.45; margin: 0 0 8px; }
+.mp-discover-card small { color: var(--faint); font-size: 12px; }
+.mp-plus { position: absolute; top: 12px; right: 12px; width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--line); display: grid; place-items: center; color: var(--muted); }
+.mp-plus:hover { border-color: var(--line-2); color: var(--ink); }
+.mp-verified { color: var(--ok); stroke-width: 3; }
+.mp-conn-table { border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; background: var(--surface); }
+.mp-conn-head, .mp-conn-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 120px; gap: 12px; align-items: center; padding: 12px 16px; }
+.mp-conn-head { font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); background: var(--surface-2); }
+.mp-conn-row { border-bottom: 1px solid var(--line); }
+.mp-conn-row:last-child { border-bottom: 0; }
+.mp-conn-name { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.mp-conn-name b { display: block; font-weight: 500; }
+.mp-conn-name small { display: block; color: var(--muted); font-size: 12px; }
+.mp-conn-type { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+.mp-conn-status { display: flex; justify-content: flex-end; color: var(--ok); }
+.mp-skill-actions { display: flex; align-items: center; gap: 6px; }
+.mp-skill-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; background: var(--surface); }
+.mp-skill-list > li { border-bottom: 1px solid var(--line); }
+.mp-skill-list > li:last-child { border-bottom: 0; }
+.mp-skill-row { width: 100%; display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 14px 16px; text-align: left; }
+.mp-skill-row:hover { background: var(--surface-2); }
+.mp-skill-ico { width: 36px; height: 36px; border-radius: 10px; background: var(--chip); border: 1px solid var(--line); display: grid; place-items: center; color: var(--muted); }
+.mp-skill-text b { font-weight: 500; margin-right: 6px; }
+.mp-skill-text small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+@media (max-width: 720px) {
+  .mp-page { padding: 16px 16px 64px; }
+  .mp-head { grid-template-columns: 1fr; }
+  .mp-grid.two, .mp-discover-grid { grid-template-columns: 1fr; }
+  .mp-conn-head { display: none; }
+  .mp-conn-row { grid-template-columns: 1fr; }
+}

@@ -24,6 +24,9 @@ const Chats = lazy(() => import('./pages/Chats.jsx'));
 const Explore = lazy(() => import('./pages/Explore.jsx'));
 const Library = lazy(() => import('./pages/Library.jsx'));
 const Integrations = lazy(() => import('./pages/Integrations.jsx'));
+const Marketplace = lazy(() => import('./pages/Marketplace.jsx'));
+const Connectors = lazy(() => import('./pages/Connectors.jsx'));
+const SkillsHub = lazy(() => import('./pages/SkillsHub.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 const NewAgent = lazy(() => import('./pages/NewAgent.jsx'));
 const AgentConfig = lazy(() => import('./pages/AgentConfig.jsx'));
@@ -119,7 +122,7 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
       )}
       <div className="side-foot">
         <Menu align="up" className="account-menu" trigger={({ toggle, open }) => (
-          <button className={`account ${['settings', 'integrations'].includes(section) ? 'on' : ''}`} onClick={toggle} aria-expanded={open} aria-haspopup="menu" title={collapsed ? 'Conta e configurações' : undefined}>
+          <button className={`account ${['settings', 'integrations', 'marketplace', 'connectors', 'skills'].includes(section) ? 'on' : ''}`} onClick={toggle} aria-expanded={open} aria-haspopup="menu" title={collapsed ? 'Conta e configurações' : undefined}>
             <span className="initial">{(S.settings.name || 'V')[0].toUpperCase()}</span>
             <span className="account-name"><b>{S.settings.name || 'Você'}</b><small>Conta e configurações</small></span>
             <Icon name="more" size={16} className="account-more" />
@@ -127,6 +130,9 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
         )}>
           <div className="account-head"><span className="initial">{(S.settings.name || 'V')[0].toUpperCase()}</span><span><b>{S.settings.name || 'Você'}</b><small>{S.agents.length} agentes · {S.projects.length} projetos</small></span></div>
           <MenuItem icon="gear" onClick={() => { onNavigate(); go('/settings'); }}>Configurações</MenuItem>
+          <MenuItem icon="store" onClick={() => { onNavigate(); go('/marketplace'); }}>Marketplace</MenuItem>
+          <MenuItem icon="plug" onClick={() => { onNavigate(); go('/connectors'); }}>Conectores</MenuItem>
+          <MenuItem icon="bolt" onClick={() => { onNavigate(); go('/skills'); }}>Habilidades</MenuItem>
           <MenuItem icon="cube" onClick={() => { onNavigate(); go('/settings/models'); }}>Modelos e computador<small className="menu-hint">Claude, Docker, plugins</small></MenuItem>
           <MenuItem icon={theme === 'dark' ? 'sun' : 'moon'} onClick={toggleTheme}>Tema {theme === 'dark' ? 'claro' : 'escuro'}</MenuItem>
           <hr className="menu-sep" />
@@ -217,6 +223,9 @@ function Shell() {
     p0 === 'explore' ? <Explore /> :
     p0 === 'library' ? <Library /> :
     p0 === 'integrations' ? <Integrations /> :
+    p0 === 'marketplace' ? <Marketplace /> :
+    p0 === 'connectors' ? <Connectors /> :
+    p0 === 'skills' ? <SkillsHub /> :
     p0 === 'settings' ? <Settings theme={theme} toggleTheme={toggleTheme} tab={p1} /> :
     <Home />;
 
