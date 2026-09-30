@@ -15,6 +15,7 @@ import { juliaOnline, juliaChoose, juliaStatus, RISK_OPTIONS, NOTIFY_OPTIONS } f
 import { checkSend, dueMessages, threadKey, inboxPrompt } from './lib/inbox.mjs';
 import { browserFor, browserRisk } from './lib/browser.mjs';
 import { runClaude, runCodex, systemPrompt } from './lib/providers.mjs';
+import { runTestProvider } from './lib/test-provider.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
 import { canUseFile, selectSpeakers, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent } from './lib/agent-flow.mjs';
 import { providerAttemptOrder, runProviderAttemptLoop } from './lib/provider-turn.mjs';
@@ -351,8 +352,10 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
   if (pick.model === 'codex' && !(await codexInstalled)) pick.model = 'claude-sonnet-5-5';
   emit({ route: { ...pick, effort } });
 
-  // Transferência automática: Claude falhou (limite/erro) → Codex, e vice-versa (se o Codex existir).
-  const order = providerAttemptOrder(pick.model, await codexInstalled);
+  const testProvider = process.env.RIPPER_TEST_PROVIDER;
+  const order = testProvider
+    ? [pick.model]
+    : providerAttemptOrder(pick.model, await codexInstalled);
   const push = (out, steps, extra) => chat.messages.push({
     id: id(), role: 'assistant', agentId: agent.id, content: out, at: Date.now(),
     ...(steps.length ? { steps } : {}), ...extra
@@ -362,6 +365,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
     signal,
     emit,
     runModel: m => {
+      if (testProvider) return runTestProvider({ prompt, signal });
       const providerSystem = MODELS[m].provider === 'codex' && s.computer.mode !== 'local'
         ? `${system}\n\nNesta execução do Codex, o computador está em modo somente leitura; não prometa executar comandos nem acessar a VM Boat.` : system;
       const args = { agent, effort, prompt, images, history, system: providerSystem, settings: s, signal };
