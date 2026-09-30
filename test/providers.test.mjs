@@ -5,6 +5,7 @@ import {
   claudeAllowedTools,
   buildCodexSpawnArgs,
   userMcp,
+  mcpPluginHttpHeaders,
   buildClaudeQueryOptions,
   parseCodexJsonEvent,
   describeRipperTool
@@ -44,6 +45,15 @@ test('claudeAllowedTools reflete ctx e plugins MCP', () => {
     tools.filter(t => t.startsWith('mcp__ripper__')),
     ripperClaudeToolAllowlist(baseAgent, ctx)
   );
+});
+
+test('mcpPluginHttpHeaders injeta Bearer OAuth', () => {
+  const h = mcpPluginHttpHeaders({
+    headers: { 'x-foo': '1' },
+    auth: { oauth: { accessToken: 'secret', tokenType: 'Bearer' } }
+  });
+  assert.equal(h['x-foo'], '1');
+  assert.match(h.authorization, /Bearer secret/);
 });
 
 test('userMcp ignora plugins quando ferramenta plugins está desligada', () => {

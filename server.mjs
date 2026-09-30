@@ -24,6 +24,17 @@ import { recordUsage, usageSummary, accountLimits, contextBreakdown, checkSendQu
 import { refreshClaudeSubscriptionUsage } from './lib/claude-subscription-usage.mjs';
 import { ripperBuiltinSchemaChars, listRipperBuiltinToolNames } from './lib/ripper-builtin-tools.mjs';
 import { verifyMcpServer } from './lib/mcp-probe.mjs';
+import {
+  applyOAuthTokensToPlugin,
+  discoverMcpOAuth,
+  exchangeOAuthCode,
+  findOAuthFlowByState,
+  getOAuthFlow,
+  mergePluginAuth,
+  oauthRedirectUri,
+  redactPluginAuth,
+  startMcpOAuthFlow
+} from './lib/mcp-oauth.mjs';
 
 function settingsForMcp(s, mcpSession) {
   if (!mcpSession) return s;
@@ -70,7 +81,18 @@ async function body(req) {
   if (!b.length) return {};
   try { return JSON.parse(b); } catch { throw new HttpError(400, 'JSON inválido.'); }
 }
-const redact = s => ({ ...s, claude: { ...s.claude, apiKey: s.claude.apiKey ? '••••' : '' }, computer: { ...s.computer, boatApiKey: s.computer.boatApiKey ? '••••' : '' } });
+const redact = s => ({
+  ...s,
+  claude: { ...s.claude, apiKey: s.claude.apiKey ? '••••' : '' },
+  computer: { ...s.computer, boatApiKey: s.computer.boatApiKey ? '••••' : '' },
+  plugins: (s.plugins || []).map(p => (p.auth ? { ...p, auth: redactPluginAuth(p.auth) } : p))
+});
+
+function publicBaseUrl(req) {
+  const host = req.headers.host || `127.0.0.1:${PORT}`;
+  const proto = req.headers['x-forwarded-proto'] || (HOST === '0.0.0.0' ? 'http' : 'http');
+  return `${proto}://${host}`;
+}
 // Prévias em texto puro: nada de ** ou # aparecendo nas listas.
 const plain = s => String(s || '').replace(/```[\s\S]*?```/g, ' ').replace(/[*_`#>]+/g, '').replace(/\s+/g, ' ').trim();
 const summary = ({ messages, ...c }) => ({ ...c, preview: plain(messages.at(-1)?.content).slice(0, 90), count: messages.length });
@@ -493,7 +515,39 @@ const routes = [
   ['POST', /^\/api\/mcp\/verify$/, async req => {
     const b = await body(req);
     if (!b.url || !/^https:\/\//.test(String(b.url))) throw new HttpError(400, 'URL HTTPS do servidor MCP é obrigatória.');
-    return verifyMcpServer(b.url);
+    let plugin;
+    if (b.pluginName) {
+      plugin = (db.settings.plugins || []).find(p => p.name === b.pluginName);
+    }
+    return verifyMcpServer(b.url, { plugin });
+  }],
+  ['POST', /^\/api\/mcp\/oauth\/start$/, async (req, _, url) => {
+    const b = await body(req);
+    const name = String(b.pluginName || '').trim();
+    if (!name) throw new HttpError(400, 'Informe pluginName.');
+    const plugin = (db.settings.plugins || []).find(p => p.name === name && p.type === 'http');
+    if (!plugin) throw new HttpError(404, 'Conector HTTP não encontrado.');
+    const mcpUrl = String(b.url || plugin.url || '');
+    if (!/^https:\/\//.test(mcpUrl)) throw new HttpError(400, 'URL MCP HTTPS inválida.');
+    let discovery = b.discovery;
+    if (!discovery?.authorizationServer) {
+      const probe = await fetch(mcpUrl, { method: 'GET', headers: { accept: 'application/json' } }).catch(() => null);
+      discovery = await discoverMcpOAuth(mcpUrl, { probeHeaders: probe?.headers });
+    }
+    if (!discovery?.authorizationServer) throw new HttpError(400, 'Não foi possível obter metadados OAuth deste servidor.');
+    const redirectUri = oauthRedirectUri(publicBaseUrl(req));
+    const started = await startMcpOAuthFlow({ plugin, discovery, redirectUri });
+    return { ...started, redirectUri };
+  }],
+  ['GET', /^\/api\/mcp\/oauth\/status\/([\w-]+)$/, (req, [flowId]) => {
+    const flow = getOAuthFlow(flowId);
+    if (!flow) throw new HttpError(404, 'Fluxo OAuth não encontrado ou expirado.');
+    return {
+      flowId,
+      status: flow.status,
+      pluginName: flow.pluginName,
+      error: flow.error || undefined
+    };
   }],
   ['PUT', /^\/api\/settings$/, async req => {
     const b = await body(req), s = db.settings;
@@ -510,13 +564,7 @@ const routes = [
     if (b.julia?.url && /^https?:\/\//.test(b.julia.url)) s.julia = { url: b.julia.url };
     if (Array.isArray(b.plugins)) s.plugins = b.plugins.filter(p => p?.name && /^[\w-]{1,40}$/.test(p.name)).map(p => {
       const prev = s.plugins.find(x => x.name === p.name);
-      const auth = p.auth && typeof p.auth === 'object' ? {
-        mode: ['oauth_now', 'oauth_lazy', 'none'].includes(p.auth.mode) ? p.auth.mode : 'oauth_lazy',
-        oauthClient: ['published', 'dcr', 'custom'].includes(p.auth.oauthClient) ? p.auth.oauthClient : 'published',
-        clientId: String(p.auth.clientId || '').slice(0, 200),
-        clientSecret: p.auth.clientSecret === '••••' ? (prev?.auth?.clientSecret || '') : String(p.auth.clientSecret || '').slice(0, 500),
-        headers: Array.isArray(p.auth.headers) ? p.auth.headers.slice(0, 4).map(h => ({ name: String(h.name || '').slice(0, 80), value: String(h.value || '').slice(0, 500) })).filter(h => h.name) : undefined
-      } : prev?.auth;
+      const auth = p.auth && typeof p.auth === 'object' ? mergePluginAuth(prev?.auth, p.auth) : prev?.auth;
       const hdr = Array.isArray(p.headers) ? Object.fromEntries(p.headers.slice(0, 4).filter(h => h?.name).map(h => [String(h.name).slice(0, 80), String(h.value || '').slice(0, 500)])) : p.headers;
       return p.type === 'http'
         ? { name: p.name, type: 'http', url: String(p.url), enabled: p.enabled !== false, ...(auth ? { auth } : {}), ...(hdr ? { headers: hdr } : {}) }
@@ -733,6 +781,46 @@ createServer(async (req, res) => {
       if (meta.type === 'ping') return json(res, { ok: true, pong: true });
       const started = runRoutine(r, { ...meta, body: summarizeEvent(raw) });
       return json(res, { ok: true, started }, started ? 202 : 429);
+    }
+    if (req.method === 'GET' && p === '/api/mcp/oauth/callback') {
+      const code = url.searchParams.get('code');
+      const state = url.searchParams.get('state') || '';
+      const err = url.searchParams.get('error');
+      const flow = findOAuthFlowByState(state);
+      if (!flow) {
+        res.writeHead(400, { ...SECURITY, 'content-type': 'text/html; charset=utf-8' });
+        res.end('<!doctype html><meta charset=utf-8><title>Ripper OAuth</title><p>Fluxo inválido ou expirado. Feche esta janela e tente de novo no Ripper.</p>');
+        return;
+      }
+      if (err) {
+        flow.status = 'error';
+        flow.error = url.searchParams.get('error_description') || err;
+        res.writeHead(400, { ...SECURITY, 'content-type': 'text/html; charset=utf-8' });
+        res.end(`<!doctype html><meta charset=utf-8><title>Ripper OAuth</title><p>Login negado: ${flow.error}</p><script>setTimeout(()=>window.close(),1200)</script>`);
+        return;
+      }
+      if (!code) {
+        res.writeHead(400, { ...SECURITY, 'content-type': 'text/html; charset=utf-8' });
+        res.end('<!doctype html><meta charset=utf-8><title>Ripper OAuth</title><p>Código OAuth ausente.</p>');
+        return;
+      }
+      try {
+        const tokens = await exchangeOAuthCode(flow, code);
+        const idx = (db.settings.plugins || []).findIndex(p => p.name === flow.pluginName);
+        if (idx >= 0) {
+          db.settings.plugins[idx] = applyOAuthTokensToPlugin(db.settings.plugins[idx], tokens, flow);
+          save();
+        }
+        flow.status = 'complete';
+        res.writeHead(200, { ...SECURITY, 'content-type': 'text/html; charset=utf-8' });
+        res.end('<!doctype html><meta charset=utf-8><title>Ripper OAuth</title><p>Login concluído. Você pode fechar esta janela.</p><script>setTimeout(()=>window.close(),800)</script>');
+      } catch (e) {
+        flow.status = 'error';
+        flow.error = e.message;
+        res.writeHead(500, { ...SECURITY, 'content-type': 'text/html; charset=utf-8' });
+        res.end('<!doctype html><meta charset=utf-8><title>Ripper OAuth</title><p>Falha ao trocar o código por token. Veja o Ripper e tente novamente.</p>');
+      }
+      return;
     }
     if (p.startsWith('/api/')) {
       if (!authed(req)) throw new HttpError(401, 'Não autorizado. Abra o Ripper com ?token=<RIPPER_TOKEN>.');
