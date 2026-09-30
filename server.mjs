@@ -5,7 +5,7 @@ import { mkdirSync, existsSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { extname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { timingSafeEqual } from 'node:crypto';
+import { authed as checkAuth } from './lib/auth.mjs';
 import { load, save, id, newAgent, patchAgent, dataUrl } from './lib/store.mjs';
 import { route, classifySpeaker, MODELS, EFFORTS } from './lib/router.mjs';
 import { computerFor } from './lib/boat.mjs';
@@ -64,10 +64,7 @@ const activeChats = new Set();
 const syncedBoatFiles = new Set();
 
 function authed(req) {
-  if (!TOKEN) return true;
-  const got = (req.headers.authorization || '').replace(/^Bearer /, '') || /(?:^|;\s*)ripper_token=([^;]+)/.exec(req.headers.cookie || '')?.[1] || '';
-  const a = Buffer.from(decodeURIComponent(got)), b = Buffer.from(TOKEN);
-  return a.length === b.length && timingSafeEqual(a, b);
+  return checkAuth(req, TOKEN);
 }
 
 function patchProject(p, b) {
