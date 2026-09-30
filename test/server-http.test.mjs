@@ -80,7 +80,8 @@ test('GET /api/usage/limits retorna agregado', async () => {
     const r = await fetch(base + '/api/usage/limits', { headers: { authorization: `Bearer ${token}` } });
     assert.equal(r.status, 200);
     const body = await r.json();
-    assert.equal(body.source, 'local_aggregate');
-    assert.ok(body.rolling5h);
+    assert.equal(body.source, 'ripper_local');
+    assert.equal(body.ripperQuota.rolling5h, null);
+    assert.ok(body.localUsage);
   });
 });
