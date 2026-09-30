@@ -1,5 +1,6 @@
 import { Icon, Menu } from './ui.jsx';
 import { useApp } from './app.jsx';
+import ModelUsage from './modelUsage.jsx';
 
 export const EFFORTS = [
   // [chave, rótulo, rótulo curto da trilha, dica]
@@ -41,13 +42,15 @@ export function EffortScale({ value, onChange, model }) {
 export default function ModelPicker({ value, onChange, group }) {
   const { S } = useApp();
   const models = [...(group ? [['agent', { label: 'Padrão de cada agente' }]] : []), ...Object.entries(S.models)];
-  const label = value.model === 'agent' ? 'Padrão dos agentes' : S.models[value.model]?.label.replace('Claude ', '') || 'Ripper Auto';
+  const label = value.model === 'agent' ? 'Padrão dos agentes' : value.model === 'auto' ? 'Ripper Auto' : (S.models[value.model]?.label.replace('Claude ', '') || value.model);
+  const effort = value.model === 'agent' ? null : effortLabel(value.effort);
   return (
+    <div className="model-bar">
     <Menu align="up" className="model-picker" trigger={({ toggle, open }) => (
-      <button type="button" className="chip" aria-expanded={open} aria-haspopup="dialog" onClick={toggle}>
-        <Icon name="bolt" size={14} />{label}
-        {value.model !== 'agent' && <span className="chip-sub">{effortLabel(value.effort)}</span>}
-        <Icon name="down" size={13} />
+      <button type="button" className="model-pill" aria-expanded={open} aria-haspopup="dialog" onClick={toggle}>
+        <span className="model-pill-main"><Icon name="bolt" size={14} />{label}</span>
+        {effort && <span className="model-pill-sub">{effort}<Icon name="down" size={12} /></span>}
+        {!effort && <Icon name="down" size={13} className="model-pill-caret" />}
       </button>
     )}>
       <div className="picker-pop" role="dialog" aria-label="Modelo e esforço">
@@ -66,5 +69,7 @@ export default function ModelPicker({ value, onChange, group }) {
         </>}
       </div>
     </Menu>
+    <ModelUsage />
+    </div>
   );
 }

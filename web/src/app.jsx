@@ -207,6 +207,11 @@ function Shell() {
     };
     addEventListener('keydown', f); return () => removeEventListener('keydown', f);
   }, []);
+  useEffect(() => {
+    const open = () => setPalette(true);
+    addEventListener('ripper:open-palette', open);
+    return () => removeEventListener('ripper:open-palette', open);
+  }, []);
   useEffect(() => { setDrawer(false); document.querySelector('.main')?.scrollTo(0, 0); }, [parts.join('/')]);
 
   const [p0, p1, p2] = parts;

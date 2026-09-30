@@ -53,7 +53,10 @@ const P = {
   filter: 'M4 6h16M7 12h10M10 18h4',
   sort: 'M8 9l4-4 4 4M16 15l-4 4-4-4',
   upload: 'M12 16V8M8 12l4-4 4 4M4 20h16',
-  video: 'M15 10l5-3v10l-5-3zM4 6h8v12H4z'
+  video: 'M15 10l5-3v10l-5-3zM4 6h8v12H4z',
+  grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+  sparkles: 'M12 3l1.2 4.2L17 8l-3.8 1.2L12 14l-1.2-4.8L7 8l3.8-.8L12 3zM5 16l.8 2.8L8 20l-2.2.7L5 23l-.8-2.3L2 20l2.2-.5L5 16z',
+  slash: 'M14.5 4 9 20M6 8h12'
 };
 export function Icon({ name, size = 18, className = '', ...rest }) {
   return <svg className={'icon ' + className} viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" {...rest}><path d={P[name]} /></svg>;

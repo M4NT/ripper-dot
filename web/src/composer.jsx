@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { VoiceBeam, useMicrophone } from 'voice-glow';
-import { Liquid } from 'liquid-gooey';
-import { api, fmtSize, local, useDark } from './lib.js';
+import { api, fmtSize, go, local, useDark } from './lib.js';
 import { AgentAvatar, Icon, useToast } from './ui.jsx';
 import ModelPicker from './modelPicker.jsx';
+import ComposerPlusMenu from './composerPlusMenu.jsx';
 
 const SpeechRec = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
 
@@ -20,13 +20,21 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
   const [files, setFiles] = useState([]); // { key, name, size, file?, id?, status }
   const [plus, setPlus] = useState(false);
   const [listening, setListening] = useState(false);
-  const ta = useRef(null), fileInput = useRef(null), rec = useRef(null), base = useRef('');
+  const ta = useRef(null), fileInput = useRef(null), folderInput = useRef(null), plusBtn = useRef(null), rec = useRef(null), base = useRef('');
   const mic = useMicrophone();
   const resolvedTheme = useDark() ? 'dark' : 'light';
 
   useLayoutEffect(() => { const el = ta.current; if (!el) return; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 260) + 'px'; }, [text]);
   useEffect(() => { local.set('draft.' + draftKey, text); }, [text, draftKey]);
   useEffect(() => () => { rec.current?.abort(); mic.stop(); }, []);
+
+  useEffect(() => {
+    const onKey = e => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') { e.preventDefault(); fileInput.current?.click(); }
+    };
+    addEventListener('keydown', onKey);
+    return () => removeEventListener('keydown', onKey);
+  }, []);
 
   const uploading = files.some(f => f.status === 'uploading');
   const canSend = !streaming && !uploading && (text.trim().length > 0 || files.some(f => f.id));
@@ -55,7 +63,6 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
     if (listening) toggleVoice();
   }
 
-  // Ditado: o reconhecimento de fala escreve no campo; o microfone alimenta o brilho.
   async function toggleVoice() {
     if (listening) { rec.current?.stop(); mic.stop(); setListening(false); return; }
     if (!SpeechRec) return toast('Este navegador não faz ditado. Use Chrome ou Edge.', 'error');
@@ -75,6 +82,29 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
     rec.current = r; r.start(); setListening(true);
   }
 
+  function openSlash() {
+    const el = ta.current;
+    if (el) {
+      const v = text;
+      const next = v.endsWith('/') || v.endsWith(' /') ? v : (v && !v.endsWith(' ') ? v + ' /' : v + '/');
+      setText(next);
+      el.focus();
+    }
+    window.dispatchEvent(new CustomEvent('ripper:open-palette'));
+  }
+
+  function teachTask() {
+    local.set('skills.openCreate', true);
+    go('/skills');
+  }
+
+  function pickFolder(e) {
+    const list = [...e.target.files];
+    e.target.value = '';
+    if (!list.length) return;
+    addFiles(list);
+    toast(`${list.length} arquivo(s) da pasta anexado(s).`);
+  }
 
   return (
     <div className="composer-wrap">
@@ -85,7 +115,6 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
             onDragLeave={e => e.currentTarget.classList.remove('drag')}
             onDrop={e => { e.preventDefault(); e.currentTarget.classList.remove('drag'); addFiles([...e.dataTransfer.files]); }}>
             {mentions && (() => {
-              // Sugestões de @menção enquanto a palavra atual começa com @.
               const m = /(^|\s)@([\wÀ-ú]*)$/.exec(text);
               const opts = m ? mentions.filter(a => a.name.toLowerCase().startsWith(m[2].toLowerCase())) : [];
               return opts.length > 0 && (
@@ -113,17 +142,17 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
               onPaste={e => { const fs = [...e.clipboardData.files]; if (fs.length) { e.preventDefault(); addFiles(fs); } }}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } if (e.key === 'Escape' && streaming) onStop(); }} />
             <div className="composer-row">
-              {/* Menu + que se divide em gotas (liquid-gooey, morph) */}
-              <Liquid className="plus-liquid" fill="var(--chip)" blur={6} contrast={18} shadow="0 1px 2px rgba(20,18,15,.08)">
-                <Liquid.Item x={0} y={0}>
-                  <button type="button" className={`round round-main ${plus ? 'open' : ''}`} aria-expanded={plus} aria-label={plus ? 'Fechar opções' : 'Mais opções'} onClick={() => setPlus(p => !p)}><Icon name="plus" size={17} /></button>
-                </Liquid.Item>
-                <Liquid.Item x={plus ? 42 : 0} y={0} transition="bouncy" delay={20}>
-                  <button type="button" className={`round ${plus ? "" : "tucked"}`} tabIndex={plus ? 0 : -1} aria-hidden={!plus} aria-label="Anexar arquivo" onClick={() => fileInput.current.click()}><Icon name="paperclip" size={16} /></button>
-                </Liquid.Item>
-              </Liquid>
-              <input ref={fileInput} type="file" multiple hidden onChange={e => { addFiles([...e.target.files]); e.target.value = ''; }} />
-              <div className={`composer-chips ${plus ? 'shifted' : ''}`}>
+              <button ref={plusBtn} type="button" className={`round-btn ${plus ? 'open' : ''}`} aria-expanded={plus} aria-label="Mais opções" onClick={() => setPlus(p => !p)}>
+                <Icon name="plus" size={17} />
+              </button>
+              <ComposerPlusMenu open={plus} onClose={() => setPlus(false)} anchorRef={plusBtn}
+                onFiles={() => fileInput.current?.click()}
+                onFolder={() => folderInput.current?.click()}
+                onSlash={openSlash}
+                onTeach={teachTask} />
+              <input ref={fileInput} type="file" multiple hidden accept="image/*,*/*" onChange={e => { addFiles([...e.target.files]); e.target.value = ''; }} />
+              <input ref={folderInput} type="file" multiple hidden webkitdirectory="" directory="" onChange={pickFolder} />
+              <div className="composer-chips">
                 {setChoice && <ModelPicker value={choice} onChange={setChoice} group={group} />}
               </div>
               <div className="grow" />

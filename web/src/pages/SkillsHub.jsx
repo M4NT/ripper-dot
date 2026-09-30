@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { local } from '../lib.js';
 import { useApp } from '../app.jsx';
 import { fmtAgo, go, useRoute } from '../lib.js';
 import { Icon, Menu, MenuItem } from '../ui.jsx';
@@ -65,6 +66,13 @@ export default function SkillsHub() {
   const tab = parts[1] === 'discover' ? 'discover' : 'mine';
   const [q, setQ] = useState('');
   const edit = useSkillEditor();
+  useEffect(() => {
+    if (local.get('skills.openCreate', false)) {
+      local.set('skills.openCreate', false);
+      edit(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <HubShell
