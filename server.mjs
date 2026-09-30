@@ -11,7 +11,7 @@ import { route, classifySpeaker, MODELS, EFFORTS } from './lib/router.mjs';
 import { computerFor } from './lib/boat.mjs';
 import { dockerAvailable, imageStatus, ensureImage, hostnameOf } from './lib/docker.mjs';
 import { needsApproval, ApprovalGate } from './lib/approvals.mjs';
-import { juliaOnline, juliaChoose, juliaStatus, RISK_OPTIONS, NOTIFY_OPTIONS } from './lib/julia.mjs';
+import { juliaOnline, juliaChoose, juliaStatus, measureTriagePromptChars, RISK_OPTIONS, NOTIFY_OPTIONS } from './lib/julia.mjs';
 import { checkSend, dueMessages, threadKey, inboxPrompt } from './lib/inbox.mjs';
 import { browserFor, browserRisk } from './lib/browser.mjs';
 import { runClaude, runCodex, systemPrompt } from './lib/providers.mjs';
@@ -196,7 +196,12 @@ function guarded(computer, { agent, chat, emit, signal }) {
     async exec(command) {
       let reason = needsApproval({ command, computerKind: computer.kind, policy, allowed: chat.allowedCommands || [] });
       if (!reason && policy === 'risky' && !(chat.allowedCommands || []).includes(command)) {
-        const j = await juliaChoose(db.settings, { context: `Agente ${agent.name} vai executar no próprio computador.`, question: command, options: RISK_OPTIONS }, 0.6);
+        const riskCtx = `Agente ${agent.name} vai executar no próprio computador.`;
+        const j = await juliaChoose(db.settings, { context: riskCtx, question: command, options: RISK_OPTIONS }, {
+          minScore: 0.6,
+          purpose: 'risk',
+          avoidedPromptChars: measureTriagePromptChars({ context: riskCtx, question: command, options: RISK_OPTIONS })
+        });
         if (j && j.index > 0) reason = `Julia 1: ${RISK_OPTIONS[j.index].split(':')[0].toLowerCase()}`;
       }
       if (reason && !(await ask('exec', command, reason))) return `O usuário NÃO aprovou este comando (${reason}). Não tente contorná-lo; explique o que precisava e ofereça uma alternativa segura.`;
@@ -856,7 +861,13 @@ function runRoutine(r, event) {
     const failed = replies.find(m => m.error)?.error;
     let verdict = null;
     if (!failed && replies.length && r.quiet !== false) {
-      const j = await juliaChoose(db.settings, { context: `Rotina "${r.name}": ${r.prompt}`, question: replies.map(m => m.content).join('\n').slice(0, 1500), options: NOTIFY_OPTIONS }, 0.55);
+      const notifyCtx = `Rotina "${r.name}": ${r.prompt}`;
+      const notifyQ = replies.map(m => m.content).join('\n').slice(0, 1500);
+      const j = await juliaChoose(db.settings, { context: notifyCtx, question: notifyQ, options: NOTIFY_OPTIONS }, {
+        minScore: 0.55,
+        purpose: 'notify',
+        avoidedPromptChars: measureTriagePromptChars({ context: notifyCtx, question: notifyQ, options: NOTIFY_OPTIONS })
+      });
       verdict = j ? ['notify', 'silence', 'escalate'][j.index] : null;
     }
     if (verdict === 'escalate') c.urgent = true;

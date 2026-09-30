@@ -10,12 +10,15 @@ function withUsageDataDir(fn) {
   process.env.RIPPER_DATA = dir;
   return import('../lib/store.mjs').then(async store => {
     const { _resetUsageEventsForTests } = await import('../lib/usage-events.mjs');
+    const { _resetJuliaEventsForTests } = await import('../lib/julia-events.mjs');
     store._resetStoreForTests();
     _resetUsageEventsForTests();
+    _resetJuliaEventsForTests();
     const usage = await import('../lib/usage.mjs');
     return Promise.resolve(fn(usage)).finally(() => {
       store._resetStoreForTests();
       _resetUsageEventsForTests();
+      _resetJuliaEventsForTests();
       process.env.RIPPER_DATA = prev;
     });
   });
@@ -33,15 +36,20 @@ test('recordUsage acumula por modelo', () =>
   }));
 
 test('accountLimits não inventa cotas nem créditos sem env', () =>
-  withUsageDataDir(({ recordUsage, accountLimits }) => {
+  withUsageDataDir(async ({ recordUsage, accountLimits }) => {
+  const { appendJuliaDecision } = await import('../lib/julia-events.mjs');
   const db = {};
   for (let i = 0; i < 5; i++) recordUsage(db, 'claude-sonnet-5-5', { charsIn: 10_000, charsOut: 5000, routedBy: 'julia-1' });
+  for (let i = 0; i < 3; i++) {
+    appendJuliaDecision({ purpose: 'route', latencyMs: 10, optionCount: 3, ok: true, score: 0.8, avoidedPromptChars: 50 });
+  }
   const lim = accountLimits(db, {});
   assert.equal(lim.source, 'ripper_local');
   assert.equal(lim.ripperQuota.rolling5h, null);
   assert.equal(lim.ripperQuota.weekly, null);
   assert.equal(lim.cloudCredits, null);
-  assert.equal(lim.juliaRouting.routedRequests, 5);
+  assert.equal(lim.juliaRouting.decisions, 3);
+  assert.equal(lim.juliaRouting.usageRoutedByJulia, 5);
   assert.equal(lim.juliaRouting.usdAvoidedEst, undefined);
   assert.ok(lim.localUsage.chars5h > 0);
   }));
