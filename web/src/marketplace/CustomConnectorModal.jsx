@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from '../lib.js';
 import { Dialog, Icon } from '../ui.jsx';
+import { runMcpOAuthLogin } from './mcpOAuth.js';
 
 const AUTH_MODES = [
   ['oauth_now', 'Entrar agora', 'Cada usuário faz login pelo fluxo OAuth do servidor antes de usar ferramentas.'],
@@ -34,6 +35,7 @@ export default function CustomConnectorModal({ open, onClose, onSaved }) {
   function close() { reset(); onClose(); }
 
   const canContinue = name.trim().length > 0 && /^https:\/\/.+/i.test(url.trim());
+  const oauthNeeded = verify?.login?.found && authMode !== 'none';
 
   async function runVerify() {
     setBusy(true);
@@ -53,9 +55,10 @@ export default function CustomConnectorModal({ open, onClose, onSaved }) {
     try {
       const state = await api('/api/state');
       const plugins = [...(state.settings.plugins || [])];
-      if (plugins.some(p => p.name === name.trim())) throw new Error('Já existe um conector com esse nome.');
+      const trimmed = name.trim();
+      if (plugins.some(p => p.name === trimmed)) throw new Error('Já existe um conector com esse nome.');
       plugins.push({
-        name: name.trim(),
+        name: trimmed,
         type: 'http',
         url: url.trim(),
         enabled: true,
@@ -69,6 +72,15 @@ export default function CustomConnectorModal({ open, onClose, onSaved }) {
         headers: Object.fromEntries(headers.filter(h => h.name).map(h => [h.name, h.value]))
       });
       await api('/api/settings', { method: 'PUT', body: { ...state.settings, plugins } });
+
+      if (oauthNeeded && authMode === 'oauth_now' && verify?.login?.discovery?.authorizationServer) {
+        await runMcpOAuthLogin({
+          pluginName: trimmed,
+          url: url.trim(),
+          discovery: verify.login.discovery
+        });
+      }
+
       onSaved?.();
       close();
     } catch (e) {
@@ -156,9 +168,13 @@ export default function CustomConnectorModal({ open, onClose, onSaved }) {
                 <div className="conn-custom-oauth">
                   <input className="input" placeholder="Client ID" value={clientId} onChange={e => setClientId(e.target.value)} />
                   <input className="input" placeholder="Client secret" type="password" value={clientSecret} onChange={e => setClientSecret(e.target.value)} />
+                  <small>Registre o redirect URI <code>{typeof window !== 'undefined' ? `${window.location.origin}/api/mcp/oauth/callback` : '/api/mcp/oauth/callback'}</code> no seu provedor.</small>
                 </div>
               )}
             </section>
+          )}
+          {oauthNeeded && authMode === 'oauth_now' && (
+            <p className="muted small">Ao concluir, o Ripper abrirá o navegador para você autorizar o acesso.</p>
           )}
           <section className="conn-section">
             <h3>Cabeçalhos de requisição</h3>
@@ -176,7 +192,7 @@ export default function CustomConnectorModal({ open, onClose, onSaved }) {
           {verify?.saveError && <p className="form-error">{verify.saveError}</p>}
           <footer className="conn-modal-foot">
             <button type="button" className="btn" onClick={() => setStep('form')}>Voltar</button>
-            <button type="button" className="btn btn-primary" disabled={busy} onClick={save}>{busy ? 'Salvando…' : 'Concluir'}</button>
+            <button type="button" className="btn btn-primary" disabled={busy} onClick={save}>{busy ? (oauthNeeded && authMode === 'oauth_now' ? 'Aguardando login…' : 'Salvando…') : 'Concluir'}</button>
           </footer>
         </>
       )}
