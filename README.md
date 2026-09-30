@@ -84,6 +84,8 @@ npm test
 
 Os testes da Julia usam mocks HTTP — não exigem PyTorch nem download do Hugging Face.
 
+Os testes E2E do chat (`test/chat-sse.test.mjs`) sobem o servidor com `RIPPER_TEST_PROVIDER` para simular o stream SSE sem chamar Claude/Codex.
+
 ## Uso, contexto e cotas (sem números fictícios)
 
 O painel de uso no chat mostra **somente** o que o Ripper mede ou o que você configurar no servidor:

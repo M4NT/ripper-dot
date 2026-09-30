@@ -125,3 +125,22 @@ test('runProviderAttemptLoop: abort interrompe sem fallback', async () => {
   assert.equal(result.aborted, true);
   assert.deepEqual(calls, ['claude-sonnet-5-5']);
 });
+
+test('runProviderAttemptLoop: abort após stream sem throw marca aborted', async () => {
+  const ac = new AbortController();
+  let stopped;
+  const result = await runProviderAttemptLoop({
+    order: ['claude-sonnet-5-5', 'codex'],
+    signal: ac.signal,
+    runModel: async function* () {
+      yield { text: 'par' };
+      ac.abort();
+    },
+    onAttemptFailed: ({ aborted, out }) => {
+      assert.equal(aborted, true);
+      stopped = out;
+    }
+  });
+  assert.equal(result.aborted, true);
+  assert.equal(stopped, 'par');
+});
