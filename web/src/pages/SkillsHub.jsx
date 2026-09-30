@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useApp } from '../app.jsx';
 import { fmtAgo, go, useRoute } from '../lib.js';
 import { Icon, Menu, MenuItem } from '../ui.jsx';
