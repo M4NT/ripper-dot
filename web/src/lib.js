@@ -3,6 +3,25 @@ import { fmtAgoLocalized, getCachedUiLocale, translateApiError } from '../../lib
 
 /* ---------- API ---------- */
 export class ApiError extends Error {}
+export async function apiUpload(path, formData, { signal } = {}) {
+  const res = await fetch(path, { method: 'POST', body: formData, signal });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(data.error || `Erro ${res.status}`);
+  return data;
+}
+
+export function brandLogoSrc(logoUrl) {
+  if (!logoUrl) return null;
+  if (/^https?:\/\//i.test(logoUrl)) return logoUrl;
+  if (logoUrl.startsWith('brand/')) return `/api/brand/file/${encodeURIComponent(logoUrl.slice('brand/'.length))}`;
+  return null;
+}
+
+export function brandTitle(settings) {
+  const n = settings?.brand?.displayName?.trim();
+  return n || 'Ripper';
+}
+
 export async function api(path, { method = 'GET', body, raw, headers, signal } = {}) {
   const res = await fetch(path, {
     method, signal,

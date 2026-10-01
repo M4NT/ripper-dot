@@ -235,6 +235,7 @@ import {
   resolveEffectiveChaos,
   scheduleChaosFire
 } from './lib/chaos.mjs';
+import { detectImageType, isSafeBrandStoragePath, newBrandLogoFilename, readBrandLogoUpload, BRAND_LOGO_MAX } from './lib/brand.mjs';
 
 installLogRedactionMiddleware();
 
@@ -437,6 +438,12 @@ function parseMeteringMsParam(raw, fallback) {
 function requireEnterpriseAdmin() {
   if (!isEnterpriseMode(db.settings)) {
     throw new HttpError(403, 'Disponível apenas no modo enterprise (Centro admin).');
+  }
+}
+
+function requireEnterpriseBrand() {
+  if (!isEnterpriseMode(db.settings)) {
+    throw new HttpError(403, 'Marca personalizada disponível apenas no modo enterprise.');
   }
 }
 
@@ -1520,11 +1527,37 @@ const routes = [
       throw new HttpError(400, e.message);
     }
   }],
+  ['GET', /^\/api\/brand\/file\/([\w.-]+)$/, async (req, [name], url, res) => {
+    requireEnterpriseBrand();
+    const rel = `brand/${name}`;
+    if (!isSafeBrandStoragePath(rel)) throw new HttpError(400, 'Arquivo inválido.');
+    let buf;
+    try { buf = await readFile(dataUrl(rel)); }
+    catch { throw new HttpError(404, 'Logo não encontrado.'); }
+    const type = detectImageType(buf);
+    if (!type) throw new HttpError(404, 'Logo não encontrado.');
+    res.writeHead(200, hdr(req, { 'content-type': type, 'cache-control': 'private, max-age=3600' }));
+    res.end(buf);
+    return undefined;
+  }],
+  ['POST', /^\/api\/brand\/logo$/, async req => {
+    requireEnterpriseBrand();
+    const { buf } = await readBrandLogoUpload(req, (r, lim) => raw(r, lim));
+    if (!buf.length) throw new HttpError(400, 'Arquivo vazio.');
+    if (buf.length > BRAND_LOGO_MAX) throw new HttpError(413, 'Imagem grande demais (máx. 2 MB).');
+    const type = detectImageType(buf);
+    if (!type) throw new HttpError(400, 'Envie uma imagem PNG, JPEG, WebP ou GIF.');
+    const rel = `brand/${newBrandLogoFilename(type)}`;
+    mkdirSync(dataUrl('brand/'), { recursive: true });
+    await writeFile(dataUrl(rel), buf);
+    return { logoUrl: rel };
+  }],
   ['GET', /^\/api\/settings$/, () => ({ settings: redact(db.settings), meta: settingsMeta() })],
   ['GET', /^\/api\/flags$/, () => ({ flags: effectiveFeatureFlags(db.settings) })],
   ['PUT', /^\/api\/settings$/, async req => {
     const b = await body(req), s = db.settings;
     const before = structuredClone(s);
+    if (!isEnterpriseMode(s) && b.brand !== undefined) delete b.brand;
     try {
       patchSettings(s, b, { mergePluginAuth });
     } catch (e) {
