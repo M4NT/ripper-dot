@@ -7,7 +7,7 @@ import AgentCard, { NewAgentCard } from '../agentCard.jsx';
 import Composer from '../composer.jsx';
 import { sessionPayload } from '../marketplace/sessionMcp.js';
 
-const TEMPLATE_ICON = { Pesquisa: 'search', Dados: 'data', Operações: 'bolt', Atendimento: 'chat', Marketing: 'edit', Vendas: 'agents', Produtividade: 'clock' };
+const TEMPLATE_ICON = { Pesquisa: 'search', Dados: 'data', Operações: 'bolt', Atendimento: 'chat', Marketing: 'edit', Vendas: 'agents', Produtividade: 'clock', Arquitetura: 'agents' };
 
 /* Campo de pontos em meio-tom: uma esfera iluminada, desenhada como geometria pura. */
 function Halftone() {

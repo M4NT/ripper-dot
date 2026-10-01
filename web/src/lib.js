@@ -3,6 +3,25 @@ import { fmtAgoLocalized, getCachedUiLocale, translateApiError } from '../../lib
 
 /* ---------- API ---------- */
 export class ApiError extends Error {}
+export async function apiUpload(path, formData, { signal } = {}) {
+  const res = await fetch(path, { method: 'POST', body: formData, signal });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(data.error || `Erro ${res.status}`);
+  return data;
+}
+
+export function brandLogoSrc(logoUrl) {
+  if (!logoUrl) return null;
+  if (/^https?:\/\//i.test(logoUrl)) return logoUrl;
+  if (logoUrl.startsWith('brand/')) return `/api/brand/file/${encodeURIComponent(logoUrl.slice('brand/'.length))}`;
+  return null;
+}
+
+export function brandTitle(settings) {
+  const n = settings?.brand?.displayName?.trim();
+  return n || 'Ripper';
+}
+
 export async function api(path, { method = 'GET', body, raw, headers, signal } = {}) {
   const res = await fetch(path, {
     method, signal,
@@ -61,15 +80,18 @@ export const TOOL_INFO = {
   memory: { label: 'Memória', icon: 'brain', desc: 'Guarda o que importa entre conversas.' },
   routines: { label: 'Rotinas', icon: 'clock', desc: 'Age sozinho em horários definidos.' },
   files: { label: 'Análise de arquivos', icon: 'file', desc: 'Lê documentos, planilhas e código enviados.' },
-  plugins: { label: 'Plugins MCP', icon: 'plug', desc: 'Usa as integrações que você conectou.' }
+  plugins: { label: 'Plugins MCP', icon: 'plug', desc: 'Usa as integrações que você conectou.' },
+  social: { label: 'Publicação social', icon: 'share', desc: 'Envia rascunhos ou posts para webhooks configurados (Slack, HTTP).' }
 };
 export const STEP_LABEL = {
   computer_exec: 'Rodando no computador', computer_share: 'Gerando link', WebSearch: 'Pesquisando na web', WebFetch: 'Lendo página',
   remember: 'Guardando na memória', schedule_routine: 'Criando rotina',
   browser_open: 'Abrindo página', browser_click: 'Clicando', browser_type: 'Digitando', browser_scroll: 'Rolando a página', browser_read: 'Lendo a página',
-  send_message: 'Mandando mensagem', save_artifact: 'Salvando artefato', read_artifact: 'Lendo artefato', use_skill: 'Usando skill', save_skill: 'Guardando skill'
+  send_message: 'Mandando mensagem', call_agent: 'Chamando colega', save_artifact: 'Salvando artefato', read_artifact: 'Lendo artefato', use_skill: 'Usando skill', save_skill: 'Guardando skill',
+  post_social: 'Publicando', send_webhook: 'Enviando webhook', list_social_webhooks: 'Listando webhooks'
 };
 export const TONES = [['direto', 'Direto'], ['amigavel', 'Amigável'], ['formal', 'Formal'], ['tecnico', 'Técnico']];
+export const FORMALITIES = [['informal', 'Informal'], ['neutro', 'Neutro'], ['formal', 'Formal']];
 
 /** Tema efetivo ('light' | 'dark'), reagindo a mudanças do atributo data-theme. */
 const themeSub = cb => { const mo = new MutationObserver(cb); mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] }); return () => mo.disconnect(); };

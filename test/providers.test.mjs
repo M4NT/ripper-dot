@@ -37,6 +37,7 @@ test('claudeAllowedTools reflete ctx e plugins MCP', () => {
   const tools = claudeAllowedTools(baseAgent, settings, ctx);
   assert.ok(tools.includes('mcp__ripper__remember'));
   assert.ok(tools.includes('mcp__ripper__send_message'));
+  assert.ok(tools.includes('mcp__ripper__call_agent'));
   assert.ok(tools.includes('mcp__my-mcp__*'));
   assert.ok(!tools.some(t => t.includes('off-mcp')));
   assert.ok(tools.includes('WebSearch'));

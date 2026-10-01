@@ -452,6 +452,22 @@ test('GET /api/audit-trail e /api/lgpd/status', async () => {
   });
 });
 
+test('POST /api/x9/scan exige enterprise e retorna findings', async () => {
+  await withServer({}, async (base, token) => {
+    const auth = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const denied = await fetch(base + '/api/x9/scan', { method: 'POST', headers: auth, body: '{}' });
+    assert.equal(denied.status, 403);
+    await enableEnterprise(base, auth);
+    const r = await fetch(base + '/api/x9/scan', { method: 'POST', headers: auth, body: '{}' });
+    assert.equal(r.status, 200);
+    const body = await r.json();
+    assert.ok(Array.isArray(body.findings));
+    assert.ok(body.sources?.ripperSettings?.available);
+    assert.equal(body.sources.adminOverview.available, true);
+    assert.equal(body.sources.lgpd.available, true);
+  });
+});
+
 test('GET /api/data/backup e restore', async () => {
   await withServer({}, async (base, token) => {
     const auth = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
@@ -466,6 +482,29 @@ test('GET /api/data/backup e restore', async () => {
     assert.equal(res.status, 200);
     const st = await fetch(base + '/api/state', { headers: auth }).then(r => r.json());
     assert.equal(st.settings.name, 'restaurado-teste');
+  });
+});
+
+test('POST /api/team-proposals parse e apply', async () => {
+  await withServer({}, async (base, token) => {
+    const auth = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const created = await fetch(base + '/api/team-proposals', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ brief: 'Time: Demo\n- Analista: olha métricas\n- Redator: escreve resumos' })
+    });
+    assert.equal(created.status, 200);
+    const proposal = await created.json();
+    assert.equal(proposal.structure.agents.length, 2);
+    const applied = await fetch(base + `/api/team-proposals/${proposal.id}/apply`, {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({})
+    });
+    assert.equal(applied.status, 200);
+    const body = await applied.json();
+    assert.equal(body.agents.length, 2);
+    assert.ok(body.project?.id);
   });
 });
 
@@ -502,3 +541,41 @@ test('RIPPER_LOG_JSON: requisição API emite linhas JSON sem token', async () =
     await new Promise(r => child.on('exit', r));
   }
 });
+
+test('POST /api/lgpd/erasure exige confirmação e apaga perfil', async () => {
+  await withServer({}, async (base, token) => {
+    const auth = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const denied = await fetch(base + '/api/lgpd/erasure', { method: 'POST', headers: auth, body: '{}' });
+    assert.equal(denied.status, 400);
+    await fetch(base + '/api/settings', {
+      method: 'PUT',
+      headers: auth,
+      body: JSON.stringify({ name: 'Titular LGPD' })
+    });
+    const st0 = await fetch(base + '/api/state', { headers: auth }).then(r => r.json());
+    assert.equal(st0.settings.name, 'Titular LGPD');
+    const ok = await fetch(base + '/api/lgpd/erasure', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ confirm: true, scope: 'profile' })
+    });
+    assert.equal(ok.status, 200);
+    const body = await ok.json();
+    assert.equal(body.ok, true);
+    assert.equal(body.report.profileCleared, true);
+    const st1 = await fetch(base + '/api/state', { headers: auth }).then(r => r.json());
+    assert.equal(st1.settings.name, '');
+  });
+});
+
+test('GET /api/lgpd/status expõe meta', async () => {
+  await withServer({}, async (base, token) => {
+    const r = await fetch(base + '/api/lgpd/status', { headers: { authorization: `Bearer ${token}` } });
+    assert.equal(r.status, 200);
+    const body = await r.json();
+    assert.equal(body.productTelemetry, false);
+    assert.equal(body.lgpd.enabled, false);
+    assert.equal(body.lgpd.placeholder, '[PII]');
+  });
+});
+

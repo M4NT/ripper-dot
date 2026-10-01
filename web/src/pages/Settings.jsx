@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { MetalBadge } from 'metal-fx';
 import { useApp } from '../app.jsx';
 import { useOv } from '../overlay.jsx';
-import { api, go, useDark } from '../lib.js';
+import { api, apiUpload, go, useDark, brandLogoSrc, TONES, FORMALITIES } from '../lib.js';
 import { Icon, Switch, Select, EmptyState } from '../ui.jsx';
 import { AdvancedBlock, HelpTip } from '../disclosure.jsx';
 import { ApprovalHistory } from '../approvals.jsx';
@@ -146,6 +146,65 @@ const Card = ({ title, badge, children, desc }) => (
   </section>
 );
 
+function BrandMarca({ s, set, toast }) {
+  const fileRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const brand = s.brand || { displayName: '', logoUrl: '', accentColor: '', tagline: '', links: {} };
+  const setBrand = (key, value) => set('brand', { ...brand, [key]: value });
+  const setLink = (key, value) => set('brand', { ...brand, links: { ...(brand.links || {}), [key]: value } });
+  const logoSrc = brandLogoSrc(brand.logoUrl);
+  const previewName = brand.displayName?.trim() || 'Ripper';
+  const previewStyle = brand.accentColor ? { '--brand-accent': brand.accentColor } : undefined;
+  async function onLogoFile(file) {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const { logoUrl } = await apiUpload('/api/brand/logo', fd);
+      setBrand('logoUrl', logoUrl);
+      toast('Logo enviado — salve para aplicar');
+    } catch (e) { toast(e.message, 'error'); }
+    finally { setUploading(false); if (fileRef.current) fileRef.current.value = ''; }
+  }
+  return <>
+    <Card title="Marca" desc="Nome, logo e cor de destaque na barra lateral. Deixe em branco para o visual padrão do Ripper.">
+      <div className="brand-preview" style={previewStyle}>
+        {logoSrc
+          ? <img className="brand-logo" src={logoSrc} width="40" height="40" alt="" />
+          : <svg viewBox="0 0 32 32" width="40" height="40" aria-hidden="true"><rect width="32" height="32" rx="8" className="brand-bg" /><path d="M11 23V9h6.2a4.3 4.3 0 0 1 .9 8.5L22 23" className="brand-r" /></svg>}
+        <div><b>{previewName}</b>{brand.tagline?.trim() && <small className="muted">{brand.tagline.trim()}</small>}</div>
+      </div>
+      <Row title="Nome exibido" desc="Aparece no topo da barra lateral."><input className="input" value={brand.displayName || ''} maxLength={80} onChange={e => setBrand('displayName', e.target.value)} placeholder="Ripper" /></Row>
+      <Row title="Tagline" desc="Opcional; só na prévia aqui (não na barra lateral)."><input className="input" value={brand.tagline || ''} maxLength={160} onChange={e => setBrand('tagline', e.target.value)} placeholder="Agentes de IA para o seu time" /></Row>
+      <Row title="Cor de destaque" desc="Usada no ícone padrão quando não há logo.">
+        <div className="row">
+          <input className="input" type="color" value={/^#[0-9a-fA-F]{6}$/.test(brand.accentColor || '') ? brand.accentColor : '#161513'} onChange={e => setBrand('accentColor', e.target.value)} aria-label="Cor de destaque" />
+          <input className="input" value={brand.accentColor || ''} onChange={e => setBrand('accentColor', e.target.value)} placeholder="#161513" style={{ maxWidth: 120 }} />
+          {brand.accentColor && <button type="button" className="btn btn-sm" onClick={() => setBrand('accentColor', '')}>Padrão</button>}
+        </div>
+      </Row>
+      <Row title="Logo" desc="URL pública (https) ou envie um arquivo (PNG, JPEG, WebP ou GIF, até 2 MB).">
+        <div className="row stack">
+          <input className="input" value={brand.logoUrl || ''} onChange={e => setBrand('logoUrl', e.target.value)} placeholder="https://… ou brand/logo-….png" />
+          <div className="row">
+            <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" aria-label="Enviar logo" onChange={e => onLogoFile(e.target.files?.[0])} disabled={uploading} />
+            {uploading && <span className="muted" role="status">Enviando…</span>}
+            {brand.logoUrl && <button type="button" className="btn btn-sm" onClick={() => setBrand('logoUrl', '')}>Remover logo</button>}
+          </div>
+        </div>
+      </Row>
+      <Row title="Redes e site" desc="Links opcionais (só para referência futura; não aparecem na barra lateral no MVP).">
+        <div className="row stack">
+          <input className="input" value={brand.links?.website || ''} onChange={e => setLink('website', e.target.value)} placeholder="Site (https://…)" />
+          <input className="input" value={brand.links?.linkedin || ''} onChange={e => setLink('linkedin', e.target.value)} placeholder="LinkedIn (https://…)" />
+          <input className="input" value={brand.links?.twitter || ''} onChange={e => setLink('twitter', e.target.value)} placeholder="X / Twitter (https://…)" />
+        </div>
+      </Row>
+    </Card>
+  </>;
+}
+
 function Plugins({ s, set }) {
   const [name, setName] = useState('');
   const [target, setTarget] = useState('');
@@ -186,7 +245,7 @@ function Plugins({ s, set }) {
 }
 
 export default function Settings({ theme, toggleTheme, tab: initial }) {
-  const { S } = useApp();
+  const { S, refresh, toast } = useApp();
   const tr = useT();
   const SETTINGS_TABS = settingsTabs(tr);
   const d = useSettingsDraft();
@@ -228,6 +287,21 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
             <Row title="Seu nome" desc="Os agentes usam isso quando falam com você."><input className="input" value={s.name} maxLength={80} onChange={e => set('name', e.target.value)} placeholder="Ex.: Rafael" /></Row>
             <Row stack title="Instruções gerais" desc="Entram em toda conversa, junto das instruções de cada agente e da skill token-the-ripper.">
               <textarea className="input" rows={6} value={s.customInstructions} maxLength={8000} onChange={e => set('customInstructions', e.target.value)} placeholder="Ex.: Sou dev frontend em SP. Respostas curtas, TypeScript no código." />
+            </Row>
+          </Card>
+          <Card title="Voz padrão dos agentes" desc="Agentes sem perfil de voz próprio herdam estes valores no prompt do modelo.">
+            <Row title="Tom">
+              <div className="pills">
+                {TONES.map(([k, l]) => <button key={k} type="button" className={`pill ${(s.defaults?.agentStyle?.tone || 'direto') === k ? 'on' : ''}`} onClick={() => set('defaults', { ...s.defaults, agentStyle: { ...(s.defaults?.agentStyle || {}), tone: k } })}>{l}</button>)}
+              </div>
+            </Row>
+            <Row title="Formalidade">
+              <div className="pills">
+                {FORMALITIES.map(([k, l]) => <button key={k} type="button" className={`pill ${(s.defaults?.agentStyle?.formality || 'neutro') === k ? 'on' : ''}`} onClick={() => set('defaults', { ...s.defaults, agentStyle: { ...(s.defaults?.agentStyle || {}), formality: k } })}>{l}</button>)}
+              </div>
+            </Row>
+            <Row title="Dicas extras" stack>
+              <textarea className="input" rows={2} maxLength={500} value={s.defaults?.agentStyle?.customHints || ''} onChange={e => set('defaults', { ...s.defaults, agentStyle: { ...(s.defaults?.agentStyle || {}), customHints: e.target.value } })} placeholder="Ex.: sempre em português do Brasil." />
             </Row>
           </Card>
         </>}
@@ -351,10 +425,31 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
               ))}
             </div>
           </Card>
+          <Card title="LGPD — dados pessoais" desc="Opt-in: antes de enviar texto a Claude, Codex ou Julia 1, o Ripper pode substituir CPF, contas, documentos e contatos por [PII]. Conversas locais continuam com o texto original.">
+            <Row title="Mascaramento antes do modelo" desc="Recomendado se você cola dados de clientes no chat."><Switch checked={!!s.lgpd?.enabled} onChange={v => set('lgpd', { ...(s.lgpd || {}), enabled: v })} label="Ativar mascaramento LGPD" /></Row>
+            {s.lgpd?.enabled && <>
+              <Row title="Também em avisos do servidor" desc="SSE warn/erro e logs do Node quando ligado."><Switch checked={!!s.lgpd?.redactInLogs} onChange={v => set('lgpd', { ...(s.lgpd || {}), redactInLogs: v })} label="Mascarar PII em logs" /></Row>
+              <Row title="Eliminar meus dados" desc="Direito de eliminação (art. 18): apaga conversas, memórias, anexos e telemetria local. Agentes e plugins permanecem.">
+                <button type="button" className="btn btn-danger" onClick={async () => {
+                  if (!window.confirm('Apagar conversas, memórias, anexos e seu nome/instruções? Não dá para desfazer.')) return;
+                  try {
+                    await api('/api/lgpd/erasure', { method: 'POST', body: { confirm: 'ERASE', scope: 'all' } });
+                    await refresh();
+                    toast('Dados pessoais eliminados nesta instalação');
+                  } catch (e) { toast(e.message, 'error'); }
+                }}>Solicitar eliminação</button>
+              </Row>
+            </>}
+          </Card>
           {enterprise && <>
             <Card title={tr('settings.security.historyTitle')} desc={tr('settings.security.historyDesc')}>
               <ApprovalHistory limit={15} />
             </Card>
+            {s.flags?.socialWebhooks && (
+              <Card title="Publicação social" desc="Webhooks HTTP para posts externos. Tokens na URL são armazenados localmente; publicar pede aprovação nas políticas acima (exceto “Nunca pedir” ou autonomia total no Enterprise).">
+                <div className="set-actions"><button type="button" className="btn btn-sm" onClick={() => go('/connectors')}><Icon name="share" size={16} />Gerenciar webhooks sociais</button></div>
+              </Card>
+            )}
             <AdvancedBlock settings={s} hint="Limite de taxa">
               <Card title="Limite de taxa" desc="Evita loops acidentais no chat e em APIs pesadas (backup, restore, export de metering). Contadores ficam na memória deste processo — várias réplicas não compartilham o mesmo limite. Variáveis RIPPER_RATE_* no servidor têm prioridade.">
                 <Row title="Ativar limite de taxa" desc="Respostas 429 com Retry-After quando exceder."><Switch checked={!!s.rateLimit?.enabled} onChange={v => set('rateLimit', { ...(s.rateLimit || {}), enabled: v })} label="Limite de taxa" /></Row>
@@ -367,9 +462,41 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
               <Card title={tr('settings.security.inboxTitle')} desc={tr('settings.security.inboxDesc')}>
                 <Row title="Máximo por agente, por hora"><div className="input-unit"><input className="input" type="number" min={1} max={200} value={s.inbox?.maxPerHour ?? 20} onChange={e => set('inbox', { ...(s.inbox || {}), maxPerHour: +e.target.value })} /><span>mensagens</span></div></Row>
                 <Row title="Profundidade máxima de uma troca" desc="Quantas vezes uma resposta pode gerar outra mensagem (saltos inbox)." tip="Valores altos podem gerar longas cadeias de mensagens automáticas entre agentes."><div className="input-unit"><input className="input" type="number" min={1} max={10} value={s.inbox?.maxHops ?? 3} onChange={e => set('inbox', { ...(s.inbox || {}), maxHops: +e.target.value })} /><span>saltos</span></div></Row>
+                <Row title="Timeout de call_agent" desc="Quanto esperar por uma chamada síncrona entre agentes (5–300 s)."><div className="input-unit"><input className="input" type="number" min={5} max={300} value={s.inbox?.callTimeoutSeconds ?? 120} onChange={e => set('inbox', { ...(s.inbox || {}), callTimeoutSeconds: +e.target.value })} /><span>segundos</span></div></Row>
+              </Card>
+            </AdvancedBlock>
+            <AdvancedBlock settings={s} hint="Chaos / testes de resiliência">
+              <Card title="Chaos / testes de resiliência" desc="Simula falhas controladas para validar fallbacks. Desligado por padrão; nunca use em produção real.">
+                <div className="chaos-banner" role="alert">
+                  <strong>Atenção:</strong> com chaos ativo, conversas e conectores MCP podem falhar ou ficar lentos de propósito. Só ligue em ambiente de desenvolvimento ou teste.
+                </div>
+                <Row title="Ativar chaos" desc="Requer NODE_ENV ≠ production ou RIPPER_CHAOS_ALLOW_PROD=1 no servidor.">
+                  <Switch checked={!!s.chaos?.enabled} onChange={v => set('chaos', { ...(s.chaos || {}), enabled: v })} label="Chaos ativo" />
+                </Row>
+                <Row title="Taxa de falha do provedor" desc="0 = nunca; 1 = sempre (antes de chamar o modelo).">
+                  <div className="input-unit"><input className="input" type="number" min={0} max={1} step={0.05} disabled={!s.chaos?.enabled} value={s.chaos?.providerFailRate ?? 0} onChange={e => set('chaos', { ...(s.chaos || {}), providerFailRate: +e.target.value })} /><span>0–1</span></div>
+                </Row>
+                <Row title="Atraso SSE" desc="Milissegundos extras antes de cada evento enviado ao navegador.">
+                  <div className="input-unit"><input className="input" type="number" min={0} max={60000} disabled={!s.chaos?.enabled} value={s.chaos?.sseDelayMs ?? 0} onChange={e => set('chaos', { ...(s.chaos || {}), sseDelayMs: +e.target.value })} /><span>ms</span></div>
+                </Row>
+                <Row title="Desconectar MCP" desc="Próximas sondas MCP e chamadas da ponte ripper falham como se a sessão tivesse caído.">
+                  <Switch checked={!!s.chaos?.mcpDisconnect} disabled={!s.chaos?.enabled} onChange={v => set('chaos', { ...(s.chaos || {}), mcpDisconnect: v })} label="Simular queda MCP" />
+                </Row>
               </Card>
             </AdvancedBlock>
           </>}
+          <Card title="Retenção de dados" desc="Apaga automaticamente conversas, eventos de uso, histórico de aprovações em db.json, artefatos e anexos órfãos após o prazo. Hard-delete no disco. Não altera audit-trail.sqlite (WORM), se existir.">
+            <Row title="Retenção automática" desc="Job periódico no servidor (padrão a cada 6 h)."><Switch checked={!!s.retention?.enabled} onChange={v => set('retention', { ...(s.retention || {}), enabled: v })} label="Ativar retenção" /></Row>
+            <Row title="Conversas" desc="Usa a data da última mensagem (updatedAt)."><div className="input-unit"><input className="input" type="number" min={1} max={3650} value={s.retention?.chatDays ?? 90} onChange={e => set('retention', { ...(s.retention || {}), chatDays: +e.target.value })} /><span>dias</span></div></Row>
+            <Row title="Eventos de uso" desc="Linhas em usage.sqlite (não os contadores em db.json)."><div className="input-unit"><input className="input" type="number" min={1} max={3650} value={s.retention?.usageEventsDays ?? 90} onChange={e => set('retention', { ...(s.retention || {}), usageEventsDays: +e.target.value })} /><span>dias</span></div></Row>
+            <Row title="Auditoria local" desc="Entradas em db.json (auditLog). WORM audit-trail.sqlite nunca é apagado aqui."><div className="input-unit"><input className="input" type="number" min={1} max={3650} value={s.retention?.auditDays ?? 180} onChange={e => set('retention', { ...(s.retention || {}), auditDays: +e.target.value })} /><span>dias</span></div></Row>
+            <Row title="Artefatos e anexos" desc="Metadados em db.json, blobs em artifacts/ e uploads órfãos."><div className="input-unit"><input className="input" type="number" min={1} max={3650} value={s.retention?.artifactsDays ?? 90} onChange={e => set('retention', { ...(s.retention || {}), artifactsDays: +e.target.value })} /><span>dias</span></div></Row>
+            {s.retention?.lastPurgeAt && (
+              <Row title="Última purga" desc={s.retention.lastReport ? `${s.retention.lastReport.chats ?? 0} conversas, ${s.retention.lastReport.usageEvents ?? 0} eventos de uso, ${s.retention.lastReport.auditLog ?? 0} auditoria, ${s.retention.lastReport.artifacts ?? 0} artefatos.` : ''}>
+                <span className="muted">{new Date(s.retention.lastPurgeAt).toLocaleString('pt-BR')}</span>
+              </Row>
+            )}
+          </Card>
         </>}
 
         {tab === 'backup' && <DataBackup s={s} set={set} />}
@@ -421,6 +548,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
           <Card title="Experiência">
             <UiModeToggle />
           </Card>
+          {enterprise && <BrandMarca s={s} set={set} toast={toast} />}
           <Card>
             <Row title={tr('settings.appearance.locale')} desc={tr('settings.appearance.localeDesc')}>
               <Select label={tr('settings.appearance.locale')} value={s.ui?.locale || 'pt-BR'} onChange={v => set('ui.locale', v)} options={[

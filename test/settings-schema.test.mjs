@@ -84,3 +84,23 @@ test('patchSettings aplica patch válido', () => {
   assert.equal(s.memory, false);
   assert.equal(s.providerRetry.maxAttempts, 2);
 });
+
+// A UI reenvia as configurações inteiras ao salvar. Tudo que o servidor devolve tem que passar no
+// validador, senão nenhuma tela de configurações salva (foi o que travou modo, flags e auditoria).
+test('configurações carregadas do store passam no próprio validador', async () => {
+  const { mkdtempSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { tmpdir } = await import('node:os');
+  const prev = process.env.RIPPER_DATA;
+  process.env.RIPPER_DATA = mkdtempSync(join(tmpdir(), 'ripper-schema-'));
+  try {
+    const { _resetStoreForTests, load } = await import('../lib/store.mjs');
+    _resetStoreForTests();
+    const { normalizeTokenBudget } = await import('../lib/token-budget-governor.mjs');
+    const settings = load().settings;
+    settings.tokenBudget = normalizeTokenBudget(settings.tokenBudget); // como sai depois de um patch
+    assert.deepEqual(validateSettingsPatch(JSON.parse(JSON.stringify(settings))), []);
+  } finally {
+    if (prev === undefined) delete process.env.RIPPER_DATA; else process.env.RIPPER_DATA = prev;
+  }
+});

@@ -34,6 +34,13 @@ test('applySettingsPatch aceita inputQueue', () => {
   assert.equal(s.inputQueue.windowMs, 1200);
 });
 
+test('applySettingsPatch aceita defaults.agentStyle', () => {
+  const s = { defaultModel: 'auto', claude: {}, computer: {}, defaults: { agentStyle: {} } };
+  applySettingsPatch(s, { defaults: { agentStyle: { tone: 'tecnico', maxSentences: 6 } } });
+  assert.equal(s.defaults.agentStyle.tone, 'tecnico');
+  assert.equal(s.defaults.agentStyle.maxSentences, 6);
+});
+
 test('settingsMeta lista modelos e esforços', () => {
   const m = settingsMeta();
   assert.ok(m.models.includes('auto'));
@@ -80,4 +87,21 @@ test('applySettingsPatch aceita contextPruning opt-in', () => {
   assert.equal(s.contextPruning.enabled, true);
   assert.equal(s.contextPruning.maxMessages, 30);
   assert.equal(s.contextPruning.keepRecent, 8);
+});
+
+test('applySettingsPatch preserva links ao atualizar brand parcialmente', () => {
+  const s = {
+    defaultModel: 'auto', claude: {}, computer: {},
+    ui: { mode: 'enterprise' },
+    enterprise: { enabled: true },
+    brand: { displayName: 'A', logoUrl: '', accentColor: '', tagline: '', links: { website: 'https://a.com/' } }
+  };
+  applySettingsPatch(s, { brand: { displayName: 'B' } });
+  assert.equal(s.brand.displayName, 'B');
+  assert.equal(s.brand.links.website, 'https://a.com/');
+});
+
+test('applySettingsPatch rejeita brand no modo simples', () => {
+  const s = { defaultModel: 'auto', claude: {}, computer: {}, ui: { mode: 'simple' }, enterprise: { enabled: false } };
+  assert.throws(() => applySettingsPatch(s, { brand: { displayName: 'X' } }), /enterprise/);
 });

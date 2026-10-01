@@ -3,6 +3,7 @@ import { useApp } from '../app.jsx';
 import { api, go } from '../lib.js';
 import { isEnterpriseMode } from '../uiMode.js';
 import { Icon, EmptyState } from '../ui.jsx';
+import X9AuditorCard from '../x9Auditor.jsx';
 
 function StatusTag({ ok, label, warn }) {
   const cls = ok ? 'tag tag-ok' : (warn ? 'tag tag-warn' : 'tag');
@@ -37,6 +38,7 @@ function Metric({ label, value }) {
 export default function AdminCenter() {
   const { S } = useApp();
   const enterprise = isEnterpriseMode(S.settings);
+  const showX9 = enterprise;
   const [overview, setOverview] = useState(null);
   const [audit, setAudit] = useState(null);
   const [lgpd, setLgpd] = useState(null);
@@ -100,6 +102,14 @@ export default function AdminCenter() {
         </div>
         <button type="button" className="btn" onClick={() => go('/settings/appearance')}><Icon name="gear" size={16} />Modo e aparência</button>
       </header>
+
+      {showX9 && (
+        <section className="admin-x9-wrap set-card">
+          <header><h3>X9 — Auditor</h3></header>
+          <p className="set-card-desc muted">Varredura somente leitura: sandbox, autonomia, LGPD/retenção e trilha local. Sem alterar produção.</p>
+          <X9AuditorCard />
+        </section>
+      )}
 
       <div className="admin-grid">
         <AdminCard

@@ -1,5 +1,5 @@
 import { BotAvatar } from 'bot-avatars';
-import { TOOL_INFO, TONES, useDark } from './lib.js';
+import { TOOL_INFO, TONES, FORMALITIES, useDark } from './lib.js';
 import { AgentAvatar, Icon, Switch } from './ui.jsx';
 import { useApp } from './app.jsx';
 import { EffortScale } from './modelPicker.jsx';
@@ -21,16 +21,64 @@ export function Basics({ v, set, categories }) {
   </>;
 }
 
+export function agentStyleDraft(v) {
+  const s = v.style || {};
+  return {
+    tone: s.tone || v.tone || 'direto',
+    formality: s.formality || 'neutro',
+    maxSentences: s.maxSentences ?? '',
+    language: s.language || '',
+    customHints: s.customHints || ''
+  };
+}
+
+function patchStyle(v, patch) {
+  const next = { ...agentStyleDraft(v), ...patch };
+  const style = {
+    tone: next.tone,
+    formality: next.formality,
+    ...(next.maxSentences !== '' && next.maxSentences != null ? { maxSentences: +next.maxSentences } : {}),
+    ...(next.language ? { language: next.language } : {}),
+    ...(next.customHints ? { customHints: next.customHints } : {})
+  };
+  return { style, tone: next.tone };
+}
+
+export function VoiceStyle({ v, set }) {
+  const st = agentStyleDraft(v);
+  const up = patch => set(patchStyle(v, patch));
+  return <>
+    <p className="muted">Define como o agente fala nas respostas. Entra no prompt do modelo em toda conversa.</p>
+    <div className="field"><span>Tom</span>
+      <div className="pills" role="radiogroup" aria-label="Tom">
+        {TONES.map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={st.tone === k} className={`pill ${st.tone === k ? 'on' : ''}`} onClick={() => up({ tone: k })}>{l}</button>)}
+      </div>
+    </div>
+    <div className="field"><span>Formalidade</span>
+      <div className="pills" role="radiogroup" aria-label="Formalidade">
+        {FORMALITIES.map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={st.formality === k} className={`pill ${st.formality === k ? 'on' : ''}`} onClick={() => up({ formality: k })}>{l}</button>)}
+      </div>
+    </div>
+    <label className="field">Máximo de frases (padrão 4)
+      <input className="input narrow-input" type="number" min={1} max={20} placeholder="4" value={st.maxSentences === '' ? '' : st.maxSentences}
+        onChange={e => up({ maxSentences: e.target.value === '' ? '' : e.target.value })} />
+      <small>Respostas curtas por padrão; detalhes só quando pedirem.</small>
+    </label>
+    <label className="field">Idioma das respostas
+      <input value={st.language} maxLength={40} onChange={e => up({ language: e.target.value })} placeholder="Ex.: pt-BR, inglês técnico" />
+    </label>
+    <label className="field">Dicas extras
+      <textarea rows={3} value={st.customHints} maxLength={500} onChange={e => up({ customHints: e.target.value })} placeholder="Ex.: use emojis com moderação; evite jargão; prefira verbos no imperativo." />
+    </label>
+  </>;
+}
+
 export function Behavior({ v, set, settings }) {
   const allowFully = isEnterpriseMode(settings);
   return <>
     <AutonomyPick value={v.autonomyLevel} onChange={autonomyLevel => set({ autonomyLevel })} allowFullyAutonomous={allowFully} />
     <label className="field">Instruções<textarea rows={8} value={v.instructions} maxLength={8000} onChange={e => set({ instructions: e.target.value })} placeholder="Defina o comportamento, as regras e o que ele nunca deve fazer." /><small>Entram em toda conversa, junto das suas instruções gerais.</small></label>
-    <div className="field"><span>Tom</span>
-      <div className="pills" role="radiogroup" aria-label="Tom">
-        {TONES.map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={v.tone === k} className={`pill ${v.tone === k ? 'on' : ''}`} onClick={() => set({ tone: k })}>{l}</button>)}
-      </div>
-    </div>
+    <p className="muted">Tom, formalidade e dicas de voz estão na aba «Voz e estilo».</p>
   </>;
 }
 

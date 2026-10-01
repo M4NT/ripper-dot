@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkSend, dueMessages, threadKey, inboxPrompt } from '../lib/inbox.mjs';
+import {
+  checkSend, dueMessages, threadKey, inboxPrompt, peerAllowed, findAgentByName, recipientBusyError
+} from '../lib/inbox.mjs';
 
 const A = { id: 'a', name: 'Ana' }, B = { id: 'b', name: 'Bia' }, P = { id: 'p', name: 'Pausado', status: 'paused' };
 const limits = { maxPerHour: 2, maxHops: 3 };
@@ -37,4 +39,21 @@ test('conversa da troca é a mesma nos dois sentidos; destinatário só vê a me
   assert.equal(threadKey('b', 'a'), threadKey('a', 'b'));
   const p = inboxPrompt({ body: 'Revise o post X', priority: 'now' }, 'Ana');
   assert.match(p, /Mensagem de Ana, urgente/); assert.match(p, /Revise o post X/);
+});
+
+test('findAgentByName e RBAC suave (callPeers)', () => {
+  const agents = [{ id: 'a', name: 'Ana' }, { id: 'b', name: 'Bia' }];
+  assert.equal(findAgentByName('@Bia', agents).id, 'b');
+  assert.equal(peerAllowed({ id: 'a', callPeers: null }, { id: 'b' }), true);
+  assert.equal(peerAllowed({ id: 'a', callPeers: ['b'] }, { id: 'b' }), true);
+  assert.equal(peerAllowed({ id: 'a', callPeers: ['b'] }, { id: 'c' }), false);
+  assert.equal(peerAllowed({ id: 'a', callPeers: [] }, { id: 'b' }), false);
+  const restricted = { id: 'a', name: 'Ana', callPeers: ['c'] };
+  assert.match(checkSend({ from: restricted, to: B, messages: [], hops: 1, limits }).error, /permissão/);
+});
+
+test('destinatário ocupado devolve erro claro', () => {
+  const busy = new Set(['b']);
+  assert.match(checkSend({ from: A, to: B, messages: [], hops: 1, limits, busyToIds: busy }).error, /ocupado/);
+  assert.equal(checkSend({ from: A, to: B, messages: [], hops: 1, limits, busyToIds: busy }).error, recipientBusyError(B.name));
 });

@@ -13,7 +13,10 @@ import { dockerAvailable, imageStatus, ensureImage, hostnameOf } from './lib/doc
 import { sandboxStatus } from './lib/exec-sandbox.mjs';
 import { ApprovalGate } from './lib/approvals.mjs';
 import { autoStartJulia, juliaOnline, juliaChoose, juliaStatus, measureTriagePromptChars, RISK_OPTIONS, NOTIFY_OPTIONS } from './lib/julia.mjs';
-import { checkSend, dueMessages, threadKey, inboxPrompt, repairInboxOnStartup, markInboxDeliveryFailed, inboxSummary } from './lib/inbox.mjs';
+import {
+  checkSend, dueMessages, threadKey, inboxPrompt, callAgentPrompt, repairInboxOnStartup, markInboxDeliveryFailed, inboxSummary,
+  findAgentByName, clampCallTimeoutMs, interpretInboxReply, formatCallAgentResult, peerAllowed
+} from './lib/inbox.mjs';
 import {
   PROTOCOL_ID,
   delegateTask,
@@ -27,7 +30,14 @@ import { trackInboxDelegation, taskItemsSummary } from './lib/task-items.mjs';
 import { closeTaskFromInboxReply } from './lib/task-closure.mjs';
 import { createGoogleTasksSync } from './lib/google-tasks-sync.mjs';
 import { rememberAllowedCommand, execNeedsApproval } from './lib/permissions.mjs';
-import { browserAutonomyGate, shareAutonomyGate, effectiveApprovalPolicy, sanitizeAutonomyLevel } from './lib/autonomy.mjs';
+import { browserAutonomyGate, shareAutonomyGate, socialPostAutonomyGate, effectiveApprovalPolicy, sanitizeAutonomyLevel } from './lib/autonomy.mjs';
+import {
+  enabledSocialWebhooks,
+  resolveSocialWebhook,
+  socialPostNeedsApproval,
+  socialApprovalCommand,
+  postToSocialWebhook
+} from './lib/social-webhooks.mjs';
 import { listChatsPage } from './lib/history.mjs';
 import { tryClaimRoutine, releaseRoutineClaim } from './lib/persist-coord.mjs';
 import { browserFor, browserRisk } from './lib/browser.mjs';
@@ -40,9 +50,10 @@ import { normalizeProviderRetry } from './lib/provider-retry.mjs';
 import { patchSettings, settingsMeta, SettingsValidationError } from './lib/settings-patch.mjs';
 import { normalizeContextPruning, pruneContextMessages } from './lib/context-pruning.mjs';
 import { coalesceSendParts } from './lib/input-queue.mjs';
-import { effectiveFeatureFlags } from './lib/feature-flags.mjs';
+import { effectiveFeatureFlags, isFlagEnabled } from './lib/feature-flags.mjs';
 import { applyAccessControlPatch } from './lib/access-control-patch.mjs';
 import { canDelegate, delegationDeniedMessage, normalizeAccessControl, accessControlMeta } from './lib/rbac.mjs';
+import { executeLgpdErasure, lgpdMeta } from './lib/lgpd-pii.mjs';
 import { appendAudit, auditFromApproval, listAudit } from './lib/audit.mjs';
 import { buildAdminOverview } from './lib/admin-overview.mjs';
 import { buildLgpdStatus } from './lib/lgpd-status.mjs';
@@ -65,6 +76,17 @@ import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStrea
 import { beginChatRun, bumpChatRunSeq, finishChatRun, chatRunPublic, canResumeChatRun, trimPartialRepliesAfterLastUser } from './lib/chat-run.mjs';
 import { exportChatPayload, importChatPayload } from './lib/chat-transfer.mjs';
 import { listAgentTemplates, createSavedTemplate, patchSavedTemplate, agentFromSavedTemplate } from './lib/agent-templates.mjs';
+import { architectSuggest } from './lib/architect-suggest.mjs';
+import {
+  parseTeamBrief,
+  normalizeTeamStructure,
+  createTeamProposal,
+  listTeamProposals,
+  applyTeamProposal,
+  orchestrateTeamStructure,
+  structureFromArchitectScaffold,
+  ORCHESTRATOR_SYSTEM
+} from './lib/team-orchestrator.mjs';
 import { ripperBuiltinSchemaChars, listRipperBuiltinToolNames } from './lib/ripper-builtin-tools.mjs';
 import { refreshClaudeSubscriptionUsage } from './lib/claude-subscription-usage.mjs';
 import {
@@ -72,7 +94,7 @@ import {
   resolveSemanticCacheConfig,
   storeSemanticCacheEntry
 } from './lib/semantic-cache.mjs';
-import { verifyMcpServer, verifyMcpConnector } from './lib/mcp-probe.mjs';
+import { verifyMcpConnector } from './lib/mcp-probe.mjs';
 import { shutdownStdioSupervisors } from './lib/mcp-stdio-supervisor.mjs';
 import {
   applyOAuthTokensToPlugin,
@@ -135,6 +157,8 @@ import {
   formatPrometheusExposition,
   prometheusContentType
 } from './lib/metrics.mjs';
+import { collectX9Sources } from './lib/x9-sources.mjs';
+import { runX9Scan } from './lib/x9-scan.mjs';
 import {
   buildBackupPayload,
   restoreBackupPayload,
@@ -197,6 +221,21 @@ import {
   stripVaultPlaintextMarker,
   vaultCredentialApiResponse
 } from './lib/connection-vault.mjs';
+import {
+  resolveRetentionSettings,
+  applyRetentionSettingsPatch,
+  runRetentionPurge,
+  startRetentionScheduler,
+  envRetentionOverrides
+} from './lib/retention-ttl.mjs';
+import {
+  chaosStatusPayload,
+  maybeChaosProviderFailure,
+  chaosSseBeforeEmit,
+  resolveEffectiveChaos,
+  scheduleChaosFire
+} from './lib/chaos.mjs';
+import { detectImageType, isSafeBrandStoragePath, newBrandLogoFilename, readBrandLogoUpload, BRAND_LOGO_MAX } from './lib/brand.mjs';
 
 installLogRedactionMiddleware();
 
@@ -296,14 +335,19 @@ function chatDetail(c, cid) {
 
 async function streamChatResponse(req, c, { text, fileIds, mcpSession, resume = false, credentialRefs }, res) {
   res.writeHead(200, hdr(req, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store', 'x-accel-buffering': 'no' }));
+  const clientAc = new AbortController();
+  const chaosCfg = resolveEffectiveChaos(db.settings);
+  let emitChain = Promise.resolve();
   const emitRaw = e => {
-    if (!res.writable) return;
-    bumpChatRunSeq(c);
-    const payload = e?.error && req.requestId ? { ...e, requestId: req.requestId } : e;
-    res.write(`data: ${JSON.stringify(redactSseEvent(payload))}\n\n`);
+    emitChain = emitChain.then(async () => {
+      await chaosSseBeforeEmit(chaosCfg, clientAc.signal);
+      if (!res.writable) return;
+      bumpChatRunSeq(c);
+      const payload = e?.error && req.requestId ? { ...e, requestId: req.requestId } : e;
+      res.write(`data: ${JSON.stringify(redactSseEvent(payload, db.settings))}\n\n`);
+    });
   };
   emitRaw({ chatId: c.id, runId: c.run?.runId, eventSeq: c.run?.lastEventSeq, resume: !!resume });
-  const clientAc = new AbortController();
   res.on('close', () => { if (!res.writableFinished) clientAc.abort(); });
   const { signal: streamSignal } = registerChatStream(c.id, { signal: clientAc.signal, emit: emitRaw });
   const ping = setInterval(() => res.writable && res.write(': ping\n\n'), 15_000);
@@ -332,11 +376,11 @@ async function streamChatResponse(req, c, { text, fileIds, mcpSession, resume = 
   }
   if (completed) {
     emitRaw({ done: true, title: c.title, runId: c.run?.runId, eventSeq: c.run?.lastEventSeq });
-    res.end();
   } else {
     emitRaw({ interrupted: true, runId: c.run?.runId, eventSeq: c.run?.lastEventSeq });
-    res.end();
   }
+  await emitChain;
+  res.end();
   return undefined;
 }
 const projectOr404 = pid => db.projects.find(p => p.id === pid) || (() => { throw new HttpError(404, 'Projeto não encontrado.'); })();
@@ -397,6 +441,12 @@ function requireEnterpriseAdmin() {
   }
 }
 
+function requireEnterpriseBrand() {
+  if (!isEnterpriseMode(db.settings)) {
+    throw new HttpError(403, 'Marca personalizada disponível apenas no modo enterprise.');
+  }
+}
+
 // Aprovações: pedidos pendentes vivem em memória (a promessa que segura o agente) e no banco (histórico).
 // Verificado uma vez: o CLI do Codex está instalado nesta máquina?
 const codexInstalled = new Promise(resolve => {
@@ -413,60 +463,77 @@ const dockerStatusCached = memoAsync(async () => ({ version: await dockerAvailab
 const inboxBusy = new Set();
 const inboxLimits = () => ({ maxPerHour: 20, maxHops: 3, ...(db.settings?.inbox || {}) });
 
+/** Entrega uma mensagem/call na thread A2A e roda o turno do destinatário. */
+async function runInboxDelivery(m, { signal } = {}) {
+  const to = db.agents.find(a => a.id === m.to), from = db.agents.find(a => a.id === m.from);
+  if (!to || !from) return { ok: false, error: 'Agente não existe mais.', threadChatId: null };
+  const key = threadKey(from.id, to.id);
+  let c = db.chats.find(x => x.inboxKey === key);
+  if (!c) {
+    c = { id: id(), agentId: to.id, agentIds: [from.id, to.id], inboxKey: key, title: `${from.name} ↔ ${to.name}`, messages: [], createdAt: Date.now(), updatedAt: Date.now() };
+    db.chats.unshift(c);
+  }
+  const prompt = m.kind === 'call'
+    ? callAgentPrompt(m, from.name)
+    : m.protocol?.id === PROTOCOL_ID
+      ? `${m.body}\n\nResponda de forma direta; para delegações use JSON manager-worker na primeira linha (accept, progress, complete ou reject).`
+      : inboxPrompt(m, from.name);
+  c.messages.push({
+    id: id(), role: 'user', content: prompt,
+    inbox: { from: from.id, messageId: m.id, priority: m.priority, kind: m.kind || 'message' },
+    at: Date.now()
+  });
+  const lenBeforeTurn = c.messages.length;
+  await turn({ agent: to, chat: c, text: m.body, prompt, images: [], group: null, hops: m.hops, signal }, () => {});
+  const parsed = interpretInboxReply(c.messages, lenBeforeTurn);
+  c.updatedAt = Date.now(); c.unread = true;
+  m.threadChatId = c.id;
+  m.deliveredAt = Date.now();
+  return { ...parsed, threadChatId: c.id, reply: parsed.ok ? { content: parsed.content, model: parsed.model } : null };
+}
+
 async function deliver(m) {
   const to = db.agents.find(a => a.id === m.to), from = db.agents.find(a => a.id === m.from);
   if (!to || !from) { markInboxDeliveryFailed(m, 'Agente não existe mais.'); save(); return; }
   inboxBusy.add(to.id); m.status = 'delivering'; save();
   try {
-    // A troca entre os dois fica numa conversa própria; o destinatário não vê a conversa de origem.
-    const key = threadKey(from.id, to.id);
-    let c = db.chats.find(x => x.inboxKey === key);
-    if (!c) { c = { id: id(), agentId: to.id, agentIds: [from.id, to.id], inboxKey: key, title: `${from.name} ↔ ${to.name}`, messages: [], createdAt: Date.now(), updatedAt: Date.now() }; db.chats.unshift(c); }
-    const prompt = m.protocol?.id === PROTOCOL_ID
-      ? `${m.body}\n\nResponda de forma direta; para delegações use JSON manager-worker na primeira linha (accept, progress, complete ou reject).`
-      : inboxPrompt(m, from.name);
-    c.messages.push({ id: id(), role: 'user', content: prompt, inbox: { from: from.id, messageId: m.id, priority: m.priority }, at: Date.now() });
-    const before = c.messages.length;
-    await turn({ agent: to, chat: c, text: m.body, prompt, images: [], group: null, hops: m.hops }, () => {});
-    const reply = c.messages.length > before ? c.messages.at(-1) : null;
-    c.updatedAt = Date.now(); c.unread = true;
-    m.threadChatId = c.id; m.deliveredAt = Date.now();
-    if (reply && !reply.error) { m.status = 'delivered'; m.error = null; }
-    else markInboxDeliveryFailed(m, reply?.error || 'Sem resposta do destinatário.');
-    if (reply?.content && m.protocol?.id === PROTOCOL_ID && m.protocol.delegationId && to.id === findDelegation(db, m.protocol.delegationId)?.workerId) {
-      const s = db.settings;
-      const limits = { maxPerHour: 20, maxHops: 3, ...(s.inbox || {}) };
+    const result = await runInboxDelivery(m, {});
+    if (result.ok) { m.status = 'delivered'; m.error = null; }
+    else markInboxDeliveryFailed(m, result.error || 'Sem resposta do destinatário.');
+    if (result.reply?.content && m.protocol?.id === PROTOCOL_ID && m.protocol.delegationId && to.id === findDelegation(db, m.protocol.delegationId)?.workerId) {
       ingestWorkerInboxReply({
         db,
         id,
         worker: to,
         manager: from,
         delegationId: m.protocol.delegationId,
-        replyText: reply.content,
+        replyText: result.reply.content,
         hops: m.hops,
-        limits
+        limits: inboxLimits()
       });
     }
-    // A resposta volta para onde o pedido nasceu, sem gastar um turno de quem pediu.
     const origin = db.chats.find(x => x.id === m.originChatId);
-    if (origin && reply?.content) {
-      origin.messages.push({ id: id(), role: 'assistant', agentId: to.id, content: reply.content, model: reply.model, via: { type: 'inbox', from: from.id, messageId: m.id, threadChatId: c.id }, at: Date.now() });
+    if (origin && result.reply?.content) {
+      origin.messages.push({
+        id: id(), role: 'assistant', agentId: to.id, content: result.reply.content, model: result.reply.model,
+        via: { type: 'inbox', from: from.id, messageId: m.id, threadChatId: result.threadChatId }, at: Date.now()
+      });
       origin.updatedAt = Date.now(); origin.unread = true;
     }
-    if (reply?.content && !reply.error) {
+    if (result.reply?.content && result.ok) {
       try {
         await closeTaskFromInboxReply({
           db,
           inboxMessage: m,
-          replyText: reply.content,
+          replyText: result.reply.content,
           id,
           limits: inboxLimits(),
           hops: m.hops || 0,
           googleTasksSync
         });
-      } catch (e) { console.error('task-closure', ...redactForLog(e.message)); }
+      } catch (e) { console.error('task-closure', ...redactForLog(db.settings, e.message)); }
     }
-  } catch (e) { markInboxDeliveryFailed(m, e.message); console.error('mensagem', ...redactForLog(e.message)); }
+  } catch (e) { markInboxDeliveryFailed(m, e.message); console.error('mensagem', ...redactForLog(db.settings, e.message)); }
   finally { inboxBusy.delete(m.to); save(); setTimeout(dispatchInbox, 50); }
 }
 function dispatchInbox() {
@@ -481,6 +548,7 @@ if (typeof inboxTimer.unref === 'function') inboxTimer.unref();
 repairInboxOnStartup(db.messages);
 save();
 dispatchInbox();
+startRetentionScheduler({ db, save, isStreaming: isChatStreaming });
 
 const gate = new ApprovalGate({
   onChange: rec => {
@@ -635,17 +703,22 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
       } catch (e) { emit({ warn: `Não consegui enviar ${f.name} ao computador: ${e.message}` }); }
     }
   }
+  const x9Sources = () => collectX9Sources({ db, settings: s });
   const ctx = {
     db,
     settings: s,
+    x9: isEnterpriseMode(s) ? {
+      context: () => JSON.stringify(x9Sources(), null, 2),
+      checklist: () => JSON.stringify(runX9Scan({ db, settings: s, sources: x9Sources() }), null, 2)
+    } : null,
     computer,
     browser,
     remember: (t, tier = 'profile') => { if (s.memory) { db.memories.push({ id: id(), agentId: agent.id, text: t, tier: tier === 'log' ? 'log' : 'profile', createdAt: Date.now() }); save(); emit({ memory: t, tier }); } },
     inbox: {
       send: a => {
-        const to = db.agents.find(x => x.name.toLowerCase() === String(a.to).trim().replace(/^@/, '').toLowerCase());
+        const to = findAgentByName(a.to, db.agents);
         const limits = { maxPerHour: 20, maxHops: 3, ...(s.inbox || {}) };
-        const chk = checkSend({ from: agent, to, messages: db.messages, hops: hops + 1, limits });
+        const chk = checkSend({ from: agent, to, messages: db.messages, hops: hops + 1, limits, busyToIds: inboxBusy });
         if (chk.error) return chk.error;
         if (to) {
           const gate = canDelegate(
@@ -664,6 +737,57 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
         if (db.messages.length > 1000) db.messages.splice(0, db.messages.length - 1000);
         save(); emit({ sent: { to: to.name, priority: m.priority } }); setTimeout(dispatchInbox, 50);
         return `Mensagem enviada para ${to.name}${m.priority === 'now' ? ' (urgente)' : ''}. A resposta aparece nesta conversa quando chegar; não espere por ela nem invente o que ${to.name} vai dizer.`;
+      },
+      call: async a => {
+        const to = findAgentByName(a.to, db.agents);
+        const limits = { maxPerHour: 20, maxHops: 3, ...(s.inbox || {}) };
+        const chk = checkSend({ from: agent, to, messages: db.messages, hops: hops + 1, limits, busyToIds: inboxBusy });
+        if (chk.error) return formatCallAgentResult({ ok: false, error: chk.error });
+        if (to) {
+          const gate = canDelegate(
+            { type: 'agent', id: agent.id },
+            { type: 'agent', id: to.id },
+            'send_message',
+            db.accessControl,
+            { agents: db.agents }
+          );
+          const denied = delegationDeniedMessage(gate);
+          if (denied) return formatCallAgentResult({ ok: false, error: denied });
+        }
+        const timeoutMs = clampCallTimeoutMs(a.timeout_seconds, s.inbox || {});
+        const m = {
+          id: id(), from: agent.id, to: to.id, kind: 'call',
+          body: String(a.message).slice(0, 4000), priority: 'now', status: 'delivering',
+          hops: hops + 1, originChatId: chat.id, createdAt: Date.now()
+        };
+        db.messages.push(m);
+        if (db.messages.length > 1000) db.messages.splice(0, db.messages.length - 1000);
+        inboxBusy.add(to.id);
+        save();
+        emit({ callAgent: { to: to.name, timeoutMs } });
+        const ac = new AbortController();
+        const timer = setTimeout(() => ac.abort(), timeoutMs);
+        let result;
+        try {
+          result = await runInboxDelivery(m, { signal: ac.signal });
+          if (result.ok) { m.status = 'delivered'; m.error = null; }
+          else {
+            const err = ac.signal.aborted && !result.error?.includes('interrompida')
+              ? `Tempo esgotado (${Math.round(timeoutMs / 1000)}s) aguardando ${to.name}.`
+              : (result.error || 'Sem resposta do destinatário.');
+            markInboxDeliveryFailed(m, err);
+            result = { ok: false, error: err };
+          }
+        } catch (e) {
+          markInboxDeliveryFailed(m, e.message);
+          result = { ok: false, error: e.message };
+        } finally {
+          clearTimeout(timer);
+          inboxBusy.delete(to.id);
+          save();
+          setTimeout(dispatchInbox, 50);
+        }
+        return formatCallAgentResult(result);
       }
     },
     artifacts: {
@@ -705,14 +829,45 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
         return `Skill "${k.name}" salva.`;
       }
     },
-    scheduleRoutine: a => { db.routines.push({ id: id(), agentId: agent.id, lastRun: 0, name: a.name, prompt: a.prompt, everyMinutes: a.everyMinutes, dailyAt: a.dailyAt, weekday: a.weekday }); save(); emit({ routine: a.name }); }
+    scheduleRoutine: a => { db.routines.push({ id: id(), agentId: agent.id, lastRun: 0, name: a.name, prompt: a.prompt, everyMinutes: a.everyMinutes, dailyAt: a.dailyAt, weekday: a.weekday }); save(); emit({ routine: a.name }); },
+    social: agent.tools.includes('social') && isFlagEnabled(s, 'socialWebhooks') ? {
+      webhooks: enabledSocialWebhooks(s),
+      list: () => {
+        const rows = enabledSocialWebhooks(s).map(h => ({ id: h.id, name: h.name }));
+        return rows.length
+          ? `Webhooks ativos: ${rows.map(r => `${r.name} (${r.id})`).join('; ')}`
+          : 'Nenhum webhook social ativo. Configure em Conectores → Webhooks sociais.';
+      },
+      post: async a => {
+        const hook = resolveSocialWebhook(s, a.webhookId);
+        const body = String(a.text || '');
+        if (!body.trim()) return 'Texto vazio; nada a publicar.';
+        if (a.draft) return `Rascunho para "${hook.name}" (não enviado):\n${body.slice(0, 2000)}`;
+        const autonomy = socialPostAutonomyGate(agent, s);
+        if (typeof autonomy === 'string') return `Esta ação não é permitida (${autonomy}).`;
+        const cmd = socialApprovalCommand(hook, body);
+        const globalPolicy = s.approvalPolicy || 'risky';
+        const policy = effectiveApprovalPolicy(agent, globalPolicy, s);
+        const reason = autonomy === null ? null : socialPostNeedsApproval({ policy, commandKey: cmd, allowed: chat.allowedCommands || [] });
+        if (reason && !(await askApproval({ agent, chat, emit, signal }, 'social', cmd, reason))) {
+          return 'O usuário NÃO aprovou publicar neste webhook. Não tente contornar; ofereça editar o rascunho ou publicar depois.';
+        }
+        const result = await postToSocialWebhook(hook, body);
+        if (!result.ok) return `Webhook respondeu ${result.status}: ${result.body || '(sem corpo)'}`;
+        return `Publicado em "${hook.name}" (HTTP ${result.status}).`;
+      }
+    } : null
   };
   const project = chat.projectId && db.projects.find(p => p.id === chat.projectId);
   const system = [
     systemPrompt(agent, s, memories),
     await projectContext(project),
     visibleArtifacts(chat).length && `Artefatos do time (leia com read_artifact; salve entregas com save_artifact): ${visibleArtifacts(chat).slice(-20).map(x => `"${x.title}" (${x.kind}, v${x.version})`).join('; ')}`,
-    (() => { const others = db.agents.filter(a => a.id !== agent.id && a.status !== 'paused'); return others.length ? `Colegas para mensagem assíncrona (send_message): ${others.map(a => `${a.name} (${a.description || a.category})`).join('; ')}.` : ''; })(),
+    (() => {
+      const others = db.agents.filter(a => a.id !== agent.id && a.status !== 'paused' && peerAllowed(agent, a));
+      if (!others.length) return '';
+      return `Colegas A2A — call_agent (resposta imediata, espere o retorno) ou send_message (assíncrono, não espere): ${others.map(a => `${a.name} (${a.description || a.category})`).join('; ')}.`;
+    })(),
     visibleSkills(chat).length ? `Skills no banco (use_skill / list_skills): ${visibleSkills(chat).map(k => `${k.name}: ${k.description}`).join(' | ')}` : 'Skills extras podem vir de skills/ ou ~/.cursor/skills-cursor — use list_skills. Quando um passo a passo funcionar, guarde com save_skill.',
     group && [
       `Você trabalha num time: ${group.map(a => `${a.name} (${a.description || a.category})`).join('; ')}.`,
@@ -798,6 +953,8 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
     retry: normalizeProviderRetry(s),
     emit: emitTurn,
     runModel: m => {
+      const chaosErr = maybeChaosProviderFailure(resolveEffectiveChaos(db.settings));
+      if (chaosErr) throw chaosErr;
       if (testProvider) return runTestProvider({ prompt, signal });
       const providerSystem = MODELS[m].provider === 'codex' && s.computer.mode !== 'local'
         ? `${system}\n\nNesta execução do Codex, o computador está em modo somente leitura; não prometa executar comandos nem acessar a VM Boat.` : system;
@@ -959,7 +1116,8 @@ const routes = [
     pendingApprovals: db.approvals.filter(a => a.status === 'pending').length
   })],
   ['GET', /^\/api\/catalog$/, (req, m, url, res) => {
-    json(res, { models: MODELS, templates: TEMPLATES, categories: CATEGORIES }, 200, { 'cache-control': 'public, max-age=3600' }, req);
+    const templates = isEnterpriseMode(db.settings) ? TEMPLATES : TEMPLATES.filter(t => t.id !== 'x9-auditor');
+    json(res, { models: MODELS, templates, categories: CATEGORIES }, 200, { 'cache-control': 'public, max-age=3600' }, req);
     return undefined;
   }],
   ['GET', /^\/api\/data\/backup$/, () => buildBackupPayload(db)],
@@ -994,7 +1152,9 @@ const routes = [
     }
   }],
   ['GET', /^\/api\/state$/, () => ({
-    settings: redact(db.settings), agents: db.agents, models: MODELS, templates: TEMPLATES, savedAgentTemplates: listAgentTemplates(db), categories: CATEGORIES,
+    settings: redact(db.settings), agents: db.agents, models: MODELS,
+    templates: isEnterpriseMode(db.settings) ? TEMPLATES : TEMPLATES.filter(t => t.id !== 'x9-auditor'),
+    savedAgentTemplates: listAgentTemplates(db), categories: CATEGORIES,
     chats: db.chats.map(summary), routines: db.routines.map(redactRoutine),
     files: db.files.map(({ path, ...f }) => f), memoriesCount: db.memories.length, pendingInbox: db.messages.filter(m => m.status === 'queued' || m.status === 'delivering').reduce((o, m) => (o[m.originChatId] = (o[m.originChatId] || 0) + 1, o), {}), approvals: db.approvals.filter(a => a.status === 'pending').map(approvalView), artifacts: db.artifacts.map(({ content, size, blob, ...a }) => ({ ...a, size: size ?? content?.length ?? 0, stored: blob ? 'disk' : 'inline' })),     skills: db.skills, memoriesByAgent: db.memories.reduce((o, x) => (o[x.agentId] = (o[x.agentId] || 0) + 1, o), {}), projects: db.projects,
     usage: usageSummary(db),
@@ -1077,7 +1237,7 @@ const routes = [
         type: 'stdio',
         command: String(b.command || ''),
         args: b.args || []
-      }, { listTools: b.listTools !== false });
+      }, { listTools: b.listTools !== false, chaosSettings: db.settings });
     }
     if (!b.url || !/^https:\/\//.test(String(b.url))) throw new HttpError(400, 'URL HTTPS do servidor MCP é obrigatória.');
     let plugin;
@@ -1086,7 +1246,7 @@ const routes = [
     } else if (b.plugin && typeof b.plugin === 'object') {
       plugin = b.plugin;
     }
-    return verifyMcpServer(b.url, { plugin, listTools: b.listTools !== false });
+    return verifyMcpConnector(b.url, { plugin, listTools: b.listTools !== false, chaosSettings: db.settings });
   }],
   ['GET', /^\/api\/mcp\/connectors$/, () => ({ connectors: listConnectorRecords(db.settings) })],
   ['POST', /^\/api\/mcp\/connectors$/, async req => {
@@ -1358,11 +1518,46 @@ const routes = [
       throw new HttpError(vaultConfigured() ? 400 : 503, e.message);
     }
   }],
+  ['GET', /^\/api\/chaos\/status$/, () => chaosStatusPayload(db.settings)],
+  ['POST', /^\/api\/chaos\/fire$/, async req => {
+    const b = await body(req);
+    try {
+      return scheduleChaosFire(b.kind);
+    } catch (e) {
+      throw new HttpError(400, e.message);
+    }
+  }],
+  ['GET', /^\/api\/brand\/file\/([\w.-]+)$/, async (req, [name], url, res) => {
+    requireEnterpriseBrand();
+    const rel = `brand/${name}`;
+    if (!isSafeBrandStoragePath(rel)) throw new HttpError(400, 'Arquivo inválido.');
+    let buf;
+    try { buf = await readFile(dataUrl(rel)); }
+    catch { throw new HttpError(404, 'Logo não encontrado.'); }
+    const type = detectImageType(buf);
+    if (!type) throw new HttpError(404, 'Logo não encontrado.');
+    res.writeHead(200, hdr(req, { 'content-type': type, 'cache-control': 'private, max-age=3600' }));
+    res.end(buf);
+    return undefined;
+  }],
+  ['POST', /^\/api\/brand\/logo$/, async req => {
+    requireEnterpriseBrand();
+    const { buf } = await readBrandLogoUpload(req, (r, lim) => raw(r, lim));
+    if (!buf.length) throw new HttpError(400, 'Arquivo vazio.');
+    if (buf.length > BRAND_LOGO_MAX) throw new HttpError(413, 'Imagem grande demais (máx. 2 MB).');
+    const type = detectImageType(buf);
+    if (!type) throw new HttpError(400, 'Envie uma imagem PNG, JPEG, WebP ou GIF.');
+    const rel = `brand/${newBrandLogoFilename(type)}`;
+    mkdirSync(dataUrl('brand/'), { recursive: true });
+    await writeFile(dataUrl(rel), buf);
+    return { logoUrl: rel };
+  }],
   ['GET', /^\/api\/settings$/, () => ({ settings: redact(db.settings), meta: settingsMeta() })],
   ['GET', /^\/api\/flags$/, () => ({ flags: effectiveFeatureFlags(db.settings) })],
   ['PUT', /^\/api\/settings$/, async req => {
     const b = await body(req), s = db.settings;
     const before = structuredClone(s);
+    if (!isEnterpriseMode(s) && b.brand !== undefined) delete b.brand;
     try {
       patchSettings(s, b, { mergePluginAuth });
     } catch (e) {
@@ -1373,6 +1568,35 @@ const routes = [
     save();
     configureLogger({ settings: s });
     return redact(s);
+  }],
+  ['GET', /^\/api\/lgpd\/status$/, () => ({
+    ...buildLgpdStatus({ settings: db.settings }),
+    lgpd: lgpdMeta(db.settings)
+  })],
+  ['POST', /^\/api\/lgpd\/erasure$/, async req => {
+    const b = await body(req);
+    if (b.confirm !== true && b.confirm !== 'ERASE') {
+      throw new HttpError(400, 'Confirme a eliminação com { "confirm": true } ou "confirm": "ERASE".');
+    }
+    const scope = b.scope === 'profile' ? 'profile' : 'all';
+    const report = await executeLgpdErasure(db, { scope });
+    save();
+    return { ok: true, scope, report };
+  }],
+  ['GET', /^\/api\/retention$/, () => ({
+    retention: resolveRetentionSettings(db.settings),
+    envOverrides: envRetentionOverrides()
+  })],
+  ['PUT', /^\/api\/retention$/, async req => {
+    const b = await body(req);
+    applyRetentionSettingsPatch(db.settings, b);
+    save();
+    return { retention: resolveRetentionSettings(db.settings) };
+  }],
+  ['POST', /^\/api\/retention\/run$/, async () => {
+    const report = await runRetentionPurge(db, { isStreaming: isChatStreaming, force: true });
+    if (report.changed) save();
+    return report;
   }],
   ['GET', /^\/api\/audit$/, (req, _, url) => ({
     entries: listAudit(db, { limit: +(url.searchParams.get('limit') || 50) })
@@ -1391,10 +1615,19 @@ const routes = [
       })
     };
   }],
-  ['GET', /^\/api\/lgpd\/status$/, () => buildLgpdStatus({ settings: db.settings })],
   ['GET', /^\/api\/admin\/overview$/, () => {
     if (!isEnterpriseMode(db.settings)) throw new HttpError(403, 'Centro admin disponível apenas no modo enterprise.');
     return buildAdminOverview(db, db.settings);
+  }],
+  ['GET', /^\/api\/x9\/context$/, () => {
+    requireEnterpriseAdmin();
+    const sources = collectX9Sources({ db, settings: db.settings });
+    return sources;
+  }],
+  ['POST', /^\/api\/x9\/scan$/, () => {
+    requireEnterpriseAdmin();
+    const sources = collectX9Sources({ db, settings: db.settings });
+    return { sources, ...runX9Scan({ db, settings: db.settings, sources }) };
   }],
   ['GET', /^\/api\/access-control$/, () => ({
     accessControl: normalizeAccessControl(db.accessControl),
@@ -1540,6 +1773,15 @@ const routes = [
     save();
     return t;
   }],
+  ['POST', /^\/api\/architect\/suggest$/, async req => {
+    const b = await body(req);
+    try {
+      return architectSuggest({ goal: b.goal, constraints: b.constraints });
+    } catch (e) {
+      if (e.code === 400) throw new HttpError(400, e.message);
+      throw e;
+    }
+  }],
   ['PUT', /^\/api\/agent-templates\/([\w-]+)$/, async (req, [tid]) => {
     const t = (db.agentTemplates || []).find(x => x.id === tid);
     if (!t) throw new HttpError(404, 'Modelo não encontrado.');
@@ -1552,11 +1794,84 @@ const routes = [
     save();
     return {};
   }],
+  ['GET', /^\/api\/team-proposals$/, () => listTeamProposals(db)],
+  ['GET', /^\/api\/team-proposals\/([\w-]+)$/, (req, [pid]) => {
+    const p = (db.teamProposals || []).find(x => x.id === pid);
+    if (!p) throw new HttpError(404, 'Proposta de time não encontrada.');
+    return p;
+  }],
+  ['POST', /^\/api\/team-proposals$/, async req => {
+    const b = await body(req);
+    let structure;
+    let source = 'parse';
+    let brief = String(b.brief || b.goal || '').trim();
+    if (b.structure && typeof b.structure === 'object') {
+      structure = normalizeTeamStructure(b.structure);
+      source = 'structure';
+    } else if (b.goal) {
+      structure = structureFromArchitectScaffold(architectSuggest({ goal: b.goal, constraints: b.constraints }));
+      source = 'architect';
+    } else if (!brief) {
+      throw new HttpError(400, 'Envie goal, brief (texto) ou structure (JSON).');
+    } else if (b.orchestrate) {
+      const orchAgent = newAgent({ name: 'Orquestrador de times', tools: [], instructions: '', model: 'claude-sonnet-5-5' });
+      const runModel = process.env.RIPPER_TEST_PROVIDER
+        ? prompt => runTestProvider({ prompt })
+        : prompt => runClaude({
+          agent: orchAgent,
+          model: 'claude-sonnet-5-5',
+          effort: 'low',
+          prompt: brief,
+          history: [],
+          system: ORCHESTRATOR_SYSTEM,
+          settings: db.settings,
+          ctx: { db }
+        });
+      structure = await orchestrateTeamStructure(brief, { settings: db.settings, runModel });
+      if (!structure) throw new HttpError(422, 'O modelo não devolveu um time válido.');
+      source = 'model';
+    } else {
+      structure = parseTeamBrief(brief);
+      if (!structure) throw new HttpError(422, 'Não foi possível entender o brief. Use lista de agentes ou um bloco JSON.');
+    }
+    const proposal = createTeamProposal(db, { brief, structure, source });
+    save();
+    return proposal;
+  }],
+  ['POST', /^\/api\/team-proposals\/([\w-]+)\/apply$/, async (req, [pid]) => {
+    const b = await body(req);
+    try {
+      const out = applyTeamProposal(db, pid, {
+        createProject: b.createProject !== false,
+        projectName: b.projectName,
+        projectDescription: b.projectDescription
+      });
+      save();
+      return out;
+    } catch (e) {
+      if (e.code === 404) throw new HttpError(404, e.message);
+      if (e.code === 409) throw new HttpError(409, e.message);
+      throw e;
+    }
+  }],
+  ['DELETE', /^\/api\/team-proposals\/([\w-]+)$/, (req, [pid]) => {
+    const i = (db.teamProposals || []).findIndex(x => x.id === pid);
+    if (i < 0) throw new HttpError(404, 'Proposta de time não encontrada.');
+    db.teamProposals.splice(i, 1);
+    save();
+    return {};
+  }],
   ['POST', /^\/api\/agents$/, async req => {
     const b = await body(req);
+    if (b.templateId === 'x9-auditor' && !isEnterpriseMode(db.settings)) {
+      throw new HttpError(403, 'O template X9 — Auditor está disponível apenas no modo enterprise.');
+    }
     let a;
     if (b.savedTemplateId) {
       a = agentFromSavedTemplate(db, b.savedTemplateId, b, TEMPLATES);
+      if (a.templateId === 'x9-auditor' && !isEnterpriseMode(db.settings)) {
+        throw new HttpError(403, 'O template X9 — Auditor está disponível apenas no modo enterprise.');
+      }
     } else {
       const t = TEMPLATES.find(t => t.id === b.templateId);
       a = patchAgent(newAgent({ ...(t || {}), templateId: t?.id }), b);
@@ -2057,7 +2372,7 @@ const server = createServer(async (req, res) => {
     return await serveStatic(req, res, p === '/' ? '/index.html' : p);
   } catch (e) {
     const code = e instanceof HttpError ? e.code : 500;
-    if (code === 500) console.error(`[${req.requestId}]`, ...redactForLog(e?.stack || e?.message || String(e)));
+    if (code === 500) console.error(`[${req.requestId}]`, ...redactForLog(db.settings, e?.stack || e?.message || String(e)));
     if (!res.headersSent) {
       const payload = { error: code === 500 ? 'Erro interno. Veja o log do servidor.' : redactSecretsInText(e.message) };
       if (e.details?.length) payload.details = e.details;
@@ -2129,7 +2444,7 @@ function runRoutine(r, event) {
     }
     r.lastChatId = r.lastStatus === 'quiet' ? r.lastChatId : c.id;
     save();
-  }).catch(e => { r.lastStatus = 'failed'; r.lastError = e.message; save(); console.error('rotina', r.name, ...redactForLog(e.message)); })
+  }).catch(e => { r.lastStatus = 'failed'; r.lastError = e.message; save(); console.error('rotina', r.name, ...redactForLog(db.settings, e.message)); })
     .finally(() => releaseRoutineClaim(r.id));
   return true;
 }
@@ -2149,5 +2464,5 @@ setInterval(() => {
   if (out?.created) save();
 }, 60_000);
 
-process.on('unhandledRejection', e => console.error('unhandledRejection', ...redactForLog(e?.message || String(e))));
+process.on('unhandledRejection', e => console.error('unhandledRejection', ...redactForLog(db?.settings, e?.message || String(e))));
 if (!existsSync(DIST)) console.warn('Aviso: frontend não compilado. Rode `npm run build`.');
