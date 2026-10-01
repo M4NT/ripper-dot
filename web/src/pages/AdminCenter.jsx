@@ -177,22 +177,16 @@ export default function AdminCenter() {
 
         <AdminCard
           icon="bolt"
-          title="Orçamento e ROI"
-          desc="Sinais de uso e cotas — sem valores de fatura fabricados."
-          status={<StatusTag ok={s.budget?.available} label={s.budget?.available ? 'Com sinais' : 'sem dados'} warn={!s.budget?.available} />}
+          title="Uso"
+          desc="Medição, economia Julia (medida) e orçamento de tokens num só lugar."
+          status={<StatusTag ok={s.usage?.available} label={s.usage?.available ? 'Com dados' : 'sem dados'} warn={!s.usage?.available} />}
         >
-          {limits?.accountUsage?.emptyLabel && !s.budget?.available && (
-            <p className="muted small">{limits.accountUsage.emptyLabel}</p>
-          )}
-          {s.budget?.available && limits && (
-            <div className="admin-metrics">
-              <Metric label="Plano" value={limits.accountUsage?.plan || s.budget?.plan || '—'} />
-              <Metric label="Eventos locais" value={limits.accountUsage?.live?.usageEvents ? 'sim' : 'não'} />
-              <Metric label="Snapshot provedor" value={limits.providerSnapshot?.available ? 'sim' : 'não'} />
-            </div>
-          )}
-          <p className="muted small">{s.budget?.notes}</p>
-          <button type="button" className="btn btn-sm" onClick={() => go('/settings/models')}>Ver modelos e uso</button>
+          <p className="muted small">{s.usage?.notes || 'Sem estimativas de fatura — só eventos medidos localmente.'}</p>
+          <div className="admin-metrics">
+            <Metric label="Eventos de uso" value={s.retention?.usageEventCount ?? 0} />
+            <Metric label="Orçamento" value={limits?.accountUsage?.tokenBudget?.enabled ? 'ativo' : 'inativo'} />
+          </div>
+          <button type="button" className="btn btn-sm" onClick={() => go('/admin/uso')}>Abrir Uso</button>
         </AdminCard>
       </div>
     </div>

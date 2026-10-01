@@ -271,6 +271,57 @@ test('GET /api/admin/overview exige modo enterprise', async () => {
     const body = await ok.json();
     assert.equal(body.enterprise, true);
     assert.equal(body.sections.auditTrail.worm, false);
+    assert.ok(body.sections.usage);
+  });
+});
+
+async function enableEnterprise(base, auth) {
+  await fetch(base + '/api/settings', {
+    method: 'PUT',
+    headers: auth,
+    body: JSON.stringify({ ui: { mode: 'enterprise' } })
+  });
+}
+
+test('GET /api/metering exige enterprise e não inventa dinheiro', async () => {
+  await withServer({}, async (base, token) => {
+    const auth = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const denied = await fetch(base + '/api/metering', { headers: auth });
+    assert.equal(denied.status, 403);
+    await enableEnterprise(base, auth);
+    const r = await fetch(base + '/api/metering', { headers: auth });
+    assert.equal(r.status, 200);
+    const body = await r.json();
+    assert.ok(body.contractVersion);
+    assert.equal(body.tokens, null);
+    assert.ok(Array.isArray(body.byDay));
+    const raw = JSON.stringify(body);
+    assert.doesNotMatch(raw, /"\$|USD|usd/i);
+  });
+});
+
+test('GET /api/metering/export retorna CSV em enterprise', async () => {
+  await withServer({}, async (base, token) => {
+    const auth = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    await enableEnterprise(base, auth);
+    const r = await fetch(base + '/api/metering/export', { headers: auth });
+    assert.equal(r.status, 200);
+    assert.match(r.headers.get('content-type') || '', /text\/csv/);
+    const text = await r.text();
+    assert.match(text, /^at_iso,at_ms,model/);
+  });
+});
+
+test('GET /api/usage/token-roi exige enterprise', async () => {
+  await withServer({}, async (base, token) => {
+    const auth = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    assert.equal((await fetch(base + '/api/usage/token-roi', { headers: auth })).status, 403);
+    await enableEnterprise(base, auth);
+    const r = await fetch(base + '/api/usage/token-roi', { headers: auth });
+    assert.equal(r.status, 200);
+    const body = await r.json();
+    assert.ok('available' in body);
+    assert.equal(body.savingsPct, undefined);
   });
 });
 

@@ -31,6 +31,7 @@ const Connectors = lazy(() => import('./pages/Connectors.jsx'));
 const SkillsHub = lazy(() => import('./pages/SkillsHub.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 const AdminCenter = lazy(() => import('./pages/AdminCenter.jsx'));
+const AdminUso = lazy(() => import('./pages/AdminUso.jsx'));
 const NewAgent = lazy(() => import('./pages/NewAgent.jsx'));
 const AgentConfig = lazy(() => import('./pages/AgentConfig.jsx'));
 
@@ -271,6 +272,7 @@ function Shell() {
     p0 === 'marketplace' ? <Marketplace /> :
     p0 === 'connectors' ? <Connectors /> :
     p0 === 'skills' ? <SkillsHub /> :
+    p0 === 'admin' && p1 === 'uso' ? <AdminUso /> :
     p0 === 'admin' ? <AdminCenter /> :
     p0 === 'enterprise' ? null :
     p0 === 'settings' ? <Settings theme={theme} toggleTheme={toggleTheme} tab={p1} /> :
