@@ -11,6 +11,7 @@ import { ResizeHandle } from './resize.jsx';
 import Chat from './pages/Chat.jsx';
 import UiModeToggle from './uiModeToggle.jsx';
 import { getUiMode, isEnterpriseMode, isRouteAllowed } from './uiMode.js';
+import { I18nProvider, useT } from './i18n/index.jsx';
 
 // Telas fora do caminho principal carregam sob demanda. Se o build mudou desde que a aba abriu,
 // o pedaço antigo não existe mais: recarrega uma vez para pegar a versão nova.
@@ -58,7 +59,7 @@ function Provider({ children }) {
   }, [S, refresh, toast, busy, busyChats]);
   if (error && !S) return <Boot error={error} retry={refresh} />;
   if (!value) return <Boot />;
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={value}><I18nProvider locale={S.settings.ui?.locale}>{children}</I18nProvider></Ctx.Provider>;
 }
 
 function Boot({ error, retry }) {
@@ -70,15 +71,14 @@ function Boot({ error, retry }) {
   );
 }
 
-const NAV_ALL = [
-  ['', 'Início', 'home'],
-  ['projects', 'Projetos', 'folder'],
-  ['agents', 'Agentes', 'agents'],
-  ['explore', 'Explorar', 'compass'],
-  ['library', 'Biblioteca', 'book']
-];
-
-function navForMode(settings) {
+function navForMode(settings, t) {
+  const NAV_ALL = [
+    ['', t('nav.home'), 'home'],
+    ['projects', t('nav.projects'), 'folder'],
+    ['agents', t('nav.agents'), 'agents'],
+    ['explore', t('nav.explore'), 'compass'],
+    ['library', t('nav.library'), 'book']
+  ];
   if (!isEnterpriseMode(settings)) {
     return NAV_ALL.filter(([k]) => k === '' || k === 'agents');
   }
@@ -87,8 +87,9 @@ function navForMode(settings) {
 
 function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollapse }) {
   const { S, agent, busy } = useApp();
+  const t = useT();
   const enterprise = isEnterpriseMode(S.settings);
-  const NAV = navForMode(S.settings);
+  const NAV = navForMode(S.settings, t);
   const { parts } = useRoute();
   const chatMenu = useChatMenu();
   const section = parts[0] === 'c' ? 'chat' : parts[0] === 'new' ? 'agents' : parts[0] === 'p' ? 'projects' : parts[0] || '';
@@ -98,25 +99,25 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
       {onCollapse && <ResizeHandle side="left" cssVar="side-w" min={220} max={440} collapsed={collapsed} label="Largura da barra lateral"
         onCollapse={() => !collapsed && onCollapse()} onExpand={() => collapsed && onCollapse()} />}
       <div className="brand-row">
-        <a href="#/" className="brand" onClick={onNavigate} aria-label="Ripper, início">
+        <a href="#/" className="brand" onClick={onNavigate} aria-label={t('nav.brand')}>
           <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><rect width="32" height="32" rx="8" className="brand-bg" /><path d="M11 23V9h6.2a4.3 4.3 0 0 1 .9 8.5L22 23" className="brand-r" /></svg>
           <span>Ripper</span>
         </a>
-        {onCollapse && <button className="icon-btn sm collapse-btn" onClick={onCollapse} aria-label={collapsed ? 'Expandir barra lateral' : 'Recolher barra lateral'} title={collapsed ? 'Expandir (Ctrl B)' : 'Recolher (Ctrl B)'}><Icon name="sidebar" size={17} /></button>}
+        {onCollapse && <button className="icon-btn sm collapse-btn" onClick={onCollapse} aria-label={collapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')} title={collapsed ? `${t('nav.expandBar')} (Ctrl B)` : `${t('nav.collapseBar')} (Ctrl B)`}><Icon name="sidebar" size={17} /></button>}
       </div>
-      <button className="side-search" onClick={onSearch} aria-label="Buscar"><Icon name="search" size={16} /><span>Buscar</span><kbd>Ctrl K</kbd></button>
-      <nav className="nav" aria-label="Principal">
+      <button className="side-search" onClick={onSearch} aria-label={t('common.search')}><Icon name="search" size={16} /><span>{t('common.search')}</span><kbd>Ctrl K</kbd></button>
+      <nav className="nav" aria-label={t('nav.main')}>
         {NAV.map((n, i) => n ? (
           <a key={n[0]} href={'#/' + n[0]} className={section === n[0] ? 'on' : ''} aria-current={section === n[0] ? 'page' : undefined} onClick={onNavigate} title={collapsed ? n[1] : undefined} aria-label={n[1]}>
             <Icon name={n[2]} /><span className="nav-label">{n[1]}</span>
             {n[0] === 'projects' && S.projects.length > 0 && <span className="count">{S.projects.length}</span>}
           </a>
         ) : <hr key={i} />)}
-        {collapsed && <a href="#/chats" className={section === 'chats' ? 'on' : ''} onClick={onNavigate} title="Conversas" aria-label="Conversas"><Icon name="chat" /></a>}
+        {collapsed && <a href="#/chats" className={section === 'chats' ? 'on' : ''} onClick={onNavigate} title={t('nav.chats')} aria-label={t('nav.chats')}><Icon name="chat" /></a>}
       </nav>
       {!collapsed && recent.length > 0 && (
         <div className="recent">
-          <div className="side-label-row"><p className="side-label">Conversas</p><a href="#/chats" className={`side-all ${section === 'chats' ? 'on' : ''}`} onClick={onNavigate}>Ver todas<span>{S.chats.length}</span></a></div>
+          <div className="side-label-row"><p className="side-label">{t('nav.chats')}</p><a href="#/chats" className={`side-all ${section === 'chats' ? 'on' : ''}`} onClick={onNavigate}>{t('nav.viewAll')}<span>{S.chats.length}</span></a></div>
           {recent.map(c => {
             const group = isGroupChat(c);
             return (
@@ -125,9 +126,9 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
                 <span className="recent-av"><ChatAvatar chat={c} size={24} /></span>
                 <span className="recent-text">
                   <b>{c.title}</b>
-                  <small>{group && <span className="recent-group">Grupo · </span>}{c.preview || 'Sem mensagens'}</small>
+                  <small>{group && <span className="recent-group">{t('nav.group')}</span>}{c.preview || t('nav.noMessages')}</small>
                 </span>
-                {c.unread && parts[1] !== c.id ? <span className="unread-dot" title="Novidade de rotina" /> : <time>{fmtAgo(c.updatedAt || c.createdAt)}</time>}
+                {c.unread && parts[1] !== c.id ? <span className="unread-dot" title={t('nav.routineUnread')} /> : <time>{fmtAgo(c.updatedAt || c.createdAt)}</time>}
               </a>
             );
           })}
@@ -136,27 +137,27 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
       <div className="side-foot">
         {!collapsed && <UiModeToggle compact className="side-mode" />}
         <Menu align="up" className="account-menu" trigger={({ toggle, open }) => (
-          <button className={`account ${['settings', 'integrations', 'marketplace', 'connectors', 'skills', 'admin'].includes(section) ? 'on' : ''}`} onClick={toggle} aria-expanded={open} aria-haspopup="menu" title={collapsed ? 'Conta e configurações' : undefined}>
+          <button className={`account ${['settings', 'integrations', 'marketplace', 'connectors', 'skills', 'admin'].includes(section) ? 'on' : ''}`} onClick={toggle} aria-expanded={open} aria-haspopup="menu" title={collapsed ? t('nav.account') : undefined}>
             <span className="initial">{(S.settings.name || 'V')[0].toUpperCase()}</span>
-            <span className="account-name"><b>{S.settings.name || 'Você'}</b><small>Conta e configurações</small></span>
+            <span className="account-name"><b>{S.settings.name || t('common.you')}</b><small>{t('nav.account')}</small></span>
             <Icon name="more" size={16} className="account-more" />
           </button>
         )}>
-          <div className="account-head"><span className="initial">{(S.settings.name || 'V')[0].toUpperCase()}</span><span><b>{S.settings.name || 'Você'}</b><small>{S.agents.length} agentes · {S.projects.length} projetos</small></span></div>
-          <MenuItem icon="gear" onClick={() => { onNavigate(); go('/settings'); }}>Configurações</MenuItem>
-          <MenuItem icon="store" onClick={() => { onNavigate(); go('/marketplace'); }}>Marketplace</MenuItem>
+          <div className="account-head"><span className="initial">{(S.settings.name || 'V')[0].toUpperCase()}</span><span><b>{S.settings.name || t('common.you')}</b><small>{t('nav.agentsProjects', { agents: S.agents.length, projects: S.projects.length })}</small></span></div>
+          <MenuItem icon="gear" onClick={() => { onNavigate(); go('/settings'); }}>{t('nav.settings')}</MenuItem>
+          <MenuItem icon="store" onClick={() => { onNavigate(); go('/marketplace'); }}>{t('nav.marketplace')}</MenuItem>
           {enterprise ? <>
-            <MenuItem icon="plug" onClick={() => { onNavigate(); go('/connectors'); }}>Conectores</MenuItem>
-            <MenuItem icon="bolt" onClick={() => { onNavigate(); go('/skills'); }}>Habilidades</MenuItem>
-            <MenuItem icon="cube" onClick={() => { onNavigate(); go('/settings/models'); }}>Modelos e computador<small className="menu-hint">Claude, Docker, plugins</small></MenuItem>
-            <MenuItem icon="grid" onClick={() => { onNavigate(); go('/admin'); }}>Centro admin<small className="menu-hint">Auditoria, uso, RBAC</small></MenuItem>
+            <MenuItem icon="plug" onClick={() => { onNavigate(); go('/connectors'); }}>{t('nav.connectors')}</MenuItem>
+            <MenuItem icon="bolt" onClick={() => { onNavigate(); go('/skills'); }}>{t('nav.skills')}</MenuItem>
+            <MenuItem icon="cube" onClick={() => { onNavigate(); go('/settings/models'); }}>{t('nav.modelsComputer')}<small className="menu-hint">{t('nav.modelsComputerHint')}</small></MenuItem>
+            <MenuItem icon="grid" onClick={() => { onNavigate(); go('/admin'); }}>{t('nav.adminCenter')}<small className="menu-hint">{t('nav.adminCenterHint')}</small></MenuItem>
           </> : (
-            <MenuItem icon="grid" onClick={() => { onNavigate(); go('/settings/appearance'); }}>Ativar modo Enterprise<small className="menu-hint">Admin, projetos e opções avançadas</small></MenuItem>
+            <MenuItem icon="grid" onClick={() => { onNavigate(); go('/settings/appearance'); }}>{t('nav.enableEnterprise')}<small className="menu-hint">{t('nav.enableEnterpriseHint')}</small></MenuItem>
           )}
-          <MenuItem icon={theme === 'dark' ? 'sun' : 'moon'} onClick={toggleTheme}>Tema {theme === 'dark' ? 'claro' : 'escuro'}</MenuItem>
+          <MenuItem icon={theme === 'dark' ? 'sun' : 'moon'} onClick={toggleTheme}>{t('nav.themeUse', { theme: theme === 'dark' ? t('nav.themeLight') : t('nav.themeDark') })}</MenuItem>
           <hr className="menu-sep" />
-          <MenuItem icon="search" onClick={onSearch}>Buscar<kbd className="menu-kbd">Ctrl K</kbd></MenuItem>
-          <MenuItem icon="sidebar" onClick={onCollapse || undefined} disabled={!onCollapse}>{collapsed ? 'Expandir barra' : 'Recolher barra'}<kbd className="menu-kbd">Ctrl B</kbd></MenuItem>
+          <MenuItem icon="search" onClick={onSearch}>{t('common.search')}<kbd className="menu-kbd">Ctrl K</kbd></MenuItem>
+          <MenuItem icon="sidebar" onClick={onCollapse || undefined} disabled={!onCollapse}>{collapsed ? t('nav.expandBar') : t('nav.collapseBar')}<kbd className="menu-kbd">Ctrl B</kbd></MenuItem>
         </Menu>
       </div>
     </aside>
@@ -167,6 +168,7 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
 function Palette({ open, onClose, toggleTheme }) {
   const { S, agent } = useApp();
   const enterprise = isEnterpriseMode(S.settings);
+  const tr = useT();
   const [q, setQ] = useState('');
   const [i, setI] = useState(0);
   const [chatHits, setChatHits] = useState([]);
@@ -179,32 +181,32 @@ function Palette({ open, onClose, toggleTheme }) {
     return () => { alive = false; };
   }, [q]);
   const items = useMemo(() => {
-    const t = q.trim().toLowerCase();
-    const chats = t.length >= 2 && chatHits.length ? chatHits : S.chats;
+    const term = q.trim().toLowerCase();
+    const chats = term.length >= 2 && chatHits.length ? chatHits : S.chats;
     const all = [
-      { g: 'Ações', label: 'Criar novo agente', icon: 'plus', run: () => go('/new') },
-      ...(enterprise ? [{ g: 'Ações', label: 'Explorar templates', icon: 'compass', run: () => go('/explore') }] : []),
-      { g: 'Ações', label: 'Alternar tema', icon: 'moon', run: toggleTheme },
-      { g: 'Ações', label: 'Configurações', icon: 'gear', run: () => go('/settings') },
-      ...S.agents.map(a => ({ g: 'Agentes', label: `Conversar com ${a.name}`, agent: a, run: () => go(`/a/${a.id}`) })),
-      ...chats.map(c => ({ g: 'Conversas', label: c.title, hint: agent(c.agentId)?.name, icon: 'chat', run: () => go(`/c/${c.id}`) }))
+      { g: tr('palette.group.actions'), label: tr('palette.action.newAgent'), icon: 'plus', run: () => go('/new') },
+      ...(enterprise ? [{ g: tr('palette.group.actions'), label: tr('palette.action.explore'), icon: 'compass', run: () => go('/explore') }] : []),
+      { g: tr('palette.group.actions'), label: tr('palette.action.toggleTheme'), icon: 'moon', run: toggleTheme },
+      { g: tr('palette.group.actions'), label: tr('palette.action.settings'), icon: 'gear', run: () => go('/settings') },
+      ...S.agents.map(a => ({ g: tr('palette.group.agents'), label: tr('palette.chatWith', { name: a.name }), agent: a, run: () => go(`/a/${a.id}`) })),
+      ...chats.map(c => ({ g: tr('palette.group.chats'), label: c.title, hint: agent(c.agentId)?.name, icon: 'chat', run: () => go(`/c/${c.id}`) }))
     ];
-    return all.filter(x => !t || x.label.toLowerCase().includes(t) || x.hint?.toLowerCase().includes(t)).slice(0, 30);
-  }, [q, S, agent, toggleTheme, chatHits, enterprise]);
+    return all.filter(x => !term || x.label.toLowerCase().includes(term) || x.hint?.toLowerCase().includes(term)).slice(0, 30);
+  }, [q, S, agent, toggleTheme, chatHits, enterprise, tr]);
   const listRef = useRef(null);
   useEffect(() => { listRef.current?.querySelector('.on')?.scrollIntoView({ block: 'nearest' }); }, [i]);
   const run = x => { onClose(); x.run(); };
   let g = '';
   return (
-    <Dialog open={open} onClose={onClose} className="palette" label="Buscar">
-      <div className="palette-input"><Icon name="search" /><input autoFocus value={q} placeholder="Buscar conversas, agentes e ações…" onChange={e => { setQ(e.target.value); setI(0); }}
+    <Dialog open={open} onClose={onClose} className="palette" label={tr('palette.title')}>
+      <div className="palette-input"><Icon name="search" /><input autoFocus value={q} placeholder={tr('palette.placeholder')} onChange={e => { setQ(e.target.value); setI(0); }}
         onKeyDown={e => {
           if (e.key === 'ArrowDown') { e.preventDefault(); setI(v => Math.min(v + 1, items.length - 1)); }
           if (e.key === 'ArrowUp') { e.preventDefault(); setI(v => Math.max(v - 1, 0)); }
           if (e.key === 'Enter' && items[i]) run(items[i]);
-        }} aria-label="Buscar" /><kbd>Esc</kbd></div>
+        }} aria-label={tr('common.search')} /><kbd>Esc</kbd></div>
       <div className="palette-list" ref={listRef} role="listbox">
-        {items.length === 0 && <p className="muted pad">Nada encontrado para “{q}”.</p>}
+        {items.length === 0 && <p className="muted pad">{tr('palette.empty', { q })}</p>}
         {items.map((x, n) => (
           <div key={n}>
             {x.g !== g && (g = x.g) && <p className="palette-group">{x.g}</p>}
@@ -222,6 +224,7 @@ function Palette({ open, onClose, toggleTheme }) {
 function Shell() {
   const { S } = useApp();
   const { parts, query } = useRoute();
+  const t = useT();
   const [theme, toggleTheme] = useTheme();
   const [palette, setPalette] = useState(false);
   const [drawer, setDrawer] = useState(false);
@@ -282,15 +285,15 @@ function Shell() {
     <div className={`shell ${drawer ? 'drawer-open' : ''} ${collapsed && !mobile ? 'side-collapsed' : ''}`}>
       <Sidebar onNavigate={() => setDrawer(false)} onSearch={() => setPalette(true)} theme={theme} toggleTheme={toggleTheme}
         collapsed={collapsed && !mobile} onCollapse={mobile ? null : toggleCollapsed} />
-      {mobile && <button className="scrim" aria-label="Fechar menu" onClick={() => setDrawer(false)} tabIndex={drawer ? 0 : -1} />}
+      {mobile && <button className="scrim" aria-label={t('shell.closeMenu')} onClick={() => setDrawer(false)} tabIndex={drawer ? 0 : -1} />}
       <main className="main">
         {mobile && (
           <div className="mobile-bar">
-            <button className="icon-btn" onClick={() => setDrawer(true)} aria-label="Abrir menu"><Icon name="menu" /></button>
-            <span className="mobile-title">Ripper{getUiMode(S.settings) === 'enterprise' ? '' : <span className="mobile-mode-tag">Simples</span>}</span>
+            <button className="icon-btn" onClick={() => setDrawer(true)} aria-label={t('shell.openMenu')}><Icon name="menu" /></button>
+            <span className="mobile-title">{t('shell.brand')}{getUiMode(S.settings) === 'enterprise' ? '' : <span className="mobile-mode-tag">{t('shell.modeSimple')}</span>}</span>
             <div className="mobile-bar-actions">
               <UiModeToggle compact className="mobile-mode" />
-              <button className="icon-btn" onClick={() => setPalette(true)} aria-label="Buscar"><Icon name="search" /></button>
+              <button className="icon-btn" onClick={() => setPalette(true)} aria-label={t('common.search')}><Icon name="search" /></button>
             </div>
           </div>
         )}

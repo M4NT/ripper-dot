@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
+import { fmtAgoLocalized, getCachedUiLocale, translateApiError } from '../../lib/i18n.mjs';
 
 /* ---------- API ---------- */
 export class ApiError extends Error {}
@@ -9,7 +10,7 @@ export async function api(path, { method = 'GET', body, raw, headers, signal } =
     body: raw ?? (body === undefined ? undefined : JSON.stringify(body))
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(data.error || `Erro ${res.status}`);
+  if (!res.ok) throw new ApiError(translateApiError(data.error || `Erro ${res.status}`, getCachedUiLocale()));
   return data;
 }
 
@@ -49,12 +50,7 @@ export function useMediaQuery(q) {
 export const fmtSize = n => n < 1024 ? `${n} B` : n < 1 << 20 ? `${(n / 1024).toFixed(0)} KB` : `${(n / (1 << 20)).toFixed(1)} MB`;
 export const fmtTime = t => new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 export function fmtAgo(t) {
-  const s = (Date.now() - t) / 1000;
-  if (s < 60) return 'agora';
-  if (s < 3600) return `${Math.floor(s / 60)} min`;
-  if (s < 86400) return `${Math.floor(s / 3600)} h`;
-  if (s < 7 * 86400) return `${Math.floor(s / 86400)} d`;
-  return new Date(t).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+  return fmtAgoLocalized(t, getCachedUiLocale());
 }
 
 /* ---------- ferramentas: rótulos humanos ---------- */

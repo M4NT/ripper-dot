@@ -8,7 +8,7 @@ test('applySettingsPatch rejeita modelo desconhecido', () => {
 });
 
 test('applySettingsPatch aceita providerRetry', () => {
-  const s = { defaultModel: 'auto', claude: {}, computer: {} };
+  const s = { defaultModel: 'auto', claude: {}, computer: {}, ui: { locale: 'pt-BR' } };
   applySettingsPatch(s, { providerRetry: { maxAttempts: 2, baseDelayMs: 500, maxDelayMs: 5000 } });
   assert.equal(s.providerRetry.maxAttempts, 2);
 });
@@ -18,6 +18,13 @@ test('applySettingsPatch aceita rateLimit', () => {
   applySettingsPatch(s, { rateLimit: { enabled: true, chatPerMinute: 5 } });
   assert.equal(s.rateLimit.enabled, true);
   assert.equal(s.rateLimit.chatPerMinute, 5);
+});
+
+test('applySettingsPatch persiste settings.ui.locale', () => {
+  const s = { defaultModel: 'auto', claude: {}, computer: {}, ui: { locale: 'pt-BR', mode: 'simple' } };
+  applySettingsPatch(s, { ui: { locale: 'en' } });
+  assert.equal(s.ui.locale, 'en');
+  assert.throws(() => applySettingsPatch(s, { ui: { locale: 'de' } }), /inválido/);
 });
 
 test('settingsMeta lista modelos e esforços', () => {

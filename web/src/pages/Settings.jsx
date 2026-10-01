@@ -9,14 +9,16 @@ import { MODEL_DESC, EffortScale } from '../modelPicker.jsx';
 import { useSettingsDraft } from '../settingsForm.js';
 import UiModeToggle from '../uiModeToggle.jsx';
 import { isEnterpriseMode, isSettingsTabAllowed } from '../uiMode.js';
+import { useT, settingsTabs } from '../i18n/index.jsx';
 
 export function SaveBar({ dirty, saving, save, reset }) {
+  const tr = useT();
   if (!dirty) return null;
   return (
-    <div className="save-bar" role="region" aria-label="Alterações não salvas">
-      <span>Você tem alterações não salvas.</span>
-      <button className="btn" onClick={reset}>Descartar</button>
-      <button className="btn btn-primary" disabled={saving} onClick={() => save()}>{saving ? 'Salvando…' : 'Salvar alterações'}</button>
+    <div className="save-bar" role="region" aria-label={tr('settings.unsavedRegion')}>
+      <span>{tr('settings.unsaved')}</span>
+      <button className="btn" onClick={reset}>{tr('common.discard')}</button>
+      <button className="btn btn-primary" disabled={saving} onClick={() => save()}>{saving ? tr('common.saving') : tr('common.save')}</button>
     </div>
   );
 }
@@ -72,17 +74,6 @@ function DataBackup() {
     </Card>
   );
 }
-
-export const SETTINGS_TABS = [
-  ['profile', 'Perfil', 'agents', 'Seu nome e instruções gerais'],
-  ['models', 'Modelos', 'bolt', 'Claude, ChatGPT e Ripper Auto'],
-  ['computer', 'Computador', 'terminal', 'Onde os agentes executam'],
-  ['plugins', 'Plugins', 'plug', 'Servidores MCP'],
-  ['security', 'Segurança', 'key', 'Aprovações e limites'],
-  ['memory', 'Memória', 'brain', 'O que os agentes lembram'],
-  ['appearance', 'Aparência', 'sun', 'Tema e atalhos'],
-  ['advanced', 'Avançado', 'layers', 'Enterprise — flags experimentais']
-];
 
 /** Linha de configuração: rótulo e explicação à esquerda, controle à direita. */
 function Row({ title, desc, children, stack, tip }) {
@@ -142,12 +133,14 @@ function Plugins({ s, set }) {
 
 export default function Settings({ theme, toggleTheme, tab: initial }) {
   const { S } = useApp();
+  const tr = useT();
+  const SETTINGS_TABS = settingsTabs(tr);
   const d = useSettingsDraft();
   const { s, set } = d;
   const dark = useDark();
   const enterprise = isEnterpriseMode(S.settings);
   const allowedTabs = SETTINGS_TABS.filter(([k]) => isSettingsTabAllowed(k, S.settings));
-  const tab = allowedTabs.some(t => t[0] === initial) ? initial : 'profile';
+  const tab = allowedTabs.some(([k]) => k === initial) ? initial : 'profile';
   const [docker, setDocker] = useState(undefined);
   const [image, setImage] = useState(null);
   const [julia, setJulia] = useState(null);
@@ -155,12 +148,12 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
     if (tab === 'computer') api('/api/computer/docker').then(r => { setDocker(r.version); setImage(r.image); }).catch(() => setDocker(null));
     if (tab === 'models') api('/api/julia/status').then(r => setJulia(r.online)).catch(() => setJulia(false));
   }, [tab]);
-  const current = SETTINGS_TABS.find(t => t[0] === tab);
+  const current = allowedTabs.find(([k]) => k === tab) || allowedTabs[0];
 
   return (
     <div className="settings-page">
-      <nav className="settings-nav" aria-label="Seções de configuração">
-        <h1>Configurações</h1>
+      <nav className="settings-nav" aria-label={tr('settings.navLabel')}>
+        <h1>{tr('settings.title')}</h1>
         {allowedTabs.map(([k, l, ic, hint]) => (
           <a key={k} href={`#/settings/${k}`} className={k === tab ? 'on' : ''} aria-current={k === tab ? 'page' : undefined}>
             <Icon name={ic} size={17} /><span><b>{l}</b><small>{hint}</small></span>
@@ -265,20 +258,20 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
         {tab === 'plugins' && <Plugins s={s} set={set} />}
 
         {tab === 'security' && <>
-          <Card title="Aprovação de ações" desc="Os agentes pausam e esperam seu ok antes de ações que podem causar estrago. Sem resposta em 10 minutos, o pedido é negado.">
+          <Card title={tr('settings.security.approvalTitle')} desc={tr('settings.security.approvalDesc')}>
             <div className="mode-grid three">
-              {[['risky', 'Só ações de risco', 'Recomendado', 'Apagar em massa, sudo, git push, publicar, scripts da internet.'],
-                ['always', 'Toda ação', '', 'Você aprova cada comando no computador.'],
-                ['never', 'Nunca pedir', 'Não recomendado', 'Na sua máquina (pasta local), sempre pede.']].map(([k, t, tag, dsc]) => (
+              {[['risky', tr('settings.security.approval.risky'), tr('settings.security.approval.riskyTag'), tr('settings.security.approval.riskyDesc')],
+                ['always', tr('settings.security.approval.always'), '', tr('settings.security.approval.alwaysDesc')],
+                ['never', tr('settings.security.approval.never'), tr('settings.security.approval.neverTag'), tr('settings.security.approval.neverDesc')]].map(([k, tit, tag, dsc]) => (
                 <button key={k} type="button" className={`mode ${(s.approvalPolicy || 'risky') === k ? 'on' : ''}`} onClick={() => set('approvalPolicy', k)} aria-pressed={(s.approvalPolicy || 'risky') === k}
                   title={k === 'never' ? 'Comandos destrutivos podem rodar sem pausa. Use só se confia em tudo que o agente faz.' : undefined}>
-                  <b>{t}{tag && <span className={`tag ${k === 'risky' ? 'tag-ok' : 'tag-warn'}`}>{tag}</span>}</b><small>{dsc}</small>
+                  <b>{tit}{tag && <span className={`tag ${k === 'risky' ? 'tag-ok' : 'tag-warn'}`}>{tag}</span>}</b><small>{dsc}</small>
                 </button>
               ))}
             </div>
           </Card>
           {enterprise && <>
-            <Card title="Histórico de aprovações" desc="Decisões recentes nesta instalação (aprovado, negado ou expirado).">
+            <Card title={tr('settings.security.historyTitle')} desc={tr('settings.security.historyDesc')}>
               <ApprovalHistory limit={15} />
             </Card>
             <AdvancedBlock settings={s} hint="Limite de taxa">
@@ -290,7 +283,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
               </Card>
             </AdvancedBlock>
             <AdvancedBlock settings={s} hint="Limites de mensagens entre agentes">
-              <Card title="Mensagens entre agentes" desc="Limites para os agentes não entrarem em conversa infinita entre si.">
+              <Card title={tr('settings.security.inboxTitle')} desc={tr('settings.security.inboxDesc')}>
                 <Row title="Máximo por agente, por hora"><div className="input-unit"><input className="input" type="number" min={1} max={200} value={s.inbox?.maxPerHour ?? 20} onChange={e => set('inbox', { ...(s.inbox || {}), maxPerHour: +e.target.value })} /><span>mensagens</span></div></Row>
                 <Row title="Profundidade máxima de uma troca" desc="Quantas vezes uma resposta pode gerar outra mensagem (saltos inbox)." tip="Valores altos podem gerar longas cadeias de mensagens automáticas entre agentes."><div className="input-unit"><input className="input" type="number" min={1} max={10} value={s.inbox?.maxHops ?? 3} onChange={e => set('inbox', { ...(s.inbox || {}), maxHops: +e.target.value })} /><span>saltos</span></div></Row>
               </Card>
@@ -341,9 +334,15 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
             <UiModeToggle />
           </Card>
           <Card>
-            <Row title="Tema" desc={`Agora: ${theme === 'dark' ? 'escuro' : 'claro'}. O padrão segue o sistema.`}><button className="btn" onClick={toggleTheme}><Icon name={theme === 'dark' ? 'sun' : 'moon'} size={16} />Usar tema {theme === 'dark' ? 'claro' : 'escuro'}</button></Row>
+            <Row title={tr('settings.appearance.locale')} desc={tr('settings.appearance.localeDesc')}>
+              <Select label={tr('settings.appearance.locale')} value={s.ui?.locale || 'pt-BR'} onChange={v => set('ui.locale', v)} options={[
+                { value: 'pt-BR', label: tr('settings.appearance.localePt') },
+                { value: 'en', label: tr('settings.appearance.localeEn') }
+              ]} />
+            </Row>
+            <Row title={tr('settings.appearance.theme')} desc={tr('settings.appearance.themeDesc', { theme: theme === 'dark' ? tr('settings.appearance.themeCurrentDark') : tr('settings.appearance.themeCurrentLight') })}><button className="btn" onClick={toggleTheme}><Icon name={theme === 'dark' ? 'sun' : 'moon'} size={16} />{tr('settings.appearance.useTheme', { theme: theme === 'dark' ? tr('settings.appearance.themeCurrentLight') : tr('settings.appearance.themeCurrentDark') })}</button></Row>
           </Card>
-          <Card title="Atalhos">
+          <Card title={tr('settings.appearance.shortcuts')}>
             <dl className="keys">
               <dt><kbd>Ctrl</kbd><kbd>K</kbd></dt><dd>Buscar conversas, agentes e ações</dd>
               <dt><kbd>Ctrl</kbd><kbd>,</kbd></dt><dd>Abrir configurações</dd>

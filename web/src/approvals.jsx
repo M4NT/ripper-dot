@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, go, useRoute, fmtAgo } from './lib.js';
 import { AgentAvatar, Icon } from './ui.jsx';
 import { useApp } from './app.jsx';
+import { useT } from './i18n/index.jsx';
 
 const KIND = { exec: 'quer rodar um comando', share: 'quer publicar um link' };
 
@@ -66,6 +67,7 @@ export function ApprovalHistory({ limit = 20 }) {
 
 export function ApprovalTray() {
   const { parts } = useRoute();
+  const t = useT();
   const [pending, setPending] = useState([]);
   const [open, setOpen] = useState(true);
   useEffect(() => {
@@ -82,9 +84,9 @@ export function ApprovalTray() {
   useEffect(() => { if (list.length) setOpen(true); }, [list.length]);
   if (!list.length) return null;
   return (
-    <aside className={`approval-tray ${open ? 'open' : ''}`} aria-label="Aprovações pendentes">
+    <aside className={`approval-tray ${open ? 'open' : ''}`} aria-label={t('approval.tray.label')}>
       <button className="tray-head" onClick={() => setOpen(o => !o)} aria-expanded={open}>
-        <span className="tray-dot" />{list.length} {list.length === 1 ? 'pedido aguardando' : 'pedidos aguardando'} sua aprovação
+        <span className="tray-dot" />{list.length === 1 ? t('approval.tray.one', { n: list.length }) : t('approval.tray.many', { n: list.length })}
         <Icon name="down" size={14} className={open ? '' : 'flip'} />
       </button>
       {open && <div className="tray-list">
