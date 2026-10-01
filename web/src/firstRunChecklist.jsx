@@ -16,6 +16,13 @@ export function FirstRunChecklist({ settings, agentCount }) {
       href: '#/settings/models'
     },
     {
+      id: 'models',
+      label: 'Escolher quais IAs usar',
+      detail: 'Ligue só as que você quer e limite o esforço de cada uma. O Ripper Auto escolhe dentro disso.',
+      done: Object.keys(settings.models?.enabled || {}).length + Object.keys(settings.models?.maxEffort || {}).length > 0,
+      href: '#/settings/models'
+    },
+    {
       id: 'agent',
       label: 'Criar um agente',
       detail: 'Dê nome e função — ou use um template.',
