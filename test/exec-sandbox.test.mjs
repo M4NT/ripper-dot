@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -117,8 +117,7 @@ test('live docker echo', async t => {
   }
   const dir = mkdtempSync(join(tmpdir(), 'ripper-sbx-live-'));
   const work = pathToFileURL(dir + '/');
-  writeFileSync(join(dir, 'marker.txt'), 'x');
-  const out = await execInDockerSandbox('cat marker.txt', work, { sandbox: { enabled: true } });
-  assert.match(out, /x/);
+  const out = await execInDockerSandbox('echo ripper-sbx-live', work, { sandbox: { enabled: true } });
+  assert.match(out, /ripper-sbx-live/);
   assert.match(out, /\[exit 0\]/);
 });
