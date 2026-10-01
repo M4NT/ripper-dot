@@ -184,6 +184,15 @@ import {
   taskSyncBridgeStatus,
   upsertTaskDelegation
 } from './lib/task-sync-bridge.mjs';
+import {
+  deleteVaultCredential,
+  getVaultCredential,
+  listVaultEntries,
+  migrateLegacySecretsToVault,
+  persistOAuthTokensInVault,
+  putVaultCredential,
+  vaultConfigured
+} from './lib/connection-vault.mjs';
 
 installLogRedactionMiddleware();
 
@@ -1306,6 +1315,44 @@ const routes = [
       auth: googleTasksOAuthStatus(db.settings)
     };
   }],
+  ['GET', /^\/api\/vault\/connections$/, () => listVaultEntries()],
+  ['PUT', /^\/api\/vault\/connections\/([\w.-]{1,64})$/, async (req, [key]) => {
+    const b = await body(req);
+    try {
+      return { entry: putVaultCredential(key, b) };
+    } catch (e) {
+      throw new HttpError(vaultConfigured() ? 400 : 503, e.message);
+    }
+  }],
+  ['GET', /^\/api\/vault\/connections\/([\w.-]{1,64})$/, (req, [key], url) => {
+    const agentId = url.searchParams.get('agentId') || '';
+    if (!agentId) throw new HttpError(400, 'Informe agentId para ler credencial com escopo.');
+    try {
+      const cred = getVaultCredential(key, { agentId });
+      if (!cred) throw new HttpError(404, 'Credencial não encontrada.');
+      return { key, agentId, credential: cred };
+    } catch (e) {
+      if (e.message?.includes('permissão')) throw new HttpError(403, e.message);
+      throw new HttpError(vaultConfigured() ? 400 : 503, e.message);
+    }
+  }],
+  ['DELETE', /^\/api\/vault\/connections\/([\w.-]{1,64})$/, (req, [key]) => {
+    try {
+      if (!deleteVaultCredential(key)) throw new HttpError(404, 'Credencial não encontrada.');
+      return { ok: true };
+    } catch (e) {
+      throw new HttpError(400, e.message);
+    }
+  }],
+  ['POST', /^\/api\/vault\/migrate-from-plugins$/, () => {
+    try {
+      const out = migrateLegacySecretsToVault(db);
+      save();
+      return out;
+    } catch (e) {
+      throw new HttpError(vaultConfigured() ? 400 : 503, e.message);
+    }
+  }],
   ['GET', /^\/api\/settings$/, () => ({ settings: redact(db.settings), meta: settingsMeta() })],
   ['GET', /^\/api\/flags$/, () => ({ flags: effectiveFeatureFlags(db.settings) })],
   ['PUT', /^\/api\/settings$/, async req => {
@@ -1966,7 +2013,8 @@ const server = createServer(async (req, res) => {
         const tokens = await exchangeOAuthCode(flow, code);
         const idx = (db.settings.plugins || []).findIndex(p => p.name === flow.pluginName);
         if (idx >= 0) {
-          db.settings.plugins[idx] = applyOAuthTokensToPlugin(db.settings.plugins[idx], tokens, flow);
+          const plugin = db.settings.plugins[idx];
+          db.settings.plugins[idx] = persistOAuthTokensInVault(plugin, tokens, flow);
           save();
         }
         flow.status = 'complete';
