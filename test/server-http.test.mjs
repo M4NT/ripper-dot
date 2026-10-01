@@ -139,6 +139,31 @@ test('GET /api/usage/limits retorna agregado', async () => {
   });
 });
 
+test('GET /api/metering retorna agregados sem campos de dinheiro', async () => {
+  await withServer({}, async (base, token) => {
+    const r = await fetch(base + '/api/metering', { headers: { authorization: `Bearer ${token}` } });
+    assert.equal(r.status, 200);
+    const body = await r.json();
+    assert.ok(body.contractVersion);
+    assert.ok(body.retention);
+    assert.equal(body.tokens, null);
+    assert.ok(Array.isArray(body.byDay));
+    assert.ok(Array.isArray(body.byModel));
+    const raw = JSON.stringify(body);
+    assert.doesNotMatch(raw, /"\$|USD|usd|economia/i);
+  });
+});
+
+test('GET /api/metering/export retorna CSV', async () => {
+  await withServer({}, async (base, token) => {
+    const r = await fetch(base + '/api/metering/export', { headers: { authorization: `Bearer ${token}` } });
+    assert.equal(r.status, 200);
+    assert.match(r.headers.get('content-type') || '', /text\/csv/);
+    const text = await r.text();
+    assert.match(text, /^at_iso,at_ms,model/);
+  });
+});
+
 test('GET /api/usage unifica contrato', async () => {
   await withServer({}, async (base, token) => {
     const r = await fetch(base + '/api/usage', { headers: { authorization: `Bearer ${token}` } });

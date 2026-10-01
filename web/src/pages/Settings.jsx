@@ -6,6 +6,7 @@ import { Icon, Switch, Select, EmptyState } from '../ui.jsx';
 import { ApprovalHistory } from '../approvals.jsx';
 import { MODEL_DESC, EffortScale } from '../modelPicker.jsx';
 import { useSettingsDraft } from '../settingsForm.js';
+import { MeteringUsage } from '../meteringUsage.jsx';
 
 export function SaveBar({ dirty, saving, save, reset }) {
   if (!dirty) return null;
@@ -75,6 +76,7 @@ export const SETTINGS_TABS = [
   ['models', 'Modelos', 'bolt', 'Claude, ChatGPT e Ripper Auto'],
   ['computer', 'Computador', 'terminal', 'Onde os agentes executam'],
   ['plugins', 'Plugins', 'plug', 'Servidores MCP'],
+  ['enterprise', 'Enterprise', 'chart', 'Medição de uso'],
   ['security', 'Segurança', 'key', 'Aprovações e limites'],
   ['memory', 'Memória', 'brain', 'O que os agentes lembram'],
   ['appearance', 'Aparência', 'sun', 'Tema e atalhos']
@@ -249,6 +251,12 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
         </>}
 
         {tab === 'plugins' && <Plugins s={s} set={set} />}
+
+        {tab === 'enterprise' && <>
+          <Card title="Medição de uso" desc="Agregados factuais de eventos locais (usage.sqlite). Sem simulação de fatura ou economia em dólar.">
+            <MeteringUsage />
+          </Card>
+        </>}
 
         {tab === 'security' && <>
           <Card title="Aprovação de ações" desc="Os agentes pausam e esperam seu ok antes de ações que podem causar estrago. Sem resposta em 10 minutos, o pedido é negado.">

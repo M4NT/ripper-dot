@@ -33,6 +33,7 @@ import { exportChatPayload, importChatPayload } from './lib/chat-transfer.mjs';
 import { listAgentTemplates, createSavedTemplate, patchSavedTemplate, agentFromSavedTemplate } from './lib/agent-templates.mjs';
 import { ripperBuiltinSchemaChars, listRipperBuiltinToolNames } from './lib/ripper-builtin-tools.mjs';
 import { refreshClaudeSubscriptionUsage } from './lib/claude-subscription-usage.mjs';
+import { buildMeteringReport, listMeteringEvents, usageEventsToCsv } from './lib/metering.mjs';
 import { verifyMcpServer, verifyMcpConnector } from './lib/mcp-probe.mjs';
 import {
   applyOAuthTokensToPlugin,
@@ -151,6 +152,14 @@ function patchProject(p, b) {
 // O que cada conversa enxerga: artefatos do projeto (ou da própria conversa) e skills globais + do projeto.
 const visibleArtifacts = chat => db.artifacts.filter(x => chat.projectId ? x.projectId === chat.projectId : x.chatId === chat.id);
 const visibleSkills = chat => db.skills.filter(k => !k.projectId || k.projectId === chat.projectId);
+
+function parseMeteringMsParam(raw, fallback) {
+  if (raw == null || String(raw).trim() === '') return fallback;
+  const n = Number(raw);
+  if (Number.isFinite(n) && n > 0) return n;
+  const t = Date.parse(String(raw));
+  return Number.isFinite(t) ? t : fallback;
+}
 
 function usageContextMeasures(chatId) {
   const chat = chatId && db.chats.find(c => c.id === chatId);
@@ -619,6 +628,29 @@ const routes = [
     if (!out.ok) throw new HttpError(404, 'Conversa não encontrada.');
     save();
     return out;
+  }],
+  ['GET', /^\/api\/metering$/, async (req, _, url) => {
+    const now = Date.now();
+    const since = parseMeteringMsParam(url.searchParams.get('since'), now - 30 * 86400_000);
+    const until = parseMeteringMsParam(url.searchParams.get('until'), now);
+    await refreshClaudeSubscriptionUsage(db, db.settings).catch(() => {});
+    save();
+    return buildMeteringReport(db, db.settings, { since, until });
+  }],
+  ['GET', /^\/api\/metering\/export$/, async (req, _, url, res) => {
+    const now = Date.now();
+    const since = parseMeteringMsParam(url.searchParams.get('since'), now - 30 * 86400_000);
+    const until = parseMeteringMsParam(url.searchParams.get('until'), now);
+    const events = listMeteringEvents({ since, until });
+    const csv = usageEventsToCsv(events);
+    const name = `ripper-usage-events-${new Date().toISOString().slice(0, 10)}.csv`;
+    res.writeHead(200, {
+      ...SECURITY,
+      'content-type': 'text/csv; charset=utf-8',
+      'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(name)}`,
+      'cache-control': 'private, max-age=60'
+    });
+    res.end(csv);
   }],
   ['POST', /^\/api\/mcp\/verify$/, async req => {
     const b = await body(req);

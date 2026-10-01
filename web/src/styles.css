@@ -1294,3 +1294,17 @@ body.resizing iframe { pointer-events: none; }
 .usage-cloud-head { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-bottom: 8px; }
 .usage-julia { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 .usage-more { margin-top: 10px; font-size: 13px; }
+.metering-panel { display: flex; flex-direction: column; gap: 16px; }
+.metering-totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; }
+.metering-totals div { padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--chip); }
+.metering-totals b { display: block; font-size: 20px; font: 20px var(--mono); }
+.metering-totals small { color: var(--muted); font-size: 12px; }
+.metering-chart { display: flex; align-items: flex-end; gap: 6px; min-height: 120px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.metering-chart-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.metering-chart-bar { width: 100%; max-width: 28px; background: #4f8ff7; border-radius: 4px 4px 0 0; min-height: 4px; }
+.metering-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+.metering-table th, .metering-table td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+.metering-table th { color: var(--muted); font-weight: 600; font-size: 12px; }
+.metering-subhead { margin: 16px 0 4px; font-size: 14px; }
+.metering-provider { margin-top: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+.metering-provider h4 { margin: 0 0 8px; font-size: 14px; }
