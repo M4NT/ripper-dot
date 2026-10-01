@@ -70,6 +70,7 @@ export const STEP_LABEL = {
   send_message: 'Mandando mensagem', save_artifact: 'Salvando artefato', read_artifact: 'Lendo artefato', use_skill: 'Usando skill', save_skill: 'Guardando skill'
 };
 export const TONES = [['direto', 'Direto'], ['amigavel', 'Amigável'], ['formal', 'Formal'], ['tecnico', 'Técnico']];
+export const FORMALITIES = [['informal', 'Informal'], ['neutro', 'Neutro'], ['formal', 'Formal']];
 
 /** Tema efetivo ('light' | 'dark'), reagindo a mudanças do atributo data-theme. */
 const themeSub = cb => { const mo = new MutationObserver(cb); mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] }); return () => mo.disconnect(); };

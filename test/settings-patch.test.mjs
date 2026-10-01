@@ -34,6 +34,13 @@ test('applySettingsPatch aceita inputQueue', () => {
   assert.equal(s.inputQueue.windowMs, 1200);
 });
 
+test('applySettingsPatch aceita defaults.agentStyle', () => {
+  const s = { defaultModel: 'auto', claude: {}, computer: {}, defaults: { agentStyle: {} } };
+  applySettingsPatch(s, { defaults: { agentStyle: { tone: 'tecnico', maxSentences: 6 } } });
+  assert.equal(s.defaults.agentStyle.tone, 'tecnico');
+  assert.equal(s.defaults.agentStyle.maxSentences, 6);
+});
+
 test('settingsMeta lista modelos e esforços', () => {
   const m = settingsMeta();
   assert.ok(m.models.includes('auto'));
