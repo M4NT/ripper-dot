@@ -31,6 +31,29 @@ export function useChatMenu() {
         const md = `# ${full.title}\n\n` + full.messages.map(m => `**${m.role === 'user' ? (S.settings.name || 'Você') : agent(m.agentId || ids[0])?.name || 'Agente'}** · ${m.at ? new Date(m.at).toLocaleString('pt-BR') : ''}\n\n${m.content}`).join('\n\n---\n\n');
         download(`${slug(full.title)}.md`, md);
       } },
+      { label: 'Exportar JSON', icon: 'download', onSelect: async () => {
+        const payload = await api(`/api/chats/${c.id}/export`);
+        download(`${slug(c.title)}.ripper-chat.json`, JSON.stringify(payload, null, 2), 'application/json');
+      } },
+      { label: 'Importar JSON…', icon: 'upload', onSelect: async () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'application/json,.json';
+        input.onchange = async () => {
+          const file = input.files?.[0];
+          if (!file) return;
+          try {
+            const raw = JSON.parse(await file.text());
+            const aid = c.agentId || ids[0];
+            const out = await api('/api/chats/import', { method: 'POST', body: { ...raw, agentId: aid, projectId: c.projectId || null } });
+            if (out.warnings?.length) toast(out.warnings.join(' '), 'warn');
+            await refresh();
+            go(`/c/${out.chat.id}`);
+            toast('Conversa importada');
+          } catch (err) { toast(err.message, 'error'); }
+        };
+        input.click();
+      } },
       { label: 'Copiar link', icon: 'share', onSelect: () => { navigator.clipboard.writeText(`${location.origin}/#/c/${c.id}`); toast('Link copiado'); } },
       ...extra,
       { sep: true },

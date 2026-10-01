@@ -114,5 +114,8 @@ test('compactChat mantém últimas mensagens', async () => {
   const db = { chats: [{ id: 'c1', messages: Array.from({ length: 30 }, (_, i) => ({ role: 'user', content: String(i) })) }] };
   const r = compactChat(db, 'c1', { keepLast: 10 });
   assert.equal(r.removed, 20);
-  assert.equal(db.chats[0].messages.length, 10);
+  assert.equal(r.summarized, true);
+  assert.equal(db.chats[0].messages.length, 11);
+  assert.equal(db.chats[0].messages[0].role, 'system');
+  assert.ok(r.measured.removedChars >= 20);
 });

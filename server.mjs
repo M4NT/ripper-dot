@@ -25,6 +25,9 @@ import { providerAttemptOrder, runProviderAttemptLoop } from './lib/provider-tur
 import { newHookToken, verifySignature, eventMeta } from './lib/hooks.mjs';
 import { recordUsage, usageSummary, accountLimits, contextBreakdown, checkSendQuota, compactChat, parseProviderLimitFromError, recordProviderSignal } from './lib/usage.mjs';
 import { buildUsageContract, normalizeContextWindow } from './lib/usage-api.mjs';
+import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStreaming } from './lib/chat-stream.mjs';
+import { exportChatPayload, importChatPayload } from './lib/chat-transfer.mjs';
+import { listAgentTemplates, createSavedTemplate, patchSavedTemplate, agentFromSavedTemplate } from './lib/agent-templates.mjs';
 import { ripperBuiltinSchemaChars, listRipperBuiltinToolNames } from './lib/ripper-builtin-tools.mjs';
 import { refreshClaudeSubscriptionUsage } from './lib/claude-subscription-usage.mjs';
 import { verifyMcpServer, verifyMcpConnector } from './lib/mcp-probe.mjs';
@@ -120,7 +123,6 @@ const plain = s => String(s || '').replace(/```[\s\S]*?```/g, ' ').replace(/[*_`
 const summary = ({ messages, ...c }) => ({ ...c, preview: plain(messages.at(-1)?.content).slice(0, 90), count: messages.length });
 const projectOr404 = pid => db.projects.find(p => p.id === pid) || (() => { throw new HttpError(404, 'Projeto não encontrado.'); })();
 const agentOr404 = aid => db.agents.find(a => a.id === aid) || (() => { throw new HttpError(404, 'Agente não encontrado.'); })();
-const activeChats = new Set();
 const syncedBoatFiles = new Set();
 
 function authed(req) {
@@ -522,7 +524,7 @@ async function serveStatic(req, res, file) {
 const routes = [
   ['GET', /^\/api\/health$/, () => ({ ok: true })],
   ['GET', /^\/api\/state$/, () => ({
-    settings: redact(db.settings), agents: db.agents, models: MODELS, templates: TEMPLATES, categories: CATEGORIES,
+    settings: redact(db.settings), agents: db.agents, models: MODELS, templates: TEMPLATES, savedAgentTemplates: listAgentTemplates(db), categories: CATEGORIES,
     chats: db.chats.map(summary), routines: db.routines.map(({ hookSecret, ...r }) => ({ ...r, hasSecret: !!hookSecret })),
     files: db.files.map(({ path, ...f }) => f), memoriesCount: db.memories.length, pendingInbox: db.messages.filter(m => m.status === 'queued' || m.status === 'delivering').reduce((o, m) => (o[m.originChatId] = (o[m.originChatId] || 0) + 1, o), {}), approvals: db.approvals.filter(a => a.status === 'pending').map(approvalView), artifacts: db.artifacts.map(({ content, size, blob, ...a }) => ({ ...a, size: size ?? content?.length ?? 0, stored: blob ? 'disk' : 'inline' })),     skills: db.skills, memoriesByAgent: db.memories.reduce((o, x) => (o[x.agentId] = (o[x.agentId] || 0) + 1, o), {}), projects: db.projects,
     usage: usageSummary(db),
@@ -805,8 +807,21 @@ const routes = [
     }
     return { ok: true };
   }],
+  ['GET', /^\/api\/projects$/, () => db.projects.map(p => ({
+    ...p,
+    chatCount: db.chats.filter(c => c.projectId === p.id).length
+  }))],
+  ['GET', /^\/api\/projects\/([\w-]+)$/, (req, [pid]) => {
+    const p = projectOr404(pid);
+    return {
+      ...p,
+      chatCount: db.chats.filter(c => c.projectId === p.id).length,
+      fileCount: db.files.filter(f => f.projectId === p.id).length
+    };
+  }],
   ['POST', /^\/api\/projects$/, async req => {
     const b = await body(req);
+    if (typeof b.name === 'string' && !b.name.trim()) throw new HttpError(400, 'Informe o nome do projeto.');
     const p = patchProject({ id: id(), name: 'Novo projeto', description: '', instructions: '', agentIds: [], createdAt: Date.now() }, b);
     db.projects.unshift(p); save(); return p;
   }],
@@ -821,10 +836,35 @@ const routes = [
     removeProjectSandboxDir(pid);
     save(); return {};
   }],
+  ['GET', /^\/api\/agent-templates$/, () => listAgentTemplates(db)],
+  ['POST', /^\/api\/agent-templates$/, async req => {
+    const b = await body(req);
+    if (!String(b.name || '').trim()) throw new HttpError(400, 'Informe o nome do modelo.');
+    const t = createSavedTemplate(db, b, { id: id() });
+    save();
+    return t;
+  }],
+  ['PUT', /^\/api\/agent-templates\/([\w-]+)$/, async (req, [tid]) => {
+    const t = (db.agentTemplates || []).find(x => x.id === tid);
+    if (!t) throw new HttpError(404, 'Modelo não encontrado.');
+    patchSavedTemplate(t, await body(req));
+    save();
+    return t;
+  }],
+  ['DELETE', /^\/api\/agent-templates\/([\w-]+)$/, (req, [tid]) => {
+    db.agentTemplates = (db.agentTemplates || []).filter(x => x.id !== tid);
+    save();
+    return {};
+  }],
   ['POST', /^\/api\/agents$/, async req => {
     const b = await body(req);
-    const t = TEMPLATES.find(t => t.id === b.templateId);
-    const a = patchAgent(newAgent({ ...(t || {}), templateId: t?.id }), b);
+    let a;
+    if (b.savedTemplateId) {
+      a = agentFromSavedTemplate(db, b.savedTemplateId, b, TEMPLATES);
+    } else {
+      const t = TEMPLATES.find(t => t.id === b.templateId);
+      a = patchAgent(newAgent({ ...(t || {}), templateId: t?.id }), b);
+    }
     db.agents.push(a); save(); return a;
   }],
   ['PUT', /^\/api\/agents\/([\w-]+)$/, async (req, [aid]) => { const a = patchAgent(agentOr404(aid), await body(req)); save(); return a; }],
@@ -897,13 +937,44 @@ const routes = [
       toName: db.agents.find(a => a.id === m.to)?.name
     }))
   })],
-  ['GET', /^\/api\/chats\/([\w-]+)$/, (req, [cid]) => { const c = db.chats.find(c => c.id === cid); if (!c) throw new HttpError(404, 'Conversa não encontrada.'); if (c.unread) { c.unread = false; save(); } return c; }],
+  ['GET', /^\/api\/chats\/([\w-]+)$/, (req, [cid]) => {
+    const c = db.chats.find(c => c.id === cid);
+    if (!c) throw new HttpError(404, 'Conversa não encontrada.');
+    if (c.unread) { c.unread = false; save(); }
+    return { ...c, streaming: isChatStreaming(cid) };
+  }],
+  ['GET', /^\/api\/chats\/([\w-]+)\/export$/, (req, [cid]) => {
+    const c = db.chats.find(c => c.id === cid);
+    if (!c) throw new HttpError(404, 'Conversa não encontrada.');
+    return exportChatPayload(c);
+  }],
+  ['POST', /^\/api\/chats\/import$/, async req => {
+    const b = await body(req);
+    const { chat, warnings } = importChatPayload(db, b, { agentId: b.agentId, projectId: b.projectId, id });
+    db.chats.unshift(chat);
+    save();
+    return { chat: summary(chat), warnings };
+  }],
   ['PUT', /^\/api\/chats\/([\w-]+)$/, async (req, [cid]) => {
     const c = db.chats.find(c => c.id === cid); if (!c) throw new HttpError(404, 'Conversa não encontrada.');
-    const b = await body(req); if (typeof b.title === 'string' && b.title.trim()) c.title = b.title.trim().slice(0, 80);
+    const b = await body(req);
+    if (typeof b.title === 'string' && b.title.trim()) c.title = b.title.trim().slice(0, 80);
+    if (b.projectId === null) delete c.projectId;
+    else if (typeof b.projectId === 'string' && b.projectId) {
+      const p = projectOr404(b.projectId);
+      const aids = c.agentIds || [c.agentId];
+      if (aids.some(a => !p.agentIds.includes(a))) throw new HttpError(400, 'Agente da conversa não está no projeto.');
+      c.projectId = p.id;
+    }
+    c.updatedAt = Date.now();
     save(); return summary(c);
   }],
-  ['DELETE', /^\/api\/chats\/([\w-]+)$/, (req, [cid]) => { if (activeChats.has(cid)) throw new HttpError(409, 'Aguarde a resposta terminar.'); db.chats = db.chats.filter(c => c.id !== cid); save(); return {}; }],
+  ['POST', /^\/api\/chats\/([\w-]+)\/cancel$/, (req, [cid]) => {
+    db.chats.find(c => c.id === cid) || (() => { throw new HttpError(404, 'Conversa não encontrada.'); })();
+    if (!cancelChatStream(cid)) throw new HttpError(404, 'Nenhuma resposta em andamento.');
+    return { ok: true };
+  }],
+  ['DELETE', /^\/api\/chats\/([\w-]+)$/, (req, [cid]) => { if (isChatStreaming(cid)) throw new HttpError(409, 'Aguarde a resposta terminar.'); db.chats = db.chats.filter(c => c.id !== cid); save(); return {}; }],
   ['POST', /^\/api\/files$/, async (req, _, url) => {
     // Arquivo de um agente, ou de um projeto (visível a todos os agentes membros).
     const chatRef = db.chats.find(c => c.id === url.searchParams.get('chatId'));
@@ -959,23 +1030,23 @@ const routes = [
         ...(project ? { projectId: project.id } : {}), ...(agentIds.length > 1 ? { agentIds } : {}) };
       db.chats.unshift(c);
     }
-    if (activeChats.has(c.id)) throw new HttpError(409, 'Esta conversa já está respondendo. Aguarde ou interrompa a resposta atual.');
+    if (isChatStreaming(c.id)) throw new HttpError(409, 'Esta conversa já está respondendo. Aguarde ou interrompa a resposta atual.');
     const quota = checkSendQuota(db);
     if (quota.blocked) throw new HttpError(429, quota.userMessage);
-    activeChats.add(c.id);
     const fileIds = (b.fileIds || []).filter(fid => db.files.some(f => f.id === fid && agentIds.some(a => canUseFile(f, { id: a }, c))));
     for (const fid of fileIds) { const f = db.files.find(x => x.id === fid); if (f && !f.chatId) f.chatId = c.id; }
     res.writeHead(200, { ...SECURITY, 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store', 'x-accel-buffering': 'no' });
     const emit = e => res.writable && res.write(`data: ${JSON.stringify(e)}\n\n`);
     emit({ chatId: c.id });
-    const ac = new AbortController();
-    res.on('close', () => { if (!res.writableFinished) ac.abort(); });
+    const clientAc = new AbortController();
+    res.on('close', () => { if (!res.writableFinished) clientAc.abort(); });
+    const { signal } = registerChatStream(c.id, { signal: clientAc.signal, emit });
     const ping = setInterval(() => res.writable && res.write(': ping\n\n'), 15_000);
     // Modelo e esforço ficam gravados na conversa ('agent' = usar o padrão de cada agente).
     if (b.model) c.model = b.model === 'agent' ? undefined : b.model;
     if (b.effort) c.effort = b.effort;
-    try { await chat({ chat: c, text, fileIds, signal: ac.signal, mcpSession: b.mcpSession }, emit); }
-    finally { clearInterval(ping); activeChats.delete(c.id); save(); }
+    try { await chat({ chat: c, text, fileIds, signal, mcpSession: b.mcpSession }, emit); }
+    finally { clearInterval(ping); unregisterChatStream(c.id); save(); }
     emit({ done: true, title: c.title }); res.end();
     return undefined;
   }]
