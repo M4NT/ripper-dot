@@ -43,6 +43,7 @@ import { coalesceSendParts } from './lib/input-queue.mjs';
 import { effectiveFeatureFlags } from './lib/feature-flags.mjs';
 import { applyAccessControlPatch } from './lib/access-control-patch.mjs';
 import { canDelegate, delegationDeniedMessage, normalizeAccessControl, accessControlMeta } from './lib/rbac.mjs';
+import { executeLgpdErasure, lgpdMeta } from './lib/lgpd-pii.mjs';
 import { appendAudit, auditFromApproval, listAudit } from './lib/audit.mjs';
 import { buildAdminOverview } from './lib/admin-overview.mjs';
 import { buildLgpdStatus } from './lib/lgpd-status.mjs';
@@ -300,7 +301,7 @@ async function streamChatResponse(req, c, { text, fileIds, mcpSession, resume = 
     if (!res.writable) return;
     bumpChatRunSeq(c);
     const payload = e?.error && req.requestId ? { ...e, requestId: req.requestId } : e;
-    res.write(`data: ${JSON.stringify(redactSseEvent(payload))}\n\n`);
+    res.write(`data: ${JSON.stringify(redactSseEvent(payload, db.settings))}\n\n`);
   };
   emitRaw({ chatId: c.id, runId: c.run?.runId, eventSeq: c.run?.lastEventSeq, resume: !!resume });
   const clientAc = new AbortController();
@@ -464,9 +465,9 @@ async function deliver(m) {
           hops: m.hops || 0,
           googleTasksSync
         });
-      } catch (e) { console.error('task-closure', ...redactForLog(e.message)); }
+      } catch (e) { console.error('task-closure', ...redactForLog(db.settings, e.message)); }
     }
-  } catch (e) { markInboxDeliveryFailed(m, e.message); console.error('mensagem', ...redactForLog(e.message)); }
+  } catch (e) { markInboxDeliveryFailed(m, e.message); console.error('mensagem', ...redactForLog(db.settings, e.message)); }
   finally { inboxBusy.delete(m.to); save(); setTimeout(dispatchInbox, 50); }
 }
 function dispatchInbox() {
@@ -1374,6 +1375,20 @@ const routes = [
     configureLogger({ settings: s });
     return redact(s);
   }],
+  ['GET', /^\/api\/lgpd\/status$/, () => ({
+    ...buildLgpdStatus({ settings: db.settings }),
+    lgpd: lgpdMeta(db.settings)
+  })],
+  ['POST', /^\/api\/lgpd\/erasure$/, async req => {
+    const b = await body(req);
+    if (b.confirm !== true && b.confirm !== 'ERASE') {
+      throw new HttpError(400, 'Confirme a eliminação com { "confirm": true } ou "confirm": "ERASE".');
+    }
+    const scope = b.scope === 'profile' ? 'profile' : 'all';
+    const report = await executeLgpdErasure(db, { scope });
+    save();
+    return { ok: true, scope, report };
+  }],
   ['GET', /^\/api\/audit$/, (req, _, url) => ({
     entries: listAudit(db, { limit: +(url.searchParams.get('limit') || 50) })
   })],
@@ -1391,7 +1406,6 @@ const routes = [
       })
     };
   }],
-  ['GET', /^\/api\/lgpd\/status$/, () => buildLgpdStatus({ settings: db.settings })],
   ['GET', /^\/api\/admin\/overview$/, () => {
     if (!isEnterpriseMode(db.settings)) throw new HttpError(403, 'Centro admin disponível apenas no modo enterprise.');
     return buildAdminOverview(db, db.settings);
@@ -2057,7 +2071,7 @@ const server = createServer(async (req, res) => {
     return await serveStatic(req, res, p === '/' ? '/index.html' : p);
   } catch (e) {
     const code = e instanceof HttpError ? e.code : 500;
-    if (code === 500) console.error(`[${req.requestId}]`, ...redactForLog(e?.stack || e?.message || String(e)));
+    if (code === 500) console.error(`[${req.requestId}]`, ...redactForLog(db.settings, e?.stack || e?.message || String(e)));
     if (!res.headersSent) {
       const payload = { error: code === 500 ? 'Erro interno. Veja o log do servidor.' : redactSecretsInText(e.message) };
       if (e.details?.length) payload.details = e.details;
@@ -2127,7 +2141,7 @@ function runRoutine(r, event) {
     }
     r.lastChatId = r.lastStatus === 'quiet' ? r.lastChatId : c.id;
     save();
-  }).catch(e => { r.lastStatus = 'failed'; r.lastError = e.message; save(); console.error('rotina', r.name, ...redactForLog(e.message)); })
+  }).catch(e => { r.lastStatus = 'failed'; r.lastError = e.message; save(); console.error('rotina', r.name, ...redactForLog(db.settings, e.message)); })
     .finally(() => releaseRoutineClaim(r.id));
   return true;
 }
@@ -2147,5 +2161,5 @@ setInterval(() => {
   if (out?.created) save();
 }, 60_000);
 
-process.on('unhandledRejection', e => console.error('unhandledRejection', ...redactForLog(e?.message || String(e))));
+process.on('unhandledRejection', e => console.error('unhandledRejection', ...redactForLog(db?.settings, e?.message || String(e))));
 if (!existsSync(DIST)) console.warn('Aviso: frontend não compilado. Rode `npm run build`.');
