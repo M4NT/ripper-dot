@@ -481,7 +481,6 @@ async function deliver(m) {
     if (result.ok) { m.status = 'delivered'; m.error = null; }
     else markInboxDeliveryFailed(m, result.error || 'Sem resposta do destinatário.');
     if (result.reply?.content && m.protocol?.id === PROTOCOL_ID && m.protocol.delegationId && to.id === findDelegation(db, m.protocol.delegationId)?.workerId) {
-      const limits = { maxPerHour: 20, maxHops: 3, ...(db.settings.inbox || {}) };
       ingestWorkerInboxReply({
         db,
         id,
@@ -490,7 +489,7 @@ async function deliver(m) {
         delegationId: m.protocol.delegationId,
         replyText: result.reply.content,
         hops: m.hops,
-        limits
+        limits: inboxLimits()
       });
     }
     const origin = db.chats.find(x => x.id === m.originChatId);
