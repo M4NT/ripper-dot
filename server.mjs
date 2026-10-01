@@ -515,6 +515,16 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
   });
   const loopDetector = new ToolLoopDetector(s.tokenBudget);
   const emitTurn = ev => {
+    if (ev.circuitBreaker) {
+      logger.warn('provider.circuit_breaker', {
+        chatId: chat.id,
+        provider: ev.circuitBreaker.provider,
+        state: ev.circuitBreaker.state,
+        model: ev.circuitBreaker.model,
+        retryAfterMs: ev.circuitBreaker.retryAfterMs,
+        probe: ev.circuitBreaker.probe
+      });
+    }
     if (ev.tool) {
       const hit = loopDetector.observe(ev.tool);
       if (hit.loop) {

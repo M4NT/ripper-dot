@@ -23,4 +23,6 @@ test('collectDiagnostics não inventa métricas de saúde', async () => {
   assert.equal(d.runtime.pendingApprovals, 1);
   assert.equal(d.score, undefined);
   assert.equal(d.healthScore, undefined);
+  assert.ok(Array.isArray(d.providers?.circuitBreakers));
+  assert.ok(d.providers.circuitBreakers.some(b => b.provider === 'claude'));
 });
