@@ -48,7 +48,7 @@ function ContextRing({ pct, size = 36 }) {
 }
 
 function SegmentedBar({ categories }) {
-  const withPct = categories.filter(c => c.pct > 0);
+  const withPct = categories.filter(c => c.pct != null && c.pct > 0);
   const total = withPct.reduce((n, c) => n + (c.pct || 0), 0) || 1;
   return (
     <div className="usage-seg-bar">
@@ -59,28 +59,66 @@ function SegmentedBar({ categories }) {
   );
 }
 
+function contractFromState(S) {
+  const c = S?.usageContract;
+  if (c?.accountUsage && c?.providerSnapshot) {
+    return {
+      account: c.accountUsage,
+      provider: c.providerSnapshot,
+      context: c.contextWindow,
+      limits: S.limits
+    };
+  }
+  const lim = S?.limits;
+  if (!lim) return null;
+  return {
+    account: {
+      available: Boolean(lim.localUsage?.totalRecordedEvents || lim.ripperQuota?.rolling5h?.configured || lim.juliaRouting),
+      localUsage: lim.localUsage,
+      ripperQuota: lim.ripperQuota,
+      cloudCredits: lim.cloudCredits,
+      byModel: lim.byModel,
+      juliaRouting: lim.juliaRouting,
+      emptyLabel: lim.localUsage?.totalRecordedEvents ? null : 'sem dados'
+    },
+    provider: {
+      available: Boolean(lim.claudeSubscription?.available || lim.providers?.length),
+      claudeSubscription: lim.claudeSubscription,
+      signals: lim.providers || [],
+      notes: lim.notes,
+      emptyLabel: lim.claudeSubscription?.available ? null : 'sem dados'
+    },
+    context: { available: false, emptyLabel: 'sem dados' },
+    limits: lim
+  };
+}
+
 /** Popover de uso da conta + janela de contexto (somente dados reais ou configurados). */
 export default function ModelUsage({ chatId }) {
   const { S, refresh } = useApp();
   const [expanded, setExpanded] = useState(false);
   const [ctxExpanded, setCtxExpanded] = useState(false);
-  const [ctx, setCtx] = useState(null);
-  const [limits, setLimits] = useState(S.limits);
+  const [bundle, setBundle] = useState(() => contractFromState(S));
+  const [loadError, setLoadError] = useState(null);
   const [compactBusy, setCompactBusy] = useState(false);
 
-  useEffect(() => { setLimits(S.limits); }, [S.limits]);
+  useEffect(() => { setBundle(contractFromState(S)); }, [S]);
 
   async function loadDetail(open) {
     if (!open) return;
+    setLoadError(null);
     try {
-      const [lim, context] = await Promise.all([
-        api('/api/usage/limits'),
-        api('/api/usage/context' + (chatId ? `?chatId=${encodeURIComponent(chatId)}` : ''))
-      ]);
-      setLimits(lim);
-      setCtx(context);
-    } catch {
-      setLimits(S.limits);
+      const q = chatId ? `?chatId=${encodeURIComponent(chatId)}` : '';
+      const data = await api('/api/usage' + q);
+      setBundle({
+        account: data.accountUsage,
+        provider: data.providerSnapshot,
+        context: data.contextWindow,
+        limits: data.limits
+      });
+    } catch (e) {
+      setLoadError(e.message || 'Falha ao carregar uso');
+      setBundle(contractFromState(S));
     }
   }
 
@@ -96,16 +134,21 @@ export default function ModelUsage({ chatId }) {
     }
   }
 
-  const lim = limits || S.limits;
-  const r5 = lim?.ripperQuota?.rolling5h;
-  const wk = lim?.ripperQuota?.weekly;
+  const account = bundle?.account;
+  const provider = bundle?.provider;
+  const ctx = bundle?.context;
+  const lim = bundle?.limits || S?.limits;
+
+  const r5 = account?.ripperQuota?.rolling5h;
+  const wk = account?.ripperQuota?.weekly;
   const hasRipperQuota = r5?.configured || wk?.configured;
-  const claudeSub = lim?.claudeSubscription;
+  const claudeSub = provider?.claudeSubscription;
   const claudeWin = claudeSub?.available ? claudeSub.windows : null;
-  const ctxPct = ctx?.hasData ? ctx.pct : null;
+  const ctxAvailable = ctx?.available === true;
+  const ctxPct = ctxAvailable ? ctx.pct : null;
   const ctxUsed = ctx?.usedTokens;
   const ctxLimit = ctx?.limitTokens ?? 1_000_000;
-  const ringPct = ctxPct ?? (claudeWin?.fiveHour?.pct != null ? claudeWin.fiveHour.pct : null) ?? (r5?.configured ? r5.pct : null);
+  const ringPct = ctxPct;
 
   return (
     <Menu align="up" className="usage-menu" onOpenChange={loadDetail} trigger={({ toggle, open }) => (
@@ -114,20 +157,22 @@ export default function ModelUsage({ chatId }) {
       </button>
     )}>
       <div className="usage-pop usage-account" role="dialog" aria-label="Uso da conta">
+        {loadError && <p className="muted small usage-hint">{loadError}</p>}
+
         <button type="button" className="usage-ctx-summary" onClick={() => setCtxExpanded(v => !v)} aria-expanded={ctxExpanded}>
           <span>
             <b>Janela de contexto</b>
-            {ctx?.hasData
+            {ctxAvailable
               ? <span className="mono"> {fmtTok(ctxUsed)} / {fmtTok(ctxLimit)} ({ctxPct}%)</span>
-              : <span className="muted small"> — abra uma conversa ou envie mensagens para medir</span>}
+              : <span className="muted small"> — {ctx?.emptyLabel || 'sem dados'}</span>}
           </span>
           <Icon name="down" size={14} className={ctxExpanded ? 'open' : ''} />
         </button>
-        {(ctxExpanded || ctx) && ctx?.hasData && (
+        {(ctxExpanded || ctx) && ctxAvailable && (
           <div className="usage-ctx-detail">
-            <SegmentedBar categories={ctx.categories.filter(c => c.id !== 'unmeasured')} />
+            <SegmentedBar categories={ctx.categories || []} />
             <ul className="usage-ctx-list">
-              {ctx.categories.filter(c => c.id !== 'unmeasured').map(c => (
+              {(ctx.categories || []).map(c => (
                 <li key={c.id}><span className="usage-swatch" style={{ background: c.color }} />{c.label}<span className="grow" /><span className="mono">{fmtTok(c.tokens)}</span><span className="usage-ctx-pct">{c.pct != null ? `${c.pct}%` : '—'}</span></li>
               ))}
             </ul>
@@ -137,19 +182,20 @@ export default function ModelUsage({ chatId }) {
                 {compactBusy ? 'Compactando…' : 'Compactar sessão'}
               </button>
             </div>
+            {ctx.unmeasuredNote && <p className="muted small">{ctx.unmeasuredNote}</p>}
             {ctx.note && <p className="muted small">{ctx.note}</p>}
           </div>
         )}
-        {(ctxExpanded || ctx) && ctx && !ctx.hasData && (
+        {(ctxExpanded || ctx) && ctx && !ctxAvailable && (
           <p className="muted small usage-hint">Sem medição de contexto ainda. O Ripper não inventa categorias de tokens do provedor.</p>
         )}
 
         <p className="pop-label">Uso registrado nesta instalação</p>
-        {lim?.localUsage && (
+        {account?.localUsage && (
           <p className="small">
-            {lim.localUsage.totalRecordedEvents
-              ? `${lim.localUsage.totalRecordedEvents} eventos · ~${fmtTok(lim.localUsage.chars5h / 4)} tokens (5 h) · ~${fmtTok(lim.localUsage.chars7d / 4)} tokens (7 d)`
-              : 'Nenhuma resposta registrada ainda nesta instalação.'}
+            {account.localUsage.totalRecordedEvents
+              ? `${account.localUsage.totalRecordedEvents} eventos · ~${fmtTok(account.localUsage.chars5h / 4)} tokens (5 h) · ~${fmtTok(account.localUsage.chars7d / 4)} tokens (7 d)`
+              : (account.emptyLabel || 'sem dados')}
           </p>
         )}
 
@@ -202,6 +248,9 @@ export default function ModelUsage({ chatId }) {
         {claudeSub?.mode === 'api_key' && (
           <p className="muted small usage-hint">{claudeSub.hint}</p>
         )}
+        {provider?.available === false && !claudeSub?.hint && provider?.emptyLabel && (
+          <p className="muted small usage-hint">Provedor: {provider.emptyLabel}</p>
+        )}
 
         {hasRipperQuota ? (
           <>
@@ -229,11 +278,11 @@ export default function ModelUsage({ chatId }) {
           <p className="muted small usage-hint">Sem cotas Ripper configuradas. Cotas Pro/Max aparecem com login do Claude Code; defina RIPPER_LIMIT_* para limites locais.</p>
         ) : null}
 
-        {lim?.providers?.length > 0 && (
+        {(provider?.signals?.length > 0) && (
           <section className="usage-julia">
             <p className="pop-label">Último bloqueio de cota (provedor)</p>
             <ul className="usage-list">
-              {lim.providers.map(p => (
+              {provider.signals.map(p => (
                 <li key={p.id}>
                   <span><b>{p.id}</b><small>{p.message?.slice(0, 120)}{(p.message?.length > 120) ? '…' : ''}</small></span>
                   {p.resetLabel && <span className="muted small">{p.resetLabel}</span>}
@@ -243,36 +292,36 @@ export default function ModelUsage({ chatId }) {
           </section>
         )}
 
-        {lim?.cloudCredits?.configured && lim.cloudCredits.remainingUsd != null && (
+        {account?.cloudCredits?.configured && account.cloudCredits.remainingUsd != null && account.cloudCredits.pctRemaining != null && (
           <div className="usage-cloud">
             <p className="usage-cloud-head"><Icon name="globe" size={14} /> Créditos na nuvem (configurados)</p>
             <UsageBar
-              label={`US$ ${lim.cloudCredits.remainingUsd} de US$ ${lim.cloudCredits.totalUsd} restantes`}
-              pct={lim.cloudCredits.pctRemaining}
+              label={`US$ ${account.cloudCredits.remainingUsd} de US$ ${account.cloudCredits.totalUsd} restantes`}
+              pct={account.cloudCredits.pctRemaining}
               tone="blue"
             />
           </div>
         )}
 
-        {lim?.juliaRouting && (
+        {account?.juliaRouting && (
           <section className="usage-julia">
             <p className="pop-label">Julia 1 (telemetria local)</p>
-            {lim.juliaRouting.decisions != null ? (
+            {account.juliaRouting.decisions != null ? (
               <>
                 <p className="small">
-                  {lim.juliaRouting.answered} decisões pela Julia · {lim.juliaRouting.fallbacks} reservas (heurística/regra)
-                  {lim.juliaRouting.latencyMs?.p50 != null && (
-                    <> · latência p50 {lim.juliaRouting.latencyMs.p50} ms{p95Label(lim.juliaRouting.latencyMs)}</>
+                  {account.juliaRouting.answered} decisões pela Julia · {account.juliaRouting.fallbacks} reservas (heurística/regra)
+                  {account.juliaRouting.latencyMs?.p50 != null && (
+                    <> · latência p50 {account.juliaRouting.latencyMs.p50} ms{p95Label(account.juliaRouting.latencyMs)}</>
                   )}
                 </p>
-                {lim.juliaRouting.avoidedPromptChars?.sum > 0 && (
+                {account.juliaRouting.avoidedPromptChars?.sum > 0 && (
                   <p className="small muted">
-                    ~{lim.juliaRouting.avoidedPromptChars.sum.toLocaleString('pt-BR')} caracteres de prompt de triagem medidos ({lim.juliaRouting.avoidedPromptChars.eventsWithMeasurement} eventos) — não é custo em US$.
+                    ~{account.juliaRouting.avoidedPromptChars.sum.toLocaleString('pt-BR')} caracteres de prompt de triagem medidos ({account.juliaRouting.avoidedPromptChars.eventsWithMeasurement} eventos) — não é custo em US$.
                   </p>
                 )}
-                {juliaFallbackLines(lim.juliaRouting.fallbacksByReason).length > 0 && (
+                {juliaFallbackLines(account.juliaRouting.fallbacksByReason).length > 0 && (
                   <ul className="usage-list">
-                    {juliaFallbackLines(lim.juliaRouting.fallbacksByReason).map(([reason, n]) => (
+                    {juliaFallbackLines(account.juliaRouting.fallbacksByReason).map(([reason, n]) => (
                       <li key={reason}><span><b>{reason}</b><small>{n} fallback{n === 1 ? '' : 's'}</small></span></li>
                     ))}
                   </ul>
@@ -281,27 +330,35 @@ export default function ModelUsage({ chatId }) {
             ) : (
               <p className="muted small">Sem decisões Julia registradas ainda.</p>
             )}
-            {lim.juliaRouting.usageRoutedByJulia > 0 && (
-              <p className="muted small">{lim.juliaRouting.usageRoutedByJulia} respostas do modelo grande com roteamento Julia/heurística (uso local).</p>
+            {account.juliaRouting.usageRoutedByJulia > 0 && (
+              <p className="muted small">{account.juliaRouting.usageRoutedByJulia} respostas do modelo grande com roteamento Julia/heurística (uso local).</p>
             )}
             <p className="muted small usage-hint">Sem estimativa de economia em US$ — só eventos medidos nesta instalação.</p>
           </section>
         )}
 
         <button type="button" className="link-btn usage-more" onClick={() => setExpanded(v => !v)}>{expanded ? 'Ocultar detalhamento' : 'Ver detalhamento por modelo'}</button>
-        {expanded && lim?.byModel && (
+        {expanded && account?.byModel && (
           <ul className="usage-list">
-            {Object.entries(lim.byModel).filter(([k, r]) => k !== 'auto' && (r.requests || r.charsIn || r.charsOut)).map(([k, r]) => (
-              <li key={k}><span><b>{r.label}</b><small>{r.sharePct}% do uso local · {r.requests || 0} respostas · {r.charsIn + r.charsOut} caracteres</small></span></li>
+            {Object.entries(account.byModel).filter(([k, r]) => k !== 'auto' && (r.requests || r.charsIn || r.charsOut)).map(([k, r]) => (
+              <li key={k}>
+                <span>
+                  <b>{r.label}</b>
+                  <small>
+                    {r.sharePct != null ? `${r.sharePct}% do uso local · ` : ''}
+                    {r.requests || 0} respostas · {r.charsIn + r.charsOut} caracteres
+                  </small>
+                </span>
+              </li>
             ))}
           </ul>
         )}
-        {expanded && lim?.localUsage?.totalRecordedEvents === 0 && (
+        {expanded && account?.localUsage?.totalRecordedEvents === 0 && (
           <p className="muted small">Sem uso por modelo ainda.</p>
         )}
 
-        {lim?.notes?.providerBilling && (
-          <p className="muted small usage-hint">{lim.notes.providerBilling}</p>
+        {(provider?.notes?.providerBilling || lim?.notes?.providerBilling) && (
+          <p className="muted small usage-hint">{provider?.notes?.providerBilling || lim?.notes?.providerBilling}</p>
         )}
       </div>
     </Menu>
