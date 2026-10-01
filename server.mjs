@@ -80,7 +80,7 @@ import {
   resolveSemanticCacheConfig,
   storeSemanticCacheEntry
 } from './lib/semantic-cache.mjs';
-import { verifyMcpServer, verifyMcpConnector } from './lib/mcp-probe.mjs';
+import { verifyMcpConnector } from './lib/mcp-probe.mjs';
 import { shutdownStdioSupervisors } from './lib/mcp-stdio-supervisor.mjs';
 import {
   applyOAuthTokensToPlugin,
