@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { isEnterpriseMode } from '../lib/enterprise.mjs';
 import { buildAdminOverview } from '../lib/admin-overview.mjs';
+import { _resetAuditTrailForTests } from '../lib/audit-trail.mjs';
 import { applySettingsPatch } from '../lib/settings-patch.mjs';
 import { buildLgpdStatus } from '../lib/lgpd-status.mjs';
 
@@ -27,6 +28,7 @@ test('buildAdminOverview não inventa worm nem billing', () => {
   assert.ok(ov.sections.budget.notes.includes('fatura'));
   assert.equal(ov.sections.budget.spendUsd, undefined);
   assert.equal(ov.sections.budget.roiPercent, undefined);
+  _resetAuditTrailForTests();
 });
 
 test('buildLgpdStatus declara telemetria desligada', () => {

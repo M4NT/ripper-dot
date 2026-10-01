@@ -91,7 +91,7 @@ test('GET /api/audit-trail exige enterprise e lista eventos imutáveis', async (
     HOST: '127.0.0.1',
     RIPPER_TOKEN: 'audit-trail-token'
   };
-  const child = spawn(process.execPath, [serverPath], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, [serverPath], { env, stdio: 'ignore' });
   const base = `http://127.0.0.1:${port}`;
   const auth = { authorization: 'Bearer audit-trail-token', 'content-type': 'application/json' };
   try {
@@ -121,6 +121,12 @@ test('GET /api/audit-trail exige enterprise e lista eventos imutáveis', async (
     assert.ok(body.entries.some(e => e.action === 'settings.patch'));
   } finally {
     child.kill('SIGTERM');
-    await new Promise(r => child.on('exit', r));
+    await Promise.race([
+      new Promise(r => child.on('exit', r)),
+      new Promise(r => setTimeout(() => {
+        if (child.exitCode === null) child.kill('SIGKILL');
+        child.on('exit', r);
+      }, 8000))
+    ]);
   }
 });

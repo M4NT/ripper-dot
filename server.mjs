@@ -440,7 +440,8 @@ function dispatchInbox() {
     console.error('inbox.dispatch_failed', e?.code || e?.message || String(e));
   }
 }
-setInterval(dispatchInbox, 5_000);
+const inboxTimer = setInterval(dispatchInbox, 5_000);
+if (typeof inboxTimer.unref === 'function') inboxTimer.unref();
 repairInboxOnStartup(db.messages);
 save();
 dispatchInbox();
