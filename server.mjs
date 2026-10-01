@@ -134,7 +134,17 @@ import {
   formatPrometheusExposition,
   prometheusContentType
 } from './lib/metrics.mjs';
-import { buildBackupPayload, restoreBackupPayload, listAutoBackups } from './lib/backup.mjs';
+import {
+  buildBackupPayload,
+  restoreBackupPayload,
+  listAutoBackups,
+  createDataSnapshot,
+  listDataSnapshots,
+  restoreDataSnapshot,
+  maybeRunScheduledBackup,
+  pruneOldSnapshots,
+  normalizeBackupSettings
+} from './lib/backup.mjs';
 import { memoAsync } from './lib/ttl-cache.mjs';
 import { attachRequestId } from './lib/request-id.mjs';
 import { isShuttingDown, registerGracefulShutdown, SHUTDOWN_MESSAGE } from './lib/shutdown.mjs';
@@ -939,7 +949,7 @@ const routes = [
     return undefined;
   }],
   ['GET', /^\/api\/data\/backup$/, () => buildBackupPayload(db)],
-  ['GET', /^\/api\/data\/backups$/, () => ({ auto: listAutoBackups() })],
+  ['GET', /^\/api\/data\/backups$/, () => ({ auto: listAutoBackups(), snapshots: listDataSnapshots() })],
   ['POST', /^\/api\/data\/restore$/, async req => {
     const b = await body(req);
     if (!b.confirm) throw new HttpError(400, 'Envie confirm: true para substituir o estado local.');
@@ -950,6 +960,24 @@ const routes = [
       chats: payload?.db?.chats?.length
     }));
     return restoreBackupPayload(db, payload);
+  }],
+  ['POST', /^\/api\/backup$/, async () => {
+    const created = createDataSnapshot({ reason: 'manual' });
+    const cfg = normalizeBackupSettings(db.settings.backup);
+    const removed = pruneOldSnapshots(cfg.keepCount);
+    save();
+    return { ok: true, ...created, removed };
+  }],
+  ['GET', /^\/api\/backup\/list$/, () => ({ snapshots: listDataSnapshots(), auto: listAutoBackups() })],
+  ['POST', /^\/api\/backup\/restore$/, async req => {
+    const b = await body(req);
+    if (!b.confirm) throw new HttpError(400, 'Envie confirm: true — o restore sobrescreve os dados vivos em RIPPER_DATA.');
+    if (!b.id && !b.path) throw new HttpError(400, 'Informe id (snapshot em backups/) ou path relativo a backups/.');
+    try {
+      return await restoreDataSnapshot(db, { confirm: true, id: b.id, path: b.path });
+    } catch (e) {
+      throw new HttpError(400, e.message);
+    }
   }],
   ['GET', /^\/api\/state$/, () => ({
     settings: redact(db.settings), agents: db.agents, models: MODELS, templates: TEMPLATES, savedAgentTemplates: listAgentTemplates(db), categories: CATEGORIES,
@@ -2059,6 +2087,11 @@ const routineTimer = setInterval(() => {
   }
 }, 30_000);
 if (typeof routineTimer.unref === 'function') routineTimer.unref();
+
+setInterval(() => {
+  const out = maybeRunScheduledBackup(db);
+  if (out?.created) save();
+}, 60_000);
 
 process.on('unhandledRejection', e => console.error('unhandledRejection', ...redactForLog(e?.message || String(e))));
 if (!existsSync(DIST)) console.warn('Aviso: frontend não compilado. Rode `npm run build`.');

@@ -67,7 +67,7 @@ Para apagar **tudo** o estado local:
 2. Remova o diretório `RIPPER_DATA` (ou `./data/`).
 3. Na próxima subida, um banco vazio é criado (agente padrão incluído).
 
-Faça backup copiando o diretório inteiro antes de apagar.
+Faça backup copiando o diretório inteiro antes de apagar, ou use **Configurações → Backup** para gerar snapshots `.tar.gz` em `RIPPER_DATA/backups/` (manual ou agendado). **Restaurar um snapshot sobrescreve os dados vivos** no mesmo `RIPPER_DATA` (inclui `db.json`, SQLite e pastas `sandbox/`). Pare outros processos Ripper que compartilhem o diretório antes de restaurar.
 
 ## Exposição na rede
 

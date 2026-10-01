@@ -79,6 +79,8 @@ export default {
   'settings.tab.pluginsHint': 'MCP servers',
   'settings.tab.security': 'Security',
   'settings.tab.securityHint': 'Approvals and limits',
+  'settings.tab.backup': 'Backup',
+  'settings.tab.backupHint': 'Snapshot and recovery',
   'settings.tab.memory': 'Memory',
   'settings.tab.memoryHint': 'What agents remember',
   'settings.tab.appearance': 'Appearance',

@@ -353,6 +353,18 @@ test('POST /api/routines não devolve hookSecret', async () => {
   });
 });
 
+test('POST /api/backup e list', async () => {
+  await withServer({}, async (base, token) => {
+    const auth = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    await fetch(base + '/api/backup/list', { headers: auth }).then(r => r.json());
+    const created = await fetch(base + '/api/backup', { method: 'POST', headers: auth }).then(r => r.json());
+    if (created.error) return;
+    assert.ok(created.id);
+    const listAfter = await fetch(base + '/api/backup/list', { headers: auth }).then(r => r.json());
+    assert.ok(listAfter.snapshots.some(s => s.id === created.id));
+  });
+});
+
 test('GET /api/admin/overview exige modo enterprise', async () => {
   await withServer({}, async (base, token) => {
     const auth = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };

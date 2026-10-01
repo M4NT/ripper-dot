@@ -23,12 +23,17 @@ export function SaveBar({ dirty, saving, save, reset }) {
   );
 }
 
-function DataBackup() {
+function DataBackup({ s, set }) {
   const { refresh, toast } = useApp();
   const [auto, setAuto] = useState(null);
+  const [snapshots, setSnapshots] = useState([]);
   const [busy, setBusy] = useState('');
   const fileRef = useRef(null);
-  useEffect(() => { api('/api/data/backups').then(r => setAuto(r.auto || [])).catch(() => setAuto([])); }, []);
+  const reloadList = () => api('/api/backup/list').then(r => {
+    setAuto(r.auto || []);
+    setSnapshots(r.snapshots || []);
+  }).catch(() => { setAuto([]); setSnapshots([]); });
+  useEffect(() => { reloadList(); }, []);
   const download = async () => {
     setBusy('export');
     try {
@@ -39,11 +44,31 @@ function DataBackup() {
       a.download = `ripper-backup-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(a.href);
-      toast('Backup baixado (inclui segredos — guarde com cuidado)');
+      toast('Backup JSON baixado (sensível — só db.json)');
     } catch (e) { toast(e.message, 'error'); }
     finally { setBusy(''); }
   };
-  const restore = async file => {
+  const createSnapshot = async () => {
+    setBusy('snapshot');
+    try {
+      await api('/api/backup', { method: 'POST' });
+      await reloadList();
+      toast('Snapshot completo gravado em RIPPER_DATA/backups');
+    } catch (e) { toast(e.message, 'error'); }
+    finally { setBusy(''); }
+  };
+  const restoreSnapshot = async id => {
+    if (!window.confirm('Restaurar este snapshot? Isso sobrescreve os dados vivos em RIPPER_DATA (db.json, SQLite, sandbox, etc.).')) return;
+    setBusy(`restore-${id}`);
+    try {
+      await api('/api/backup/restore', { method: 'POST', body: { confirm: true, id } });
+      await refresh();
+      await reloadList();
+      toast('Dados restaurados a partir do snapshot');
+    } catch (e) { toast(e.message, 'error'); }
+    finally { setBusy(''); }
+  };
+  const restoreJson = async file => {
     if (!file) return;
     setBusy('import');
     try {
@@ -51,27 +76,54 @@ function DataBackup() {
       const backup = JSON.parse(text);
       await api('/api/data/restore', { method: 'POST', body: { confirm: true, backup } });
       await refresh();
-      toast('Estado restaurado a partir do backup');
+      toast('db.json restaurado (SQLite e pastas não mudam)');
     } catch (e) { toast(e.message, 'error'); }
     finally { setBusy(''); if (fileRef.current) fileRef.current.value = ''; }
   };
+  const backup = s.backup || { enabled: false, intervalHours: 24, keepCount: 5 };
   return (
-    <Card title="Backup e restauração" desc="Exporta ou substitui db.json (agentes, conversas, configurações). Arquivos em sandbox/ e usage.sqlite não entram no JSON — copie a pasta RIPPER_DATA inteira para backup completo.">
-      <Row title="Exportar" desc="JSON com chaves de API e tokens OAuth (sensível).">
-        <button type="button" className="btn" disabled={!!busy} onClick={download} aria-busy={busy === 'export'}>{busy === 'export' ? 'Gerando…' : 'Baixar backup'}</button>
-      </Row>
-      <Row title="Restaurar" desc="Grava db.pre-restore.*.backup.json antes de substituir." tip="Substitui conversas e configurações atuais. Guarde o JSON em lugar seguro.">
-        <div className="row">
-          <input ref={fileRef} type="file" accept="application/json,.json" aria-label="Arquivo de backup JSON" onChange={e => restore(e.target.files?.[0])} disabled={!!busy} />
-          {busy === 'import' && <span className="muted" role="status">Restaurando…</span>}
-        </div>
-      </Row>
-      {auto?.length > 0 && (
-        <Row title="Backups automáticos" desc="Criados na migração de schema ou antes de restaurar.">
-          <ul className="mono small">{auto.map(n => <li key={n}>{n}</li>)}</ul>
+    <>
+      <Card title="Snapshot completo (RIPPER_DATA)" desc="Arquivo .tar.gz em RIPPER_DATA/backups com db.json, usage/julia SQLite, sandbox e anexos. Restaurar substitui os dados vivos — pare outros processos Ripper no mesmo diretório.">
+        <Row title="Backup manual">
+          <button type="button" className="btn btn-primary" disabled={!!busy} onClick={createSnapshot} aria-busy={busy === 'snapshot'}>{busy === 'snapshot' ? 'Criando…' : 'Criar snapshot agora'}</button>
         </Row>
-      )}
-    </Card>
+        <Row title="Agendamento" desc="Snapshots automáticos na pasta backups/; os mais antigos são removidos conforme manter abaixo.">
+          <Switch checked={!!backup.enabled} onChange={v => set('backup', { ...backup, enabled: v })} label="Backup automático" />
+        </Row>
+        {backup.enabled && <>
+          <Row title="Intervalo"><div className="input-unit"><input className="input" type="number" min={1} max={168} value={backup.intervalHours ?? 24} onChange={e => set('backup', { ...backup, intervalHours: +e.target.value })} /><span>horas</span></div></Row>
+          <Row title="Manter no disco"><div className="input-unit"><input className="input" type="number" min={1} max={50} value={backup.keepCount ?? 5} onChange={e => set('backup', { ...backup, keepCount: +e.target.value })} /><span>snapshots</span></div></Row>
+        </>}
+        {snapshots.length > 0 && (
+          <Row title="Snapshots no servidor" stack>
+            <ul className="rows flat">
+              {snapshots.map(row => (
+                <li key={row.id} className="row-item">
+                  <div className="row-main"><b className="mono small">{row.fileName}</b><small>{new Date(row.createdAt).toLocaleString()} · {(row.bytes / 1024).toFixed(1)} KB</small></div>
+                  <button type="button" className="btn btn-sm" disabled={!!busy} onClick={() => restoreSnapshot(row.id)} aria-busy={busy === `restore-${row.id}`}>Restaurar</button>
+                </li>
+              ))}
+            </ul>
+          </Row>
+        )}
+      </Card>
+      <Card title="Exportar só db.json" desc="JSON leve (agentes, chats, configurações). Não inclui usage.sqlite nem arquivos em sandbox/.">
+        <Row title="Download JSON">
+          <button type="button" className="btn" disabled={!!busy} onClick={download} aria-busy={busy === 'export'}>{busy === 'export' ? 'Gerando…' : 'Baixar JSON'}</button>
+        </Row>
+        <Row title="Restaurar JSON" desc="Grava db.pre-restore.*.backup.json antes de substituir só o db.json." tip="Substitui conversas e configurações atuais. Guarde o JSON em lugar seguro.">
+          <div className="row">
+            <input ref={fileRef} type="file" accept="application/json,.json" aria-label="Arquivo de backup JSON" onChange={e => restoreJson(e.target.files?.[0])} disabled={!!busy} />
+            {busy === 'import' && <span className="muted" role="status">Restaurando…</span>}
+          </div>
+        </Row>
+        {auto?.length > 0 && (
+          <Row title="Backups automáticos de db.json" desc="Migração de schema ou antes de restaurar.">
+            <ul className="mono small">{auto.map(n => <li key={n}>{n}</li>)}</ul>
+          </Row>
+        )}
+      </Card>
+    </>
   );
 }
 
@@ -294,11 +346,10 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
                 <Row title="Profundidade máxima de uma troca" desc="Quantas vezes uma resposta pode gerar outra mensagem (saltos inbox)." tip="Valores altos podem gerar longas cadeias de mensagens automáticas entre agentes."><div className="input-unit"><input className="input" type="number" min={1} max={10} value={s.inbox?.maxHops ?? 3} onChange={e => set('inbox', { ...(s.inbox || {}), maxHops: +e.target.value })} /><span>saltos</span></div></Row>
               </Card>
             </AdvancedBlock>
-            <AdvancedBlock settings={s} hint="Backup completo com segredos">
-              <DataBackup />
-            </AdvancedBlock>
           </>}
         </>}
+
+        {tab === 'backup' && <DataBackup s={s} set={set} />}
 
         {tab === 'memory' && <>
           <Card>
