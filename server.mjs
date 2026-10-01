@@ -184,6 +184,18 @@ import {
   taskSyncBridgeStatus,
   upsertTaskDelegation
 } from './lib/task-sync-bridge.mjs';
+import {
+  deleteVaultCredential,
+  getVaultCredential,
+  listVaultEntries,
+  migrateLegacySecretsToVault,
+  persistOAuthTokensInVault,
+  putVaultCredential,
+  vaultConfigured,
+  isVaultPlaintextResponse,
+  stripVaultPlaintextMarker,
+  vaultCredentialApiResponse
+} from './lib/connection-vault.mjs';
 
 installLogRedactionMiddleware();
 
@@ -243,8 +255,9 @@ const json = (res, data, code = 200, extra = {}, req = null) => {
   if (req?.requestId && data && typeof data === 'object' && data !== null && 'error' in data) {
     payload = { ...data, requestId: req.requestId };
   }
+  const bodyOut = isVaultPlaintextResponse(payload) ? stripVaultPlaintextMarker(payload) : redactJsonPayload(payload);
   res.writeHead(code, hdr(req, { 'content-type': 'application/json; charset=utf-8', 'cache-control': extra['cache-control'] || 'no-store', ...extra }));
-  res.end(JSON.stringify(redactJsonPayload(payload)));
+  res.end(JSON.stringify(bodyOut));
 };
 function probePayload(extra = {}) {
   return { ok: true, version: APP_PKG.version, uptimeSeconds: Math.floor((Date.now() - SERVER_STARTED_AT) / 1000), ...extra };
@@ -1306,6 +1319,44 @@ const routes = [
       auth: googleTasksOAuthStatus(db.settings)
     };
   }],
+  ['GET', /^\/api\/vault\/connections$/, () => listVaultEntries()],
+  ['PUT', /^\/api\/vault\/connections\/([\w.-]{1,64})$/, async (req, [key]) => {
+    const b = await body(req);
+    try {
+      return { entry: putVaultCredential(key, b) };
+    } catch (e) {
+      throw new HttpError(vaultConfigured() ? 400 : 503, e.message);
+    }
+  }],
+  ['GET', /^\/api\/vault\/connections\/([\w.-]{1,64})$/, (req, [key], url) => {
+    const agentId = url.searchParams.get('agentId') || '';
+    if (!agentId) throw new HttpError(400, 'Informe agentId para ler credencial com escopo.');
+    try {
+      const cred = getVaultCredential(key, { agentId });
+      if (!cred) throw new HttpError(404, 'Credencial não encontrada.');
+      return vaultCredentialApiResponse(key, agentId, cred);
+    } catch (e) {
+      if (e.message?.includes('permissão')) throw new HttpError(403, e.message);
+      throw new HttpError(vaultConfigured() ? 400 : 503, e.message);
+    }
+  }],
+  ['DELETE', /^\/api\/vault\/connections\/([\w.-]{1,64})$/, (req, [key]) => {
+    try {
+      if (!deleteVaultCredential(key)) throw new HttpError(404, 'Credencial não encontrada.');
+      return { ok: true };
+    } catch (e) {
+      throw new HttpError(400, e.message);
+    }
+  }],
+  ['POST', /^\/api\/vault\/migrate-from-plugins$/, () => {
+    try {
+      const out = migrateLegacySecretsToVault(db);
+      save();
+      return out;
+    } catch (e) {
+      throw new HttpError(vaultConfigured() ? 400 : 503, e.message);
+    }
+  }],
   ['GET', /^\/api\/settings$/, () => ({ settings: redact(db.settings), meta: settingsMeta() })],
   ['GET', /^\/api\/flags$/, () => ({ flags: effectiveFeatureFlags(db.settings) })],
   ['PUT', /^\/api\/settings$/, async req => {
@@ -1966,7 +2017,8 @@ const server = createServer(async (req, res) => {
         const tokens = await exchangeOAuthCode(flow, code);
         const idx = (db.settings.plugins || []).findIndex(p => p.name === flow.pluginName);
         if (idx >= 0) {
-          db.settings.plugins[idx] = applyOAuthTokensToPlugin(db.settings.plugins[idx], tokens, flow);
+          const plugin = db.settings.plugins[idx];
+          db.settings.plugins[idx] = persistOAuthTokensInVault(plugin, tokens, flow);
           save();
         }
         flow.status = 'complete';
