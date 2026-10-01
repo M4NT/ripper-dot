@@ -12,7 +12,7 @@ import { computerFor } from './lib/boat.mjs';
 import { dockerAvailable, imageStatus, ensureImage, hostnameOf } from './lib/docker.mjs';
 import { sandboxStatus } from './lib/exec-sandbox.mjs';
 import { ApprovalGate } from './lib/approvals.mjs';
-import { autoStartJulia, juliaOnline, juliaChoose, juliaStatus, measureTriagePromptChars, RISK_OPTIONS, NOTIFY_OPTIONS } from './lib/julia.mjs';
+import { autoStartJulia, juliaOnline, juliaChoose, juliaStatus, measureTriagePromptChars, RISK_OPTIONS, NOTIFY_OPTIONS, MEMORY_OPTIONS } from './lib/julia.mjs';
 import {
   checkSend, dueMessages, threadKey, inboxPrompt, callAgentPrompt, repairInboxOnStartup, markInboxDeliveryFailed, inboxSummary,
   findAgentByName, clampCallTimeoutMs, interpretInboxReply, formatCallAgentResult, peerAllowed
@@ -44,7 +44,7 @@ import { browserFor, browserRisk } from './lib/browser.mjs';
 import { runClaude, runCodex, systemPrompt } from './lib/providers.mjs';
 import { runTestProvider } from './lib/test-provider.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
-import { canUseFile, selectSpeakers, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent, turnPlanIds } from './lib/agent-flow.mjs';
+import { isDuplicateMemory, canUseFile, selectSpeakers, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent, turnPlanIds } from './lib/agent-flow.mjs';
 import { providerAttemptOrder, runProviderAttemptLoop } from './lib/provider-turn.mjs';
 import { normalizeProviderRetry } from './lib/provider-retry.mjs';
 import { patchSettings, settingsMeta, SettingsValidationError } from './lib/settings-patch.mjs';
@@ -714,7 +714,22 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
     } : null,
     computer,
     browser,
-    remember: (t, tier = 'profile') => { if (s.memory) { db.memories.push({ id: id(), agentId: agent.id, text: t, tier: tier === 'log' ? 'log' : 'profile', createdAt: Date.now() }); save(); emit({ memory: t, tier }); } },
+    remember: async (t, tier = 'profile') => {
+      if (!s.memory) return;
+      const mine = db.memories.filter(m => m.agentId === agent.id);
+      if (isDuplicateMemory(t, mine)) return; // já sabe: não incha o contexto de toda conversa
+      tier = tier === 'log' ? 'log' : 'profile';
+      // Perfil entra em toda conversa; a Julia rebaixa detalhe passageiro para o registro datado (nada se perde).
+      if (tier === 'profile') {
+        const j = await juliaChoose(db.settings, { context: `Memória que o agente ${agent.name} quer guardar no perfil do usuário.`, question: t, options: MEMORY_OPTIONS }, {
+          minScore: 0.6, purpose: 'memory',
+          avoidedPromptChars: measureTriagePromptChars({ context: '', question: t, options: MEMORY_OPTIONS })
+        });
+        if (j && j.index === 1) tier = 'log';
+      }
+      db.memories.push({ id: id(), agentId: agent.id, text: t, tier, createdAt: Date.now() });
+      save(); emit({ memory: t, tier });
+    },
     inbox: {
       send: a => {
         const to = findAgentByName(a.to, db.agents);
