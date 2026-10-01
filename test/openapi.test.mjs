@@ -65,6 +65,8 @@ test('GET /openapi.json retorna OpenAPI 3 válido', async () => {
     assert.ok(doc.paths['/api/chat']);
     assert.ok(doc.paths['/api/flags']);
     assert.ok(doc.paths['/metrics']);
+    assert.ok(doc.paths['/api/chats/{chatId}']);
+    assert.ok(doc.paths['/api/chats/{chatId}/resume']);
     assert.ok(doc.paths['/healthz']);
     assert.ok(doc.components?.securitySchemes?.bearerAuth);
     assert.match(doc.info.description, /RIPPER_METRICS_PUBLIC/);
