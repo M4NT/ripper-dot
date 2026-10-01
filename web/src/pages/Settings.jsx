@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { MetalBadge } from 'metal-fx';
 import { useApp } from '../app.jsx';
+import { useOv } from '../overlay.jsx';
 import { api, go, useDark } from '../lib.js';
 import { Icon, Switch, Select, EmptyState } from '../ui.jsx';
 import { AdvancedBlock, HelpTip } from '../disclosure.jsx';
@@ -25,6 +26,7 @@ export function SaveBar({ dirty, saving, save, reset }) {
 
 function DataBackup({ s, set }) {
   const { refresh, toast } = useApp();
+  const ov = useOv();
   const [auto, setAuto] = useState(null);
   const [snapshots, setSnapshots] = useState([]);
   const [busy, setBusy] = useState('');
@@ -58,7 +60,7 @@ function DataBackup({ s, set }) {
     finally { setBusy(''); }
   };
   const restoreSnapshot = async id => {
-    if (!window.confirm('Restaurar este snapshot? Isso sobrescreve os dados vivos em RIPPER_DATA (db.json, SQLite, sandbox, etc.).')) return;
+    if (!(await ov.confirm({ title: 'Restaurar este snapshot?', body: 'Isso sobrescreve os dados vivos em RIPPER_DATA (db.json, SQLite, sandbox, etc.).', action: 'Restaurar', danger: true }))) return;
     setBusy(`restore-${id}`);
     try {
       await api('/api/backup/restore', { method: 'POST', body: { confirm: true, id } });
@@ -113,13 +115,13 @@ function DataBackup({ s, set }) {
         </Row>
         <Row title="Restaurar JSON" desc="Grava db.pre-restore.*.backup.json antes de substituir só o db.json." tip="Substitui conversas e configurações atuais. Guarde o JSON em lugar seguro.">
           <div className="row">
-            <input ref={fileRef} type="file" accept="application/json,.json" aria-label="Arquivo de backup JSON" onChange={e => restoreJson(e.target.files?.[0])} disabled={!!busy} />
-            {busy === 'import' && <span className="muted" role="status">Restaurando…</span>}
+            <input ref={fileRef} type="file" hidden accept="application/json,.json" onChange={e => restoreJson(e.target.files?.[0])} />
+            <button type="button" className="btn" disabled={!!busy} onClick={() => fileRef.current?.click()} aria-busy={busy === 'import'}><Icon name="upload" size={16} />{busy === 'import' ? 'Restaurando…' : 'Escolher arquivo…'}</button>
           </div>
         </Row>
         {auto?.length > 0 && (
-          <Row title="Backups automáticos de db.json" desc="Migração de schema ou antes de restaurar.">
-            <ul className="mono small">{auto.map(n => <li key={n}>{n}</li>)}</ul>
+          <Row title="Backups automáticos de db.json" desc="Migração de schema ou antes de restaurar." stack>
+            <ul className="rows flat">{auto.map(n => <li key={n} className="row-item"><div className="row-main"><b className="mono small">{n}</b></div></li>)}</ul>
           </Row>
         )}
       </Card>

@@ -96,7 +96,7 @@ test('vários load no mesmo processo compartilham o cache em memória', () =>
     assert.ok(existsSync(join(dir, 'coord.sqlite')));
   }));
 
-test('checkStoreReady reflete acesso à pasta de dados', () =>
+test('checkStoreReady reflete acesso à pasta de dados', { skip: process.platform === 'win32' && 'chmod não restringe acesso no Windows' }, () =>
   withDataDir(async ({ load, checkStoreReady }, dir) => {
     load();
     assert.deepEqual(checkStoreReady(), { ok: true });
@@ -110,7 +110,7 @@ test('checkStoreReady reflete acesso à pasta de dados', () =>
     }
   }));
 
-test('flush não derruba o processo quando a pasta de dados fica inacessível', () =>
+test('flush não derruba o processo quando a pasta de dados fica inacessível', { skip: process.platform === 'win32' && 'chmod não restringe acesso no Windows' }, () =>
   withDataDir(async ({ load, flush, checkStoreReady }, dir) => {
     load();
     chmodSync(dir, 0);

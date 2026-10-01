@@ -41,7 +41,7 @@ async function waitForHealth(base, token, ms) {
   throw new Error('servidor não subiu a tempo');
 }
 
-test('SIGTERM faz novas requisições /api/* retornarem 503', async () => {
+test('SIGTERM faz novas requisições /api/* retornarem 503', { skip: process.platform === 'win32' && 'no Windows o SIGTERM encerra o processo na hora (sem desligamento gracioso)' }, async () => {
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-shutdown-'));
   const port = await freePort();
   const token = 'shutdown-test-token';

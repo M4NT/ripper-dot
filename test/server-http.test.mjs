@@ -29,6 +29,10 @@ async function withServer(envExtra, fn) {
     PORT: String(port),
     HOST: '127.0.0.1',
     RIPPER_TOKEN: 'test-http-token',
+    // Isola do login real do Claude (~/.claude) da máquina de quem roda os testes.
+    HOME: dataDir,
+    USERPROFILE: dataDir,
+    CLAUDE_CODE_OAUTH_TOKEN: '',
     ...envExtra
   };
   const child = spawn(process.execPath, [serverPath], { env, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -181,7 +185,7 @@ test('GET /healthz e /readyz respondem sem RIPPER_TOKEN', async () => {
   });
 });
 
-test('GET /readyz retorna 503 quando a pasta de dados fica inacessível', async () => {
+test('GET /readyz retorna 503 quando a pasta de dados fica inacessível', { skip: process.platform === 'win32' && 'chmod não restringe acesso no Windows' }, async () => {
   await withServer({}, async (base, _token, dataDir) => {
     chmodSync(dataDir, 0);
     try {

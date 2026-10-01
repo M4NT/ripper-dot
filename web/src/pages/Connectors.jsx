@@ -62,7 +62,7 @@ function Mine({ settings, authByName, onRefresh, busyAuth, refresh }) {
 }
 
 export default function Connectors() {
-  const { S, refresh } = useApp();
+  const { S, refresh, toast } = useApp();
   const { parts } = useRoute();
   const tab = parts[1] === 'discover' ? 'discover' : 'mine';
   const [q, setQ] = useState('');
@@ -88,7 +88,7 @@ export default function Connectors() {
       for (const c of r.connectors || []) map[c.name] = c.authStatus;
       setAuthByName(map);
     } catch (e) {
-      alert(e.message);
+      toast(e.message, 'error');
     }
     setBusyAuth(null);
   }

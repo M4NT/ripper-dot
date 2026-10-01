@@ -53,7 +53,7 @@ export default function AdminUso() {
       <Section
         id="medicao"
         title="Medição de uso"
-        desc="Agregados de usage.sqlite e export CSV (substitui painel fragmentado do draft #50)."
+        desc="Agregados de usage.sqlite e export CSV."
       >
         <MeteringPanel />
       </Section>
@@ -61,7 +61,7 @@ export default function AdminUso() {
       <Section
         id="julia"
         title="Economia Julia (medida)"
-        desc="Telemetria real de roteamento, cache e cascata — sem US$ ou percentual de economia fabricado (draft #37)."
+        desc="Telemetria real de roteamento, cache e cascata — sem US$ ou percentual de economia fabricado."
       >
         <JuliaEconomiaPanel />
       </Section>
@@ -69,7 +69,7 @@ export default function AdminUso() {
       <Section
         id="orcamento"
         title="Orçamento de tokens"
-        desc="Limites configuráveis com soft-stop no backend (draft #34). Cotas Ripper via RIPPER_LIMIT_* continuam no servidor."
+        desc="Limites configuráveis com soft-stop no backend. Cotas Ripper via RIPPER_LIMIT_* continuam no servidor."
       >
         <TokenBudgetPanel />
       </Section>

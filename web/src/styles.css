@@ -1079,7 +1079,7 @@ html.lightbox-open { overflow: hidden; }
 .hook-url code { flex: 1; min-width: 0; font-size: 11.5px; padding: 6px 8px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wrap-row { flex-wrap: wrap; }
 .recent-item.unread b, .crow.unread .crow-top b { font-weight: 700; }
-.unread-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-dot, #3a7bd5); flex: none; }
+.unread-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink); flex: none; }
 
 /* ============ configurações em abas ============ */
 .settings-page { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 40px; max-width: 1100px; margin: 0 auto; padding: 40px 40px 96px; animation: fade .3s var(--out); }
@@ -1377,7 +1377,7 @@ body.resizing iframe { pointer-events: none; }
 .usage-more { margin-top: 10px; font-size: 13px; }
 
 /* Modo simples / enterprise */
-.ui-mode-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: var(--radius, 10px); border: 1px solid var(--line); background: var(--chip); }
+.ui-mode-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: var(--r); border: 1px solid var(--line); background: var(--chip); }
 .ui-mode-toggle.compact { padding: 6px 8px; border: 0; background: transparent; }
 .ui-mode-copy { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
 .ui-mode-copy small { color: var(--muted); font-size: 12px; line-height: 1.35; }
@@ -1405,18 +1405,18 @@ body.resizing iframe { pointer-events: none; }
 .admin-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .admin-notes { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 6px; }
 .admin-uso-page { max-width: 960px; display: flex; flex-direction: column; gap: 28px; }
-.admin-uso-crumb a { color: var(--accent); text-decoration: none; }
+.admin-uso-crumb a { color: var(--muted); text-decoration: none; }
 .admin-uso-block { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 20px 22px; box-shadow: var(--shadow-1); }
 .admin-uso-block header { margin-bottom: 14px; }
 .admin-uso-block h2 { font-size: 18px; font-weight: 500; margin: 0 0 4px; }
 .admin-uso-section { display: flex; flex-direction: column; gap: 12px; }
 .admin-budget-form { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
-.admin-budget-loop { border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px; margin: 0; }
+.admin-budget-loop { border: 1px solid var(--line); border-radius: var(--r); padding: 12px; margin: 0; }
 .usage-pop-compact { max-width: 320px; }
 .usage-admin-link { width: 100%; margin-top: 8px; justify-content: center; }
 .metering-panel { display: flex; flex-direction: column; gap: 16px; }
 .metering-totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; }
-.metering-totals div { padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--chip); }
+.metering-totals div { padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--chip); }
 .metering-totals b { display: block; font-size: 20px; font: 20px var(--mono); }
 .metering-totals small { color: var(--muted); font-size: 12px; }
 .metering-chart { display: flex; align-items: flex-end; gap: 6px; min-height: 120px; padding: 8px 0; border-bottom: 1px solid var(--line); }
@@ -1428,3 +1428,33 @@ body.resizing iframe { pointer-events: none; }
 .metering-subhead { margin: 16px 0 4px; font-size: 14px; }
 .metering-provider { margin-top: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
 .metering-provider h4 { margin: 0 0 8px; font-size: 14px; }
+
+/* ============ revisão geral de UI ============ */
+/* mobile: a regra de --side-w (resizable) vinha depois do media query e reabria a coluna da barra */
+@media (max-width: 900px) { .shell { grid-template-columns: minmax(0, 1fr); } .sidebar { position: fixed; overflow: hidden; } }
+/* rodapé da barra: modo em cima, conta embaixo — lado a lado estourava os 264px */
+.side-foot { flex-direction: column; align-items: stretch; }
+.side-foot .side-mode { margin: 0; padding: 4px 8px; }
+.side-foot .account { min-width: 0; }
+.side-foot .account-name { min-width: 0; }
+.side-foot .account-name b, .side-foot .account-name small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* textos longos (caminhos, ids) não vazam dos cartões */
+code, .mono, pre { overflow-wrap: anywhere; }
+.member-list .av-box, .member-list .av-box span { flex: none; }
+/* menu de configurações sempre fixo: em telas baixas ele rola por dentro em vez de ir junto com a página */
+@media (min-width: 901px) {
+  .settings-nav { top: 40px; max-height: calc(100dvh - 80px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+}
+/* setas nativas do input numérico destoam do design; teclado e roda do mouse continuam funcionando */
+.input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+.input[type=number]::-webkit-inner-spin-button, .input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+/* Admin → Uso no design do projeto: tokens de cor/raio, números editoriais, barras monocromáticas */
+.metering-totals div { border-radius: var(--r-lg); background: var(--surface); padding: 14px 16px; }
+.metering-totals b { font: 400 26px/1.1 var(--font); letter-spacing: -.03em; margin-bottom: 4px; }
+.metering-chart-bar, .usage-bar-fill.blue { background: var(--ink); }
+.metering-chart-bar { border-radius: 6px 6px 2px 2px; opacity: .85; }
+.metering-table th { font-weight: 500; letter-spacing: .02em; }
+.metering-table tbody tr:hover td { background: color-mix(in srgb, var(--surface) 60%, transparent); }
+.metering-table td:first-child, .metering-table th:first-child { padding-left: 10px; }
+.metering-subhead { font-weight: 500; }
+.admin-budget-form { gap: 0; margin-top: 16px; }

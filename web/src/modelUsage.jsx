@@ -31,7 +31,7 @@ function ContextRing({ pct, size = 36 }) {
     <svg className="usage-ring" width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
       <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--line)" strokeWidth="3" />
       {show && (
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--accent, #4f8ff7)" strokeWidth="3" strokeLinecap="round"
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--ink)" strokeWidth="3" strokeLinecap="round"
           strokeDasharray={c} strokeDashoffset={off} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
       )}
     </svg>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '../app.jsx';
 import { api } from '../lib.js';
-import { EmptyState } from '../ui.jsx';
+import { EmptyState, Switch } from '../ui.jsx';
 
 function UsageBar({ pct, label, sublabel, tone = 'blue' }) {
   if (pct == null) return null;
@@ -94,36 +94,19 @@ export default function TokenBudgetPanel() {
         <EmptyState title="sem dados" body="Defina um limite global abaixo e ative o governador para ver consumo no período." />
       )}
 
-      <div className="form-grid admin-budget-form">
-        <label className="check-row">
-          <input type="checkbox" checked={draft.enabled} onChange={e => setDraft(d => ({ ...d, enabled: e.target.checked }))} />
-          Ativar governador de orçamento
-        </label>
-        <label>
-          Período (horas)
-          <input type="number" min={1} max={168} value={draft.periodHours} onChange={e => setDraft(d => ({ ...d, periodHours: +e.target.value }))} />
-        </label>
-        <label>
-          Limite global (tokens)
-          <input type="number" min={0} placeholder="sem limite" value={draft.globalMaxTokens} onChange={e => setDraft(d => ({ ...d, globalMaxTokens: e.target.value }))} />
-        </label>
-        <fieldset className="admin-budget-loop">
-          <legend>Detecção de loop de ferramentas</legend>
-          <label className="check-row">
-            <input type="checkbox" checked={draft.loopEnabled} onChange={e => setDraft(d => ({ ...d, loopEnabled: e.target.checked }))} />
-            Interromper execução em loop
-          </label>
-          <label>
-            Mesma ferramenta (vezes)
-            <input type="number" min={3} max={30} value={draft.sameToolThreshold} disabled={!draft.loopEnabled} onChange={e => setDraft(d => ({ ...d, sameToolThreshold: +e.target.value }))} />
-          </label>
-          <label>
-            Janela (segundos)
-            <input type="number" min={30} max={600} value={draft.windowSeconds} disabled={!draft.loopEnabled} onChange={e => setDraft(d => ({ ...d, windowSeconds: +e.target.value }))} />
-          </label>
-        </fieldset>
+      <div className="admin-budget-form">
+        <div className="set-row"><div className="set-label"><b>Governador de orçamento</b><small>Interrompe novas respostas ao atingir o limite do período.</small></div><div className="set-control"><Switch checked={draft.enabled} onChange={v => setDraft(d => ({ ...d, enabled: v }))} label="Ativar governador de orçamento" /></div></div>
+        <div className="set-row"><div className="set-label"><b>Período</b></div><div className="set-control"><div className="input-unit"><input className="input" type="number" min={1} max={168} value={draft.periodHours} onChange={e => setDraft(d => ({ ...d, periodHours: +e.target.value }))} /><span>horas</span></div></div></div>
+        <div className="set-row"><div className="set-label"><b>Limite global</b><small>Deixe vazio para não limitar.</small></div><div className="set-control"><div className="input-unit"><input className="input" type="number" min={0} placeholder="sem limite" value={draft.globalMaxTokens} onChange={e => setDraft(d => ({ ...d, globalMaxTokens: e.target.value }))} /><span>tokens</span></div></div></div>
+        <div className="set-row"><div className="set-label"><b>Detecção de loop de ferramentas</b><small>Para a execução quando o agente repete a mesma ferramenta.</small></div><div className="set-control"><Switch checked={draft.loopEnabled} onChange={v => setDraft(d => ({ ...d, loopEnabled: v }))} label="Interromper execução em loop" /></div></div>
+        {draft.loopEnabled && <>
+        <div className="set-row"><div className="set-label"><b>Mesma ferramenta</b></div><div className="set-control"><div className="input-unit"><input className="input" type="number" min={3} max={30} value={draft.sameToolThreshold} onChange={e => setDraft(d => ({ ...d, sameToolThreshold: +e.target.value }))} /><span>vezes</span></div></div></div>
+        <div className="set-row"><div className="set-label"><b>Janela</b></div><div className="set-control"><div className="input-unit"><input className="input" type="number" min={30} max={600} value={draft.windowSeconds} onChange={e => setDraft(d => ({ ...d, windowSeconds: +e.target.value }))} /><span>segundos</span></div></div></div>
+        </>}
       </div>
-      <button type="button" className="btn" disabled={busy} onClick={save}>{busy ? 'Salvando…' : 'Salvar orçamento'}</button>
+      <div className="set-actions">
+        <button type="button" className="btn btn-primary" disabled={busy} onClick={save}>{busy ? 'Salvando…' : 'Salvar orçamento'}</button>
+      </div>
       {status?.note && <p className="muted small">{status.note}</p>}
     </div>
   );

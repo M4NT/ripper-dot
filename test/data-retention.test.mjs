@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 
 async function withDataDir(fn) {
   const dir = mkdtempSync(join(tmpdir(), 'ripper-ret-'));
@@ -60,7 +61,7 @@ test('clearJuliaEventsStore remove decisões', () =>
 
 test('clear-* exige --confirm no CLI', async () => {
   const { spawnSync } = await import('node:child_process');
-  const script = new URL('../scripts/ripper-data.mjs', import.meta.url).pathname;
+  const script = fileURLToPath(new URL('../scripts/ripper-data.mjs', import.meta.url));
   const noConfirm = spawnSync(process.execPath, [script, 'clear-usage'], { encoding: 'utf8' });
   assert.notEqual(noConfirm.status, 0);
   assert.match(noConfirm.stderr, /--confirm/);

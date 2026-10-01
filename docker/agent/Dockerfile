@@ -8,8 +8,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LANG=pt_BR.UTF-8
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      chromium fonts-liberation fonts-noto-color-emoji \
-      xvfb x11vnc fluxbox novnc websockify \
+      chromium fonts-liberation fonts-noto-core fonts-noto-color-emoji \
+      xvfb x11vnc novnc websockify \
       procps curl ca-certificates git python3-pip jq locales \
   && sed -i 's/# pt_BR.UTF-8/pt_BR.UTF-8/' /etc/locale.gen && locale-gen \
   && rm -rf /var/lib/apt/lists/*
@@ -17,6 +17,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Controle do navegador pelo agente (a mesma janela que você vê e controla pela tela).
 RUN mkdir -p /opt/ripper-browser && cd /opt/ripper-browser \
   && npm init -y >/dev/null && npm i -s puppeteer-core@23 >/dev/null
+
+# Esconde a aba lateral do noVNC: o Ripper já tem os próprios controles da tela.
+RUN echo '#noVNC_control_bar_anchor,#noVNC_status{display:none!important}' >> /usr/share/novnc/app/styles/base.css
+
+# Chromium sem convite de login nem sincronização (é o navegador do agente, não o seu).
+RUN mkdir -p /etc/chromium/policies/managed && echo '{"BrowserSignin":0,"SyncDisabled":true,"PromotionalTabsEnabled":false}' > /etc/chromium/policies/managed/ripper.json
 
 COPY start.sh /usr/local/bin/ripper-start
 RUN chmod +x /usr/local/bin/ripper-start

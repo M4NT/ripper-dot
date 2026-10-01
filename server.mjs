@@ -12,7 +12,7 @@ import { computerFor } from './lib/boat.mjs';
 import { dockerAvailable, imageStatus, ensureImage, hostnameOf } from './lib/docker.mjs';
 import { sandboxStatus } from './lib/exec-sandbox.mjs';
 import { ApprovalGate } from './lib/approvals.mjs';
-import { juliaOnline, juliaChoose, juliaStatus, measureTriagePromptChars, RISK_OPTIONS, NOTIFY_OPTIONS } from './lib/julia.mjs';
+import { autoStartJulia, juliaOnline, juliaChoose, juliaStatus, measureTriagePromptChars, RISK_OPTIONS, NOTIFY_OPTIONS } from './lib/julia.mjs';
 import { checkSend, dueMessages, threadKey, inboxPrompt, repairInboxOnStartup, markInboxDeliveryFailed, inboxSummary } from './lib/inbox.mjs';
 import {
   PROTOCOL_ID,
@@ -2078,6 +2078,8 @@ server.on('connection', socket => {
 });
 
 server.listen(PORT, HOST, () => console.log(`Ripper em http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`));
+// Julia instalada = Julia no ar; sem pesos em julia/Julia-1, segue nas regras de reserva.
+if (!process.env.RIPPER_TEST_PROVIDER) autoStartJulia(db.settings).catch(e => console.warn('[julia]', e.message));
 
 registerGracefulShutdown(server, {
   logger,

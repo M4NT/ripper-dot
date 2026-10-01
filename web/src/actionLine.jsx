@@ -88,7 +88,7 @@ export default function ActionLine({ steps, live }) {
             aria-label={canExpand ? barLabel : undefined}
             disabled={!canExpand}
           >
-            {running ? <ThinkingOrb state={ORB[last.tool] || 'working'} size={18} /> : <Icon name={leadIcon} size={15} />}
+            {running ? <ThinkingOrb state={ORB[last.tool] || 'working'} size={20} /> : <Icon name={leadIcon} size={15} />}
             <span className="action-line-text">{summarize(activity, live)}</span>
             {activity.length > 1 && <span className="action-line-badge">{activity.length}</span>}
             {canExpand && <Icon name="down" size={14} className={`action-line-chevron ${open ? 'open' : ''}`} />}
