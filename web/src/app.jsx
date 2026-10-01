@@ -9,6 +9,8 @@ import { useChatMenu } from './actions.jsx';
 import { ApprovalTray } from './approvals.jsx';
 import { ResizeHandle } from './resize.jsx';
 import Chat from './pages/Chat.jsx';
+import UiModeToggle from './uiModeToggle.jsx';
+import { getUiMode, isEnterpriseMode, isRouteAllowed } from './uiMode.js';
 
 // Telas fora do caminho principal carregam sob demanda. Se o build mudou desde que a aba abriu,
 // o pedaço antigo não existe mais: recarrega uma vez para pegar a versão nova.
@@ -28,6 +30,7 @@ const Marketplace = lazy(() => import('./pages/Marketplace.jsx'));
 const Connectors = lazy(() => import('./pages/Connectors.jsx'));
 const SkillsHub = lazy(() => import('./pages/SkillsHub.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
+const AdminCenter = lazy(() => import('./pages/AdminCenter.jsx'));
 const NewAgent = lazy(() => import('./pages/NewAgent.jsx'));
 const AgentConfig = lazy(() => import('./pages/AgentConfig.jsx'));
 
@@ -66,7 +69,7 @@ function Boot({ error, retry }) {
   );
 }
 
-const NAV = [
+const NAV_ALL = [
   ['', 'Início', 'home'],
   ['projects', 'Projetos', 'folder'],
   ['agents', 'Agentes', 'agents'],
@@ -74,8 +77,17 @@ const NAV = [
   ['library', 'Biblioteca', 'book']
 ];
 
+function navForMode(settings) {
+  if (!isEnterpriseMode(settings)) {
+    return NAV_ALL.filter(([k]) => k === '' || k === 'agents');
+  }
+  return NAV_ALL;
+}
+
 function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollapse }) {
   const { S, agent, busy } = useApp();
+  const enterprise = isEnterpriseMode(S.settings);
+  const NAV = navForMode(S.settings);
   const { parts } = useRoute();
   const chatMenu = useChatMenu();
   const section = parts[0] === 'c' ? 'chat' : parts[0] === 'new' ? 'agents' : parts[0] === 'p' ? 'projects' : parts[0] || '';
@@ -121,8 +133,9 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
         </div>
       )}
       <div className="side-foot">
+        {!collapsed && <UiModeToggle compact className="side-mode" />}
         <Menu align="up" className="account-menu" trigger={({ toggle, open }) => (
-          <button className={`account ${['settings', 'integrations', 'marketplace', 'connectors', 'skills'].includes(section) ? 'on' : ''}`} onClick={toggle} aria-expanded={open} aria-haspopup="menu" title={collapsed ? 'Conta e configurações' : undefined}>
+          <button className={`account ${['settings', 'integrations', 'marketplace', 'connectors', 'skills', 'admin'].includes(section) ? 'on' : ''}`} onClick={toggle} aria-expanded={open} aria-haspopup="menu" title={collapsed ? 'Conta e configurações' : undefined}>
             <span className="initial">{(S.settings.name || 'V')[0].toUpperCase()}</span>
             <span className="account-name"><b>{S.settings.name || 'Você'}</b><small>Conta e configurações</small></span>
             <Icon name="more" size={16} className="account-more" />
@@ -131,9 +144,14 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
           <div className="account-head"><span className="initial">{(S.settings.name || 'V')[0].toUpperCase()}</span><span><b>{S.settings.name || 'Você'}</b><small>{S.agents.length} agentes · {S.projects.length} projetos</small></span></div>
           <MenuItem icon="gear" onClick={() => { onNavigate(); go('/settings'); }}>Configurações</MenuItem>
           <MenuItem icon="store" onClick={() => { onNavigate(); go('/marketplace'); }}>Marketplace</MenuItem>
-          <MenuItem icon="plug" onClick={() => { onNavigate(); go('/connectors'); }}>Conectores</MenuItem>
-          <MenuItem icon="bolt" onClick={() => { onNavigate(); go('/skills'); }}>Habilidades</MenuItem>
-          <MenuItem icon="cube" onClick={() => { onNavigate(); go('/settings/models'); }}>Modelos e computador<small className="menu-hint">Claude, Docker, plugins</small></MenuItem>
+          {enterprise ? <>
+            <MenuItem icon="plug" onClick={() => { onNavigate(); go('/connectors'); }}>Conectores</MenuItem>
+            <MenuItem icon="bolt" onClick={() => { onNavigate(); go('/skills'); }}>Habilidades</MenuItem>
+            <MenuItem icon="cube" onClick={() => { onNavigate(); go('/settings/models'); }}>Modelos e computador<small className="menu-hint">Claude, Docker, plugins</small></MenuItem>
+            <MenuItem icon="grid" onClick={() => { onNavigate(); go('/admin'); }}>Centro admin<small className="menu-hint">Auditoria, uso, RBAC</small></MenuItem>
+          </> : (
+            <MenuItem icon="grid" onClick={() => { onNavigate(); go('/settings/appearance'); }}>Ativar modo Enterprise<small className="menu-hint">Admin, projetos e opções avançadas</small></MenuItem>
+          )}
           <MenuItem icon={theme === 'dark' ? 'sun' : 'moon'} onClick={toggleTheme}>Tema {theme === 'dark' ? 'claro' : 'escuro'}</MenuItem>
           <hr className="menu-sep" />
           <MenuItem icon="search" onClick={onSearch}>Buscar<kbd className="menu-kbd">Ctrl K</kbd></MenuItem>
@@ -147,6 +165,7 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
 /* ---------- paleta de comandos ---------- */
 function Palette({ open, onClose, toggleTheme }) {
   const { S, agent } = useApp();
+  const enterprise = isEnterpriseMode(S.settings);
   const [q, setQ] = useState('');
   const [i, setI] = useState(0);
   const [chatHits, setChatHits] = useState([]);
@@ -163,14 +182,14 @@ function Palette({ open, onClose, toggleTheme }) {
     const chats = t.length >= 2 && chatHits.length ? chatHits : S.chats;
     const all = [
       { g: 'Ações', label: 'Criar novo agente', icon: 'plus', run: () => go('/new') },
-      { g: 'Ações', label: 'Explorar templates', icon: 'compass', run: () => go('/explore') },
+      ...(enterprise ? [{ g: 'Ações', label: 'Explorar templates', icon: 'compass', run: () => go('/explore') }] : []),
       { g: 'Ações', label: 'Alternar tema', icon: 'moon', run: toggleTheme },
       { g: 'Ações', label: 'Configurações', icon: 'gear', run: () => go('/settings') },
       ...S.agents.map(a => ({ g: 'Agentes', label: `Conversar com ${a.name}`, agent: a, run: () => go(`/a/${a.id}`) })),
       ...chats.map(c => ({ g: 'Conversas', label: c.title, hint: agent(c.agentId)?.name, icon: 'chat', run: () => go(`/c/${c.id}`) }))
     ];
     return all.filter(x => !t || x.label.toLowerCase().includes(t) || x.hint?.toLowerCase().includes(t)).slice(0, 30);
-  }, [q, S, agent, toggleTheme, chatHits]);
+  }, [q, S, agent, toggleTheme, chatHits, enterprise]);
   const listRef = useRef(null);
   useEffect(() => { listRef.current?.querySelector('.on')?.scrollIntoView({ block: 'nearest' }); }, [i]);
   const run = x => { onClose(); x.run(); };
@@ -200,6 +219,7 @@ function Palette({ open, onClose, toggleTheme }) {
 }
 
 function Shell() {
+  const { S } = useApp();
   const { parts, query } = useRoute();
   const [theme, toggleTheme] = useTheme();
   const [palette, setPalette] = useState(false);
@@ -222,6 +242,17 @@ function Shell() {
     return () => removeEventListener('ripper:open-palette', open);
   }, []);
   useEffect(() => { setDrawer(false); document.querySelector('.main')?.scrollTo(0, 0); }, [parts.join('/')]);
+  useEffect(() => {
+    if (!S) return;
+    if (parts[0] === 'enterprise') {
+      go('/admin');
+      return;
+    }
+    if (!isRouteAllowed(parts, S.settings)) {
+      if (parts[0] === 'settings') go('/settings');
+      else go('/');
+    }
+  }, [parts.join('/'), S?.settings?.ui?.mode, S?.settings?.enterprise?.enabled]);
 
   const [p0, p1, p2] = parts;
   const page =
@@ -240,6 +271,8 @@ function Shell() {
     p0 === 'marketplace' ? <Marketplace /> :
     p0 === 'connectors' ? <Connectors /> :
     p0 === 'skills' ? <SkillsHub /> :
+    p0 === 'admin' ? <AdminCenter /> :
+    p0 === 'enterprise' ? null :
     p0 === 'settings' ? <Settings theme={theme} toggleTheme={toggleTheme} tab={p1} /> :
     <Home />;
 
@@ -252,8 +285,11 @@ function Shell() {
         {mobile && (
           <div className="mobile-bar">
             <button className="icon-btn" onClick={() => setDrawer(true)} aria-label="Abrir menu"><Icon name="menu" /></button>
-            <span className="mobile-title">Ripper</span>
-            <button className="icon-btn" onClick={() => setPalette(true)} aria-label="Buscar"><Icon name="search" /></button>
+            <span className="mobile-title">Ripper{getUiMode(S.settings) === 'enterprise' ? '' : <span className="mobile-mode-tag">Simples</span>}</span>
+            <div className="mobile-bar-actions">
+              <UiModeToggle compact className="mobile-mode" />
+              <button className="icon-btn" onClick={() => setPalette(true)} aria-label="Buscar"><Icon name="search" /></button>
+            </div>
           </div>
         )}
         <Suspense fallback={<div className="page-loading"><ThinkingOrb state="breathing" size={20} /></div>}>{page}</Suspense>

@@ -30,7 +30,7 @@ export default function AgentCard({ agent }) {
         </div>
         <div className="agent-card-foot">
           <StatusDot status={agent.status} />
-          <AutonomySemaphore level={agent.autonomyLevel} showLabel={false} size="sm" />
+          <AutonomySemaphore level={agent.autonomyLevel} settings={S.settings} showLabel={false} size="sm" />
           {working && <span className="working-label">respondendo</span>}
         </div>
         <Menu align="right" className="agent-card-menu" trigger={({ toggle, open }) => (

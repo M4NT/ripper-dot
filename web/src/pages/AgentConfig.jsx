@@ -5,8 +5,9 @@ import { AgentAvatar, Icon, Segmented, StatusDot, EmptyState, useConfirm, Select
 import { Basics, Behavior, Tools, Appearance, ModelPick } from '../agentForm.jsx';
 import { AutonomySemaphore } from '../autonomy.jsx';
 import { uploadFile } from '../composer.jsx';
+import { isEnterpriseMode } from '../uiMode.js';
 
-const TABS = [['general', 'Geral'], ['model', 'Modelo'], ['behavior', 'Comportamento'], ['tools', 'Ferramentas'], ['knowledge', 'Conhecimento'], ['look', 'Aparência'], ['routines', 'Rotinas'], ['advanced', 'Avançado']];
+const ALL_TABS = [['general', 'Geral'], ['model', 'Modelo'], ['behavior', 'Comportamento'], ['tools', 'Ferramentas'], ['knowledge', 'Conhecimento'], ['look', 'Aparência'], ['routines', 'Rotinas'], ['advanced', 'Avançado']];
 const pick = a => ({ name: a.name, description: a.description, category: a.category, status: a.status, instructions: a.instructions, tone: a.tone, model: a.model, effort: a.effort || 'auto', tools: a.tools, avatar: a.avatar, autonomyLevel: a.autonomyLevel || 'semi_autonomous' });
 
 function Knowledge({ agent }) {
@@ -87,6 +88,7 @@ export default function AgentConfig({ id }) {
   const { S, agent: get, updateAgent, refresh, toast } = useApp();
   const { query } = useRoute();
   const agent = get(id);
+  const tabs = isEnterpriseMode(S.settings) ? ALL_TABS : ALL_TABS.filter(([k]) => k !== 'advanced');
   const [tab, setTab] = useState(query.get('tab') || 'general');
   const [v, setV] = useState(() => agent && pick(agent));
   const [saving, setSaving] = useState(false);
@@ -123,9 +125,9 @@ export default function AgentConfig({ id }) {
       </header>
       <div className="config-hero">
         <AgentAvatar agent={{ ...agent, ...v }} size={80} interactive animate />
-        <div><h1>{v.name || 'Sem nome'}</h1><div className="config-hero-meta"><StatusDot status={v.status} /><AutonomySemaphore level={v.autonomyLevel} /></div><p className="lede">{v.description || 'Sem descrição.'}</p></div>
+        <div><h1>{v.name || 'Sem nome'}</h1><div className="config-hero-meta"><StatusDot status={v.status} /><AutonomySemaphore level={v.autonomyLevel} settings={S.settings} /></div><p className="lede">{v.description || 'Sem descrição.'}</p></div>
       </div>
-      <Segmented label="Seções" value={tab} onChange={setTab} items={TABS} className="seg-scroll config-tabs" />
+      <Segmented label="Seções" value={tab} onChange={setTab} items={tabs} className="seg-scroll config-tabs" />
       <div className="config-body">
         {tab === 'general' && <>
           <Basics v={v} set={set} categories={S.categories} />
@@ -136,7 +138,7 @@ export default function AgentConfig({ id }) {
           </div>
         </>}
         {tab === 'model' && <ModelPick v={v} set={set} />}
-        {tab === 'behavior' && <Behavior v={v} set={set} />}
+        {tab === 'behavior' && <Behavior v={v} set={set} settings={S.settings} />}
         {tab === 'tools' && <Tools v={v} set={set} />}
         {tab === 'look' && <Appearance v={v} set={set} />}
         {tab === 'knowledge' && <Knowledge agent={agent} />}

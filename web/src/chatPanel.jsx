@@ -1,15 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
-import { api, fmtSize, fmtTime, fmtAgo, TOOL_INFO } from './lib.js';
+import { api, fmtAgo, TOOL_INFO } from './lib.js';
 import { AgentAvatar, Icon, Menu, Segmented, StatusDot } from './ui.jsx';
 import { useApp } from './app.jsx';
 import { uploadFile } from './composer.jsx';
 import { ResizeHandle } from './resize.jsx';
 import { effortLabel } from './modelPicker.jsx';
-import FileThumb from './fileThumb.jsx';
 import { ArtifactList } from './actions.jsx';
-
-const isImage = t => /^image\/(png|jpe?g|webp|gif)$/.test(t);
+import ConversationMedia from './ConversationMedia.jsx';
 const COMP_LABEL = { running: 'Ligado', stopped: 'Parado', 'not started': 'Ainda não iniciado', local: 'Pasta local', off: 'Desligado', 'no key': 'Falta a chave do boat.dev', unknown: 'Sem resposta da VM' };
 
 /** Engrenagem: as ferramentas de cada agente ficam "anexadas" aqui, sem ocupar o painel. */
@@ -75,22 +73,18 @@ function Files({ members, project, chatId, files, refresh, toast }) {
     for (const f of list) { try { await uploadFile(members[0].id, chatId, f, project?.id); } catch (e) { toast(e.message, 'error'); } }
     refresh();
   }
+  const emptyHint = `Nenhum arquivo nesta conversa.${members.length > 1 ? ' Todos os participantes veem o que for enviado.' : ''}`;
   return (
-    <div className="panel-tab">
-      {files.length === 0 && <p className="muted small">Nenhum arquivo nesta conversa.{members.length > 1 ? ' Todos os participantes veem o que for enviado.' : ''}</p>}
-      <ul className="file-list">
-        {files.map(f => (
-          <li key={f.id}>
-            {isImage(f.type) ? <FileThumb src={`/api/files/${f.id}`} /> : <span className="thumb file-ico"><Icon name="file" size={18} /></span>}
-            <a href={`/api/files/${f.id}`} target="_blank" rel="noreferrer"><b>{f.name}</b><small>{fmtSize(f.size)} · {fmtTime(f.createdAt)}</small></a>
-            <button className="icon-btn sm" aria-label={`Remover ${f.name}`} onClick={() => api(`/api/files/${f.id}`, { method: 'DELETE' }).then(refresh)}><Icon name="trash" size={15} /></button>
-          </li>
-        ))}
-      </ul>
-      <button className="btn btn-block btn-ghost-line" onClick={() => input.current.click()} disabled={!chatId}><Icon name="plus" size={16} />Adicionar arquivo</button>
-      {!chatId && <p className="muted small center">Envie a primeira mensagem para anexar aqui.</p>}
+    <>
+      <ConversationMedia
+        files={files}
+        canUpload={!!chatId}
+        emptyHint={emptyHint}
+        onAdd={() => input.current?.click()}
+        onRemove={f => api(`/api/files/${f.id}`, { method: 'DELETE' }).then(refresh)}
+      />
       <input ref={input} type="file" multiple hidden onChange={e => { add([...e.target.files]); e.target.value = ''; }} />
-    </div>
+    </>
   );
 }
 

@@ -1,22 +1,22 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
-import { api, go, fmtTime, fmtSize, TOOL_INFO, STEP_LABEL, useMediaQuery, local, nameColor } from '../lib.js';
+import { api, go, fmtTime, fmtSize, STEP_LABEL, useMediaQuery, local, nameColor } from '../lib.js';
 import { markdown, closeOpen } from '../markdown.js';
 import { AgentAvatar, Icon, Menu, MenuItem, StatusDot, useConfirm, EmptyState } from '../ui.jsx';
 import { useApp } from '../app.jsx';
 import Composer, { uploadFile } from '../composer.jsx';
 import { sessionPayload } from '../marketplace/sessionMcp.js';
 import { effortLabel } from '../modelPicker.jsx';
-import FileThumb from '../fileThumb.jsx';
+import MessageAttachments from '../MessageAttachments.jsx';
 import ChatPanel from '../chatPanel.jsx';
 import { ResizeHandle } from '../resize.jsx';
-import { ApprovalCard } from '../approvals.jsx';
+import ActionLine from '../actionLine.jsx';
 import { useChatMenu } from '../actions.jsx';
 import { useOv } from '../overlay.jsx';
 import { botAvatarPalette } from 'bot-avatars';
+import { FirstRunChecklist } from '../firstRunChecklist.jsx';
 
 const agentColor = a => nameColor(a, botAvatarPalette);
-const isImage = t => /^image\/(png|jpe?g|webp|gif)$/.test(t);
 // Qual "verbo" o orb mostra para cada fase da resposta.
 const ORB = { route: 'connecting', WebSearch: 'searching', WebFetch: 'searching', computer_exec: 'working', computer_share: 'working', remember: 'weaving', schedule_routine: 'shaping', think: 'solving', text: 'composing' };
 
@@ -46,25 +46,6 @@ function useSmoothText(target, live) {
   return shown;
 }
 
-function Steps({ steps, live }) {
-  if (!steps?.length) return null;
-  return (
-    <ol className="steps">
-      {steps.map((raw, i) => {
-        if (raw.kind === 'approval') return <li key={i} className="step step-approval"><ApprovalCard rec={raw.rec} status={raw.status} /></li>;
-        const s = raw.kind ? raw : { ...raw, kind: 'tool', label: STEP_LABEL[raw.tool] || `Usando ${raw.tool}` };
-        const running = live && i === steps.length - 1 && s.kind === 'tool';
-        return (
-          <li key={i} className={`step step-${s.kind} ${running ? 'running' : ''}`}>
-            {running ? <ThinkingOrb state={ORB[s.tool] || 'working'} size={20} /> : <Icon name={s.kind === 'warn' ? 'x' : 'check'} size={13} />}
-            <span>{s.label}</span>{s.detail && <code>{s.detail}</code>}
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
 function Markdown({ text, live }) {
   // Markdown só é recalculado quando o texto muda; mensagens antigas nunca são refeitas.
   const html = useMemo(() => markdown(text), [text]);
@@ -87,7 +68,7 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, mo
       <div className="msg-col">
         {group && <span className="speaker" style={{ color: agentColor(agent) }}>{agent.name}</span>}
         <div className="bubble bot-bubble">
-          <Steps steps={m.steps} live={live} />
+          <ActionLine steps={m.steps} live={live} />
           {m.content ? (live ? <LiveText text={m.content} /> : <Markdown text={m.content} />)
             : live ? <div className="thinking"><ThinkingOrb state={ORB[phase] || 'breathing'} size={20} /><span>{phase === 'route' ? 'Escolhendo o melhor modelo…' : phase === 'think' ? 'Pensando com calma…' : phase === 'approval' ? 'Aguardando sua aprovação…' : 'Pensando…'}</span></div>
             : m.error ? <p className="msg-error">Não consegui responder. {m.error}</p>
@@ -123,17 +104,12 @@ function InboxMessage({ m, from }) {
 const UserMessage = memo(function UserMessage({ m, name, files }) {
   // Prévias locais (recém-enviadas) ou os arquivos já salvos no servidor.
   const mine = m.previews || (m.files || []).map(id => files.find(f => f.id === id)).filter(Boolean).map(f => ({ ...f, url: `/api/files/${f.id}` }));
-  const imgs = mine.filter(f => isImage(f.type)), others = mine.filter(f => !isImage(f.type));
+  const hasFiles = mine.length > 0;
   return (
     <div className="msg user">
       <div className="msg-col">
-        {imgs.length > 0 && (
-          <div className="msg-images">
-            {imgs.map(f => <a key={f.id || f.url} href={f.url} target="_blank" rel="noreferrer" className="msg-image"><img src={f.url} alt={f.name} loading="lazy" /></a>)}
-          </div>
-        )}
+        {hasFiles && <MessageAttachments items={mine} />}
         {m.content && <div className="bubble user-bubble">{m.content}</div>}
-        {others.length > 0 && <div className="msg-files">{others.map(f => <a key={f.id || f.url} href={f.url} target="_blank" rel="noreferrer" className="attach"><Icon name="file" size={14} />{f.name}</a>)}</div>}
         {m.at && <time className="msg-time">{fmtTime(m.at)}</time>}
       </div>
       <span className="initial">{(name || 'V')[0].toUpperCase()}</span>
@@ -342,6 +318,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
                 <p>{isGroup ? 'Fale com o time: quem é da área responde e chama os colegas quando precisa. Use @Nome para chamar alguém direto.' : agent.description || 'Pronto para ajudar.'}</p>
                 {project && <p className="muted small">No projeto {project.name}: instruções e arquivos do projeto entram no contexto.</p>}
                 {agent.status === 'paused' && <p className="note">Este agente está pausado: conversas funcionam, rotinas não.</p>}
+                {!isGroup && <FirstRunChecklist settings={S.settings} agentCount={S.agents.length} />}
               </div>
             )}
             {messages.map((m, i) => m.inbox ? <InboxMessage key={m.id || i} m={m} from={getAgent(m.inbox.from)} /> : m.role === 'user'

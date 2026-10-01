@@ -14,7 +14,7 @@ import { ApprovalGate } from './lib/approvals.mjs';
 import { juliaOnline, juliaChoose, juliaStatus, measureTriagePromptChars, RISK_OPTIONS, NOTIFY_OPTIONS } from './lib/julia.mjs';
 import { checkSend, dueMessages, threadKey, inboxPrompt, repairInboxOnStartup, markInboxDeliveryFailed, inboxSummary } from './lib/inbox.mjs';
 import { rememberAllowedCommand, execNeedsApproval } from './lib/permissions.mjs';
-import { browserAutonomyGate, shareAutonomyGate, effectiveApprovalPolicy } from './lib/autonomy.mjs';
+import { browserAutonomyGate, shareAutonomyGate, effectiveApprovalPolicy, sanitizeAutonomyLevel } from './lib/autonomy.mjs';
 import { listChatsPage } from './lib/history.mjs';
 import { tryClaimRoutine, releaseRoutineClaim } from './lib/persist-coord.mjs';
 import { browserFor, browserRisk } from './lib/browser.mjs';
@@ -26,6 +26,9 @@ import { providerAttemptOrder, runProviderAttemptLoop } from './lib/provider-tur
 import { normalizeProviderRetry } from './lib/provider-retry.mjs';
 import { applySettingsPatch, applyPluginsPatch, settingsMeta } from './lib/settings-patch.mjs';
 import { appendAudit, auditFromApproval, listAudit } from './lib/audit.mjs';
+import { buildAdminOverview } from './lib/admin-overview.mjs';
+import { buildLgpdStatus } from './lib/lgpd-status.mjs';
+import { isEnterpriseMode } from './lib/enterprise.mjs';
 import { newHookToken, verifySignature, eventMeta } from './lib/hooks.mjs';
 import { recordUsage, usageSummary, accountLimits, contextBreakdown, checkSendQuota, compactChat, parseProviderLimitFromError, recordProviderSignal } from './lib/usage.mjs';
 import { buildUsageContract, normalizeContextWindow } from './lib/usage-api.mjs';
@@ -257,11 +260,12 @@ function guarded(computer, { agent, chat, emit, signal }) {
     if (done.status === 'approved' && done.remember) rememberAllowedCommand(chat, command);
     return done.status === 'approved';
   };
-  const policy = effectiveApprovalPolicy(agent, db.settings.approvalPolicy || 'risky');
+  const globalPolicy = db.settings.approvalPolicy || 'risky';
+  const policy = effectiveApprovalPolicy(agent, globalPolicy, db.settings);
   return {
     ...computer,
     async exec(command) {
-      let reason = execNeedsApproval({ command, computerKind: computer.kind, policy, chat, agent });
+      let reason = execNeedsApproval({ command, computerKind: computer.kind, policy: globalPolicy, chat, agent, settings: db.settings });
       if (!reason && policy === 'risky' && !(chat.allowedCommands || []).includes(command)) {
         const riskCtx = `Agente ${agent.name} vai executar no próprio computador.`;
         const j = await juliaChoose(db.settings, { context: riskCtx, question: command, options: RISK_OPTIONS }, {
@@ -275,7 +279,7 @@ function guarded(computer, { agent, chat, emit, signal }) {
       return computer.exec(command);
     },
     async share(port) {
-      const autonomy = shareAutonomyGate(agent);
+      const autonomy = shareAutonomyGate(agent, db.settings);
       if (typeof autonomy === 'string') return `Esta ação não é permitida (${autonomy}).`;
       // Link público na internet (boat) pede aprovação; localhost não.
       if (computer.kind === 'boat' && autonomy === undefined && !(await ask('share', `compartilhar porta ${port}`, 'publica um link na internet'))) return 'O usuário não aprovou publicar o link.';
@@ -339,7 +343,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
     const b = browsers.get(agent.id) || browserFor(computer, sandboxDir(agent));
     browsers.set(agent.id, b);
     const ask = (action, opts, label) => {
-      const autonomy = browserAutonomyGate(agent, action);
+      const autonomy = browserAutonomyGate(agent, action, s);
       if (typeof autonomy === 'string') return Promise.resolve(false);
       const reason = autonomy === null ? null : browserRisk(action, opts);
       return reason ? askApproval({ agent, chat, emit, signal }, 'browser', label, reason) : Promise.resolve(true);
@@ -365,6 +369,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
   }
   const ctx = {
     db,
+    settings: s,
     computer,
     browser,
     remember: (t, tier = 'profile') => { if (s.memory) { db.memories.push({ id: id(), agentId: agent.id, text: t, tier: tier === 'log' ? 'log' : 'profile', createdAt: Date.now() }); save(); emit({ memory: t, tier }); } },
@@ -768,6 +773,17 @@ const routes = [
   ['GET', /^\/api\/audit$/, (req, _, url) => ({
     entries: listAudit(db, { limit: +(url.searchParams.get('limit') || 50) })
   })],
+  ['GET', /^\/api\/audit-trail$/, (req, _, url) => ({
+    store: 'local',
+    worm: false,
+    entryCount: (db.auditLog || []).length,
+    entries: listAudit(db, { limit: +(url.searchParams.get('limit') || 50) })
+  })],
+  ['GET', /^\/api\/lgpd\/status$/, () => buildLgpdStatus({ settings: db.settings })],
+  ['GET', /^\/api\/admin\/overview$/, () => {
+    if (!isEnterpriseMode(db.settings)) throw new HttpError(403, 'Centro admin disponível apenas no modo enterprise.');
+    return buildAdminOverview(db, db.settings);
+  }],
   ['GET', /^\/api\/artifacts\/([\w-]+)\/download$/, async (req, [aid], url, res) => {
     const a = db.artifacts.find(x => x.id === aid);
     if (!a) throw new HttpError(404, 'Artefato não encontrado.');
@@ -911,7 +927,13 @@ const routes = [
     }
     db.agents.push(a); save(); return a;
   }],
-  ['PUT', /^\/api\/agents\/([\w-]+)$/, async (req, [aid]) => { const a = patchAgent(agentOr404(aid), await body(req)); save(); return a; }],
+  ['PUT', /^\/api\/agents\/([\w-]+)$/, async (req, [aid]) => {
+    const b = await body(req);
+    if (b.autonomyLevel) b.autonomyLevel = sanitizeAutonomyLevel(b.autonomyLevel, db.settings);
+    const a = patchAgent(agentOr404(aid), b);
+    save();
+    return a;
+  }],
   ['DELETE', /^\/api\/agents\/([\w-]+)$/, async (req, [aid]) => {
     const a = agentOr404(aid);
     if (db.agents.length === 1) throw new HttpError(409, 'Mantenha pelo menos um agente.');

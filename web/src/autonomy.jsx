@@ -1,5 +1,7 @@
 /** Semáforo de autonomia do agente (privilégio de ação). */
 
+import { isEnterpriseMode } from './uiMode.js';
+
 export const AUTONOMY_LEVELS = [
   {
     id: 'read_only',
@@ -28,8 +30,15 @@ export function autonomyMeta(level) {
   return AUTONOMY_LEVELS.find(x => x.id === level) || AUTONOMY_LEVELS[1];
 }
 
-export function AutonomySemaphore({ level, showLabel = true, size = 'md' }) {
-  const m = autonomyMeta(level);
+/** Nível exibido/aplicado na UI (modo simples não mostra totalmente autônomo). */
+export function displayAutonomyLevel(level, settings) {
+  const v = level || 'semi_autonomous';
+  if (v === 'fully_autonomous' && settings && !isEnterpriseMode(settings)) return 'semi_autonomous';
+  return v;
+}
+
+export function AutonomySemaphore({ level, settings, showLabel = true, size = 'md' }) {
+  const m = autonomyMeta(displayAutonomyLevel(level, settings));
   return (
     <span className={`autonomy-sem autonomy-sem-${m.sem} autonomy-sem-${size}`} title={`${m.label} · ${m.en}`}>
       <span className="autonomy-lights" aria-hidden="true">
@@ -42,13 +51,16 @@ export function AutonomySemaphore({ level, showLabel = true, size = 'md' }) {
   );
 }
 
-export function AutonomyPick({ value, onChange }) {
+export function AutonomyPick({ value, onChange, allowFullyAutonomous = false }) {
   const v = value || 'semi_autonomous';
+  const levels = AUTONOMY_LEVELS.filter(m => allowFullyAutonomous || m.id !== 'fully_autonomous');
+  const gridClass = levels.length > 2 ? 'three' : 'two';
   return (
     <div className="field">
       <span>Nível de autonomia</span>
-      <div className="mode-grid three autonomy-grid" role="radiogroup" aria-label="Nível de autonomia">
-        {AUTONOMY_LEVELS.map(m => (
+      {!allowFullyAutonomous && <small className="muted">Totalmente autônomo está disponível no modo Enterprise (Configurações → Aparência).</small>}
+      <div className={`mode-grid ${gridClass} autonomy-grid`} role="radiogroup" aria-label="Nível de autonomia">
+        {levels.map(m => (
           <button key={m.id} type="button" role="radio" aria-checked={v === m.id} className={`mode autonomy-mode ${v === m.id ? 'on' : ''}`} onClick={() => onChange(m.id)}>
             <AutonomySemaphore level={m.id} showLabel={false} size="sm" />
             <b>{m.label}<span className="tag tag-muted">{m.en}</span></b>
