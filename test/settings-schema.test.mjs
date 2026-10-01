@@ -48,6 +48,17 @@ test('validateSettingsPatch valida ui.locale e enterprise.enabled', () => {
   assert.equal(validateSettingsPatch({ ui: { locale: 'en' }, enterprise: { enabled: true } }).length, 0);
 });
 
+test('validateSettingsPatch aceita rateLimit e logging', () => {
+  assert.equal(
+    validateSettingsPatch({
+      rateLimit: { enabled: true, chatPerMinute: 10, apiPerMinute: 5, windowMs: 60_000 },
+      logging: { json: true }
+    }).length,
+    0
+  );
+  assert.ok(validateSettingsPatch({ rateLimit: { surprise: 1 } }).some(d => d.path === 'rateLimit.surprise'));
+});
+
 test('assertValidSettingsPatch lança com details', () => {
   assert.throws(
     () => assertValidSettingsPatch({ defaultModel: 'nope' }),
