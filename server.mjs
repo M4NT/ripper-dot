@@ -27,6 +27,8 @@ import { normalizeProviderRetry } from './lib/provider-retry.mjs';
 import { patchSettings, settingsMeta, SettingsValidationError } from './lib/settings-patch.mjs';
 import { normalizeContextPruning, pruneContextMessages } from './lib/context-pruning.mjs';
 import { effectiveFeatureFlags } from './lib/feature-flags.mjs';
+import { applyAccessControlPatch } from './lib/access-control-patch.mjs';
+import { canDelegate, delegationDeniedMessage, normalizeAccessControl, accessControlMeta } from './lib/rbac.mjs';
 import { appendAudit, auditFromApproval, listAudit } from './lib/audit.mjs';
 import { buildAdminOverview } from './lib/admin-overview.mjs';
 import { buildLgpdStatus } from './lib/lgpd-status.mjs';
@@ -506,6 +508,17 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
         const limits = { maxPerHour: 20, maxHops: 3, ...(s.inbox || {}) };
         const chk = checkSend({ from: agent, to, messages: db.messages, hops: hops + 1, limits });
         if (chk.error) return chk.error;
+        if (to) {
+          const gate = canDelegate(
+            { type: 'agent', id: agent.id },
+            { type: 'agent', id: to.id },
+            'send_message',
+            db.accessControl,
+            { agents: db.agents }
+          );
+          const denied = delegationDeniedMessage(gate);
+          if (denied) return denied;
+        }
         const m = { id: id(), from: agent.id, to: to.id, body: String(a.message).slice(0, 4000), priority: a.priority || 'normal', status: 'queued', hops: hops + 1, originChatId: chat.id, createdAt: Date.now() };
         db.messages.push(m);
         if (db.messages.length > 1000) db.messages.splice(0, db.messages.length - 1000);
@@ -689,7 +702,21 @@ async function chat({ chat, text, fileIds, signal, mcpSession, skipUserPush = fa
     const reply = chat.messages.length > before ? chat.messages.at(-1) : null;
     if (group && reply && isPass(reply.content)) { chat.messages.pop(); emit({ passed: agent.id }); }
     else if (group && reply) {
-      const next = floor.afterReply(agent, reply.content);
+      const deniedPeers = [];
+      const next = floor.afterReply(agent, reply.content, {
+        allowPeer: peer => {
+          const gate = canDelegate(
+            { type: 'agent', id: agent.id },
+            { type: 'agent', id: peer.id },
+            'delegate_task',
+            db.accessControl,
+            { agents: db.agents }
+          );
+          if (!gate.ok) { deniedPeers.push(gate); return false; }
+          return true;
+        }
+      });
+      for (const gate of deniedPeers) emit({ warn: delegationDeniedMessage(gate) });
       if (next.length) {
         const ids = next.map(a => a.id);
         emit({ delegated: ids, agentHandoff: { from: agent.id, to: ids } });
@@ -990,6 +1017,29 @@ const routes = [
     if (!isEnterpriseMode(db.settings)) throw new HttpError(403, 'Centro admin disponível apenas no modo enterprise.');
     return buildAdminOverview(db, db.settings);
   }],
+  ['GET', /^\/api\/access-control$/, () => ({
+    accessControl: normalizeAccessControl(db.accessControl),
+    meta: accessControlMeta()
+  })],
+  ['PUT', /^\/api\/access-control$/, async req => {
+    try {
+      const ac = applyAccessControlPatch(db, await body(req));
+      save();
+      return { accessControl: ac, meta: accessControlMeta() };
+    } catch (e) {
+      throw new HttpError(400, e.message);
+    }
+  }],
+  ['POST', /^\/api\/access-control\/can-delegate$/, async req => {
+    const b = await body(req);
+    const actor = b.actor;
+    const target = b.target;
+    const action = b.action;
+    if (!actor?.id || !target?.id || !action) throw new HttpError(400, 'Informe actor, target e action.');
+    const result = canDelegate(actor, target, action, db.accessControl, { agents: db.agents });
+    if (!result.ok) return { allowed: false, code: result.code, error: result.error };
+    return { allowed: true };
+  }],
   ['GET', /^\/api\/artifacts\/([\w-]+)\/download$/, async (req, [aid], url, res) => {
     const a = db.artifacts.find(x => x.id === aid);
     if (!a) throw new HttpError(404, 'Artefato não encontrado.');
@@ -1181,6 +1231,14 @@ const routes = [
   ['DELETE', /^\/api\/memories\/([\w-]+)$/, (req, [mid]) => { db.memories = db.memories.filter(x => x.id !== mid); save(); return {}; }],
   ['POST', /^\/api\/routines$/, async req => {
     const b = await body(req); agentOr404(b.agentId);
+    const routineGate = canDelegate(
+      { type: 'user', id: 'owner' },
+      { type: 'agent', id: b.agentId },
+      'assign_routine',
+      db.accessControl,
+      { agents: db.agents }
+    );
+    if (!routineGate.ok) throw new HttpError(403, routineGate.error);
     if (!b.prompt) throw new HttpError(400, 'Diga o que a rotina deve fazer.');
     const r = { id: id(), agentId: b.agentId, name: String(b.name || 'Rotina').slice(0, 80), prompt: String(b.prompt).slice(0, 4000), lastRun: 0, lastStatus: 'never', lastError: null,
       quiet: b.quiet !== false,
