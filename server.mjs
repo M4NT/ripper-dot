@@ -157,6 +157,8 @@ import {
   formatPrometheusExposition,
   prometheusContentType
 } from './lib/metrics.mjs';
+import { collectX9Sources } from './lib/x9-sources.mjs';
+import { runX9Scan } from './lib/x9-scan.mjs';
 import {
   buildBackupPayload,
   restoreBackupPayload,
@@ -694,9 +696,14 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
       } catch (e) { emit({ warn: `Não consegui enviar ${f.name} ao computador: ${e.message}` }); }
     }
   }
+  const x9Sources = () => collectX9Sources({ db, settings: s });
   const ctx = {
     db,
     settings: s,
+    x9: isEnterpriseMode(s) ? {
+      context: () => JSON.stringify(x9Sources(), null, 2),
+      checklist: () => JSON.stringify(runX9Scan({ db, settings: s, sources: x9Sources() }), null, 2)
+    } : null,
     computer,
     browser,
     remember: (t, tier = 'profile') => { if (s.memory) { db.memories.push({ id: id(), agentId: agent.id, text: t, tier: tier === 'log' ? 'log' : 'profile', createdAt: Date.now() }); save(); emit({ memory: t, tier }); } },
@@ -1102,7 +1109,8 @@ const routes = [
     pendingApprovals: db.approvals.filter(a => a.status === 'pending').length
   })],
   ['GET', /^\/api\/catalog$/, (req, m, url, res) => {
-    json(res, { models: MODELS, templates: TEMPLATES, categories: CATEGORIES }, 200, { 'cache-control': 'public, max-age=3600' }, req);
+    const templates = isEnterpriseMode(db.settings) ? TEMPLATES : TEMPLATES.filter(t => t.id !== 'x9-auditor');
+    json(res, { models: MODELS, templates, categories: CATEGORIES }, 200, { 'cache-control': 'public, max-age=3600' }, req);
     return undefined;
   }],
   ['GET', /^\/api\/data\/backup$/, () => buildBackupPayload(db)],
@@ -1137,7 +1145,9 @@ const routes = [
     }
   }],
   ['GET', /^\/api\/state$/, () => ({
-    settings: redact(db.settings), agents: db.agents, models: MODELS, templates: TEMPLATES, savedAgentTemplates: listAgentTemplates(db), categories: CATEGORIES,
+    settings: redact(db.settings), agents: db.agents, models: MODELS,
+    templates: isEnterpriseMode(db.settings) ? TEMPLATES : TEMPLATES.filter(t => t.id !== 'x9-auditor'),
+    savedAgentTemplates: listAgentTemplates(db), categories: CATEGORIES,
     chats: db.chats.map(summary), routines: db.routines.map(redactRoutine),
     files: db.files.map(({ path, ...f }) => f), memoriesCount: db.memories.length, pendingInbox: db.messages.filter(m => m.status === 'queued' || m.status === 'delivering').reduce((o, m) => (o[m.originChatId] = (o[m.originChatId] || 0) + 1, o), {}), approvals: db.approvals.filter(a => a.status === 'pending').map(approvalView), artifacts: db.artifacts.map(({ content, size, blob, ...a }) => ({ ...a, size: size ?? content?.length ?? 0, stored: blob ? 'disk' : 'inline' })),     skills: db.skills, memoriesByAgent: db.memories.reduce((o, x) => (o[x.agentId] = (o[x.agentId] || 0) + 1, o), {}), projects: db.projects,
     usage: usageSummary(db),
@@ -1576,6 +1586,16 @@ const routes = [
     if (!isEnterpriseMode(db.settings)) throw new HttpError(403, 'Centro admin disponível apenas no modo enterprise.');
     return buildAdminOverview(db, db.settings);
   }],
+  ['GET', /^\/api\/x9\/context$/, () => {
+    requireEnterpriseAdmin();
+    const sources = collectX9Sources({ db, settings: db.settings });
+    return sources;
+  }],
+  ['POST', /^\/api\/x9\/scan$/, () => {
+    requireEnterpriseAdmin();
+    const sources = collectX9Sources({ db, settings: db.settings });
+    return { sources, ...runX9Scan({ db, settings: db.settings, sources }) };
+  }],
   ['GET', /^\/api\/access-control$/, () => ({
     accessControl: normalizeAccessControl(db.accessControl),
     meta: accessControlMeta()
@@ -1810,9 +1830,15 @@ const routes = [
   }],
   ['POST', /^\/api\/agents$/, async req => {
     const b = await body(req);
+    if (b.templateId === 'x9-auditor' && !isEnterpriseMode(db.settings)) {
+      throw new HttpError(403, 'O template X9 — Auditor está disponível apenas no modo enterprise.');
+    }
     let a;
     if (b.savedTemplateId) {
       a = agentFromSavedTemplate(db, b.savedTemplateId, b, TEMPLATES);
+      if (a.templateId === 'x9-auditor' && !isEnterpriseMode(db.settings)) {
+        throw new HttpError(403, 'O template X9 — Auditor está disponível apenas no modo enterprise.');
+      }
     } else {
       const t = TEMPLATES.find(t => t.id === b.templateId);
       a = patchAgent(newAgent({ ...(t || {}), templateId: t?.id }), b);
