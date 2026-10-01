@@ -8,9 +8,9 @@ import ComposerPlusMenu from './composerPlusMenu.jsx';
 const SpeechRec = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
 
 /** Envia arquivos para o agente e devolve os registros criados. */
-export async function uploadFile(agentId, chatId, file, projectId) {
+export async function uploadFile(agentId, chatId, file, projectId, { batch } = {}) {
   if (file.size > 25 << 20) throw new Error(`${file.name} passa de 25 MB.`);
-  const qs = new URLSearchParams({ name: file.name, ...(agentId ? { agentId } : {}), ...(chatId ? { chatId } : {}), ...(projectId ? { projectId } : {}) });
+  const qs = new URLSearchParams({ name: file.name, ...(agentId ? { agentId } : {}), ...(chatId ? { chatId } : {}), ...(projectId ? { projectId } : {}), ...(batch ? { batch: String(batch) } : {}) });
   return api('/api/files?' + qs, { method: 'POST', raw: file, headers: { 'content-type': file.type || 'application/octet-stream' } });
 }
 
@@ -41,12 +41,13 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
 
   async function addFiles(list) {
     setPlus(false);
+    const batch = list.length;
     for (const file of list) {
       const key = Math.random().toString(36).slice(2);
       const url = file.type.startsWith('image/') ? URL.createObjectURL(file) : null;
       setFiles(fs => [...fs, { key, name: file.name, size: file.size, type: file.type, url, status: 'uploading' }]);
       try {
-        const rec = await uploadFile(agent.id, chatId, file, projectId);
+        const rec = await uploadFile(agent.id, chatId, file, projectId, { batch });
         setFiles(fs => fs.map(f => f.key === key ? { ...f, id: rec.id, status: 'ready' } : f));
       } catch (e) {
         toast(e.message, 'error');

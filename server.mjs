@@ -39,6 +39,21 @@ import {
   redactPluginAuth,
   startMcpOAuthFlow
 } from './lib/mcp-oauth.mjs';
+import {
+  persistArtifactContent,
+  readArtifactContent,
+  deleteArtifactStorage,
+  migrateInlineArtifacts,
+  artifactDownloadName
+} from './lib/artifacts.mjs';
+import { resolveSkillContent, formatSkillsList, listSkillsCatalog } from './lib/skills-runtime.mjs';
+import { buildMessageAttachments, attachmentWarnings, MAX_FOLDER_FILES } from './lib/attachments.mjs';
+import {
+  startupStorageCleanup,
+  cleanupAgentResources,
+  removeProjectSandboxDir
+} from './lib/sandbox-lifecycle.mjs';
+import { releaseBoatSandbox, clearBoatIdleTimer } from './lib/boat.mjs';
 
 function settingsForMcp(s, mcpSession) {
   if (!mcpSession) return s;
@@ -52,6 +67,9 @@ function settingsForMcp(s, mcpSession) {
 
 const db = load();
 for (const a of db.approvals || []) if (a.status === 'pending') { a.status = 'expired'; a.decidedAt = Date.now(); }
+await migrateInlineArtifacts(db.artifacts).catch(e => console.error('[artifacts] migração:', e.message));
+const _storageCleanup = await startupStorageCleanup(db).catch(e => ({ error: e.message }));
+if (_storageCleanup?.files?.removedRecords?.length) save();
 const PORT = +process.env.PORT || 3000;
 const HOST = process.env.HOST || '127.0.0.1';          // só a própria máquina, a não ser que você peça
 const TOKEN = process.env.RIPPER_TOKEN || '';            // obrigatório ao expor na rede
@@ -250,22 +268,7 @@ function sandboxDir(agent) {
   return d;
 }
 
-// Anexos de texto entram no prompt; os demais ficam no computador do agente.
-const IMAGE_TYPES = /^image\/(png|jpeg|webp|gif)$/;
-// Texto entra no prompt; imagens vão como imagem de verdade (o modelo enxerga); o resto só é citado.
-async function attachments(agent, chat, fileIds = []) {
-  const parts = [], images = [];
-  for (const fid of fileIds.slice(0, 10)) {
-    const f = db.files.find(x => x.id === fid && canUseFile(x, agent, chat));
-    if (!f) continue;
-    if (TEXT_EXT.test(f.name) && f.size < 200_000) parts.push(`<arquivo nome="${f.name}">
-${await readFile(dataUrl(f.path), 'utf8')}
-</arquivo>`);
-    else if (IMAGE_TYPES.test(f.type) && f.size <= 5 << 20) images.push({ name: f.name, mediaType: f.type, path: fileURLToPath(dataUrl(f.path)), data: (await readFile(dataUrl(f.path))).toString('base64') });
-    else parts.push(`<arquivo nome="${f.name}" tipo="${f.type}" tamanho="${f.size}">Arquivo binário anexado (${f.size} bytes).</arquivo>`);
-  }
-  return { text: parts.join('\n'), images };
-}
+// Anexos de texto entram no prompt; os demais ficam no computador do agente (ver lib/attachments.mjs).
 
 // Contexto do projeto: instruções + arquivos de texto compartilhados (limite total de ~60 KB).
 async function projectContext(project) {
@@ -355,21 +358,36 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
       }
     },
     artifacts: {
-      save: a => {
+      save: async a => {
         const scope = x => chat.projectId ? x.projectId === chat.projectId : x.chatId === chat.id;
         let art = db.artifacts.find(x => scope(x) && x.title.toLowerCase() === a.title.trim().toLowerCase());
-        if (art) Object.assign(art, { content: a.content, kind: a.kind || art.kind, agentId: agent.id, version: (art.version || 1) + 1, updatedAt: Date.now() });
-        else { art = { id: id(), projectId: chat.projectId || null, chatId: chat.id, agentId: agent.id, title: a.title.trim(), kind: a.kind || 'documento', content: a.content, version: 1, createdAt: Date.now(), updatedAt: Date.now() }; db.artifacts.push(art); }
+        if (art) {
+          art.kind = a.kind || art.kind;
+          art.agentId = agent.id;
+          art.version = (art.version || 1) + 1;
+          art.updatedAt = Date.now();
+          await persistArtifactContent(art, a.content);
+        } else {
+          art = { id: id(), projectId: chat.projectId || null, chatId: chat.id, agentId: agent.id, title: a.title.trim(), kind: a.kind || 'documento', content: '', version: 1, createdAt: Date.now(), updatedAt: Date.now() };
+          db.artifacts.push(art);
+          await persistArtifactContent(art, a.content);
+        }
         save(); emit({ artifact: { id: art.id, title: art.title, version: art.version } });
         return `Artefato "${art.title}" salvo (versão ${art.version}).`;
       },
-      read: title => {
+      read: async title => {
         const art = visibleArtifacts(chat).find(x => x.title.toLowerCase() === String(title).trim().toLowerCase());
-        return art ? art.content : `Não há artefato "${title}". Existentes: ${visibleArtifacts(chat).map(x => x.title).join(', ') || 'nenhum'}.`;
+        if (!art) return `Não há artefato "${title}". Existentes: ${visibleArtifacts(chat).map(x => x.title).join(', ') || 'nenhum'}.`;
+        try { return await readArtifactContent(art); }
+        catch (e) { return e.message; }
       }
     },
     skills: {
-      use: nm => { const k = visibleSkills(chat).find(x => x.name.toLowerCase() === String(nm).trim().toLowerCase()); return k ? k.content : `Skill "${nm}" não existe.`; },
+      use: async nm => {
+        const hit = resolveSkillContent(nm, db, chat);
+        return hit ? hit.content : `Skill "${nm}" não existe. Use list_skills para ver nomes disponíveis.`;
+      },
+      list: () => formatSkillsList(db, chat),
       save: a => {
         let k = db.skills.find(x => x.name.toLowerCase() === a.name.trim().toLowerCase() && (x.projectId || null) === (chat.projectId || null));
         if (k) Object.assign(k, { description: a.description, content: a.content, updatedAt: Date.now() });
@@ -386,7 +404,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
     await projectContext(project),
     visibleArtifacts(chat).length && `Artefatos do time (leia com read_artifact; salve entregas com save_artifact): ${visibleArtifacts(chat).slice(-20).map(x => `"${x.title}" (${x.kind}, v${x.version})`).join('; ')}`,
     (() => { const others = db.agents.filter(a => a.id !== agent.id && a.status !== 'paused'); return others.length ? `Colegas para mensagem assíncrona (send_message): ${others.map(a => `${a.name} (${a.description || a.category})`).join('; ')}.` : ''; })(),
-    visibleSkills(chat).length ? `Skills disponíveis (carregue com use_skill): ${visibleSkills(chat).map(k => `${k.name}: ${k.description}`).join(' | ')}` : 'Quando um passo a passo funcionar bem e puder se repetir, guarde com save_skill.',
+    visibleSkills(chat).length ? `Skills no banco (use_skill / list_skills): ${visibleSkills(chat).map(k => `${k.name}: ${k.description}`).join(' | ')}` : 'Skills extras podem vir de skills/ ou ~/.cursor/skills-cursor — use list_skills. Quando um passo a passo funcionar, guarde com save_skill.',
     group && [
       `Você trabalha num time: ${group.map(a => `${a.name} (${a.description || a.category})`).join('; ')}.`,
       'Regras do time:',
@@ -462,7 +480,8 @@ async function chat({ chat, text, fileIds, signal, mcpSession }, emit) {
     if (signal?.aborted) break;
     emit({ speaker: agent.id });
     await syncLocalFiles(agent, chat);
-    const extra = await attachments(agent, chat, fileIds);
+    const extra = await buildMessageAttachments(db, agent, chat, fileIds);
+    for (const w of attachmentWarnings(extra)) emit({ warn: w });
     const before = chat.messages.length;
     await turn({ agent, chat, text, prompt: extra.text ? `${text}\n\n${extra.text}` : text, images: extra.images, signal, group, mcpSession }, emit);
     const reply = chat.messages.length > before ? chat.messages.at(-1) : null;
@@ -505,7 +524,7 @@ const routes = [
   ['GET', /^\/api\/state$/, () => ({
     settings: redact(db.settings), agents: db.agents, models: MODELS, templates: TEMPLATES, categories: CATEGORIES,
     chats: db.chats.map(summary), routines: db.routines.map(({ hookSecret, ...r }) => ({ ...r, hasSecret: !!hookSecret })),
-    files: db.files.map(({ path, ...f }) => f), memoriesCount: db.memories.length, pendingInbox: db.messages.filter(m => m.status === 'queued' || m.status === 'delivering').reduce((o, m) => (o[m.originChatId] = (o[m.originChatId] || 0) + 1, o), {}), approvals: db.approvals.filter(a => a.status === 'pending').map(approvalView), artifacts: db.artifacts.map(({ content, ...a }) => ({ ...a, size: content.length })),     skills: db.skills, memoriesByAgent: db.memories.reduce((o, x) => (o[x.agentId] = (o[x.agentId] || 0) + 1, o), {}), projects: db.projects,
+    files: db.files.map(({ path, ...f }) => f), memoriesCount: db.memories.length, pendingInbox: db.messages.filter(m => m.status === 'queued' || m.status === 'delivering').reduce((o, m) => (o[m.originChatId] = (o[m.originChatId] || 0) + 1, o), {}), approvals: db.approvals.filter(a => a.status === 'pending').map(approvalView), artifacts: db.artifacts.map(({ content, size, blob, ...a }) => ({ ...a, size: size ?? content?.length ?? 0, stored: blob ? 'disk' : 'inline' })),     skills: db.skills, memoriesByAgent: db.memories.reduce((o, x) => (o[x.agentId] = (o[x.agentId] || 0) + 1, o), {}), projects: db.projects,
     usage: usageSummary(db),
     limits: accountLimits(db, db.settings),
     usageContract: (() => {
@@ -609,15 +628,42 @@ const routes = [
     });
     save(); return redact(s);
   }],
-  ['GET', /^\/api\/artifacts\/([\w-]+)$/, (req, [aid]) => db.artifacts.find(a => a.id === aid) || (() => { throw new HttpError(404, 'Artefato não encontrado.'); })()],
+  ['GET', /^\/api\/artifacts\/([\w-]+)\/download$/, async (req, [aid], url, res) => {
+    const a = db.artifacts.find(x => x.id === aid);
+    if (!a) throw new HttpError(404, 'Artefato não encontrado.');
+    let content;
+    try { content = await readArtifactContent(a); }
+    catch (e) { throw new HttpError(404, e.message); }
+    const name = artifactDownloadName(a);
+    res.writeHead(200, { ...SECURITY, 'content-type': 'text/plain; charset=utf-8', 'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(name)}`, 'cache-control': 'private, max-age=60' });
+    res.end(content);
+  }],
+  ['GET', /^\/api\/artifacts\/([\w-]+)$/, async (req, [aid]) => {
+    const a = db.artifacts.find(x => x.id === aid);
+    if (!a) throw new HttpError(404, 'Artefato não encontrado.');
+    const content = await readArtifactContent(a).catch(e => { throw new HttpError(404, e.message); });
+    return { ...a, content };
+  }],
   ['PUT', /^\/api\/artifacts\/([\w-]+)$/, async (req, [aid]) => {
     const a = db.artifacts.find(x => x.id === aid); if (!a) throw new HttpError(404, 'Artefato não encontrado.');
     const b = await body(req);
     if (typeof b.title === 'string' && b.title.trim()) a.title = b.title.trim().slice(0, 120);
-    if (typeof b.content === 'string') { a.content = b.content.slice(0, 60000); a.version = (a.version || 1) + 1; }
-    a.updatedAt = Date.now(); save(); return a;
+    if (typeof b.content === 'string') {
+      a.version = (a.version || 1) + 1;
+      await persistArtifactContent(a, b.content);
+    }
+    a.updatedAt = Date.now(); save(); return { ...a, content: await readArtifactContent(a) };
   }],
-  ['DELETE', /^\/api\/artifacts\/([\w-]+)$/, (req, [aid]) => { db.artifacts = db.artifacts.filter(a => a.id !== aid); save(); return {}; }],
+  ['DELETE', /^\/api\/artifacts\/([\w-]+)$/, async (req, [aid]) => {
+    const a = db.artifacts.find(x => x.id === aid);
+    db.artifacts = db.artifacts.filter(x => x.id !== aid);
+    if (a) await deleteArtifactStorage(a);
+    save(); return {};
+  }],
+  ['GET', /^\/api\/skills\/catalog$/, (req, _, url) => {
+    const chat = url.searchParams.get('chatId') ? db.chats.find(c => c.id === url.searchParams.get('chatId')) : null;
+    return { skills: listSkillsCatalog(db, chat) };
+  }],
   ['POST', /^\/api\/skills$/, async req => {
     const b = await body(req);
     if (!b.name?.trim() || !b.content?.trim()) throw new HttpError(400, 'Skill precisa de nome e conteúdo.');
@@ -634,6 +680,11 @@ const routes = [
   ['GET', /^\/api\/julia\/status$/, async () => {
     const online = await juliaOnline(db.settings);
     return { online, url: db.settings.julia.url, reason: online ? 'ok' : (juliaStatus.reason || 'offline') };
+  }],
+  ['POST', /^\/api\/computer\/cleanup$/, async () => {
+    const report = await startupStorageCleanup(db);
+    if (report.files?.removedRecords?.length) save();
+    return report;
   }],
   ['GET', /^\/api\/computer\/docker$/, async () => ({ version: await dockerAvailable(), image: await imageStatus() })],
   ['POST', /^\/api\/computer\/image$/, async () => { ensureImage().catch(e => console.error('imagem', e.message)); return { image: await imageStatus() }; }],
@@ -672,7 +723,9 @@ const routes = [
     for (const f of db.files.filter(f => f.projectId === pid && !f.agentId)) await unlink(dataUrl(f.path)).catch(() => {});
     db.files = db.files.filter(f => !(f.projectId === pid && !f.agentId));
     db.chats.forEach(c => { if (c.projectId === pid) delete c.projectId; });
-    db.projects = db.projects.filter(p => p.id !== pid); save(); return {};
+    db.projects = db.projects.filter(p => p.id !== pid);
+    removeProjectSandboxDir(pid);
+    save(); return {};
   }],
   ['POST', /^\/api\/agents$/, async req => {
     const b = await body(req);
@@ -681,12 +734,20 @@ const routes = [
     db.agents.push(a); save(); return a;
   }],
   ['PUT', /^\/api\/agents\/([\w-]+)$/, async (req, [aid]) => { const a = patchAgent(agentOr404(aid), await body(req)); save(); return a; }],
-  ['DELETE', /^\/api\/agents\/([\w-]+)$/, (req, [aid]) => {
-    agentOr404(aid);
+  ['DELETE', /^\/api\/agents\/([\w-]+)$/, async (req, [aid]) => {
+    const a = agentOr404(aid);
     if (db.agents.length === 1) throw new HttpError(409, 'Mantenha pelo menos um agente.');
+    browsers.delete(aid);
+    clearBoatIdleTimer(aid);
+    if (db.settings.computer.mode === 'boat') await releaseBoatSandbox(a, db.settings, save);
+    await cleanupAgentResources(a, db.settings);
+    for (const art of db.artifacts.filter(x => x.agentId === aid)) await deleteArtifactStorage(art);
+    db.artifacts = db.artifacts.filter(x => x.agentId !== aid);
+    for (const f of db.files.filter(f => f.agentId === aid)) await unlink(dataUrl(f.path)).catch(() => {});
+    db.files = db.files.filter(f => f.agentId !== aid);
     db.agents = db.agents.filter(x => x.id !== aid);
     db.routines = db.routines.filter(r => r.agentId !== aid);
-    db.projects.forEach(p => { p.agentIds = p.agentIds.filter(a => a !== aid); });
+    db.projects.forEach(p => { p.agentIds = p.agentIds.filter(x => x !== aid); });
     save(); return {};
   }],
   ['GET', /^\/api\/agents\/([\w-]+)\/computer$/, async (req, [aid]) => {
@@ -754,7 +815,11 @@ const routes = [
     const chatRef = db.chats.find(c => c.id === url.searchParams.get('chatId'));
     const pid = url.searchParams.get('projectId') || chatRef?.projectId || null;
     const project = pid ? projectOr404(pid) : null;
-    const a = project && !url.searchParams.get('agentId') ? null : agentOr404(url.searchParams.get('agentId'));
+    const agentParam = url.searchParams.get('agentId');
+    if (!project && !agentParam) throw new HttpError(400, 'Informe agentId ou projectId (ou envie chatId ligado a um projeto) para anexar arquivos.');
+    const a = project && !agentParam ? null : agentOr404(agentParam);
+    const batch = Math.max(1, +(url.searchParams.get('batch') || 1));
+    if (batch > MAX_FOLDER_FILES) throw new HttpError(400, `Pastas grandes demais: máximo ${MAX_FOLDER_FILES} arquivos por lote.`);
     const name = basename(String(url.searchParams.get('name') || 'arquivo')).replace(/[^\w.\- ()À-ú]/g, '_').slice(0, 120);
     const buf = await raw(req, MAX_FILE);
     if (!buf.length) throw new HttpError(400, 'Arquivo vazio.');
@@ -769,7 +834,9 @@ const routes = [
   }],
   ['GET', /^\/api\/files\/([\w-]+)$/, async (req, [fid], url, res) => {
     const f = db.files.find(x => x.id === fid); if (!f) throw new HttpError(404, 'Arquivo não encontrado.');
-    const buf = await readFile(dataUrl(f.path));
+    let buf;
+    try { buf = await readFile(dataUrl(f.path)); }
+    catch { throw new HttpError(404, 'Arquivo ausente no disco (registro removido na próxima limpeza).'); }
     const inline = /^image\/(png|jpe?g|webp|gif)$/.test(f.type);
     res.writeHead(200, { ...SECURITY, 'content-type': inline ? f.type : 'application/octet-stream', 'content-disposition': `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(f.name)}`, 'cache-control': 'private, max-age=3600' });
     res.end(buf);
