@@ -54,6 +54,20 @@ async function waitFor(url, token, ms) {
   throw new Error('servidor não subiu a tempo');
 }
 
+/** Aguarda resposta HTTP mesmo se o servidor estiver sob flush concorrente (CI). */
+async function fetchWithRetry(url, { attempts = 5, delayMs = 80 } = {}) {
+  let lastErr;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fetch(url);
+    } catch (e) {
+      lastErr = e;
+      if (i < attempts - 1) await new Promise(r => setTimeout(r, delayMs));
+    }
+  }
+  throw lastErr;
+}
+
 test('respostas da API incluem cabeçalhos de segurança', async () => {
   await withServer({}, async (base, token) => {
     const r = await fetch(base + '/api/health', { headers: { authorization: `Bearer ${token}` } });
@@ -145,7 +159,7 @@ test('GET /readyz retorna 503 quando a pasta de dados fica inacessível', async 
   await withServer({}, async (base, _token, dataDir) => {
     chmodSync(dataDir, 0);
     try {
-      const r = await fetch(base + '/readyz');
+      const r = await fetchWithRetry(base + '/readyz');
       assert.equal(r.status, 503);
       const body = await r.json();
       assert.equal(body.ok, false);

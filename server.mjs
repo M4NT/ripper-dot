@@ -267,7 +267,11 @@ async function deliver(m) {
   finally { inboxBusy.delete(m.to); save(); setTimeout(dispatchInbox, 50); }
 }
 function dispatchInbox() {
-  for (const m of dueMessages(db.messages, [...inboxBusy])) deliver(m);
+  try {
+    for (const m of dueMessages(db.messages, [...inboxBusy])) deliver(m);
+  } catch (e) {
+    console.error('inbox.dispatch_failed', e?.code || e?.message || String(e));
+  }
 }
 setInterval(dispatchInbox, 5_000);
 repairInboxOnStartup(db.messages);
@@ -1262,16 +1266,21 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === 'GET' && (p === '/healthz' || p === '/readyz')) {
       if (p === '/healthz') return json(res, probePayload(), 200, {}, req);
-      if (isShuttingDown()) {
-        return json(res, {
-          ok: false,
-          reason: 'shutting_down',
-          version: APP_PKG.version,
-          uptimeSeconds: Math.floor((Date.now() - SERVER_STARTED_AT) / 1000)
-        }, 503, {}, req);
+      const uptimeSeconds = Math.floor((Date.now() - SERVER_STARTED_AT) / 1000);
+      const notReady = (reason, code = 503) => json(res, {
+        ok: false,
+        reason,
+        version: APP_PKG.version,
+        uptimeSeconds
+      }, code, {}, req);
+      try {
+        if (isShuttingDown()) return notReady('shutting_down');
+        const ready = safeCheckStoreReady();
+        if (!ready.ok) return notReady(ready.reason || 'store_unavailable');
+        return json(res, probePayload(), 200, {}, req);
+      } catch (e) {
+        return notReady(e?.code || e?.message || 'store_unavailable');
       }
-      const ready = safeCheckStoreReady();
-      return json(res, ready.ok ? probePayload() : { ok: false, reason: ready.reason, version: APP_PKG.version, uptimeSeconds: Math.floor((Date.now() - SERVER_STARTED_AT) / 1000) }, ready.ok ? 200 : 503, {}, req);
     }
     if (req.method === 'GET' && p === '/api/mcp/oauth/callback') {
       const code = url.searchParams.get('code');
@@ -1406,8 +1415,12 @@ function runRoutine(r, event) {
 }
 
 const routineTimer = setInterval(() => {
-  const now = new Date();
-  for (const r of db.routines) if (routineDue(r, now)) runRoutine(r);
+  try {
+    const now = new Date();
+    for (const r of db.routines) if (routineDue(r, now)) runRoutine(r);
+  } catch (e) {
+    console.error('routine.tick_failed', e?.code || e?.message || String(e));
+  }
 }, 30_000);
 if (typeof routineTimer.unref === 'function') routineTimer.unref();
 
