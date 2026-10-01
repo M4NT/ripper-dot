@@ -89,6 +89,7 @@ import { isShuttingDown, registerGracefulShutdown, SHUTDOWN_MESSAGE } from './li
 import { closeUsageEventsStore } from './lib/usage-events.mjs';
 import { closeJuliaEventsStore } from './lib/julia-events.mjs';
 import { closePersistCoordStore } from './lib/persist-coord.mjs';
+import { checkRateLimit } from './lib/rate-limit.mjs';
 
 function settingsForMcp(s, mcpSession) {
   return settingsForMcpSession(s, mcpSession);
@@ -1306,6 +1307,11 @@ const server = createServer(async (req, res) => {
       if (!authed(req)) throw new HttpError(401, 'Não autorizado. Abra o Ripper com ?token=<RIPPER_TOKEN>.');
       // Bloqueia requisições de outros sites (CSRF) nas rotas que mudam estado.
       if (req.method !== 'GET' && req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) throw new HttpError(403, 'Origem não permitida.');
+      const rl = checkRateLimit({ req, settings: db.settings, ripperToken: TOKEN, method: req.method, path: p });
+      if (!rl.ok) {
+        json(res, { error: rl.message }, 429, { 'retry-after': String(rl.retryAfterSec) }, req);
+        return;
+      }
       for (const [method, re, fn] of routes) {
         const m = req.method === method && re.exec(p);
         if (!m) continue;
