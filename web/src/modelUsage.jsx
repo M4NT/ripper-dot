@@ -66,7 +66,8 @@ function contractFromState(S) {
       account: c.accountUsage,
       provider: c.providerSnapshot,
       context: c.contextWindow,
-      limits: S.limits
+      limits: S.limits,
+      tokenRoi: c.tokenRoi
     };
   }
   const lim = S?.limits;
@@ -89,8 +90,35 @@ function contractFromState(S) {
       emptyLabel: lim.claudeSubscription?.available ? null : 'sem dados'
     },
     context: { available: false, emptyLabel: 'sem dados' },
-    limits: lim
+    limits: lim,
+    tokenRoi: null
   };
+}
+
+function fmtChars(n) {
+  if (n == null) return '—';
+  return n.toLocaleString('pt-BR');
+}
+
+function CascadeTable({ rows }) {
+  if (!rows?.length) return <p className="muted small">Nenhuma decisão de cascata registrada.</p>;
+  return (
+    <table className="usage-roi-table small">
+      <thead>
+        <tr><th>Quando</th><th>Decisão</th><th>Chars</th><th>Tiers</th></tr>
+      </thead>
+      <tbody>
+        {rows.map((row, i) => (
+          <tr key={`${row.at}-${i}`}>
+            <td className="mono">{row.at ? new Date(row.at).toLocaleString('pt-BR') : '—'}</td>
+            <td>{row.decision || '—'}{row.ok === false && row.reason ? ` (${row.reason})` : ''}</td>
+            <td className="mono">{row.savedChars != null ? fmtChars(row.savedChars) : '—'}</td>
+            <td className="muted">{row.tierFrom || row.tierTo ? `${row.tierFrom || '?'} → ${row.tierTo || '?'}` : '—'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
 }
 
 /** Popover de uso da conta + janela de contexto (somente dados reais ou configurados). */
@@ -101,6 +129,7 @@ export default function ModelUsage({ chatId }) {
   const [bundle, setBundle] = useState(() => contractFromState(S));
   const [loadError, setLoadError] = useState(null);
   const [compactBusy, setCompactBusy] = useState(false);
+  const [roiExpanded, setRoiExpanded] = useState(false);
 
   useEffect(() => { setBundle(contractFromState(S)); }, [S]);
 
@@ -114,7 +143,8 @@ export default function ModelUsage({ chatId }) {
         account: data.accountUsage,
         provider: data.providerSnapshot,
         context: data.contextWindow,
-        limits: data.limits
+        limits: data.limits,
+        tokenRoi: data.tokenRoi
       });
     } catch (e) {
       setLoadError(e.message || 'Falha ao carregar uso');
@@ -138,6 +168,7 @@ export default function ModelUsage({ chatId }) {
   const provider = bundle?.provider;
   const ctx = bundle?.context;
   const lim = bundle?.limits || S?.limits;
+  const tokenRoi = bundle?.tokenRoi;
 
   const r5 = account?.ripperQuota?.rolling5h;
   const wk = account?.ripperQuota?.weekly;
@@ -302,6 +333,61 @@ export default function ModelUsage({ chatId }) {
             />
           </div>
         )}
+
+        <section className="usage-julia">
+          <button type="button" className="usage-ctx-summary" onClick={() => setRoiExpanded(v => !v)} aria-expanded={roiExpanded}>
+            <span><b>Token ROI (economia Julia)</b></span>
+            <Icon name="down" size={14} className={roiExpanded ? 'open' : ''} />
+          </button>
+          {roiExpanded && (
+            <div className="usage-roi-detail">
+              {!tokenRoi?.available && (
+                <p className="muted small">{tokenRoi?.emptyLabel || 'sem dados'}</p>
+              )}
+              {tokenRoi?.usageEvents && (
+                <p className="small">
+                  {tokenRoi.usageEvents.events} eventos de uso · ~{fmtTok(tokenRoi.usageEvents.estTokens)} tokens medidos
+                  {tokenRoi.usageEvents.routedByJulia > 0 && ` · ${tokenRoi.usageEvents.routedByJulia} com roteamento Julia`}
+                  {tokenRoi.usageEvents.routedByHeuristic > 0 && ` · ${tokenRoi.usageEvents.routedByHeuristic} heurística`}
+                </p>
+              )}
+              {tokenRoi?.semanticCache?.present && tokenRoi.semanticCache.total > 0 && (
+                <p className="small">
+                  Cache semântico: {tokenRoi.semanticCache.hits} acertos, {tokenRoi.semanticCache.misses} falhas
+                  {tokenRoi.semanticCache.savedChars?.sum > 0 && (
+                    <> · {fmtChars(tokenRoi.semanticCache.savedChars.sum)} caracteres em acertos (~{fmtTok(tokenRoi.semanticCache.estTokensSaved)} tokens)</>
+                  )}
+                </p>
+              )}
+              {tokenRoi?.semanticCache?.present && !tokenRoi.semanticCache.total && (
+                <p className="muted small">Cache semântico: {tokenRoi.semanticCache.emptyLabel || 'sem dados'}</p>
+              )}
+              {tokenRoi?.cascade?.present && tokenRoi.cascade.total > 0 && (
+                <>
+                  <p className="small">
+                    Cascata: {tokenRoi.cascade.total} decisões
+                    {tokenRoi.cascade.savedChars?.sum > 0 && (
+                      <> · {fmtChars(tokenRoi.cascade.savedChars.sum)} caracteres medidos em economia</>
+                    )}
+                  </p>
+                  <CascadeTable rows={tokenRoi.cascade.recent} />
+                </>
+              )}
+              {tokenRoi?.cascade?.present && !tokenRoi.cascade.total && (
+                <p className="muted small">Cascata: {tokenRoi.cascade.emptyLabel || 'sem dados'}</p>
+              )}
+              {tokenRoi?.juliaDecisions && (
+                <p className="small muted">
+                  Julia: {tokenRoi.juliaDecisions.answered} decisões OK
+                  {tokenRoi.juliaDecisions.avoidedPromptChars?.sum > 0 && (
+                    <> · ~{fmtChars(tokenRoi.juliaDecisions.avoidedPromptChars.sum)} caracteres de triagem medidos</>
+                  )}
+                </p>
+              )}
+              <p className="muted small usage-hint">{tokenRoi?.note || 'Sem estimativa de economia em US$ — só eventos medidos nesta instalação.'}</p>
+            </div>
+          )}
+        </section>
 
         {account?.juliaRouting && (
           <section className="usage-julia">

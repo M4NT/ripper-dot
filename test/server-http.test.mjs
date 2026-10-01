@@ -148,6 +148,19 @@ test('GET /api/usage unifica contrato', async () => {
     assert.ok(body.providerSnapshot);
     assert.ok(body.contextWindow);
     assert.equal(body.contextWindow.emptyLabel, 'sem dados');
+    assert.ok(body.tokenRoi);
+    assert.equal(body.tokenRoi.emptyLabel, 'sem dados');
+  });
+});
+
+test('GET /api/usage/token-roi sem telemetria', async () => {
+  await withServer({}, async (base, token) => {
+    const r = await fetch(base + '/api/usage/token-roi', { headers: { authorization: `Bearer ${token}` } });
+    assert.equal(r.status, 200);
+    const body = await r.json();
+    assert.equal(body.available, false);
+    assert.equal(body.emptyLabel, 'sem dados');
+    assert.equal(body.savingsPct, undefined);
   });
 });
 

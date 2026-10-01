@@ -1293,4 +1293,8 @@ body.resizing iframe { pointer-events: none; }
 .usage-cloud { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 .usage-cloud-head { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-bottom: 8px; }
 .usage-julia { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.usage-roi-detail { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.usage-roi-table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+.usage-roi-table th, .usage-roi-table td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.usage-roi-table th { font-weight: 600; color: var(--muted); }
 .usage-more { margin-top: 10px; font-size: 13px; }

@@ -28,6 +28,7 @@ import { appendAudit, auditFromApproval, listAudit } from './lib/audit.mjs';
 import { newHookToken, verifySignature, eventMeta } from './lib/hooks.mjs';
 import { recordUsage, usageSummary, accountLimits, contextBreakdown, checkSendQuota, compactChat, parseProviderLimitFromError, recordProviderSignal } from './lib/usage.mjs';
 import { buildUsageContract, normalizeContextWindow } from './lib/usage-api.mjs';
+import { buildTokenRoiContract } from './lib/token-roi.mjs';
 import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStreaming, activeChatStreamCount } from './lib/chat-stream.mjs';
 import { exportChatPayload, importChatPayload } from './lib/chat-transfer.mjs';
 import { listAgentTemplates, createSavedTemplate, patchSavedTemplate, agentFromSavedTemplate } from './lib/agent-templates.mjs';
@@ -586,7 +587,8 @@ const routes = [
         summary: b.summary,
         accountUsage: b.accountUsage,
         providerSnapshot: b.providerSnapshot,
-        contextWindow: { ...b.contextWindow, emptyLabel: 'sem dados', available: false, hasData: false }
+        contextWindow: { ...b.contextWindow, emptyLabel: 'sem dados', available: false, hasData: false },
+        tokenRoi: b.tokenRoi
       };
     })()
   })],
@@ -612,6 +614,7 @@ const routes = [
     const raw = contextBreakdown(db, db.settings, { chatId, measures: usageContextMeasures(chatId) });
     return normalizeContextWindow(raw, { chatId });
   }],
+  ['GET', /^\/api\/usage\/token-roi$/, async () => buildTokenRoiContract()],
   ['POST', /^\/api\/usage\/compact$/, async req => {
     const b = await body(req);
     if (!b.chatId) throw new HttpError(400, 'Informe chatId.');
