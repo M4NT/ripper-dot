@@ -79,6 +79,7 @@ import {
   redactPlugin
 } from './lib/mcp-connectors.mjs';
 import { redactRoutine, redactSseEvent, redactJsonPayload, redactForLog } from './lib/redact.mjs';
+import { logger, configureLogger, runWithRequestContext, shouldLogHttpRoute } from './lib/logger.mjs';
 import { collectDiagnostics } from './lib/diagnostics.mjs';
 import { runBootLint } from './lib/boot-lint.mjs';
 import { buildBackupPayload, restoreBackupPayload, listAutoBackups } from './lib/backup.mjs';
@@ -92,6 +93,7 @@ function settingsForMcp(s, mcpSession) {
 const APP_PKG = JSON.parse(await readFile(new URL('./package.json', import.meta.url), 'utf8'));
 const SERVER_STARTED_AT = Date.now();
 const db = load();
+configureLogger({ settings: db.settings });
 for (const a of db.approvals || []) if (a.status === 'pending') { a.status = 'expired'; a.decidedAt = Date.now(); }
 await migrateInlineArtifacts(db.artifacts).catch(e => console.error('[artifacts] migração:', e.message));
 const _storageCleanup = await startupStorageCleanup(db).catch(e => ({ error: e.message }));
@@ -548,6 +550,8 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
 }
 
 async function chat({ chat, text, fileIds, signal, mcpSession }, emit) {
+  logger.info('chat.turn.start', { chatId: chat.id });
+  try {
   chat.messages.push({ id: id(), role: 'user', content: text, files: fileIds?.length ? fileIds : undefined, at: Date.now() });
   const members = groupMembers(chat, db.agents);
   const group = members.length > 1 ? members : null;
@@ -585,6 +589,9 @@ async function chat({ chat, text, fileIds, signal, mcpSession }, emit) {
   if (chat.title === 'Nova conversa') chat.title = text.replace(/\s+/g, ' ').trim().slice(0, 60) || 'Conversa';
   chat.updatedAt = Date.now();
   save();
+  } finally {
+    logger.info('chat.turn.end', { chatId: chat.id });
+  }
 }
 
 // Estáticos do build do Vite: lidos uma vez, comprimidos uma vez, servidos com ETag.
@@ -852,7 +859,9 @@ const routes = [
     } catch (e) {
       throw new HttpError(400, e.message);
     }
-    save(); return redact(s);
+    save();
+    configureLogger({ settings: s });
+    return redact(s);
   }],
   ['GET', /^\/api\/audit$/, (req, _, url) => ({
     entries: listAudit(db, { limit: +(url.searchParams.get('limit') || 50) })
@@ -1210,6 +1219,15 @@ createServer(async (req, res) => {
   attachRequestId(req, res);
   const url = new URL(req.url, 'http://x');
   const p = url.pathname;
+  await runWithRequestContext(req, p, async () => {
+  const httpLog = shouldLogHttpRoute(p);
+  const httpStarted = httpLog ? Date.now() : 0;
+  if (httpLog) logger.info('http.request.start', { method: req.method });
+  if (httpLog) {
+    res.on('finish', () => {
+      logger.info('http.request.end', { method: req.method, status: res.statusCode, ms: Date.now() - httpStarted });
+    });
+  }
   try {
     if (TOKEN && url.searchParams.get('token') === TOKEN) {
       res.writeHead(302, { 'set-cookie': `ripper_token=${encodeURIComponent(TOKEN)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`, location: '/' });
@@ -1291,6 +1309,7 @@ createServer(async (req, res) => {
     if (code === 500) console.error(`[${req.requestId}]`, ...redactForLog(e?.stack || e?.message || String(e)));
     if (!res.headersSent) json(res, { error: code === 500 ? 'Erro interno. Veja o log do servidor.' : e.message }, code, {}, req); else res.end();
   }
+  });
 }).listen(PORT, HOST, () => console.log(`Ripper em http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`));
 
 // Rotinas: o agente dono acorda (por horário ou evento), executa e só deixa conversa se houver novidade.

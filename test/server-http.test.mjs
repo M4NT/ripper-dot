@@ -352,3 +352,37 @@ test('GET /api/data/backup e restore', async () => {
     assert.equal(st.settings.name, 'restaurado-teste');
   });
 });
+
+test('RIPPER_LOG_JSON: requisição API emite linhas JSON sem token', async () => {
+  const dataDir = mkdtempSync(join(tmpdir(), 'ripper-http-log-'));
+  const port = await freePort();
+  const env = {
+    ...process.env,
+    RIPPER_DATA: dataDir,
+    PORT: String(port),
+    HOST: '127.0.0.1',
+    RIPPER_TOKEN: 'test-http-token',
+    RIPPER_LOG_JSON: '1'
+  };
+  const child = spawn(process.execPath, [serverPath], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  const stdout = [];
+  child.stdout.on('data', c => stdout.push(c.toString()));
+  const base = `http://127.0.0.1:${port}`;
+  try {
+    await waitFor(base + '/api/health', env.RIPPER_TOKEN, 15_000);
+    const parsed = stdout.join('').split('\n').filter(Boolean).map(line => {
+      try { return JSON.parse(line); } catch { return null; }
+    }).filter(Boolean);
+    const start = parsed.find(e => e.msg === 'http.request.start' && e.route === '/api/health');
+    assert.ok(start, 'esperava http.request.start em JSON');
+    assert.equal(start.level, 'info');
+    assert.ok(start.ts);
+    assert.ok(start.requestId);
+    const blob = JSON.stringify(parsed);
+    assert.doesNotMatch(blob, /test-http-token/);
+    assert.doesNotMatch(blob, /Bearer/);
+  } finally {
+    child.kill('SIGTERM');
+    await new Promise(r => child.on('exit', r));
+  }
+});
