@@ -1,6 +1,7 @@
 import { BorderBeam } from 'border-beam';
 import { go, useDark } from './lib.js';
 import { AgentAvatar, Icon, Menu, MenuItem, StatusDot, useConfirm } from './ui.jsx';
+import { AutonomySemaphore } from './autonomy.jsx';
 import { useApp } from './app.jsx';
 import { api } from './lib.js';
 
@@ -29,6 +30,7 @@ export default function AgentCard({ agent }) {
         </div>
         <div className="agent-card-foot">
           <StatusDot status={agent.status} />
+          <AutonomySemaphore level={agent.autonomyLevel} settings={S.settings} showLabel={false} size="sm" />
           {working && <span className="working-label">respondendo</span>}
         </div>
         <Menu align="right" className="agent-card-menu" trigger={({ toggle, open }) => (
