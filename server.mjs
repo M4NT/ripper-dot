@@ -78,6 +78,7 @@ import { redactRoutine, redactSseEvent, redactJsonPayload, redactForLog } from '
 import { collectDiagnostics } from './lib/diagnostics.mjs';
 import { buildBackupPayload, restoreBackupPayload, listAutoBackups } from './lib/backup.mjs';
 import { memoAsync } from './lib/ttl-cache.mjs';
+import { attachRequestId } from './lib/request-id.mjs';
 
 function settingsForMcp(s, mcpSession) {
   return settingsForMcpSession(s, mcpSession);
@@ -111,9 +112,13 @@ const SECURITY = {
   'content-security-policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; frame-src http://127.0.0.1:* http://localhost:*; frame-ancestors 'none'; base-uri 'none'"
 };
 
-const json = (res, data, code = 200, extra = {}) => {
+const json = (res, data, code = 200, extra = {}, req) => {
+  let payload = data;
+  if (req?.requestId && data && typeof data === 'object' && data !== null && 'error' in data) {
+    payload = { ...data, requestId: req.requestId };
+  }
   res.writeHead(code, { ...SECURITY, 'content-type': 'application/json; charset=utf-8', 'cache-control': extra['cache-control'] || 'no-store', ...extra });
-  res.end(JSON.stringify(redactJsonPayload(data)));
+  res.end(JSON.stringify(redactJsonPayload(payload)));
 };
 function probePayload(extra = {}) {
   return { ok: true, version: APP_PKG.version, uptimeSeconds: Math.floor((Date.now() - SERVER_STARTED_AT) / 1000), ...extra };
@@ -1094,7 +1099,11 @@ const routes = [
     const fileIds = (b.fileIds || []).filter(fid => db.files.some(f => f.id === fid && agentIds.some(a => canUseFile(f, { id: a }, c))));
     for (const fid of fileIds) { const f = db.files.find(x => x.id === fid); if (f && !f.chatId) f.chatId = c.id; }
     res.writeHead(200, { ...SECURITY, 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store', 'x-accel-buffering': 'no' });
-    const emit = e => res.writable && res.write(`data: ${JSON.stringify(redactSseEvent(e))}\n\n`);
+    const emit = e => {
+      if (!res.writable) return;
+      const payload = e?.error && req.requestId ? { ...e, requestId: req.requestId } : e;
+      res.write(`data: ${JSON.stringify(redactSseEvent(payload))}\n\n`);
+    };
     emit({ chatId: c.id });
     const clientAc = new AbortController();
     res.on('close', () => { if (!res.writableFinished) clientAc.abort(); });
@@ -1111,6 +1120,7 @@ const routes = [
 ];
 
 createServer(async (req, res) => {
+  attachRequestId(req, res);
   const url = new URL(req.url, 'http://x');
   const p = url.pathname;
   try {
@@ -1182,7 +1192,7 @@ createServer(async (req, res) => {
         const m = req.method === method && re.exec(p);
         if (!m) continue;
         const out = await fn(req, m.slice(1), url, res);
-        if (out !== undefined && !res.headersSent) json(res, out);
+        if (out !== undefined && !res.headersSent) json(res, out, 200, {}, req);
         return;
       }
       throw new HttpError(404, 'Rota não encontrada.');
@@ -1191,8 +1201,8 @@ createServer(async (req, res) => {
     return await serveStatic(req, res, p === '/' ? '/index.html' : p);
   } catch (e) {
     const code = e instanceof HttpError ? e.code : 500;
-    if (code === 500) console.error(...redactForLog(e?.stack || e?.message || String(e)));
-    if (!res.headersSent) json(res, { error: code === 500 ? 'Erro interno. Veja o log do servidor.' : e.message }, code); else res.end();
+    if (code === 500) console.error(`[${req.requestId}]`, ...redactForLog(e?.stack || e?.message || String(e)));
+    if (!res.headersSent) json(res, { error: code === 500 ? 'Erro interno. Veja o log do servidor.' : e.message }, code, {}, req); else res.end();
   }
 }).listen(PORT, HOST, () => console.log(`Ripper em http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`));
 

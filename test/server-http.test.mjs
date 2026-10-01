@@ -102,6 +102,37 @@ test('GET /readyz retorna 503 quando a pasta de dados fica inacessível', async 
   });
 });
 
+test('X-Request-Id é ecoado quando enviado pelo cliente', async () => {
+  await withServer({}, async base => {
+    const r = await fetch(base + '/api/health', {
+      headers: { authorization: 'Bearer test-http-token', 'X-Request-Id': 'abc' }
+    });
+    assert.equal(r.status, 200);
+    assert.equal(r.headers.get('x-request-id'), 'abc');
+  });
+});
+
+test('X-Request-Id é gerado quando o cliente não envia', async () => {
+  await withServer({}, async base => {
+    const r = await fetch(base + '/api/health', { headers: { authorization: 'Bearer test-http-token' } });
+    assert.equal(r.status, 200);
+    const id = r.headers.get('x-request-id');
+    assert.ok(id);
+    assert.match(id, /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+  });
+});
+
+test('corpo JSON de erro inclui requestId', async () => {
+  await withServer({}, async base => {
+    const r = await fetch(base + '/api/health', { headers: { 'X-Request-Id': 'err-body-id' } });
+    assert.equal(r.status, 401);
+    assert.equal(r.headers.get('x-request-id'), 'err-body-id');
+    const body = await r.json();
+    assert.equal(body.requestId, 'err-body-id');
+    assert.match(body.error, /Não autorizado/);
+  });
+});
+
 test('?token= define cookie e redireciona (sem auth header)', async () => {
   await withServer({}, async (base, token) => {
     const r = await fetch(base + '/?token=' + encodeURIComponent(token), { redirect: 'manual' });
