@@ -73,6 +73,7 @@ import { buildUsageContract, normalizeContextWindow } from './lib/usage-api.mjs'
 import { buildMeteringReport, listMeteringEvents, usageEventsToCsv } from './lib/metering.mjs';
 import { buildTokenRoiContract, routingSummary } from './lib/token-roi.mjs';
 import { listScripts, deleteScript } from './lib/script-pool.mjs';
+import { parseWhatsappMessages, whatsappPrompt, sendWhatsappText, whatsappReady } from './lib/whatsapp.mjs';
 import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStreaming, activeChatStreamCount } from './lib/chat-stream.mjs';
 import { beginChatRun, bumpChatRunSeq, finishChatRun, chatRunPublic, canResumeChatRun, trimPartialRepliesAfterLastUser } from './lib/chat-run.mjs';
 import { exportChatPayload, importChatPayload } from './lib/chat-transfer.mjs';
@@ -492,6 +493,29 @@ async function runInboxDelivery(m, { signal } = {}) {
   m.threadChatId = c.id;
   m.deliveredAt = Date.now();
   return { ...parsed, threadChatId: c.id, reply: parsed.ok ? { content: parsed.content, model: parsed.model } : null };
+}
+
+/** Uma conversa por contato do WhatsApp; o agente escolhido responde e a resposta volta pela Graph API. */
+const waSeen = new Set(); // a Meta reentrega o mesmo evento; o id da mensagem evita responder duas vezes
+async function handleWhatsappMessage(msg) {
+  if (waSeen.has(msg.id)) return;
+  waSeen.add(msg.id); if (waSeen.size > 500) waSeen.delete(waSeen.values().next().value);
+  const w = db.settings.whatsapp;
+  const agent = db.agents.find(a => a.id === w.agentId);
+  if (!agent) throw new Error('Agente do canal WhatsApp não existe mais.');
+  const key = `wa:${msg.from}`;
+  let c = db.chats.find(x => x.channelKey === key);
+  if (!c) {
+    c = { id: id(), agentId: agent.id, channelKey: key, channel: 'whatsapp', title: `WhatsApp · ${msg.name || '+' + msg.from}`, messages: [], createdAt: Date.now(), updatedAt: Date.now() };
+    db.chats.unshift(c);
+  }
+  const prompt = whatsappPrompt(msg);
+  c.messages.push({ id: id(), role: 'user', content: msg.text, via: { type: 'whatsapp', from: msg.from, messageId: msg.id }, at: Date.now() });
+  const before = c.messages.length;
+  await turn({ agent, chat: c, text: msg.text, prompt, images: [], group: null }, () => {});
+  const reply = c.messages.slice(before).findLast(m => m.role === 'assistant' && m.content && !m.stopped);
+  c.updatedAt = Date.now(); c.unread = true; save();
+  if (reply) await sendWhatsappText(w, msg.from, reply.content);
 }
 
 async function deliver(m) {
@@ -2276,6 +2300,24 @@ const server = createServer(async (req, res) => {
     if (req.method === 'GET' && p === '/docs') {
       res.writeHead(200, hdr(req, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'public, max-age=3600' }));
       return res.end(OPENAPI_DOCS_HTML);
+    }
+    // Canal WhatsApp (Meta chama sem login): GET = verificação do webhook, POST = mensagens (assinadas).
+    if (p === '/api/channels/whatsapp/webhook') {
+      const w = db.settings.whatsapp;
+      if (!whatsappReady(w) || !isEnterpriseMode(db.settings)) throw new HttpError(404, 'Canal WhatsApp desligado.');
+      if (req.method === 'GET') {
+        const ok = url.searchParams.get('hub.mode') === 'subscribe' && url.searchParams.get('hub.verify_token') === w.verifyToken;
+        if (!ok) throw new HttpError(403, 'Token de verificação não confere.');
+        res.writeHead(200, hdr(req, { 'content-type': 'text/plain' }));
+        return res.end(url.searchParams.get('hub.challenge') || '');
+      }
+      if (req.method === 'POST') {
+        const raw = (await body.raw(req)).toString('utf8');
+        if (!verifySignature(w.appSecret, raw, req.headers['x-hub-signature-256'])) throw new HttpError(401, 'Assinatura inválida.');
+        let payload; try { payload = JSON.parse(raw); } catch { throw new HttpError(400, 'JSON inválido.'); }
+        for (const m of parseWhatsappMessages(payload)) handleWhatsappMessage(m).catch(e => console.error('whatsapp', ...redactForLog(db.settings, e.message)));
+        return json(res, { ok: true }, 200, {}, req); // a Meta reenvia se não receber 200 rápido
+      }
     }
     const hook = req.method === 'POST' && /^\/api\/hooks\/([a-f0-9]{48})$/.exec(p);
     if (hook) {

@@ -414,6 +414,28 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
         </>}
 
         {tab === 'plugins' && <Plugins s={s} set={set} />}
+        {tab === 'plugins' && enterprise && (() => {
+          const w = s.whatsapp || {};
+          const setW = (k, v) => set('whatsapp', { ...w, [k]: v });
+          const hook = `${location.origin}/api/channels/whatsapp/webhook`;
+          return (
+            <Card title="Canal WhatsApp" desc="Um agente responde quem escreve no seu número do WhatsApp Business (API oficial da Meta, WhatsApp Cloud API). Cada contato vira uma conversa aqui, que você acompanha e pode assumir.">
+              <Row title="Ativar canal" desc="Desligado, o webhook responde 404 e nada é enviado.">
+                <Switch checked={!!w.enabled} onChange={v => setW('enabled', v)} label="Ativar canal WhatsApp" />
+              </Row>
+              <Row title="Agente que responde" desc="Prefira um agente sem computador: quem escreve é gente de fora.">
+                <Select label="Agente do WhatsApp" value={w.agentId || ''} onChange={v => setW('agentId', v)} options={S.agents.map(a => ({ value: a.id, label: a.name }))} />
+              </Row>
+              <Row title="Phone number ID" desc="No painel da Meta: WhatsApp → Configuração da API."><input className="input" value={w.phoneNumberId || ''} onChange={e => setW('phoneNumberId', e.target.value)} placeholder="123456789012345" /></Row>
+              <Row title="Token de acesso" desc="Token permanente de um usuário do sistema."><input className="input" type="password" autoComplete="off" value={w.accessToken || ''} onChange={e => setW('accessToken', e.target.value)} placeholder="EAAG…" /></Row>
+              <Row title="App secret" desc="Configurações do app → Básico. Usado para conferir a assinatura de cada webhook."><input className="input" type="password" autoComplete="off" value={w.appSecret || ''} onChange={e => setW('appSecret', e.target.value)} /></Row>
+              <Row title="Token de verificação" desc="Você inventa; cole o mesmo valor na Meta."><input className="input" value={w.verifyToken || ''} onChange={e => setW('verifyToken', e.target.value)} placeholder="uma-frase-secreta" /></Row>
+              <Row title="URL do webhook" desc="Cole na Meta (assine o campo messages). Precisa ser HTTPS público: use um túnel (Cloudflare Tunnel, ngrok) apontando para esta porta." stack>
+                <div className="row"><code className="mono small grow">{hook}</code><button type="button" className="btn btn-sm" onClick={() => { navigator.clipboard.writeText(hook); toast('URL copiada'); }}><Icon name="copy" size={14} />Copiar</button></div>
+              </Row>
+            </Card>
+          );
+        })()}
 
         {tab === 'security' && <>
           <Card

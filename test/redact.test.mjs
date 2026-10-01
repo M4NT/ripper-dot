@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { redactSettingsSecrets as redactSettings } from '../lib/mcp-connectors.mjs'; // a que o servidor usa no /api/state
 import {
-  redactSettings,
   redactRoutine,
   redactSecretsInText,
   redactSecretsInLogText,
@@ -22,14 +22,17 @@ test('redactSettings mascara chaves e OAuth', () => {
       url: 'https://mcp',
       auth: { clientSecret: 'cs', oauth: { accessToken: 'at', refreshToken: 'rt' } },
       headers: { Authorization: 'Bearer tok123', 'X-Custom': 'ok' }
-    }]
+    }],
+    whatsapp: { enabled: true, accessToken: 'EAAG-real', appSecret: 'app-sec', verifyToken: 'vt' }
   });
   assert.equal(s.claude.apiKey, '••••');
+  assert.equal(s.whatsapp.accessToken, '••••');
+  assert.equal(s.whatsapp.appSecret, '••••');
   assert.equal(s.computer.boatApiKey, '••••');
   assert.equal(s.plugins[0].auth.clientSecret, '••••');
   assert.equal(s.plugins[0].auth.oauth.accessToken, '••••');
   assert.equal(s.plugins[0].headers.Authorization, '••••');
-  assert.equal(s.plugins[0].headers['X-Custom'], 'ok');
+  assert.equal(s.plugins[0].headers['X-Custom'], '••••'); // a função real mascara todo header de plugin
 });
 
 test('redactRoutine não expõe hookSecret', () => {
