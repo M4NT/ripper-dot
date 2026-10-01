@@ -105,6 +105,8 @@ O painel de uso no chat mostra **somente** o que o Ripper mede ou o que você co
 
 Variáveis opcionais: `RIPPER_PLAN_NAME` (rótulo, não altera fatura), `RIPPER_CLOUD_CREDITS_*`, `RIPPER_LIMIT_*`.
 
+**Circuit breaker de provedor:** após falhas consecutivas na API Claude/Codex, o Ripper abre o circuito e usa fallback (ou falha rápido) até o cooldown. `RIPPER_CB_FAILURES` (default `5`), `RIPPER_CB_COOLDOWN_MS` (default `30000`). Estado em `GET /api/diagnostics` → `providers.circuitBreakers`.
+
 ### Uso Pro/Max (assinatura Claude Code)
 
 - **Estável o suficiente para UI:** erros de rate limit nas respostas, contadores locais do Ripper, janela de contexto medida no chat.
