@@ -149,19 +149,28 @@ function Palette({ open, onClose, toggleTheme }) {
   const { S, agent } = useApp();
   const [q, setQ] = useState('');
   const [i, setI] = useState(0);
-  useEffect(() => { if (open) { setQ(''); setI(0); } }, [open]);
+  const [chatHits, setChatHits] = useState([]);
+  useEffect(() => { if (open) { setQ(''); setI(0); setChatHits([]); } }, [open]);
+  useEffect(() => {
+    let alive = true;
+    const t = q.trim();
+    if (t.length < 2) { setChatHits([]); return () => { alive = false; }; }
+    api(`/api/chats?q=${encodeURIComponent(t)}&limit=15`).then(r => { if (alive) setChatHits(r.items || []); }).catch(() => { if (alive) setChatHits([]); });
+    return () => { alive = false; };
+  }, [q]);
   const items = useMemo(() => {
     const t = q.trim().toLowerCase();
+    const chats = t.length >= 2 && chatHits.length ? chatHits : S.chats;
     const all = [
       { g: 'Ações', label: 'Criar novo agente', icon: 'plus', run: () => go('/new') },
       { g: 'Ações', label: 'Explorar templates', icon: 'compass', run: () => go('/explore') },
       { g: 'Ações', label: 'Alternar tema', icon: 'moon', run: toggleTheme },
       { g: 'Ações', label: 'Configurações', icon: 'gear', run: () => go('/settings') },
       ...S.agents.map(a => ({ g: 'Agentes', label: `Conversar com ${a.name}`, agent: a, run: () => go(`/a/${a.id}`) })),
-      ...S.chats.map(c => ({ g: 'Conversas', label: c.title, hint: agent(c.agentId)?.name, icon: 'chat', run: () => go(`/c/${c.id}`) }))
+      ...chats.map(c => ({ g: 'Conversas', label: c.title, hint: agent(c.agentId)?.name, icon: 'chat', run: () => go(`/c/${c.id}`) }))
     ];
     return all.filter(x => !t || x.label.toLowerCase().includes(t) || x.hint?.toLowerCase().includes(t)).slice(0, 30);
-  }, [q, S, agent, toggleTheme]);
+  }, [q, S, agent, toggleTheme, chatHits]);
   const listRef = useRef(null);
   useEffect(() => { listRef.current?.querySelector('.on')?.scrollIntoView({ block: 'nearest' }); }, [i]);
   const run = x => { onClose(); x.run(); };

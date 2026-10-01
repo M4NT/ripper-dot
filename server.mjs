@@ -10,14 +10,17 @@ import { load, save, id, newAgent, patchAgent, dataUrl } from './lib/store.mjs';
 import { route, classifySpeaker, MODELS, EFFORTS } from './lib/router.mjs';
 import { computerFor } from './lib/boat.mjs';
 import { dockerAvailable, imageStatus, ensureImage, hostnameOf } from './lib/docker.mjs';
-import { needsApproval, ApprovalGate } from './lib/approvals.mjs';
+import { ApprovalGate } from './lib/approvals.mjs';
 import { juliaOnline, juliaChoose, juliaStatus, measureTriagePromptChars, RISK_OPTIONS, NOTIFY_OPTIONS } from './lib/julia.mjs';
-import { checkSend, dueMessages, threadKey, inboxPrompt } from './lib/inbox.mjs';
+import { checkSend, dueMessages, threadKey, inboxPrompt, repairInboxOnStartup, markInboxDeliveryFailed, inboxSummary } from './lib/inbox.mjs';
+import { rememberAllowedCommand, execNeedsApproval } from './lib/permissions.mjs';
+import { listChatsPage } from './lib/history.mjs';
+import { tryClaimRoutine, releaseRoutineClaim } from './lib/persist-coord.mjs';
 import { browserFor, browserRisk } from './lib/browser.mjs';
 import { runClaude, runCodex, systemPrompt } from './lib/providers.mjs';
 import { runTestProvider } from './lib/test-provider.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
-import { canUseFile, selectSpeakers, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent } from './lib/agent-flow.mjs';
+import { canUseFile, selectSpeakers, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent } from './lib/agent-flow.mjs';
 import { providerAttemptOrder, runProviderAttemptLoop } from './lib/provider-turn.mjs';
 import { newHookToken, verifySignature, eventMeta } from './lib/hooks.mjs';
 import { recordUsage, usageSummary, accountLimits, contextBreakdown, checkSendQuota, compactChat, parseProviderLimitFromError, recordProviderSignal } from './lib/usage.mjs';
@@ -132,7 +135,7 @@ codexInstalled.then(ok => { if (!ok) console.log('Codex não encontrado: o Rippe
 const inboxBusy = new Set();
 async function deliver(m) {
   const to = db.agents.find(a => a.id === m.to), from = db.agents.find(a => a.id === m.from);
-  if (!to || !from) { m.status = 'failed'; m.error = 'Agente não existe mais.'; save(); return; }
+  if (!to || !from) { markInboxDeliveryFailed(m, 'Agente não existe mais.'); save(); return; }
   inboxBusy.add(to.id); m.status = 'delivering'; save();
   try {
     // A troca entre os dois fica numa conversa própria; o destinatário não vê a conversa de origem.
@@ -146,22 +149,24 @@ async function deliver(m) {
     const reply = c.messages.length > before ? c.messages.at(-1) : null;
     c.updatedAt = Date.now(); c.unread = true;
     m.threadChatId = c.id; m.deliveredAt = Date.now();
-    m.status = reply && !reply.error ? 'delivered' : 'failed'; m.error = reply?.error;
+    if (reply && !reply.error) { m.status = 'delivered'; m.error = null; }
+    else markInboxDeliveryFailed(m, reply?.error || 'Sem resposta do destinatário.');
     // A resposta volta para onde o pedido nasceu, sem gastar um turno de quem pediu.
     const origin = db.chats.find(x => x.id === m.originChatId);
     if (origin && reply?.content) {
       origin.messages.push({ id: id(), role: 'assistant', agentId: to.id, content: reply.content, model: reply.model, via: { type: 'inbox', from: from.id, messageId: m.id, threadChatId: c.id }, at: Date.now() });
       origin.updatedAt = Date.now(); origin.unread = true;
     }
-  } catch (e) { m.status = 'failed'; m.error = e.message; console.error('mensagem', e.message); }
+  } catch (e) { markInboxDeliveryFailed(m, e.message); console.error('mensagem', e.message); }
   finally { inboxBusy.delete(m.to); save(); setTimeout(dispatchInbox, 50); }
 }
 function dispatchInbox() {
   for (const m of dueMessages(db.messages, [...inboxBusy])) deliver(m);
 }
 setInterval(dispatchInbox, 5_000);
-// Entregas interrompidas por reinício voltam para a fila.
-for (const m of db.messages || []) if (m.status === 'delivering') m.status = 'queued';
+repairInboxOnStartup(db.messages);
+save();
+dispatchInbox();
 
 const gate = new ApprovalGate({ onChange: () => save() });
 const approvalView = a => ({ ...a, agentName: db.agents.find(x => x.id === a.agentId)?.name, chatTitle: db.chats.find(c => c.id === a.chatId)?.title });
@@ -175,7 +180,7 @@ async function askApproval({ agent, chat, emit, signal }, kind, command, reason,
   emit({ approval: approvalView(rec) });
   const done = await gate.request(rec, signal);
   emit({ approvalDone: { id: rec.id, status: done.status } });
-  if (remember && done.status === 'approved' && done.remember) (chat.allowedCommands ||= []).push(command);
+  if (remember && done.status === 'approved' && done.remember) rememberAllowedCommand(chat, command);
   return done.status === 'approved';
 }
 
@@ -187,14 +192,14 @@ function guarded(computer, { agent, chat, emit, signal }) {
     emit({ approval: approvalView(rec) });
     const done = await gate.request(rec, signal);
     emit({ approvalDone: { id: rec.id, status: done.status } });
-    if (done.status === 'approved' && done.remember) (chat.allowedCommands ||= []).push(command);
+    if (done.status === 'approved' && done.remember) rememberAllowedCommand(chat, command);
     return done.status === 'approved';
   };
   const policy = db.settings.approvalPolicy || 'risky';
   return {
     ...computer,
     async exec(command) {
-      let reason = needsApproval({ command, computerKind: computer.kind, policy, allowed: chat.allowedCommands || [] });
+      let reason = execNeedsApproval({ command, computerKind: computer.kind, policy, chat });
       if (!reason && policy === 'risky' && !(chat.allowedCommands || []).includes(command)) {
         const riskCtx = `Agente ${agent.name} vai executar no próprio computador.`;
         const j = await juliaChoose(db.settings, { context: riskCtx, question: command, options: RISK_OPTIONS }, {
@@ -270,12 +275,12 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
   const s = settingsForMcp(db.settings, mcpSession);
   const name = id => db.agents.find(a => a.id === id)?.name || 'Outro agente';
   // Em grupo, a fala dos colegas chega rotulada com o nome de quem falou.
-  const label = m => m.role === 'assistant' && m.agentId && m.agentId !== agent.id ? { role: 'user', content: `[${name(m.agentId)} disse]: ${m.content}` } : m;
+  const label = m => labelMessageForAgent(m, agent.id, name, { group });
   // Histórico = tudo antes da pergunta atual; o que os colegas já responderam nesta rodada vai depois dela.
-  const at = chat.messages.findLastIndex(m => m.role === 'user');
-  const history = trimHistory(chat.messages.slice(0, at)).map(label);
-  const round = chat.messages.slice(at + 1).filter(m => m.content);
-  if (round.length) prompt += '\n\n' + round.map(m => `[${name(m.agentId)} respondeu nesta rodada]: ${m.content}`).join('\n\n') + `\n\nAgora é a sua vez, ${agent.name}.`;
+  const at = lastUserTurnIndex(chat.messages);
+  const history = trimHistory(at >= 0 ? chat.messages.slice(0, at) : chat.messages).map(label);
+  const round = at >= 0 ? chat.messages.slice(at + 1).filter(m => m.content && m.role === 'assistant') : [];
+  if (round.length) prompt += '\n\n' + round.map(m => `[${name(m.agentId || agent.id)} respondeu nesta rodada]: ${m.content}`).join('\n\n') + `\n\nAgora é a sua vez, ${agent.name}.`;
   const memories = s.memory && agent.tools.includes('memory') ? db.memories.filter(m => m.agentId === agent.id) : [];
   let computer = null;
   // Sem chave/computador desligado: a ferramenta só não é oferecida (o painel do agente avisa).
@@ -690,6 +695,26 @@ const routes = [
     db.routines.push(r); save(); return r;
   }],
   ['DELETE', /^\/api\/routines\/([\w-]+)$/, (req, [rid]) => { db.routines = db.routines.filter(x => x.id !== rid); save(); return {}; }],
+  ['GET', /^\/api\/chats$/, (req, _, url) => {
+    const q = url.searchParams.get('q') || '';
+    const agentId = url.searchParams.get('agentId') || undefined;
+    const limit = url.searchParams.get('limit');
+    const cursor = url.searchParams.get('cursor') || undefined;
+    const page = listChatsPage(db.chats, { q, agentId, limit: limit ? +limit : 30, cursor });
+    return {
+      items: page.items.map(summary),
+      nextCursor: page.nextCursor,
+      total: page.total
+    };
+  }],
+  ['GET', /^\/api\/inbox$/, () => ({
+    summary: inboxSummary(db.messages),
+    pending: db.messages.filter(m => m.status === 'queued' || m.status === 'delivering').map(m => ({
+      ...m,
+      fromName: db.agents.find(a => a.id === m.from)?.name,
+      toName: db.agents.find(a => a.id === m.to)?.name
+    }))
+  })],
   ['GET', /^\/api\/chats\/([\w-]+)$/, (req, [cid]) => { const c = db.chats.find(c => c.id === cid); if (!c) throw new HttpError(404, 'Conversa não encontrada.'); if (c.unread) { c.unread = false; save(); } return c; }],
   ['PUT', /^\/api\/chats\/([\w-]+)$/, async (req, [cid]) => {
     const c = db.chats.find(c => c.id === cid); if (!c) throw new HttpError(404, 'Conversa não encontrada.');
@@ -853,6 +878,7 @@ createServer(async (req, res) => {
 function runRoutine(r, event) {
   const agent = db.agents.find(a => a.id === r.agentId);
   if (!agent || agent.status === 'paused' || r.lastStatus === 'running') return false;
+  if (!tryClaimRoutine(r.id)) return false;
   r.lastRun = Date.now(); r.lastStatus = 'running'; r.lastError = null; save();
   const c = { id: id(), agentId: agent.id, title: event ? `${r.name} · ${event.source}${event.type ? ' ' + event.type : ''}` : r.name, routineId: r.id, messages: [], createdAt: Date.now(), updatedAt: Date.now() };
   db.chats.unshift(c);
@@ -880,7 +906,8 @@ function runRoutine(r, event) {
     }
     r.lastChatId = r.lastStatus === 'quiet' ? r.lastChatId : c.id;
     save();
-  }).catch(e => { r.lastStatus = 'failed'; r.lastError = e.message; save(); console.error('rotina', r.name, e.message); });
+  }).catch(e => { r.lastStatus = 'failed'; r.lastError = e.message; save(); console.error('rotina', r.name, e.message); })
+    .finally(() => releaseRoutineClaim(r.id));
   return true;
 }
 
