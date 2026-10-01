@@ -13,6 +13,15 @@ import { dockerAvailable, imageStatus, ensureImage, hostnameOf } from './lib/doc
 import { ApprovalGate } from './lib/approvals.mjs';
 import { juliaOnline, juliaChoose, juliaStatus, measureTriagePromptChars, RISK_OPTIONS, NOTIFY_OPTIONS } from './lib/julia.mjs';
 import { checkSend, dueMessages, threadKey, inboxPrompt, repairInboxOnStartup, markInboxDeliveryFailed, inboxSummary } from './lib/inbox.mjs';
+import {
+  PROTOCOL_ID,
+  delegateTask,
+  workerProtocolEvent,
+  ingestWorkerInboxReply,
+  findDelegation,
+  delegationsSummary,
+  MESSAGE_KIND
+} from './lib/manager-worker-protocol.mjs';
 import { rememberAllowedCommand, execNeedsApproval } from './lib/permissions.mjs';
 import { browserAutonomyGate, shareAutonomyGate, effectiveApprovalPolicy, sanitizeAutonomyLevel } from './lib/autonomy.mjs';
 import { listChatsPage } from './lib/history.mjs';
@@ -328,7 +337,9 @@ async function deliver(m) {
     const key = threadKey(from.id, to.id);
     let c = db.chats.find(x => x.inboxKey === key);
     if (!c) { c = { id: id(), agentId: to.id, agentIds: [from.id, to.id], inboxKey: key, title: `${from.name} ↔ ${to.name}`, messages: [], createdAt: Date.now(), updatedAt: Date.now() }; db.chats.unshift(c); }
-    const prompt = inboxPrompt(m, from.name);
+    const prompt = m.protocol?.id === PROTOCOL_ID
+      ? `${m.body}\n\nResponda de forma direta; para delegações use JSON manager-worker na primeira linha (accept, progress, complete ou reject).`
+      : inboxPrompt(m, from.name);
     c.messages.push({ id: id(), role: 'user', content: prompt, inbox: { from: from.id, messageId: m.id, priority: m.priority }, at: Date.now() });
     const before = c.messages.length;
     await turn({ agent: to, chat: c, text: m.body, prompt, images: [], group: null, hops: m.hops }, () => {});
@@ -337,6 +348,20 @@ async function deliver(m) {
     m.threadChatId = c.id; m.deliveredAt = Date.now();
     if (reply && !reply.error) { m.status = 'delivered'; m.error = null; }
     else markInboxDeliveryFailed(m, reply?.error || 'Sem resposta do destinatário.');
+    if (reply?.content && m.protocol?.id === PROTOCOL_ID && m.protocol.delegationId && to.id === findDelegation(db, m.protocol.delegationId)?.workerId) {
+      const s = db.settings;
+      const limits = { maxPerHour: 20, maxHops: 3, ...(s.inbox || {}) };
+      ingestWorkerInboxReply({
+        db,
+        id,
+        worker: to,
+        manager: from,
+        delegationId: m.protocol.delegationId,
+        replyText: reply.content,
+        hops: m.hops,
+        limits
+      });
+    }
     // A resposta volta para onde o pedido nasceu, sem gastar um turno de quem pediu.
     const origin = db.chats.find(x => x.id === m.originChatId);
     if (origin && reply?.content) {
@@ -1309,6 +1334,62 @@ const routes = [
       toName: db.agents.find(a => a.id === m.to)?.name
     }))
   })],
+  ['GET', /^\/api\/delegations$/, (_, __, url) => {
+    const status = url.searchParams.get('status');
+    const managerId = url.searchParams.get('managerId');
+    const workerId = url.searchParams.get('workerId');
+    let items = db.delegations || [];
+    if (status) items = items.filter(d => d.status === status);
+    if (managerId) items = items.filter(d => d.managerId === managerId);
+    if (workerId) items = items.filter(d => d.workerId === workerId);
+    return { summary: delegationsSummary(db.delegations), items: items.slice(0, 200) };
+  }],
+  ['POST', /^\/api\/delegations$/, async req => {
+    const b = await body(req);
+    const manager = agentOr404(b.managerId);
+    const worker = agentOr404(b.workerId);
+    const limits = { maxPerHour: 20, maxHops: 3, ...(db.settings.inbox || {}) };
+    const hops = Math.max(0, +b.hops || 0);
+    const out = delegateTask({
+      db,
+      id,
+      manager,
+      worker,
+      title: b.title,
+      description: b.description,
+      originChatId: b.originChatId || null,
+      priority: b.priority,
+      hops,
+      limits
+    });
+    if (out.error) throw new HttpError(400, out.error);
+    save();
+    setTimeout(dispatchInbox, 50);
+    return { delegation: out.delegation, messageId: out.message.id };
+  }],
+  ['POST', /^\/api\/delegations\/([\w-]+)\/events$/, async (req, [delegationId]) => {
+    const b = await body(req);
+    const worker = agentOr404(b.workerId);
+    const kind = b.kind;
+    if (!Object.values(MESSAGE_KIND).includes(kind) || kind === MESSAGE_KIND.delegate) {
+      throw new HttpError(400, 'kind inválido (accept, progress, complete, reject).');
+    }
+    const limits = { maxPerHour: 20, maxHops: 3, ...(db.settings.inbox || {}) };
+    const out = workerProtocolEvent({
+      db,
+      id,
+      worker,
+      delegationId,
+      kind,
+      payload: b.payload || {},
+      hops: Math.max(0, +b.hops || 0),
+      limits
+    });
+    if (out.error) throw new HttpError(400, out.error);
+    save();
+    setTimeout(dispatchInbox, 50);
+    return { delegation: out.delegation, messageId: out.notifyMessage.id };
+  }],
   ['GET', /^\/api\/chats\/([\w-]+)$/, (req, [cid]) => {
     const c = db.chats.find(c => c.id === cid);
     if (!c) throw new HttpError(404, 'Conversa não encontrada.');
