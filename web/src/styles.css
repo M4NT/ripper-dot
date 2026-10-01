@@ -1294,3 +1294,23 @@ body.resizing iframe { pointer-events: none; }
 .usage-cloud-head { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-bottom: 8px; }
 .usage-julia { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 .usage-more { margin-top: 10px; font-size: 13px; }
+
+/* Modo simples / enterprise */
+.ui-mode-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: var(--radius, 10px); border: 1px solid var(--line); background: var(--chip); }
+.ui-mode-toggle.compact { padding: 6px 8px; border: 0; background: transparent; }
+.ui-mode-copy { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.ui-mode-copy small { color: var(--muted); font-size: 12px; line-height: 1.35; }
+.ui-mode-switch { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.ui-mode-labels { display: flex; gap: 6px; font-size: 11px; color: var(--muted); }
+.ui-mode-labels .on { color: var(--ink); font-weight: 600; }
+.side-mode { margin: 0 10px 8px; }
+.settings-simple-hint { margin: 12px 10px 0; line-height: 1.4; }
+.settings-nav-foot { margin-top: 16px; padding: 0 10px; }
+.enterprise-page .settings-nav h1 { margin-bottom: 4px; }
+.enterprise-gate .set-card { max-width: 520px; }
+.mobile-bar-actions { display: flex; align-items: center; gap: 4px; }
+.mobile-mode-tag { margin-left: 6px; font-size: 11px; font-weight: 500; color: var(--muted); vertical-align: middle; }
+.mobile-mode .ui-mode-labels { display: none; }
+.set-card.pad { padding: 16px; }
+.audit-list time { font-size: 12px; white-space: nowrap; }
+.enterprise-usage .usage-list { margin-top: 12px; }

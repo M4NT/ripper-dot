@@ -1,6 +1,7 @@
 import { Icon, Menu } from './ui.jsx';
 import { useApp } from './app.jsx';
 import ModelUsage from './modelUsage.jsx';
+import { isEnterpriseMode } from './uiMode.js';
 
 export const EFFORTS = [
   // [chave, rótulo, rótulo curto da trilha, dica]
@@ -41,6 +42,7 @@ export function EffortScale({ value, onChange, model }) {
 /** Seletor único de modelo + esforço, usado no campo de mensagem. */
 export default function ModelPicker({ value, onChange, group, chatId }) {
   const { S } = useApp();
+  const showUsage = isEnterpriseMode(S.settings);
   const models = [...(group ? [['agent', { label: 'Padrão de cada agente' }]] : []), ...Object.entries(S.models)];
   const label = value.model === 'agent' ? 'Padrão dos agentes' : value.model === 'auto' ? 'Ripper Auto' : (S.models[value.model]?.label.replace('Claude ', '') || value.model);
   const effort = value.model === 'agent' ? null : effortLabel(value.effort);
@@ -69,7 +71,7 @@ export default function ModelPicker({ value, onChange, group, chatId }) {
         </>}
       </div>
     </Menu>
-    <ModelUsage chatId={chatId} />
+    {showUsage && <ModelUsage chatId={chatId} />}
     </div>
   );
 }

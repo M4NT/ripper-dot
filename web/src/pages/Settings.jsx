@@ -6,6 +6,8 @@ import { Icon, Switch, Select, EmptyState } from '../ui.jsx';
 import { ApprovalHistory } from '../approvals.jsx';
 import { MODEL_DESC, EffortScale } from '../modelPicker.jsx';
 import { useSettingsDraft } from '../settingsForm.js';
+import UiModeToggle from '../uiModeToggle.jsx';
+import { isEnterpriseMode, isSettingsTabAllowed } from '../uiMode.js';
 
 export function SaveBar({ dirty, saving, save, reset }) {
   if (!dirty) return null;
@@ -139,7 +141,9 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
   const d = useSettingsDraft();
   const { s, set } = d;
   const dark = useDark();
-  const tab = SETTINGS_TABS.some(t => t[0] === initial) ? initial : 'profile';
+  const enterprise = isEnterpriseMode(S.settings);
+  const allowedTabs = SETTINGS_TABS.filter(([k]) => isSettingsTabAllowed(k, S.settings));
+  const tab = allowedTabs.some(t => t[0] === initial) ? initial : 'profile';
   const [docker, setDocker] = useState(undefined);
   const [image, setImage] = useState(null);
   const [julia, setJulia] = useState(null);
@@ -153,11 +157,14 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
     <div className="settings-page">
       <nav className="settings-nav" aria-label="Seções de configuração">
         <h1>Configurações</h1>
-        {SETTINGS_TABS.map(([k, l, ic, hint]) => (
+        {allowedTabs.map(([k, l, ic, hint]) => (
           <a key={k} href={`#/settings/${k}`} className={k === tab ? 'on' : ''} aria-current={k === tab ? 'page' : undefined}>
             <Icon name={ic} size={17} /><span><b>{l}</b><small>{hint}</small></span>
           </a>
         ))}
+        {!enterprise && (
+          <p className="settings-simple-hint muted small">Modelos, Docker, plugins e backup ficam no <a href="#/enterprise">modo enterprise</a>.</p>
+        )}
       </nav>
 
       <div className="settings-main">
@@ -262,14 +269,16 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
               ))}
             </div>
           </Card>
-          <Card title="Histórico de aprovações" desc="Decisões recentes nesta instalação (aprovado, negado ou expirado).">
-            <ApprovalHistory limit={15} />
-          </Card>
-          <Card title="Mensagens entre agentes" desc="Limites para os agentes não entrarem em conversa infinita entre si.">
-            <Row title="Máximo por agente, por hora"><div className="input-unit"><input className="input" type="number" min={1} max={200} value={s.inbox?.maxPerHour ?? 20} onChange={e => set('inbox', { ...(s.inbox || {}), maxPerHour: +e.target.value })} /><span>mensagens</span></div></Row>
-            <Row title="Profundidade máxima de uma troca" desc="Quantas vezes uma resposta pode gerar outra mensagem."><div className="input-unit"><input className="input" type="number" min={1} max={10} value={s.inbox?.maxHops ?? 3} onChange={e => set('inbox', { ...(s.inbox || {}), maxHops: +e.target.value })} /><span>saltos</span></div></Row>
-          </Card>
-          <DataBackup />
+          {enterprise && <>
+            <Card title="Histórico de aprovações" desc="Decisões recentes nesta instalação (aprovado, negado ou expirado).">
+              <ApprovalHistory limit={15} />
+            </Card>
+            <Card title="Mensagens entre agentes" desc="Limites para os agentes não entrarem em conversa infinita entre si.">
+              <Row title="Máximo por agente, por hora"><div className="input-unit"><input className="input" type="number" min={1} max={200} value={s.inbox?.maxPerHour ?? 20} onChange={e => set('inbox', { ...(s.inbox || {}), maxPerHour: +e.target.value })} /><span>mensagens</span></div></Row>
+              <Row title="Profundidade máxima de uma troca" desc="Quantas vezes uma resposta pode gerar outra mensagem."><div className="input-unit"><input className="input" type="number" min={1} max={10} value={s.inbox?.maxHops ?? 3} onChange={e => set('inbox', { ...(s.inbox || {}), maxHops: +e.target.value })} /><span>saltos</span></div></Row>
+            </Card>
+            <DataBackup />
+          </>}
         </>}
 
         {tab === 'memory' && <>
@@ -283,6 +292,9 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
         </>}
 
         {tab === 'appearance' && <>
+          <Card title="Experiência">
+            <UiModeToggle />
+          </Card>
           <Card>
             <Row title="Tema" desc={`Agora: ${theme === 'dark' ? 'escuro' : 'claro'}. O padrão segue o sistema.`}><button className="btn" onClick={toggleTheme}><Icon name={theme === 'dark' ? 'sun' : 'moon'} size={16} />Usar tema {theme === 'dark' ? 'claro' : 'escuro'}</button></Row>
           </Card>
