@@ -8,7 +8,7 @@ import {
   resolveSocialWebhook
 } from '../lib/social-webhooks.mjs';
 import { applySettingsPatch } from '../lib/settings-patch.mjs';
-import { redactSettings } from '../lib/redact.mjs';
+import { redactSettingsSecrets as redactSettings } from '../lib/mcp-connectors.mjs'; // a que o servidor usa
 import { buildRipperBuiltinTools } from '../lib/ripper-builtin-tools.mjs';
 
 test('redactSocialWebhooks mascara URL', () => {
