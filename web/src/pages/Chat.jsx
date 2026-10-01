@@ -7,7 +7,7 @@ import { useApp } from '../app.jsx';
 import Composer, { uploadFile } from '../composer.jsx';
 import { sessionPayload } from '../marketplace/sessionMcp.js';
 import { effortLabel } from '../modelPicker.jsx';
-import FileThumb from '../fileThumb.jsx';
+import MessageAttachments from '../MessageAttachments.jsx';
 import ChatPanel from '../chatPanel.jsx';
 import { ResizeHandle } from '../resize.jsx';
 import { ApprovalCard } from '../approvals.jsx';
@@ -16,7 +16,6 @@ import { useOv } from '../overlay.jsx';
 import { botAvatarPalette } from 'bot-avatars';
 
 const agentColor = a => nameColor(a, botAvatarPalette);
-const isImage = t => /^image\/(png|jpe?g|webp|gif)$/.test(t);
 // Qual "verbo" o orb mostra para cada fase da resposta.
 const ORB = { route: 'connecting', WebSearch: 'searching', WebFetch: 'searching', computer_exec: 'working', computer_share: 'working', remember: 'weaving', schedule_routine: 'shaping', think: 'solving', text: 'composing' };
 
@@ -123,17 +122,12 @@ function InboxMessage({ m, from }) {
 const UserMessage = memo(function UserMessage({ m, name, files }) {
   // Prévias locais (recém-enviadas) ou os arquivos já salvos no servidor.
   const mine = m.previews || (m.files || []).map(id => files.find(f => f.id === id)).filter(Boolean).map(f => ({ ...f, url: `/api/files/${f.id}` }));
-  const imgs = mine.filter(f => isImage(f.type)), others = mine.filter(f => !isImage(f.type));
+  const hasFiles = mine.length > 0;
   return (
     <div className="msg user">
       <div className="msg-col">
-        {imgs.length > 0 && (
-          <div className="msg-images">
-            {imgs.map(f => <a key={f.id || f.url} href={f.url} target="_blank" rel="noreferrer" className="msg-image"><img src={f.url} alt={f.name} loading="lazy" /></a>)}
-          </div>
-        )}
+        {hasFiles && <MessageAttachments items={mine} />}
         {m.content && <div className="bubble user-bubble">{m.content}</div>}
-        {others.length > 0 && <div className="msg-files">{others.map(f => <a key={f.id || f.url} href={f.url} target="_blank" rel="noreferrer" className="attach"><Icon name="file" size={14} />{f.name}</a>)}</div>}
         {m.at && <time className="msg-time">{fmtTime(m.at)}</time>}
       </div>
       <span className="initial">{(name || 'V')[0].toUpperCase()}</span>
