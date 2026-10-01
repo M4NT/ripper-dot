@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { useApp } from '../app.jsx';
 import { Segmented, Icon, EmptyState } from '../ui.jsx';
 import AgentCard, { NewAgentCard } from '../agentCard.jsx';
+import { useT } from '../i18n/index.jsx';
 
 export default function Agents() {
   const { S } = useApp();
+  const t = useT();
   const [filter, setFilter] = useState('all');
   const [q, setQ] = useState('');
   const list = S.agents
@@ -14,15 +16,15 @@ export default function Agents() {
   return (
     <div className="page">
       <header className="page-head">
-        <div><h1>Agentes</h1><p className="lede">Cada agente tem instruções, ferramentas e um computador só dele.</p></div>
-        <a href="#/new" className="btn btn-primary"><Icon name="plus" size={16} />Novo agente</a>
+        <div><h1>{t('agents.title')}</h1><p className="lede">{t('agents.lede')}</p></div>
+        <a href="#/new" className="btn btn-primary"><Icon name="plus" size={16} />{t('agents.new')}</a>
       </header>
       <div className="toolbar">
-        <Segmented label="Filtrar por status" value={filter} onChange={setFilter} items={[['all', 'Todos', count('all')], ['online', 'Online', count('online')], ['paused', 'Pausados', count('paused')]]} />
-        <label className="search-field"><Icon name="search" size={16} /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar agentes" aria-label="Buscar agentes" /></label>
+        <Segmented label="Filtrar por status" value={filter} onChange={setFilter} items={[['all', t('agents.filterAll'), count('all')], ['online', t('agents.filterOnline'), count('online')], ['paused', t('agents.filterPaused'), count('paused')]]} />
+        <label className="search-field"><Icon name="search" size={16} /><input value={q} onChange={e => setQ(e.target.value)} placeholder={t('agents.search')} aria-label={t('agents.search')} /></label>
       </div>
       {list.length === 0
-        ? <EmptyState title="Nenhum agente aqui" body={q ? `Nada combina com “${q}”.` : 'Pause um agente para ele aparecer nesta lista.'} />
+        ? <EmptyState title={t('agents.empty.title')} body={q ? t('agents.empty.bodySearch', { q }) : t('agents.empty.body')} />
         : <div className="agent-grid">{list.map(a => <AgentCard key={a.id} agent={a} />)}<NewAgentCard /></div>}
     </div>
   );

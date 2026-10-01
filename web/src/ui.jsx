@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useLayoutEffect, use
 import { createPortal } from 'react-dom';
 import { BotAvatar } from 'bot-avatars';
 import { Liquid } from 'liquid-gooey';
+import { useT } from './i18n/index.jsx';
 
 /* ---------- ícones: um só traço, 1.6px, desenhados à mão ---------- */
 const P = {
@@ -156,6 +157,7 @@ export function Dialog({ open, onClose, children, className = '', label }) {
 }
 
 export function useConfirm() {
+  const t = useT();
   const [state, setState] = useState(null);
   const confirm = (opts) => new Promise(resolve => setState({ ...opts, resolve }));
   const close = v => { state?.resolve(v); setState(null); };
@@ -165,8 +167,8 @@ export function useConfirm() {
         <h2>{state.title}</h2>
         {state.body && <p>{state.body}</p>}
         <div className="row end">
-          <button className="btn" onClick={() => close(false)}>Cancelar</button>
-          <button className={`btn ${state.danger ? 'btn-danger' : 'btn-primary'}`} onClick={() => close(true)} autoFocus>{state.action || 'Confirmar'}</button>
+          <button className="btn" onClick={() => close(false)}>{t('common.cancel')}</button>
+          <button className={`btn ${state.danger ? 'btn-danger' : 'btn-primary'}`} onClick={() => close(true)} autoFocus>{state.action || t('common.confirm')}</button>
         </div>
       </>}
     </Dialog>
@@ -235,7 +237,9 @@ export const MenuItem = ({ icon, children, danger, ...rest }) => (
  * Seleção no padrão do Ripper (substitui o <select> do navegador).
  * options: [{ value, label, hint?, icon?, node? }]
  */
-export function Select({ value, onChange, options, label, placeholder = 'Selecione', className = '', size = 'md' }) {
+export function Select({ value, onChange, options, label, placeholder, className = '', size = 'md' }) {
+  const t = useT();
+  const ph = placeholder ?? t('common.select');
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const anchor = useRef(null), pop = useRef(null);
@@ -257,7 +261,7 @@ export function Select({ value, onChange, options, label, placeholder = 'Selecio
     <div className={`select-wrap ${className}`} ref={anchor}>
       <button type="button" className={`select-btn select-${size}`} aria-haspopup="listbox" aria-expanded={open} aria-label={label}
         onClick={() => setOpen(o => !o)} onKeyDown={onKey}>
-        {current?.icon}{current?.node || <span className={current ? '' : 'muted'}>{current?.label || placeholder}</span>}
+        {current?.icon}{current?.node || <span className={current ? '' : 'muted'}>{current?.label || ph}</span>}
         <Icon name="down" size={15} className={`select-caret ${open ? 'up' : ''}`} />
       </button>
       {open && pos && createPortal(
@@ -280,9 +284,12 @@ export const Switch = ({ checked, onChange, label, ...rest }) => (
   <input type="checkbox" role="switch" className="switch" checked={!!checked} aria-label={label} onChange={e => onChange(e.target.checked)} {...rest} />
 );
 
-export const StatusDot = ({ status }) => (
-  <span className={`status status-${status}`}><i />{status === 'paused' ? 'Pausado' : 'Online'}</span>
-);
+export const StatusDot = ({ status }) => {
+  const t = useT();
+  return (
+    <span className={`status status-${status}`}><i />{status === 'paused' ? t('common.paused') : t('common.online')}</span>
+  );
+};
 
 export function EmptyState({ title, body, action }) {
   return <div className="empty"><p className="empty-title">{title}</p>{body && <p className="empty-body">{body}</p>}{action}</div>;
