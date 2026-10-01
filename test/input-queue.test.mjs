@@ -32,24 +32,29 @@ test('createInputQueue agrupa envios na janela', () => {
   scheduled?.();
   assert.equal(out.length, 1);
   assert.equal(out[0].text, 'a\n\nb');
+  q.cancel();
 });
 
 test('createInputQueue flush imediato no envio intencional', () => {
   const out = [];
-  const timers = [];
+  let timerId;
   const q = createInputQueue({
     enabled: true,
     windowMs: 3000,
     onFlush: batch => out.push(batch),
-    schedule: (fn, ms) => { const id = setTimeout(fn, ms); timers.push(id); return id; },
-    clearSchedule: clearTimeout
+    schedule: (fn, ms) => { timerId = setTimeout(fn, ms); return timerId; },
+    clearSchedule: id => { clearTimeout(id); timerId = null; }
   });
-  q.enqueue({ text: 'a' });
-  q.enqueue({ text: 'b' }, { immediate: true });
-  assert.equal(out.length, 1);
-  assert.equal(out[0].text, 'a\n\nb');
-  assert.equal(q.pendingCount(), 0);
-  timers.forEach(clearTimeout);
+  try {
+    q.enqueue({ text: 'a' });
+    q.enqueue({ text: 'b' }, { immediate: true });
+    assert.equal(out.length, 1);
+    assert.equal(out[0].text, 'a\n\nb');
+    assert.equal(q.pendingCount(), 0);
+  } finally {
+    if (timerId != null) clearTimeout(timerId);
+    q.cancel();
+  }
 });
 
 test('flush esvazia fila; cancel descarta sem enviar', () => {
@@ -69,6 +74,7 @@ test('flush esvazia fila; cancel descarta sem enviar', () => {
   q.flush();
   assert.equal(out.length, 1);
   assert.equal(out[0].text, 'y');
+  q.cancel();
 });
 
 test('desabilitado envia cada mensagem sem agrupar', () => {
@@ -77,4 +83,19 @@ test('desabilitado envia cada mensagem sem agrupar', () => {
   q.enqueue({ text: '1' });
   q.enqueue({ text: '2' });
   assert.equal(out.length, 2);
+  q.cancel();
+});
+
+test('scheduleFlush não deixa timer pendente após cancel', () => {
+  let pendingId;
+  const q = createInputQueue({
+    enabled: true,
+    windowMs: 60_000,
+    onFlush: () => {},
+    schedule: (fn, ms) => { pendingId = setTimeout(fn, ms); return pendingId; },
+    clearSchedule: id => { clearTimeout(id); pendingId = null; }
+  });
+  q.enqueue({ text: 'pendente' });
+  q.cancel();
+  assert.equal(pendingId, null);
 });
