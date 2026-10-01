@@ -24,7 +24,7 @@ import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
 import { canUseFile, selectSpeakers, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent, turnPlanIds } from './lib/agent-flow.mjs';
 import { providerAttemptOrder, runProviderAttemptLoop } from './lib/provider-turn.mjs';
 import { normalizeProviderRetry } from './lib/provider-retry.mjs';
-import { applySettingsPatch, applyPluginsPatch, settingsMeta } from './lib/settings-patch.mjs';
+import { patchSettings, settingsMeta, SettingsValidationError } from './lib/settings-patch.mjs';
 import { appendAudit, auditFromApproval, listAudit } from './lib/audit.mjs';
 import { buildAdminOverview } from './lib/admin-overview.mjs';
 import { buildLgpdStatus } from './lib/lgpd-status.mjs';
@@ -117,7 +117,13 @@ if (HOST !== '127.0.0.1' && HOST !== 'localhost' && !TOKEN) {
 
 runBootLint({ host: HOST, port: PORT, token: TOKEN });
 
-class HttpError extends Error { constructor(code, msg) { super(msg); this.code = code; } }
+class HttpError extends Error {
+  constructor(code, msg, details) {
+    super(msg);
+    this.code = code;
+    if (details?.length) this.details = details;
+  }
+}
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.woff2': 'font/woff2', '.json': 'application/json', '.pdf': 'application/pdf', '.ico': 'image/x-icon' };
 const SECURITY = {
   'x-content-type-options': 'nosniff',
@@ -859,9 +865,9 @@ const routes = [
   ['PUT', /^\/api\/settings$/, async req => {
     const b = await body(req), s = db.settings;
     try {
-      applySettingsPatch(s, b);
-      applyPluginsPatch(s, b.plugins, { mergePluginAuth });
+      patchSettings(s, b, { mergePluginAuth });
     } catch (e) {
+      if (e instanceof SettingsValidationError) throw new HttpError(400, e.message, e.details);
       throw new HttpError(400, e.message);
     }
     save();
@@ -1326,7 +1332,11 @@ const server = createServer(async (req, res) => {
   } catch (e) {
     const code = e instanceof HttpError ? e.code : 500;
     if (code === 500) console.error(`[${req.requestId}]`, ...redactForLog(e?.stack || e?.message || String(e)));
-    if (!res.headersSent) json(res, { error: code === 500 ? 'Erro interno. Veja o log do servidor.' : e.message }, code, {}, req); else res.end();
+    if (!res.headersSent) {
+      const payload = { error: code === 500 ? 'Erro interno. Veja o log do servidor.' : e.message };
+      if (e.details?.length) payload.details = e.details;
+      json(res, payload, code, {}, req);
+    } else res.end();
   }
   });
 });
