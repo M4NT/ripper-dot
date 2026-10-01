@@ -46,7 +46,7 @@ function SubMenu({ items, anchor, onClose }) {
   );
 }
 
-export default function ComposerPlusMenu({ open, onClose, anchorRef, onFiles, onFolder, onSlash, onTeach }) {
+export default function ComposerPlusMenu({ open, onClose, anchorRef, onFiles, onFolder, onSlash, onTeach, onCredential }) {
   const { S, refresh } = useApp();
   const pos = useFloating(anchorRef, open);
   const [sub, setSub] = useState(null);
@@ -111,6 +111,11 @@ export default function ComposerPlusMenu({ open, onClose, anchorRef, onFiles, on
       <button type="button" className="menu-item" onClick={() => { onClose(); onTeach(); }}>
         <Icon name="bolt" size={16} />Ensinar uma tarefa
       </button>
+      {onCredential && (
+        <button type="button" className="menu-item" onClick={() => { onClose(); onCredential(); }}>
+          <Icon name="plug" size={16} />Credencial segura (cofre)
+        </button>
+      )}
       <hr className="menu-sep" />
       <button type="button" className="menu-item" onMouseEnter={e => setSub({ type: 'connectors', el: e.currentTarget })} onClick={e => setSub({ type: 'connectors', el: e.currentTarget })}>
         <Icon name="grid" size={16} />Conectores<Icon name="arrowR" size={14} className="menu-chevron" />

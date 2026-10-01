@@ -4,6 +4,8 @@ import { api, fmtSize, go, local, useDark } from './lib.js';
 import { AgentAvatar, Icon, useToast } from './ui.jsx';
 import ModelPicker from './modelPicker.jsx';
 import ComposerPlusMenu from './composerPlusMenu.jsx';
+import BlindCredentialInput from './vault/BlindCredentialInput.jsx';
+import { sessionPayload } from './marketplace/sessionMcp.js';
 
 const SpeechRec = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
 
@@ -19,6 +21,8 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
   const [text, setText] = useState(() => local.get('draft.' + draftKey, ''));
   const [files, setFiles] = useState([]); // { key, name, size, file?, id?, status }
   const [plus, setPlus] = useState(false);
+  const [credentials, setCredentials] = useState([]); // { ref, label }
+  const [credOpen, setCredOpen] = useState(false);
   const [listening, setListening] = useState(false);
   const ta = useRef(null), fileInput = useRef(null), folderInput = useRef(null), plusBtn = useRef(null), rec = useRef(null), base = useRef('');
   const mic = useMicrophone();
@@ -37,7 +41,7 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
   }, []);
 
   const uploading = files.some(f => f.status === 'uploading');
-  const canSend = !streaming && !uploading && (text.trim().length > 0 || files.some(f => f.id));
+  const canSend = !streaming && !uploading && (text.trim().length > 0 || files.some(f => f.id) || credentials.length > 0);
 
   async function addFiles(list) {
     setPlus(false);
@@ -61,8 +65,18 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
   function sendFromComposer(immediate = false) {
     if (!canSend) return;
     const ready = files.filter(f => f.id);
-    onSend({ text: text.trim(), fileIds: ready.map(f => f.id), previews: ready.map(f => ({ id: f.id, name: f.name, type: f.type, url: f.url || `/api/files/${f.id}` })) }, { immediate });
-    setText(''); setFiles([]);
+    const credRefs = credentials.map(c => c.ref);
+    const credNote = credentials.length
+      ? `\n\n[${credentials.map(c => `${c.label} (${c.ref})`).join('; ')}]`
+      : '';
+    onSend({
+      text: (text.trim() + credNote).trim() || (credentials.length ? 'Use as credenciais guardadas no cofre conforme necessário.' : ''),
+      fileIds: ready.map(f => f.id),
+      previews: ready.map(f => ({ id: f.id, name: f.name, type: f.type, url: f.url || `/api/files/${f.id}` })),
+      credentialRefs: credRefs,
+      mcpSession: sessionPayload()
+    }, { immediate });
+    setText(''); setFiles([]); setCredentials([]); setCredOpen(false);
     if (listening) toggleVoice();
   }
 
@@ -130,6 +144,30 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
                 </div>
               );
             })()}
+            {credentials.length > 0 && (
+              <div className="composer-cred-row">
+                {credentials.map(c => (
+                  <span key={c.ref} className="composer-cred-chip">
+                    <Icon name="check" size={12} />{c.label}
+                    <button type="button" aria-label="Remover credencial" onClick={() => setCredentials(cs => cs.filter(x => x.ref !== c.ref))}><Icon name="x" size={12} /></button>
+                  </span>
+                ))}
+              </div>
+            )}
+            {credOpen && (
+              <div className="composer-cred-row">
+                <BlindCredentialInput
+                  label="Senha / token"
+                  purpose="chat"
+                  onVaultRef={ref => {
+                    if (ref) {
+                      setCredentials(cs => [...cs, { ref, label: 'Credencial guardada' }]);
+                      setCredOpen(false);
+                    }
+                  }}
+                />
+              </div>
+            )}
             {files.length > 0 && (
               <div className="attach-row">
                 {files.map(f => (
@@ -152,7 +190,8 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
                 onFiles={() => fileInput.current?.click()}
                 onFolder={() => folderInput.current?.click()}
                 onSlash={openSlash}
-                onTeach={teachTask} />
+                onTeach={teachTask}
+                onCredential={() => { setPlus(false); setCredOpen(true); }} />
               <input ref={fileInput} type="file" multiple hidden accept="image/*,*/*" onChange={e => { addFiles([...e.target.files]); e.target.value = ''; }} />
               <input ref={folderInput} type="file" multiple hidden webkitdirectory="" directory="" onChange={pickFolder} />
               <div className="composer-chips">

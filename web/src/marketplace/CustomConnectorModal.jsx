@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api } from '../lib.js';
 import { Dialog, Icon } from '../ui.jsx';
 import { runMcpOAuthLogin } from './mcpOAuth.js';
+import BlindCredentialInput, { isSensitiveFieldName } from '../vault/BlindCredentialInput.jsx';
 
 const AUTH_MODES = [
   ['oauth_now', 'Entrar agora', 'Cada usuário faz login pelo fluxo OAuth do servidor antes de usar ferramentas.'],
@@ -26,10 +27,11 @@ export default function CustomConnectorModal({ open, onClose, onSaved }) {
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
   const [headers, setHeaders] = useState([]);
+  const [clientSecretRef, setClientSecretRef] = useState('');
 
   function reset() {
     setStep('form'); setName(''); setUrl(''); setVerify(null); setBusy(false);
-    setAuthMode('oauth_now'); setOauthClient('published'); setClientId(''); setClientSecret(''); setHeaders([]);
+    setAuthMode('oauth_now'); setOauthClient('published'); setClientId(''); setClientSecret(''); setClientSecretRef(''); setHeaders([]);
   }
 
   function close() { reset(); onClose(); }
@@ -66,7 +68,7 @@ export default function CustomConnectorModal({ open, onClose, onSaved }) {
             mode: authMode,
             oauthClient,
             clientId: oauthClient === 'custom' ? clientId : '',
-            clientSecret: oauthClient === 'custom' ? clientSecret : ''
+            clientSecret: oauthClient === 'custom' ? (clientSecretRef || clientSecret) : ''
           },
           headers: hdr
         }
@@ -166,7 +168,14 @@ export default function CustomConnectorModal({ open, onClose, onSaved }) {
               {oauthClient === 'custom' && (
                 <div className="conn-custom-oauth">
                   <input className="input" placeholder="Client ID" value={clientId} onChange={e => setClientId(e.target.value)} />
-                  <input className="input" placeholder="Client secret" type="password" value={clientSecret} onChange={e => setClientSecret(e.target.value)} />
+                  {clientSecretRef ? (
+                    <BlindCredentialInput label="Client secret" purpose="oauth" vaultRef={clientSecretRef} onVaultRef={setClientSecretRef} />
+                  ) : (
+                    <>
+                      <BlindCredentialInput label="Client secret" purpose="oauth" onVaultRef={setClientSecretRef} />
+                      <input className="input" placeholder="Ou digite legado (não recomendado)" type="password" value={clientSecret} onChange={e => setClientSecret(e.target.value)} />
+                    </>
+                  )}
                   <small>Registre o redirect URI <code>{typeof window !== 'undefined' ? `${window.location.origin}/api/mcp/oauth/callback` : '/api/mcp/oauth/callback'}</code> no seu provedor.</small>
                 </div>
               )}
@@ -177,11 +186,20 @@ export default function CustomConnectorModal({ open, onClose, onSaved }) {
           )}
           <section className="conn-section">
             <h3>Cabeçalhos de requisição</h3>
-            <p className="muted small">Enviados em cada requisição (máx. 4). Armazenados com segurança.</p>
+            <p className="muted small">Enviados em cada requisição (máx. 4). Valores sensíveis: use o cofre (referência vlt_…).</p>
             {headers.map((h, i) => (
               <div key={i} className="conn-header-row">
                 <input className="input" placeholder="Nome" value={h.name} onChange={e => setHeaders(rs => rs.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} />
-                <input className="input" placeholder="Valor" value={h.value} onChange={e => setHeaders(rs => rs.map((x, j) => j === i ? { ...x, value: e.target.value } : x))} />
+                {isSensitiveFieldName(h.name) || /^vlt_/.test(h.value || '') ? (
+                  <BlindCredentialInput
+                    label={h.name || 'Cabeçalho'}
+                    purpose="connector-header"
+                    vaultRef={/^vlt_/.test(h.value || '') ? h.value : ''}
+                    onVaultRef={ref => setHeaders(rs => rs.map((x, j) => j === i ? { ...x, value: ref } : x))}
+                  />
+                ) : (
+                  <input className="input" placeholder="Valor" value={h.value} onChange={e => setHeaders(rs => rs.map((x, j) => j === i ? { ...x, value: e.target.value } : x))} />
+                )}
               </div>
             ))}
             {headers.length < 4 && (

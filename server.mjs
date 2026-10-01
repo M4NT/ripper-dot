@@ -113,8 +113,16 @@ import {
 import { redactRoutine, redactSseEvent, redactJsonPayload, redactForLog, redactSecretsInText } from './lib/redact.mjs';
 import { installLogRedactionMiddleware } from './lib/log-redact-middleware.mjs';
 import { logger, configureLogger, runWithRequestContext, shouldLogHttpRoute } from './lib/logger.mjs';
-
-installLogRedactionMiddleware();
+import {
+  assertVaultStoreBody,
+  generateVaultRef,
+  isVaultRef,
+  redactVaultEntry,
+  sanitizeHeaderValueForStorage,
+  validateSealedBlob,
+  vaultContextFromSession,
+  resolvePluginsVaultSecrets
+} from './lib/credential-vault.mjs';
 import { collectDiagnostics } from './lib/diagnostics.mjs';
 import { runBootLint } from './lib/boot-lint.mjs';
 import {
@@ -166,6 +174,8 @@ import {
   taskSyncBridgeStatus,
   upsertTaskDelegation
 } from './lib/task-sync-bridge.mjs';
+
+installLogRedactionMiddleware();
 
 function settingsForMcp(s, mcpSession) {
   return settingsForMcpSession(s, mcpSession);
@@ -260,7 +270,7 @@ function chatDetail(c, cid) {
   };
 }
 
-async function streamChatResponse(req, c, { text, fileIds, mcpSession, resume = false }, res) {
+async function streamChatResponse(req, c, { text, fileIds, mcpSession, resume = false, credentialRefs }, res) {
   res.writeHead(200, hdr(req, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store', 'x-accel-buffering': 'no' }));
   const emitRaw = e => {
     if (!res.writable) return;
@@ -280,7 +290,9 @@ async function streamChatResponse(req, c, { text, fileIds, mcpSession, resume = 
     emitRaw(e);
   };
   try {
-    await chat({ chat: c, text, fileIds, signal: streamSignal, mcpSession, skipUserPush: resume }, chatEmit);
+    await chat({
+      chat: c, text, fileIds, signal: streamSignal, mcpSession, skipUserPush: resume, credentialRefs
+    }, chatEmit);
     completed = !streamSignal.aborted;
   } finally {
     clearInterval(ping);
@@ -545,8 +557,15 @@ async function syncLocalFiles(agent, chat) {
   }
 }
 
-async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0, mcpSession }, emit) {
-  const s = settingsForMcp(db.settings, mcpSession);
+async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0, mcpSession, credentialRefs }, emit) {
+  let s = settingsForMcp(db.settings, mcpSession);
+  const vault = vaultContextFromSession(mcpSession, db);
+  if (vault.dek) {
+    s = { ...s, plugins: await resolvePluginsVaultSecrets(s.plugins || [], vault) };
+  }
+  if (credentialRefs?.length) {
+    prompt += `\n\n[O usuário anexou credenciais guardadas no cofre (${credentialRefs.join(', ')}) para uso em conectores MCP. Nunca peça senha ou token em texto claro.]`;
+  }
   const name = id => db.agents.find(a => a.id === id)?.name || 'Outro agente';
   // Em grupo, a fala dos colegas chega rotulada com o nome de quem falou.
   const label = m => labelMessageForAgent(m, agent.id, name, { group });
@@ -804,12 +823,17 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
   else recordChatTurn('error');
 }
 
-async function chat({ chat, text, fileIds, signal, mcpSession, skipUserPush = false }, emit) {
+async function chat({ chat, text, fileIds, signal, mcpSession, skipUserPush = false, credentialRefs }, emit) {
   logger.info('chat.turn.start', { chatId: chat.id, resume: skipUserPush });
+  const refs = (credentialRefs || []).filter(isVaultRef);
   try {
   if (!skipUserPush) {
     const uid = id();
-    chat.messages.push({ id: uid, role: 'user', content: text, files: fileIds?.length ? fileIds : undefined, at: Date.now() });
+    chat.messages.push({
+      id: uid, role: 'user', content: text, files: fileIds?.length ? fileIds : undefined,
+      ...(refs.length ? { credentialRefs: refs } : {}),
+      at: Date.now()
+    });
     if (chat.run?.status === 'running' && !chat.run.userMessageId) chat.run.userMessageId = uid;
   }
   const members = groupMembers(chat, db.agents);
@@ -832,7 +856,11 @@ async function chat({ chat, text, fileIds, signal, mcpSession, skipUserPush = fa
     const extra = await buildMessageAttachments(db, agent, chat, fileIds);
     for (const w of attachmentWarnings(extra)) emit({ warn: w });
     const before = chat.messages.length;
-    await turn({ agent, chat, text, prompt: extra.text ? `${text}\n\n${extra.text}` : text, images: extra.images, signal, group, mcpSession }, emit);
+    await turn({
+      agent, chat, text,
+      prompt: extra.text ? `${text}\n\n${extra.text}` : text,
+      images: extra.images, signal, group, mcpSession, credentialRefs: refs
+    }, emit);
     const reply = chat.messages.length > before ? chat.messages.at(-1) : null;
     if (group && reply && isPass(reply.content)) { chat.messages.pop(); emit({ passed: agent.id }); }
     else if (group && reply) {
@@ -1030,7 +1058,9 @@ const routes = [
     }
     if (b.auth) created.auth = mergePluginAuth(undefined, b.auth);
     if (b.headers && typeof b.headers === 'object') {
-      created.headers = Object.fromEntries(Object.entries(b.headers).slice(0, 4).map(([k, v]) => [String(k).slice(0, 80), String(v).slice(0, 500)]));
+      created.headers = Object.fromEntries(
+        Object.entries(b.headers).slice(0, 4).map(([k, v]) => [String(k).slice(0, 80), sanitizeHeaderValueForStorage(k, v)])
+      );
     }
     db.settings.plugins = [...prev, created];
     save();
@@ -1046,8 +1076,8 @@ const routes = [
     if (b.headers) {
       next.headers = Object.fromEntries(
         (Array.isArray(b.headers)
-          ? b.headers.filter(h => h?.name).map(h => [String(h.name).slice(0, 80), String(h.value || '').slice(0, 500)])
-          : Object.entries(b.headers)
+          ? b.headers.filter(h => h?.name).map(h => [String(h.name).slice(0, 80), sanitizeHeaderValueForStorage(h.name, h.value)])
+          : Object.entries(b.headers).map(([k, v]) => [k, sanitizeHeaderValueForStorage(k, v)])
         ).slice(0, 4)
       );
     }
@@ -1068,11 +1098,42 @@ const routes = [
     if (raw) {
       try { mcpSession = JSON.parse(raw); } catch { throw new HttpError(400, 'mcpSession JSON inválido.'); }
     }
-    return listMcpToolCatalog(db.settings, mcpSession);
+    return listMcpToolCatalog(db.settings, mcpSession, { credentialVault: db.credentialVault });
   }],
   ['POST', /^\/api\/mcp\/tools$/, async req => {
     const b = await body(req);
-    return listMcpToolCatalog(db.settings, b.mcpSession);
+    return listMcpToolCatalog(db.settings, b.mcpSession, { credentialVault: db.credentialVault });
+  }],
+  ['GET', /^\/api\/vault\/entries$/, () => ({
+    entries: Object.entries(db.credentialVault || {}).map(([ref, e]) => ({ ref, ...redactVaultEntry(e) }))
+  })],
+  ['GET', /^\/api\/vault\/entries\/(vlt_[\w-]+)$/, (req, [ref]) => {
+    const e = db.credentialVault?.[ref];
+    if (!e) throw new HttpError(404, 'Credencial não encontrada.');
+    return { ref, label: e.label, purpose: e.purpose, createdAt: e.createdAt, sealed: e.sealed };
+  }],
+  ['POST', /^\/api\/vault\/entries$/, async req => {
+    const b = await body(req);
+    try { assertVaultStoreBody(b); } catch (e) { throw new HttpError(400, e.message); }
+    let meta;
+    try { meta = validateSealedBlob(b.sealed); } catch (e) { throw new HttpError(400, e.message); }
+    const ref = generateVaultRef();
+    db.credentialVault = db.credentialVault || {};
+    db.credentialVault[ref] = {
+      sealed: b.sealed,
+      label: meta.label || b.label || 'Credencial',
+      purpose: meta.purpose || b.purpose || 'connector',
+      createdAt: Date.now()
+    };
+    save();
+    return { ref, label: db.credentialVault[ref].label, purpose: db.credentialVault[ref].purpose };
+  }],
+  ['DELETE', /^\/api\/vault\/entries\/(vlt_[\w-]+)$/, (req, [ref]) => {
+    if (!db.credentialVault?.[ref]) throw new HttpError(404, 'Credencial não encontrada.');
+    const { [ref]: _, ...rest } = db.credentialVault;
+    db.credentialVault = rest;
+    save();
+    return { ok: true };
   }],
   ['GET', /^\/api\/mcp\/session\/connectors$/, (req, _, url) => {
     let mcpSession;
@@ -1723,7 +1784,10 @@ const routes = [
       beginChatRun(c, { runId: id(), userMessageId: null });
       save();
       const idemCapture = idem ? captureResponseBody(res) : null;
-      await streamChatResponse(req, c, { text, fileIds, mcpSession: b.mcpSession, resume: false }, res);
+      const credentialRefs = Array.isArray(b.credentialRefs) ? b.credentialRefs.filter(isVaultRef) : [];
+      await streamChatResponse(req, c, {
+        text, fileIds, mcpSession: b.mcpSession, resume: false, credentialRefs
+      }, res);
       if (idem && idemCapture) idem.complete(idemCapture.snapshot());
     } catch (e) {
       if (idem && !res.headersSent) idem.release();

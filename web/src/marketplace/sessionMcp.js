@@ -1,5 +1,6 @@
 import { local } from '../lib.js';
 import { BUILTIN_CONNECTORS } from './catalog.js';
+import { getVaultDekB64url } from '../vault/crypto.js';
 
 const KEY = 'mcp.session.disabled';
 
@@ -23,9 +24,12 @@ export function setSessionEnabled(id, enabled) {
 export function sessionPayload() {
   const disabled = getSessionDisabled();
   const uiOnly = new Set(['claude-chrome', 'inspo', 'claude-connectors']);
+  let vaultDek;
+  try { vaultDek = getVaultDekB64url(); } catch { vaultDek = undefined; }
   return {
     disabledPlugins: disabled.filter(id => !uiOnly.has(id)),
-    claudeConnectors: !disabled.includes('claude-connectors')
+    claudeConnectors: !disabled.includes('claude-connectors'),
+    ...(vaultDek ? { vaultDek } : {})
   };
 }
 
