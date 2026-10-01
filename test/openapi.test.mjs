@@ -70,6 +70,9 @@ test('GET /openapi.json retorna OpenAPI 3 válido', async () => {
     assert.ok(doc.paths['/healthz']);
     assert.ok(doc.components?.securitySchemes?.bearerAuth);
     assert.match(doc.info.description, /RIPPER_METRICS_PUBLIC/);
+    assert.match(doc.info.description, /Idempotency-Key/);
+    const chatPost = doc.paths['/api/chat'].post;
+    assert.ok(chatPost.parameters?.some(p => p.name === 'Idempotency-Key' || p.$ref?.includes('idempotencyKey')));
 
     const m = await fetch(base + '/metrics', { headers: { authorization: `Bearer ${token}` } });
     assert.equal(m.status, 200);
