@@ -125,3 +125,5 @@ Na subida, o Ripper valida variáveis críticas (`lib/boot-lint.mjs`): em desenv
 **Backup:** em Configurações → Segurança, use *Baixar backup* (`GET /api/data/backup`) para exportar `db.json` com metadados. *Restaurar* (`POST /api/data/restore` com `confirm: true`) substitui o estado em memória e grava `db.pre-restore.<timestamp>.backup.json` antes. Para cópia completa (uploads, `usage.sqlite`, `julia.sqlite`), copie a pasta `RIPPER_DATA` no disco. Migrações de schema criam `db.pre-v2.backup.json` automaticamente.
 
 **Diagnóstico:** `GET /api/diagnostics` (autenticado) devolve contagem real de agentes/conversas, presença dos arquivos de dados e status do Julia/Docker/Codex — sem pontuações inventadas.
+
+**Métricas (Prometheus):** `GET /metrics` expõe contadores/gauges operacionais (`ripper_http_requests_total`, `ripper_chat_turns_total`, `ripper_http_in_flight`, `ripper_process_uptime_seconds`) — sem uso fictício nem billing. Com `RIPPER_TOKEN` definido, o scrape exige o mesmo Bearer/cookie das APIs, **ou** defina `RIPPER_METRICS_PUBLIC=1` para liberar o endpoint só para coletores (ex.: Prometheus no cluster).

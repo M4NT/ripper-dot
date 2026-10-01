@@ -122,6 +122,32 @@ test('CORS: POST com origem fora da allowlist retorna 403', async () => {
   });
 });
 
+test('GET /metrics exige token ou RIPPER_METRICS_PUBLIC', async () => {
+  await withServer({}, async (base, token) => {
+    const denied = await fetch(base + '/metrics');
+    assert.equal(denied.status, 401);
+
+    const r1 = await fetch(base + '/api/health', { headers: { authorization: `Bearer ${token}` } });
+    assert.equal(r1.status, 200);
+
+    const m = await fetch(base + '/metrics', { headers: { authorization: `Bearer ${token}` } });
+    assert.equal(m.status, 200);
+    assert.match(m.headers.get('content-type') || '', /text\/plain; version=0\.0\.4/);
+    const body = await m.text();
+    assert.match(body, /ripper_http_requests_total/);
+    assert.match(body, /ripper_process_uptime_seconds/);
+    assert.match(body, /route="\/api\/health",status="200"/);
+  });
+});
+
+test('GET /metrics com RIPPER_METRICS_PUBLIC=1 sem Bearer', async () => {
+  await withServer({ RIPPER_METRICS_PUBLIC: '1' }, async base => {
+    const m = await fetch(base + '/metrics');
+    assert.equal(m.status, 200);
+    assert.match(await m.text(), /ripper_http_in_flight/);
+  });
+});
+
 test('GET /api/health exige RIPPER_TOKEN', async () => {
   await withServer({}, async base => {
     const denied = await fetch(base + '/api/health');

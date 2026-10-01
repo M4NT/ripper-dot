@@ -47,6 +47,7 @@ Abra `http://127.0.0.1:3000` (porta padrão). Variáveis úteis:
 | `RIPPER_RATE_CHAT_PER_MINUTE` | (settings) | Máximo de `POST /api/chat` por janela, por token e por IP |
 | `RIPPER_RATE_API_PER_MINUTE` | (settings) | Máximo de backup/restore, export de metering e APIs pesadas por janela |
 | `RIPPER_RATE_WINDOW_MS` | `60000` | Duração da janela em ms (contadores só na memória deste processo) |
+| `RIPPER_METRICS_PUBLIC` | (vazio) | Se `1`, `GET /metrics` fica acessível sem token (scrape Prometheus/K8s); padrão segue o mesmo auth de `/api/*` |
 
 Em Docker/Kubernetes o orquestrador envia `SIGTERM` ao parar o container. O servidor deixa de aceitar conexões novas, responde **503** em rotas `/api/*` enquanto drena requisições em andamento, persiste `db.json` e fecha os SQLite de uso/Julia/coordenação.
 

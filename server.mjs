@@ -83,6 +83,15 @@ import { redactRoutine, redactSseEvent, redactJsonPayload, redactForLog } from '
 import { logger, configureLogger, runWithRequestContext, shouldLogHttpRoute } from './lib/logger.mjs';
 import { collectDiagnostics } from './lib/diagnostics.mjs';
 import { runBootLint } from './lib/boot-lint.mjs';
+import {
+  metricsAccessAllowed,
+  incrementHttpInFlight,
+  recordHttpRequest,
+  recordChatTurn,
+  normalizeMetricRoute,
+  formatPrometheusExposition,
+  prometheusContentType
+} from './lib/metrics.mjs';
 import { buildBackupPayload, restoreBackupPayload, listAutoBackups } from './lib/backup.mjs';
 import { memoAsync } from './lib/ttl-cache.mjs';
 import { attachRequestId } from './lib/request-id.mjs';
@@ -536,7 +545,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
     }
     emit(ev);
   };
-  await runProviderAttemptLoop({
+  const loopResult = await runProviderAttemptLoop({
     order,
     signal,
     retry: normalizeProviderRetry(s),
@@ -575,6 +584,9 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
       if (!canFallback) push(out, steps, { model: m, error: e.message });
     }
   });
+  if (loopResult.aborted) recordChatTurn('interrupted');
+  else if (loopResult.ok) recordChatTurn('ok');
+  else recordChatTurn('error');
 }
 
 async function chat({ chat, text, fileIds, signal, mcpSession }, emit) {
@@ -1248,6 +1260,17 @@ const server = createServer(async (req, res) => {
   attachRequestId(req, res);
   const url = new URL(req.url, 'http://x');
   const p = url.pathname;
+  const metricRoute = normalizeMetricRoute(p);
+  incrementHttpInFlight(1);
+  let metricDone = false;
+  const finishMetric = status => {
+    if (metricDone) return;
+    metricDone = true;
+    recordHttpRequest(req.method, metricRoute, status);
+    incrementHttpInFlight(-1);
+  };
+  res.on('finish', () => finishMetric(res.statusCode || 0));
+  res.on('close', () => { if (!metricDone) finishMetric(res.headersSent ? (res.statusCode || 0) : 0); });
   await runWithRequestContext(req, p, async () => {
   const httpLog = shouldLogHttpRoute(p);
   const httpStarted = httpLog ? Date.now() : 0;
@@ -1262,6 +1285,13 @@ const server = createServer(async (req, res) => {
     if (TOKEN && url.searchParams.get('token') === TOKEN) {
       res.writeHead(302, { 'set-cookie': `ripper_token=${encodeURIComponent(TOKEN)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`, location: '/' });
       return res.end();
+    }
+    if (req.method === 'GET' && p === '/metrics') {
+      if (!metricsAccessAllowed(req, TOKEN)) throw new HttpError(401, 'Não autorizado.');
+      const metricsBody = formatPrometheusExposition();
+      res.writeHead(200, hdr(req, { 'content-type': prometheusContentType(), 'cache-control': 'no-store' }));
+      res.end(metricsBody);
+      return;
     }
     const hook = req.method === 'POST' && /^\/api\/hooks\/([a-f0-9]{48})$/.exec(p);
     if (hook) {
