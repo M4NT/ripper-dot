@@ -6,7 +6,7 @@ import { gzipSync } from 'node:zlib';
 import { extname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { authed as checkAuth } from './lib/auth.mjs';
-import { load, save, flush, id, newAgent, patchAgent, dataUrl, checkStoreReady } from './lib/store.mjs';
+import { load, save, flush, id, newAgent, patchAgent, dataUrl, safeCheckStoreReady } from './lib/store.mjs';
 import { route, classifySpeaker, MODELS, EFFORTS } from './lib/router.mjs';
 import { computerFor } from './lib/boat.mjs';
 import { dockerAvailable, imageStatus, ensureImage, hostnameOf } from './lib/docker.mjs';
@@ -25,6 +25,7 @@ import { canUseFile, selectSpeakers, routineDue, Floor, isPass, heuristicSpeaker
 import { providerAttemptOrder, runProviderAttemptLoop } from './lib/provider-turn.mjs';
 import { normalizeProviderRetry } from './lib/provider-retry.mjs';
 import { patchSettings, settingsMeta, SettingsValidationError } from './lib/settings-patch.mjs';
+import { effectiveFeatureFlags } from './lib/feature-flags.mjs';
 import { appendAudit, auditFromApproval, listAudit } from './lib/audit.mjs';
 import { buildAdminOverview } from './lib/admin-overview.mjs';
 import { buildLgpdStatus } from './lib/lgpd-status.mjs';
@@ -266,7 +267,11 @@ async function deliver(m) {
   finally { inboxBusy.delete(m.to); save(); setTimeout(dispatchInbox, 50); }
 }
 function dispatchInbox() {
-  for (const m of dueMessages(db.messages, [...inboxBusy])) deliver(m);
+  try {
+    for (const m of dueMessages(db.messages, [...inboxBusy])) deliver(m);
+  } catch (e) {
+    console.error('inbox.dispatch_failed', e?.code || e?.message || String(e));
+  }
 }
 setInterval(dispatchInbox, 5_000);
 repairInboxOnStartup(db.messages);
@@ -673,7 +678,8 @@ const routes = [
         providerSnapshot: b.providerSnapshot,
         contextWindow: { ...b.contextWindow, emptyLabel: 'sem dados', available: false, hasData: false }
       };
-    })()
+    })(),
+    meta: settingsMeta()
   })],
   ['GET', /^\/api\/usage$/, async (req, _, url) => {
     const chatId = url.searchParams.get('chatId') || undefined;
@@ -863,6 +869,7 @@ const routes = [
     };
   }],
   ['GET', /^\/api\/settings$/, () => ({ settings: redact(db.settings), meta: settingsMeta() })],
+  ['GET', /^\/api\/flags$/, () => ({ flags: effectiveFeatureFlags(db.settings) })],
   ['PUT', /^\/api\/settings$/, async req => {
     const b = await body(req), s = db.settings;
     try {
@@ -1259,16 +1266,21 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === 'GET' && (p === '/healthz' || p === '/readyz')) {
       if (p === '/healthz') return json(res, probePayload(), 200, {}, req);
-      if (isShuttingDown()) {
-        return json(res, {
-          ok: false,
-          reason: 'shutting_down',
-          version: APP_PKG.version,
-          uptimeSeconds: Math.floor((Date.now() - SERVER_STARTED_AT) / 1000)
-        }, 503, {}, req);
+      const uptimeSeconds = Math.floor((Date.now() - SERVER_STARTED_AT) / 1000);
+      const notReady = (reason, code = 503) => json(res, {
+        ok: false,
+        reason,
+        version: APP_PKG.version,
+        uptimeSeconds
+      }, code, {}, req);
+      try {
+        if (isShuttingDown()) return notReady('shutting_down');
+        const ready = safeCheckStoreReady();
+        if (!ready.ok) return notReady(ready.reason || 'store_unavailable');
+        return json(res, probePayload(), 200, {}, req);
+      } catch (e) {
+        return notReady(e?.code || e?.message || 'store_unavailable');
       }
-      const ready = checkStoreReady();
-      return json(res, ready.ok ? probePayload() : { ok: false, reason: ready.reason, version: APP_PKG.version, uptimeSeconds: Math.floor((Date.now() - SERVER_STARTED_AT) / 1000) }, ready.ok ? 200 : 503, {}, req);
     }
     if (req.method === 'GET' && p === '/api/mcp/oauth/callback') {
       const code = url.searchParams.get('code');
@@ -1403,8 +1415,12 @@ function runRoutine(r, event) {
 }
 
 const routineTimer = setInterval(() => {
-  const now = new Date();
-  for (const r of db.routines) if (routineDue(r, now)) runRoutine(r);
+  try {
+    const now = new Date();
+    for (const r of db.routines) if (routineDue(r, now)) runRoutine(r);
+  } catch (e) {
+    console.error('routine.tick_failed', e?.code || e?.message || String(e));
+  }
 }, 30_000);
 if (typeof routineTimer.unref === 'function') routineTimer.unref();
 

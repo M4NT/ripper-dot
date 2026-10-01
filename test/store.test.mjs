@@ -110,6 +110,18 @@ test('checkStoreReady reflete acesso à pasta de dados', () =>
     }
   }));
 
+test('flush não derruba o processo quando a pasta de dados fica inacessível', () =>
+  withDataDir(async ({ load, flush, checkStoreReady }, dir) => {
+    load();
+    chmodSync(dir, 0);
+    try {
+      flush();
+      assert.equal(checkStoreReady().ok, false);
+    } finally {
+      chmodSync(dir, 0o700);
+    }
+  }));
+
 test('patchAgent filtra campos e ferramentas desconhecidas', async () => {
   const { newAgent, patchAgent } = await import('../lib/store.mjs');
   const a = newAgent({ tools: ['web', 'bogus'] });

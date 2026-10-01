@@ -40,3 +40,12 @@ test('applySettingsPatch rejeita ui.mode inválido', () => {
   const s = { defaultModel: 'auto', claude: {}, computer: {} };
   assert.throws(() => applySettingsPatch(s, { ui: { mode: 'completa' } }), /interface/);
 });
+
+test('applySettingsPatch normaliza flags', () => {
+  const s = { defaultModel: 'auto', claude: {}, computer: {}, flags: { chaosUi: false } };
+  applySettingsPatch(s, { flags: { chaosUi: true, evil: true } });
+  assert.equal(s.flags.chaosUi, true);
+  assert.equal(s.flags.evil, undefined);
+  applySettingsPatch(s, { flags: { allowCustom: true, evil: true } });
+  assert.equal(s.flags.evil, true);
+});
