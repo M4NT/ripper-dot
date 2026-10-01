@@ -458,7 +458,7 @@ test('POST /api/x9/scan exige enterprise e retorna findings', async () => {
     assert.equal(r.status, 200);
     const body = await r.json();
     assert.ok(Array.isArray(body.findings));
-    assert.ok(body.sources?.settings?.available);
+    assert.ok(body.sources?.ripperSettings?.available);
     assert.equal(body.sources.adminOverview.available, true);
     assert.equal(body.sources.lgpd.available, true);
   });
