@@ -384,6 +384,11 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
             <Card title={tr('settings.security.historyTitle')} desc={tr('settings.security.historyDesc')}>
               <ApprovalHistory limit={15} />
             </Card>
+            {s.flags?.socialWebhooks && (
+              <Card title="Publicação social" desc="Webhooks HTTP para posts externos. Tokens na URL são armazenados localmente; publicar pede aprovação nas políticas acima (exceto “Nunca pedir” ou autonomia total no Enterprise).">
+                <div className="set-actions"><button type="button" className="btn btn-sm" onClick={() => go('/connectors')}><Icon name="share" size={16} />Gerenciar webhooks sociais</button></div>
+              </Card>
+            )}
             <AdvancedBlock settings={s} hint="Limite de taxa">
               <Card title="Limite de taxa" desc="Evita loops acidentais no chat e em APIs pesadas (backup, restore, export de metering). Contadores ficam na memória deste processo — várias réplicas não compartilham o mesmo limite. Variáveis RIPPER_RATE_* no servidor têm prioridade.">
                 <Row title="Ativar limite de taxa" desc="Respostas 429 com Retry-After quando exceder."><Switch checked={!!s.rateLimit?.enabled} onChange={v => set('rateLimit', { ...(s.rateLimit || {}), enabled: v })} label="Limite de taxa" /></Row>

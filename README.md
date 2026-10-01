@@ -10,7 +10,7 @@ Aplicação local para criar agentes de IA, conversar individualmente ou em grup
 
 ## Claude e Codex: ferramentas Ripper
 
-Os agentes usam o mesmo conjunto de **ferramentas builtin** do Ripper (`remember`, `schedule_routine`, navegador, computador, artefatos, skills, `send_message`) quando o modelo e as permissões do agente permitem:
+Os agentes usam o mesmo conjunto de **ferramentas builtin** do Ripper (`remember`, `schedule_routine`, navegador, computador, artefatos, skills, `send_message`, `post_social` / `send_webhook` quando há webhooks configurados) quando o modelo e as permissões do agente permitem:
 
 | Capacidade | Claude (Agent SDK) | Codex (CLI `codex exec`) |
 | --- | --- | --- |
@@ -77,6 +77,16 @@ Se o modelo ou o pacote Python estiver mal configurado, `julia/serve.py` **encer
 - Em **Configurações → Modelos**, o selo mostra “fora do ar”; `GET /api/julia/status` devolve `{ online, url, reason }`.
 
 Confira o endereço em Configurações (padrão `http://127.0.0.1:8765`) se mudou a porta.
+
+## Publicação social (webhooks)
+
+MVP leve para saída em canais externos (Slack incoming webhook, HTTP genérico):
+
+1. **Conectores → Webhooks sociais** — cadastre `{ nome, URL HTTPS, ativo }`. URLs são mascaradas na API (`••••`); tokens na query string são segredos — não exponha em capturas nem em chats públicos.
+2. No agente, ative a ferramenta **Publicação social**.
+3. O modelo usa `post_social` / `send_webhook` com corpo `{ text }`. `draft=true` só rascunha. Publicar de verdade pede aprovação conforme **Configurações → Segurança** (exceto política “Nunca pedir”). O Ripper **não** inventa curtidas, alcance ou outras métricas.
+
+Também acessível em **Mais opções** (composer) → Conectores → Webhooks sociais.
 
 ## Testes
 

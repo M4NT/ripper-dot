@@ -7,6 +7,8 @@ import BrandIcon from '../marketplace/BrandIcon.jsx';
 import CustomConnectorModal from '../marketplace/CustomConnectorModal.jsx';
 import { listMyConnectors } from '../marketplace/state.js';
 import { authStatusLabel, refreshMcpOAuth, runMcpOAuthLogin } from '../marketplace/mcpOAuth.js';
+import SocialWebhooksPanel from '../marketplace/SocialWebhooksPanel.jsx';
+import { isEnterpriseMode } from '../uiMode.js';
 
 function RowIcon({ id }) {
   const stroke = { plug: 'plug', terminal: 'terminal', bulb: 'bulb', cube: 'cube' };
@@ -114,6 +116,7 @@ export default function Connectors() {
         }
       >
         <Mine settings={S.settings} authByName={authByName} onRefresh={refreshOAuth} busyAuth={busyAuth} refresh={refresh} />
+        {isEnterpriseMode(S.settings) && S.settings.flags?.socialWebhooks && <SocialWebhooksPanel />}
       </HubShell>
       <CustomConnectorModal open={customOpen} onClose={() => setCustomOpen(false)} onSaved={refresh} />
     </>

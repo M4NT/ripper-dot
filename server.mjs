@@ -27,7 +27,14 @@ import { trackInboxDelegation, taskItemsSummary } from './lib/task-items.mjs';
 import { closeTaskFromInboxReply } from './lib/task-closure.mjs';
 import { createGoogleTasksSync } from './lib/google-tasks-sync.mjs';
 import { rememberAllowedCommand, execNeedsApproval } from './lib/permissions.mjs';
-import { browserAutonomyGate, shareAutonomyGate, effectiveApprovalPolicy, sanitizeAutonomyLevel } from './lib/autonomy.mjs';
+import { browserAutonomyGate, shareAutonomyGate, socialPostAutonomyGate, effectiveApprovalPolicy, sanitizeAutonomyLevel } from './lib/autonomy.mjs';
+import {
+  enabledSocialWebhooks,
+  resolveSocialWebhook,
+  socialPostNeedsApproval,
+  socialApprovalCommand,
+  postToSocialWebhook
+} from './lib/social-webhooks.mjs';
 import { listChatsPage } from './lib/history.mjs';
 import { tryClaimRoutine, releaseRoutineClaim } from './lib/persist-coord.mjs';
 import { browserFor, browserRisk } from './lib/browser.mjs';
@@ -40,7 +47,7 @@ import { normalizeProviderRetry } from './lib/provider-retry.mjs';
 import { patchSettings, settingsMeta, SettingsValidationError } from './lib/settings-patch.mjs';
 import { normalizeContextPruning, pruneContextMessages } from './lib/context-pruning.mjs';
 import { coalesceSendParts } from './lib/input-queue.mjs';
-import { effectiveFeatureFlags } from './lib/feature-flags.mjs';
+import { effectiveFeatureFlags, isFlagEnabled } from './lib/feature-flags.mjs';
 import { applyAccessControlPatch } from './lib/access-control-patch.mjs';
 import { canDelegate, delegationDeniedMessage, normalizeAccessControl, accessControlMeta } from './lib/rbac.mjs';
 import { executeLgpdErasure, lgpdMeta } from './lib/lgpd-pii.mjs';
@@ -714,7 +721,34 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
         return `Skill "${k.name}" salva.`;
       }
     },
-    scheduleRoutine: a => { db.routines.push({ id: id(), agentId: agent.id, lastRun: 0, name: a.name, prompt: a.prompt, everyMinutes: a.everyMinutes, dailyAt: a.dailyAt, weekday: a.weekday }); save(); emit({ routine: a.name }); }
+    scheduleRoutine: a => { db.routines.push({ id: id(), agentId: agent.id, lastRun: 0, name: a.name, prompt: a.prompt, everyMinutes: a.everyMinutes, dailyAt: a.dailyAt, weekday: a.weekday }); save(); emit({ routine: a.name }); },
+    social: agent.tools.includes('social') && isFlagEnabled(s, 'socialWebhooks') ? {
+      webhooks: enabledSocialWebhooks(s),
+      list: () => {
+        const rows = enabledSocialWebhooks(s).map(h => ({ id: h.id, name: h.name }));
+        return rows.length
+          ? `Webhooks ativos: ${rows.map(r => `${r.name} (${r.id})`).join('; ')}`
+          : 'Nenhum webhook social ativo. Configure em Conectores → Webhooks sociais.';
+      },
+      post: async a => {
+        const hook = resolveSocialWebhook(s, a.webhookId);
+        const body = String(a.text || '');
+        if (!body.trim()) return 'Texto vazio; nada a publicar.';
+        if (a.draft) return `Rascunho para "${hook.name}" (não enviado):\n${body.slice(0, 2000)}`;
+        const autonomy = socialPostAutonomyGate(agent, s);
+        if (typeof autonomy === 'string') return `Esta ação não é permitida (${autonomy}).`;
+        const cmd = socialApprovalCommand(hook, body);
+        const globalPolicy = s.approvalPolicy || 'risky';
+        const policy = effectiveApprovalPolicy(agent, globalPolicy, s);
+        const reason = autonomy === null ? null : socialPostNeedsApproval({ policy, commandKey: cmd, allowed: chat.allowedCommands || [] });
+        if (reason && !(await askApproval({ agent, chat, emit, signal }, 'social', cmd, reason))) {
+          return 'O usuário NÃO aprovou publicar neste webhook. Não tente contornar; ofereça editar o rascunho ou publicar depois.';
+        }
+        const result = await postToSocialWebhook(hook, body);
+        if (!result.ok) return `Webhook respondeu ${result.status}: ${result.body || '(sem corpo)'}`;
+        return `Publicado em "${hook.name}" (HTTP ${result.status}).`;
+      }
+    } : null
   };
   const project = chat.projectId && db.projects.find(p => p.id === chat.projectId);
   const system = [

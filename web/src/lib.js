@@ -61,13 +61,15 @@ export const TOOL_INFO = {
   memory: { label: 'Memória', icon: 'brain', desc: 'Guarda o que importa entre conversas.' },
   routines: { label: 'Rotinas', icon: 'clock', desc: 'Age sozinho em horários definidos.' },
   files: { label: 'Análise de arquivos', icon: 'file', desc: 'Lê documentos, planilhas e código enviados.' },
-  plugins: { label: 'Plugins MCP', icon: 'plug', desc: 'Usa as integrações que você conectou.' }
+  plugins: { label: 'Plugins MCP', icon: 'plug', desc: 'Usa as integrações que você conectou.' },
+  social: { label: 'Publicação social', icon: 'share', desc: 'Envia rascunhos ou posts para webhooks configurados (Slack, HTTP).' }
 };
 export const STEP_LABEL = {
   computer_exec: 'Rodando no computador', computer_share: 'Gerando link', WebSearch: 'Pesquisando na web', WebFetch: 'Lendo página',
   remember: 'Guardando na memória', schedule_routine: 'Criando rotina',
   browser_open: 'Abrindo página', browser_click: 'Clicando', browser_type: 'Digitando', browser_scroll: 'Rolando a página', browser_read: 'Lendo a página',
-  send_message: 'Mandando mensagem', save_artifact: 'Salvando artefato', read_artifact: 'Lendo artefato', use_skill: 'Usando skill', save_skill: 'Guardando skill'
+  send_message: 'Mandando mensagem', save_artifact: 'Salvando artefato', read_artifact: 'Lendo artefato', use_skill: 'Usando skill', save_skill: 'Guardando skill',
+  post_social: 'Publicando', send_webhook: 'Enviando webhook', list_social_webhooks: 'Listando webhooks'
 };
 export const TONES = [['direto', 'Direto'], ['amigavel', 'Amigável'], ['formal', 'Formal'], ['tecnico', 'Técnico']];
 export const FORMALITIES = [['informal', 'Informal'], ['neutro', 'Neutro'], ['formal', 'Formal']];

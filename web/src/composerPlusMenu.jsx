@@ -5,6 +5,7 @@ import { Icon, Switch } from './ui.jsx';
 import { useApp } from './app.jsx';
 import { api } from './lib.js';
 import { listSessionConnectors, setSessionEnabled } from './marketplace/sessionMcp.js';
+import { isEnterpriseMode } from './uiMode.js';
 
 function useFloating(anchorRef, open) {
   const [pos, setPos] = useState(null);
@@ -84,6 +85,11 @@ export default function ComposerPlusMenu({ open, onClose, anchorRef, onFiles, on
       <button type="button" className="menu-item" onClick={() => { onClose(); go(type === 'plugin' ? '/marketplace/manage' : '/connectors'); }}>
         <Icon name="folder" size={16} />Gerenciar {type === 'plugin' ? 'plugins' : 'conectores'}
       </button>
+      {type === 'connector' && isEnterpriseMode(S.settings) && S.settings.flags?.socialWebhooks && (
+        <button type="button" className="menu-item" onClick={() => { onClose(); go('/connectors'); }}>
+          <Icon name="share" size={16} />Webhooks sociais
+        </button>
+      )}
       <hr className="menu-sep" />
       {rows.length === 0 && <p className="muted small pad">Nenhum ativo. Instale no Marketplace.</p>}
       {rows.map(r => (
