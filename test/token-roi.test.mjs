@@ -107,6 +107,32 @@ test('buildTokenRoiContract com fixture — usage, Julia, cascade e cache', () =
     assert.ok(roi.cascade.recent.length >= 1);
   }));
 
+test('buildTokenRoiContract lê julia_cascade_decisions (CPS) sem US$', () =>
+  withRoiDir(async () => {
+    const { appendCascadeDecision } = await import('../lib/julia-events.mjs');
+    const { ensureJuliaEventsStore } = await import('../lib/julia-events.mjs');
+    ensureJuliaEventsStore();
+    appendCascadeDecision({
+      taskCategory: 'coding',
+      modelId: 'codex',
+      provider: 'codex',
+      rawCost: 0.002,
+      effectiveCost: 0.0021,
+      successRate: 0.94,
+      candidates: 4,
+      reason: 'lowest_cps',
+      routedBy: 'julia-1+cascade'
+    });
+    const { buildTokenRoiContract } = await import('../lib/token-roi.mjs');
+    const roi = buildTokenRoiContract();
+    assert.equal(roi.available, true);
+    assert.equal(roi.cascade.total, 1);
+    assert.equal(roi.cascade.source, 'julia_cascade_decisions');
+    assert.equal(roi.cascade.recent[0].decision, 'codex · coding');
+    assert.equal(roi.usdAvoided, undefined);
+    assert.equal(roi.cascade.rawCost, undefined);
+  }));
+
 test('buildUsageContract não inclui tokenRoi (painel Admin dedicado)', () =>
   withRoiDir(async () => {
     const { buildUsageContract } = await import('../lib/usage-api.mjs');
