@@ -90,6 +90,12 @@ import { closeUsageEventsStore } from './lib/usage-events.mjs';
 import { closeJuliaEventsStore } from './lib/julia-events.mjs';
 import { closePersistCoordStore } from './lib/persist-coord.mjs';
 import { checkRateLimit } from './lib/rate-limit.mjs';
+import {
+  parseCorsAllowlist,
+  mergeResponseHeaders,
+  handleApiCorsPreflight,
+  mutatingOriginError
+} from './lib/security-headers.mjs';
 
 function settingsForMcp(s, mcpSession) {
   return settingsForMcpSession(s, mcpSession);
@@ -125,19 +131,15 @@ class HttpError extends Error {
   }
 }
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.woff2': 'font/woff2', '.json': 'application/json', '.pdf': 'application/pdf', '.ico': 'image/x-icon' };
-const SECURITY = {
-  'x-content-type-options': 'nosniff',
-  'referrer-policy': 'no-referrer',
-  'x-frame-options': 'DENY',
-  'content-security-policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; frame-src http://127.0.0.1:* http://localhost:*; frame-ancestors 'none'; base-uri 'none'"
-};
+const CORS_ALLOWLIST = parseCorsAllowlist();
+const hdr = (req, extra = {}) => mergeResponseHeaders(req, CORS_ALLOWLIST, extra);
 
-const json = (res, data, code = 200, extra = {}, req) => {
+const json = (res, data, code = 200, extra = {}, req = null) => {
   let payload = data;
   if (req?.requestId && data && typeof data === 'object' && data !== null && 'error' in data) {
     payload = { ...data, requestId: req.requestId };
   }
-  res.writeHead(code, { ...SECURITY, 'content-type': 'application/json; charset=utf-8', 'cache-control': extra['cache-control'] || 'no-store', ...extra });
+  res.writeHead(code, hdr(req, { 'content-type': 'application/json; charset=utf-8', 'cache-control': extra['cache-control'] || 'no-store', ...extra }));
   res.end(JSON.stringify(redactJsonPayload(payload)));
 };
 function probePayload(extra = {}) {
@@ -622,7 +624,7 @@ async function serveStatic(req, res, file) {
     cache.set(file, e);
   }
   const immutable = file.startsWith('/assets/');
-  const headers = { ...SECURITY, 'content-type': (MIME[extname(file)] || 'application/octet-stream') + (/\.(html|js|css)$/.test(file) ? '; charset=utf-8' : ''), etag: e.etag, 'cache-control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache', vary: 'accept-encoding' };
+  const headers = hdr(req, { 'content-type': (MIME[extname(file)] || 'application/octet-stream') + (/\.(html|js|css)$/.test(file) ? '; charset=utf-8' : ''), etag: e.etag, 'cache-control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache', vary: 'accept-encoding' });
   if (req.headers['if-none-match'] === e.etag) { res.writeHead(304, headers); return res.end(); }
   const gz = /gzip/.test(req.headers['accept-encoding'] || '') && /\.(html|js|css|svg|json)$/.test(file);
   res.writeHead(200, gz ? { ...headers, 'content-encoding': 'gzip' } : headers);
@@ -645,7 +647,7 @@ const routes = [
     pendingApprovals: db.approvals.filter(a => a.status === 'pending').length
   })],
   ['GET', /^\/api\/catalog$/, (req, m, url, res) => {
-    json(res, { models: MODELS, templates: TEMPLATES, categories: CATEGORIES }, 200, { 'cache-control': 'public, max-age=3600' });
+    json(res, { models: MODELS, templates: TEMPLATES, categories: CATEGORIES }, 200, { 'cache-control': 'public, max-age=3600' }, req);
     return undefined;
   }],
   ['GET', /^\/api\/data\/backup$/, () => buildBackupPayload(db)],
@@ -724,12 +726,11 @@ const routes = [
     const events = listMeteringEvents({ since, until });
     const csv = usageEventsToCsv(events);
     const name = `ripper-usage-events-${new Date().toISOString().slice(0, 10)}.csv`;
-    res.writeHead(200, {
-      ...SECURITY,
+    res.writeHead(200, hdr(req, {
       'content-type': 'text/csv; charset=utf-8',
       'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(name)}`,
       'cache-control': 'private, max-age=60'
-    });
+    }));
     res.end(csv);
   }],
   ['POST', /^\/api\/mcp\/verify$/, async req => {
@@ -895,7 +896,7 @@ const routes = [
     try { content = await readArtifactContent(a); }
     catch (e) { throw new HttpError(404, e.message); }
     const name = artifactDownloadName(a);
-    res.writeHead(200, { ...SECURITY, 'content-type': 'text/plain; charset=utf-8', 'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(name)}`, 'cache-control': 'private, max-age=60' });
+    res.writeHead(200, hdr(req, { 'content-type': 'text/plain; charset=utf-8', 'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(name)}`, 'cache-control': 'private, max-age=60' }));
     res.end(content);
   }],
   ['GET', /^\/api\/artifacts\/([\w-]+)$/, async (req, [aid]) => {
@@ -1065,7 +1066,7 @@ const routes = [
     const file = dataUrl(`sandbox/${aid}/.ripper/screen.jpg`);
     const st = await stat(file).catch(() => null);
     if (!st) throw new HttpError(404, 'Sem tela ainda.');
-    res.writeHead(200, { ...SECURITY, 'content-type': 'image/jpeg', 'cache-control': 'no-store', 'last-modified': st.mtime.toUTCString() });
+    res.writeHead(200, hdr(req, { 'content-type': 'image/jpeg', 'cache-control': 'no-store', 'last-modified': st.mtime.toUTCString() }));
     res.end(await readFile(file));
   }],
   ['GET', /^\/api\/agents\/([\w-]+)\/memories$/, (req, [aid]) => db.memories.filter(x => x.agentId === aid)],
@@ -1173,7 +1174,7 @@ const routes = [
     try { buf = await readFile(dataUrl(f.path)); }
     catch { throw new HttpError(404, 'Arquivo ausente no disco (registro removido na próxima limpeza).'); }
     const inline = /^image\/(png|jpe?g|webp|gif)$/.test(f.type);
-    res.writeHead(200, { ...SECURITY, 'content-type': inline ? f.type : 'application/octet-stream', 'content-disposition': `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(f.name)}`, 'cache-control': 'private, max-age=3600' });
+    res.writeHead(200, hdr(req, { 'content-type': inline ? f.type : 'application/octet-stream', 'content-disposition': `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(f.name)}`, 'cache-control': 'private, max-age=3600' }));
     res.end(buf);
   }],
   ['DELETE', /^\/api\/files\/([\w-]+)$/, async (req, [fid]) => {
@@ -1205,7 +1206,7 @@ const routes = [
     if (quota.blocked) throw new HttpError(429, quota.userMessage);
     const fileIds = (b.fileIds || []).filter(fid => db.files.some(f => f.id === fid && agentIds.some(a => canUseFile(f, { id: a }, c))));
     for (const fid of fileIds) { const f = db.files.find(x => x.id === fid); if (f && !f.chatId) f.chatId = c.id; }
-    res.writeHead(200, { ...SECURITY, 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store', 'x-accel-buffering': 'no' });
+    res.writeHead(200, hdr(req, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store', 'x-accel-buffering': 'no' }));
     const emit = e => {
       if (!res.writable) return;
       const payload = e?.error && req.requestId ? { ...e, requestId: req.requestId } : e;
@@ -1252,9 +1253,9 @@ const server = createServer(async (req, res) => {
       const raw = (await body.raw(req)).toString('utf8');
       if (!verifySignature(r.hookSecret, raw, req.headers['x-hub-signature-256'])) throw new HttpError(401, 'Assinatura inválida.');
       const meta = eventMeta(req.headers);
-      if (meta.type === 'ping') return json(res, { ok: true, pong: true });
+      if (meta.type === 'ping') return json(res, { ok: true, pong: true }, 200, {}, req);
       const started = runRoutine(r, { ...meta, body: summarizeEvent(raw) });
-      return json(res, { ok: true, started }, started ? 202 : 429);
+      return json(res, { ok: true, started }, started ? 202 : 429, {}, req);
     }
     if (req.method === 'GET' && (p === '/healthz' || p === '/readyz')) {
       if (p === '/healthz') return json(res, probePayload(), 200, {}, req);
@@ -1275,19 +1276,19 @@ const server = createServer(async (req, res) => {
       const err = url.searchParams.get('error');
       const flow = findOAuthFlowByState(state);
       if (!flow) {
-        res.writeHead(400, { ...SECURITY, 'content-type': 'text/html; charset=utf-8' });
+        res.writeHead(400, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
         res.end('<!doctype html><meta charset=utf-8><title>Ripper OAuth</title><p>Fluxo inválido ou expirado. Feche esta janela e tente de novo no Ripper.</p>');
         return;
       }
       if (err) {
         flow.status = 'error';
         flow.error = url.searchParams.get('error_description') || err;
-        res.writeHead(400, { ...SECURITY, 'content-type': 'text/html; charset=utf-8' });
+        res.writeHead(400, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
         res.end(`<!doctype html><meta charset=utf-8><title>Ripper OAuth</title><p>Login negado: ${flow.error}</p><script>setTimeout(()=>window.close(),1200)</script>`);
         return;
       }
       if (!code) {
-        res.writeHead(400, { ...SECURITY, 'content-type': 'text/html; charset=utf-8' });
+        res.writeHead(400, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
         res.end('<!doctype html><meta charset=utf-8><title>Ripper OAuth</title><p>Código OAuth ausente.</p>');
         return;
       }
@@ -1299,20 +1300,21 @@ const server = createServer(async (req, res) => {
           save();
         }
         flow.status = 'complete';
-        res.writeHead(200, { ...SECURITY, 'content-type': 'text/html; charset=utf-8' });
+        res.writeHead(200, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
         res.end('<!doctype html><meta charset=utf-8><title>Ripper OAuth</title><p>Login concluído. Você pode fechar esta janela.</p><script>setTimeout(()=>window.close(),800)</script>');
       } catch (e) {
         flow.status = 'error';
         flow.error = e.message;
-        res.writeHead(500, { ...SECURITY, 'content-type': 'text/html; charset=utf-8' });
+        res.writeHead(500, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
         res.end('<!doctype html><meta charset=utf-8><title>Ripper OAuth</title><p>Falha ao trocar o código por token. Veja o Ripper e tente novamente.</p>');
       }
       return;
     }
     if (p.startsWith('/api/')) {
+      if (handleApiCorsPreflight(req, res, CORS_ALLOWLIST)) return;
       if (!authed(req)) throw new HttpError(401, 'Não autorizado. Abra o Ripper com ?token=<RIPPER_TOKEN>.');
-      // Bloqueia requisições de outros sites (CSRF) nas rotas que mudam estado.
-      if (req.method !== 'GET' && req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) throw new HttpError(403, 'Origem não permitida.');
+      const originErr = mutatingOriginError(req, CORS_ALLOWLIST);
+      if (originErr) throw new HttpError(403, originErr);
       const rl = checkRateLimit({ req, settings: db.settings, ripperToken: TOKEN, method: req.method, path: p });
       if (!rl.ok) {
         json(res, { error: rl.message }, 429, { 'retry-after': String(rl.retryAfterSec) }, req);
