@@ -22,6 +22,9 @@ import {
   delegationsSummary,
   MESSAGE_KIND
 } from './lib/manager-worker-protocol.mjs';
+import { trackInboxDelegation, taskItemsSummary } from './lib/task-items.mjs';
+import { closeTaskFromInboxReply } from './lib/task-closure.mjs';
+import { noopGoogleTasksSync } from './lib/google-tasks-sync.mjs';
 import { rememberAllowedCommand, execNeedsApproval } from './lib/permissions.mjs';
 import { browserAutonomyGate, shareAutonomyGate, effectiveApprovalPolicy, sanitizeAutonomyLevel } from './lib/autonomy.mjs';
 import { listChatsPage } from './lib/history.mjs';
@@ -331,6 +334,9 @@ const dockerStatusCached = memoAsync(async () => ({ version: await dockerAvailab
 
 // ---------- mensagens entre agentes ----------
 const inboxBusy = new Set();
+const googleTasksSync = noopGoogleTasksSync();
+const inboxLimits = () => ({ maxPerHour: 20, maxHops: 3, ...(db.settings?.inbox || {}) });
+
 async function deliver(m) {
   const to = db.agents.find(a => a.id === m.to), from = db.agents.find(a => a.id === m.from);
   if (!to || !from) { markInboxDeliveryFailed(m, 'Agente não existe mais.'); save(); return; }
@@ -370,6 +376,19 @@ async function deliver(m) {
     if (origin && reply?.content) {
       origin.messages.push({ id: id(), role: 'assistant', agentId: to.id, content: reply.content, model: reply.model, via: { type: 'inbox', from: from.id, messageId: m.id, threadChatId: c.id }, at: Date.now() });
       origin.updatedAt = Date.now(); origin.unread = true;
+    }
+    if (reply?.content && !reply.error) {
+      try {
+        await closeTaskFromInboxReply({
+          db,
+          inboxMessage: m,
+          replyText: reply.content,
+          id,
+          limits: inboxLimits(),
+          hops: m.hops || 0,
+          googleTasksSync
+        });
+      } catch (e) { console.error('task-closure', ...redactForLog(e.message)); }
     }
   } catch (e) { markInboxDeliveryFailed(m, e.message); console.error('mensagem', ...redactForLog(e.message)); }
   finally { inboxBusy.delete(m.to); save(); setTimeout(dispatchInbox, 50); }
@@ -554,6 +573,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
         }
         const m = { id: id(), from: agent.id, to: to.id, body: String(a.message).slice(0, 4000), priority: a.priority || 'normal', status: 'queued', hops: hops + 1, originChatId: chat.id, createdAt: Date.now() };
         db.messages.push(m);
+        trackInboxDelegation(db, m, { id });
         if (db.messages.length > 1000) db.messages.splice(0, db.messages.length - 1000);
         save(); emit({ sent: { to: to.name, priority: m.priority } }); setTimeout(dispatchInbox, 50);
         return `Mensagem enviada para ${to.name}${m.priority === 'now' ? ' (urgente)' : ''}. A resposta aparece nesta conversa quando chegar; não espere por ela nem invente o que ${to.name} vai dizer.`;
@@ -1331,6 +1351,7 @@ const routes = [
   }],
   ['GET', /^\/api\/inbox$/, () => ({
     summary: inboxSummary(db.messages),
+    tasks: taskItemsSummary(db.taskItems),
     pending: db.messages.filter(m => m.status === 'queued' || m.status === 'delivering').map(m => ({
       ...m,
       fromName: db.agents.find(a => a.id === m.from)?.name,
