@@ -66,10 +66,12 @@ export default function ActionLine({ steps, live }) {
 
   const last = activity[activity.length - 1];
   const running = live && last?.kind === 'tool';
+  const canExpand = activity.length > 1 || activity.some(s => s.detail);
 
   if (!activity.length && !approvals.length) return null;
 
   const leadIcon = running ? null : stepIcon(last || { kind: 'done' });
+  const barLabel = open ? 'Recolher atividades do agente' : 'Expandir atividades do agente';
 
   return (
     <div className="action-line-wrap">
@@ -77,12 +79,19 @@ export default function ActionLine({ steps, live }) {
         <div key={`a-${i}`} className="step step-approval"><ApprovalCard rec={s.rec} status={s.status} /></div>
       ))}
       {activity.length > 0 && (
-        <div className={`action-line ${open ? 'open' : ''} ${running ? 'is-live' : ''}`}>
-          <button type="button" className="action-line-bar" onClick={() => setOpen(o => !o)} aria-expanded={open}>
+        <div className={`action-line ${open ? 'open' : ''} ${running ? 'is-live' : ''} ${canExpand ? '' : 'action-line-static'}`}>
+          <button
+            type="button"
+            className="action-line-bar"
+            onClick={() => canExpand && setOpen(o => !o)}
+            aria-expanded={canExpand ? open : undefined}
+            aria-label={canExpand ? barLabel : undefined}
+            disabled={!canExpand}
+          >
             {running ? <ThinkingOrb state={ORB[last.tool] || 'working'} size={18} /> : <Icon name={leadIcon} size={15} />}
             <span className="action-line-text">{summarize(activity, live)}</span>
             {activity.length > 1 && <span className="action-line-badge">{activity.length}</span>}
-            <Icon name="down" size={14} className={`action-line-chevron ${open ? 'open' : ''}`} />
+            {canExpand && <Icon name="down" size={14} className={`action-line-chevron ${open ? 'open' : ''}`} />}
           </button>
           {open && (
             <ol className="steps action-line-steps">

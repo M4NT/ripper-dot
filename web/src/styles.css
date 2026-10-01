@@ -347,7 +347,9 @@ a.row-main:hover b { text-decoration: underline; text-underline-offset: 3px; }
   border: 1px solid var(--line); background: var(--surface-2); box-shadow: var(--shadow-1);
   font-size: 13px; color: var(--ink-2); text-align: left; transition: border-color .15s, background .15s;
 }
-.action-line-bar:hover { border-color: var(--line-2); background: var(--surface); }
+.action-line-bar:hover:not(:disabled) { border-color: var(--line-2); background: var(--surface); }
+.action-line-bar:disabled { cursor: default; opacity: 1; }
+.action-line-static .action-line-bar { box-shadow: none; }
 .action-line.is-live .action-line-bar { border-color: color-mix(in srgb, var(--ink) 22%, var(--line)); }
 .action-line-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .action-line-badge { flex: none; font: 11px var(--mono); padding: 2px 7px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); color: var(--muted); }
