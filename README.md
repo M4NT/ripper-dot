@@ -114,7 +114,7 @@ Variáveis opcionais: `RIPPER_PLAN_NAME` (rótulo, não altera fatura), `RIPPER_
 - **Headers** `anthropic-ratelimit-unified-*` são persistidos quando aparecem em respostas HTTP capturadas.
 - **Agent SDK:** após cada turno Claude em modo assinatura, o Ripper tenta `usage_EXPERIMENTAL_*` (pode mudar entre versões do SDK).
 
-Os dados locais ficam em `data/` (ou em `RIPPER_DATA`), que não é enviado ao Git. O estado principal continua em `db.json`; eventos de uso (`recordUsage`) vão para `usage.sqlite` no mesmo diretório (até ~800 eventos, para cotas locais 5 h/semanal sem inflar o JSON). Decisões do classificador Julia ficam em `julia.sqlite` (mesmo limite). Detalhes, retenção e limpeza opt-in: **[docs/privacidade-e-dados.md](docs/privacidade-e-dados.md)**. Checklist antes de taguear release: **[docs/release.md](docs/release.md)**.
+Os dados locais ficam em `data/` (ou em `RIPPER_DATA`), que não é enviado ao Git. O estado principal continua em `db.json`; eventos de uso (`recordUsage`) vão para `usage.sqlite` no mesmo diretório (até ~800 eventos, para cotas locais 5 h/semanal sem inflar o JSON). Decisões do classificador Julia ficam em `julia.sqlite` (mesmo limite). Detalhes, retenção e limpeza opt-in: **[docs/privacidade-e-dados.md](docs/privacidade-e-dados.md)**. Checklist antes de taguear release: **[docs/release.md](docs/release.md)**. Leis de engenharia para agentes: **[docs/manifesto-ripper.md](docs/manifesto-ripper.md)** (skill em `skills/manifesto-ripper.md`).
 
 Ao expor o servidor na rede, configure `RIPPER_TOKEN`. O modo de comandos locais exige ativação explícita em Integrações.
 
