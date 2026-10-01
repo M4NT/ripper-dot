@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { MetalBadge } from 'metal-fx';
 import { useApp } from '../app.jsx';
-import { api, go, useDark } from '../lib.js';
+import { api, go, useDark, TONES, FORMALITIES } from '../lib.js';
 import { Icon, Switch, Select, EmptyState } from '../ui.jsx';
 import { AdvancedBlock, HelpTip } from '../disclosure.jsx';
 import { ApprovalHistory } from '../approvals.jsx';
@@ -226,6 +226,21 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
             <Row title="Seu nome" desc="Os agentes usam isso quando falam com você."><input className="input" value={s.name} maxLength={80} onChange={e => set('name', e.target.value)} placeholder="Ex.: Rafael" /></Row>
             <Row stack title="Instruções gerais" desc="Entram em toda conversa, junto das instruções de cada agente e da skill token-the-ripper.">
               <textarea className="input" rows={6} value={s.customInstructions} maxLength={8000} onChange={e => set('customInstructions', e.target.value)} placeholder="Ex.: Sou dev frontend em SP. Respostas curtas, TypeScript no código." />
+            </Row>
+          </Card>
+          <Card title="Voz padrão dos agentes" desc="Agentes sem perfil de voz próprio herdam estes valores no prompt do modelo.">
+            <Row title="Tom">
+              <div className="pills">
+                {TONES.map(([k, l]) => <button key={k} type="button" className={`pill ${(s.defaults?.agentStyle?.tone || 'direto') === k ? 'on' : ''}`} onClick={() => set('defaults', { ...s.defaults, agentStyle: { ...(s.defaults?.agentStyle || {}), tone: k } })}>{l}</button>)}
+              </div>
+            </Row>
+            <Row title="Formalidade">
+              <div className="pills">
+                {FORMALITIES.map(([k, l]) => <button key={k} type="button" className={`pill ${(s.defaults?.agentStyle?.formality || 'neutro') === k ? 'on' : ''}`} onClick={() => set('defaults', { ...s.defaults, agentStyle: { ...(s.defaults?.agentStyle || {}), formality: k } })}>{l}</button>)}
+              </div>
+            </Row>
+            <Row title="Dicas extras" stack>
+              <textarea className="input" rows={2} maxLength={500} value={s.defaults?.agentStyle?.customHints || ''} onChange={e => set('defaults', { ...s.defaults, agentStyle: { ...(s.defaults?.agentStyle || {}), customHints: e.target.value } })} placeholder="Ex.: sempre em português do Brasil." />
             </Row>
           </Card>
         </>}

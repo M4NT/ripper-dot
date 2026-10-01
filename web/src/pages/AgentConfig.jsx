@@ -2,13 +2,18 @@ import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../app.jsx';
 import { api, go, useRoute, fmtSize, fmtAgo } from '../lib.js';
 import { AgentAvatar, Icon, Segmented, StatusDot, EmptyState, useConfirm, Select, Switch } from '../ui.jsx';
-import { Basics, Behavior, Tools, Appearance, ModelPick } from '../agentForm.jsx';
+import { Basics, Behavior, Tools, Appearance, ModelPick, VoiceStyle, agentStyleDraft } from '../agentForm.jsx';
 import { AutonomySemaphore } from '../autonomy.jsx';
 import { uploadFile } from '../composer.jsx';
 import { isEnterpriseMode } from '../uiMode.js';
 
-const ALL_TABS = [['general', 'Geral'], ['model', 'Modelo'], ['behavior', 'Comportamento'], ['tools', 'Ferramentas'], ['knowledge', 'Conhecimento'], ['look', 'Aparência'], ['routines', 'Rotinas'], ['advanced', 'Avançado']];
-const pick = a => ({ name: a.name, description: a.description, category: a.category, status: a.status, instructions: a.instructions, tone: a.tone, model: a.model, effort: a.effort || 'auto', tools: a.tools, avatar: a.avatar, autonomyLevel: a.autonomyLevel || 'semi_autonomous' });
+const ALL_TABS = [['general', 'Geral'], ['model', 'Modelo'], ['behavior', 'Comportamento'], ['voice', 'Voz e estilo'], ['tools', 'Ferramentas'], ['knowledge', 'Conhecimento'], ['look', 'Aparência'], ['routines', 'Rotinas'], ['advanced', 'Avançado']];
+const pick = a => ({
+  name: a.name, description: a.description, category: a.category, status: a.status,
+  instructions: a.instructions, tone: a.tone, style: agentStyleDraft(a),
+  model: a.model, effort: a.effort || 'auto', tools: a.tools, avatar: a.avatar,
+  autonomyLevel: a.autonomyLevel || 'semi_autonomous'
+});
 
 function Knowledge({ agent }) {
   const { S, refresh, toast } = useApp();
@@ -139,6 +144,7 @@ export default function AgentConfig({ id }) {
         </>}
         {tab === 'model' && <ModelPick v={v} set={set} />}
         {tab === 'behavior' && <Behavior v={v} set={set} settings={S.settings} />}
+        {tab === 'voice' && <VoiceStyle v={v} set={set} />}
         {tab === 'tools' && <Tools v={v} set={set} />}
         {tab === 'look' && <Appearance v={v} set={set} />}
         {tab === 'knowledge' && <Knowledge agent={agent} />}
