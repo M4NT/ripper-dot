@@ -13,6 +13,13 @@ test('applySettingsPatch aceita providerRetry', () => {
   assert.equal(s.providerRetry.maxAttempts, 2);
 });
 
+test('applySettingsPatch aceita rateLimit', () => {
+  const s = { defaultModel: 'auto', claude: {}, computer: {}, rateLimit: { enabled: false, chatPerMinute: 30, apiPerMinute: 20, windowMs: 60_000 } };
+  applySettingsPatch(s, { rateLimit: { enabled: true, chatPerMinute: 5 } });
+  assert.equal(s.rateLimit.enabled, true);
+  assert.equal(s.rateLimit.chatPerMinute, 5);
+});
+
 test('settingsMeta lista modelos e esforços', () => {
   const m = settingsMeta();
   assert.ok(m.models.includes('auto'));

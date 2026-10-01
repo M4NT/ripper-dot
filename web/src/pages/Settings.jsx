@@ -280,6 +280,14 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
             <Card title="Histórico de aprovações" desc="Decisões recentes nesta instalação (aprovado, negado ou expirado).">
               <ApprovalHistory limit={15} />
             </Card>
+            <AdvancedBlock settings={s} hint="Limite de taxa">
+              <Card title="Limite de taxa" desc="Evita loops acidentais no chat e em APIs pesadas (backup, restore, export de metering). Contadores ficam na memória deste processo — várias réplicas não compartilham o mesmo limite. Variáveis RIPPER_RATE_* no servidor têm prioridade.">
+                <Row title="Ativar limite de taxa" desc="Respostas 429 com Retry-After quando exceder."><Switch checked={!!s.rateLimit?.enabled} onChange={v => set('rateLimit', { ...(s.rateLimit || {}), enabled: v })} label="Limite de taxa" /></Row>
+                <Row title="Chat (POST /api/chat)" desc="Por token e por IP na janela abaixo."><div className="input-unit"><input className="input" type="number" min={1} max={10000} value={s.rateLimit?.chatPerMinute ?? 30} onChange={e => set('rateLimit', { ...(s.rateLimit || {}), chatPerMinute: +e.target.value })} /><span>req / janela</span></div></Row>
+                <Row title="APIs pesadas" desc="Backup, restore, export de metering e rotas de teste de carga."><div className="input-unit"><input className="input" type="number" min={1} max={10000} value={s.rateLimit?.apiPerMinute ?? 20} onChange={e => set('rateLimit', { ...(s.rateLimit || {}), apiPerMinute: +e.target.value })} /><span>req / janela</span></div></Row>
+                <Row title="Janela" desc="Duração da janela em memória."><div className="input-unit"><input className="input" type="number" min={1} max={3600} value={Math.round((s.rateLimit?.windowMs ?? 60000) / 1000)} onChange={e => set('rateLimit', { ...(s.rateLimit || {}), windowMs: +e.target.value * 1000 })} /><span>segundos</span></div></Row>
+              </Card>
+            </AdvancedBlock>
             <AdvancedBlock settings={s} hint="Limites de mensagens entre agentes">
               <Card title="Mensagens entre agentes" desc="Limites para os agentes não entrarem em conversa infinita entre si.">
                 <Row title="Máximo por agente, por hora"><div className="input-unit"><input className="input" type="number" min={1} max={200} value={s.inbox?.maxPerHour ?? 20} onChange={e => set('inbox', { ...(s.inbox || {}), maxPerHour: +e.target.value })} /><span>mensagens</span></div></Row>
