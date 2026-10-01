@@ -88,3 +88,20 @@ test('applySettingsPatch aceita contextPruning opt-in', () => {
   assert.equal(s.contextPruning.maxMessages, 30);
   assert.equal(s.contextPruning.keepRecent, 8);
 });
+
+test('applySettingsPatch preserva links ao atualizar brand parcialmente', () => {
+  const s = {
+    defaultModel: 'auto', claude: {}, computer: {},
+    ui: { mode: 'enterprise' },
+    enterprise: { enabled: true },
+    brand: { displayName: 'A', logoUrl: '', accentColor: '', tagline: '', links: { website: 'https://a.com/' } }
+  };
+  applySettingsPatch(s, { brand: { displayName: 'B' } });
+  assert.equal(s.brand.displayName, 'B');
+  assert.equal(s.brand.links.website, 'https://a.com/');
+});
+
+test('applySettingsPatch rejeita brand no modo simples', () => {
+  const s = { defaultModel: 'auto', claude: {}, computer: {}, ui: { mode: 'simple' }, enterprise: { enabled: false } };
+  assert.throws(() => applySettingsPatch(s, { brand: { displayName: 'X' } }), /enterprise/);
+});

@@ -1,6 +1,6 @@
 import { createContext, lazy as reactLazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
-import { api, go, useRoute, useTheme, useMediaQuery, fmtAgo, local } from './lib.js';
+import { api, go, useRoute, useTheme, useMediaQuery, fmtAgo, local, brandLogoSrc, brandTitle } from './lib.js';
 import { Icon, AgentAvatar, ToastProvider, useToast, Dialog, Menu, MenuItem } from './ui.jsx';
 import Home from './pages/Home.jsx';
 import { OverlayProvider } from './overlay.jsx';
@@ -10,7 +10,7 @@ import { ApprovalTray } from './approvals.jsx';
 import { ResizeHandle } from './resize.jsx';
 import Chat from './pages/Chat.jsx';
 import UiModeToggle from './uiModeToggle.jsx';
-import { getUiMode, isEnterpriseMode, isRouteAllowed } from './uiMode.js';
+import { getUiMode, isEnterpriseMode, isRouteAllowed, brandForChrome } from './uiMode.js';
 import { I18nProvider, useT } from './i18n/index.jsx';
 
 // Telas fora do caminho principal carregam sob demanda. Se o build mudou desde que a aba abriu,
@@ -94,14 +94,20 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
   const chatMenu = useChatMenu();
   const section = parts[0] === 'c' ? 'chat' : parts[0] === 'new' ? 'agents' : parts[0] === 'p' ? 'projects' : parts[0] || '';
   const recent = [...S.chats].sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt)).slice(0, 12);
+  const brand = brandForChrome(S.settings);
+  const logoSrc = brand ? brandLogoSrc(brand.logoUrl) : null;
+  const brandName = brand ? brandTitle(S.settings) : t('shell.brand');
+  const brandStyle = brand?.accentColor ? { '--brand-accent': brand.accentColor } : undefined;
   return (
-    <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
+    <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`} style={brandStyle}>
       {onCollapse && <ResizeHandle side="left" cssVar="side-w" min={220} max={440} collapsed={collapsed} label="Largura da barra lateral"
         onCollapse={() => !collapsed && onCollapse()} onExpand={() => collapsed && onCollapse()} />}
       <div className="brand-row">
-        <a href="#/" className="brand" onClick={onNavigate} aria-label={t('nav.brand')}>
-          <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><rect width="32" height="32" rx="8" className="brand-bg" /><path d="M11 23V9h6.2a4.3 4.3 0 0 1 .9 8.5L22 23" className="brand-r" /></svg>
-          <span>Ripper</span>
+        <a href="#/" className="brand" onClick={onNavigate} aria-label={brand ? `${brandName}, início` : t('nav.brand')}>
+          {logoSrc
+            ? <img className="brand-logo" src={logoSrc} width="30" height="30" alt="" />
+            : <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><rect width="32" height="32" rx="8" className="brand-bg" /><path d="M11 23V9h6.2a4.3 4.3 0 0 1 .9 8.5L22 23" className="brand-r" /></svg>}
+          <span>{brandName}</span>
         </a>
         {onCollapse && <button className="icon-btn sm collapse-btn" onClick={onCollapse} aria-label={collapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')} title={collapsed ? `${t('nav.expandBar')} (Ctrl B)` : `${t('nav.collapseBar')} (Ctrl B)`}><Icon name="sidebar" size={17} /></button>}
       </div>

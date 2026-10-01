@@ -18,6 +18,12 @@ export function isEnterpriseMode(settings) {
   return getUiMode(settings) === 'enterprise';
 }
 
+/** Marca na chrome (sidebar): só no modo enterprise; simples sempre Ripper padrão. */
+export function brandForChrome(settings) {
+  if (!isEnterpriseMode(settings)) return null;
+  return settings?.brand || null;
+}
+
 /** Abas de configurações visíveis no modo simples. */
 export const SIMPLE_SETTINGS_TABS = new Set(['profile', 'appearance', 'memory', 'security']);
 
