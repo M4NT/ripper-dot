@@ -76,6 +76,7 @@ import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStrea
 import { beginChatRun, bumpChatRunSeq, finishChatRun, chatRunPublic, canResumeChatRun, trimPartialRepliesAfterLastUser } from './lib/chat-run.mjs';
 import { exportChatPayload, importChatPayload } from './lib/chat-transfer.mjs';
 import { listAgentTemplates, createSavedTemplate, patchSavedTemplate, agentFromSavedTemplate } from './lib/agent-templates.mjs';
+import { architectSuggest } from './lib/architect-suggest.mjs';
 import { ripperBuiltinSchemaChars, listRipperBuiltinToolNames } from './lib/ripper-builtin-tools.mjs';
 import { refreshClaudeSubscriptionUsage } from './lib/claude-subscription-usage.mjs';
 import {
@@ -1708,6 +1709,15 @@ const routes = [
     const t = createSavedTemplate(db, b, { id: id() });
     save();
     return t;
+  }],
+  ['POST', /^\/api\/architect\/suggest$/, async req => {
+    const b = await body(req);
+    try {
+      return architectSuggest({ goal: b.goal, constraints: b.constraints });
+    } catch (e) {
+      if (e.code === 400) throw new HttpError(400, e.message);
+      throw e;
+    }
   }],
   ['PUT', /^\/api\/agent-templates\/([\w-]+)$/, async (req, [tid]) => {
     const t = (db.agentTemplates || []).find(x => x.id === tid);

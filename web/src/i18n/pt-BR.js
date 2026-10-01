@@ -115,6 +115,8 @@ export default {
   'agents.title': 'Agentes',
   'agents.lede': 'Cada agente tem instruções, ferramentas e um computador só dele.',
   'agents.new': 'Novo agente',
+  'agents.architect': 'Architect — desenho de times',
+  'composer.architect': 'Architect — desenho de times',
   'agents.filterAll': 'Todos',
   'agents.filterOnline': 'Online',
   'agents.filterPaused': 'Pausados',
