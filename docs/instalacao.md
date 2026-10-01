@@ -51,8 +51,9 @@ Abra `http://127.0.0.1:3000` (porta padrão). Variáveis úteis:
 | `RIPPER_MAX_BODY_BYTES` | `1048576` (1 MiB) | Rejeita corpos JSON/API maiores com HTTP 413 (antes de parsear o JSON) |
 | `RIPPER_HTTP_TIMEOUT_MS` | `120000` | Encerra requisições HTTP comuns ociosas ou presas (408); não se aplica ao stream SSE do chat |
 | `RIPPER_SSE_TIMEOUT_MS` | `0` (sem limite) | Orçamento opcional só para `POST /api/chat`; `0` mantém o SSE aberto pelo tempo necessário |
+| `RIPPER_IDEMPOTENCY_TTL_MS` | `86400000` (24 h) | Tempo em ms para lembrar respostas de requisições com header `Idempotency-Key` (SQLite `idempotency.sqlite`) |
 
-Em Docker/Kubernetes o orquestrador envia `SIGTERM` ao parar o container. O servidor deixa de aceitar conexões novas, responde **503** em rotas `/api/*` enquanto drena requisições em andamento, persiste `db.json` e fecha os SQLite de uso/Julia/coordenação.
+Em Docker/Kubernetes o orquestrador envia `SIGTERM` ao parar o container. O servidor deixa de aceitar conexões novas, responde **503** em rotas `/api/*` enquanto drena requisições em andamento, persiste `db.json` e fecha os SQLite de uso/Julia/coordenação/idempotência.
 
 Com token definido, acesse a UI com `?token=<segredo>` ou envie `Authorization: Bearer <segredo>`.
 
@@ -72,6 +73,17 @@ healthcheck:
   retries: 3
   start_period: 15s
 ```
+
+### Idempotency-Key (API)
+
+Rotas mutáveis selecionadas aceitam o header opcional **`Idempotency-Key`** (`[A-Za-z0-9_-]{8,128}`), escopado por `RIPPER_TOKEN` + rota + chave. Hoje: **`POST /api/chat`**.
+
+- Mesma chave **e** mesmo corpo (hash SHA-256 do JSON bruto): o servidor **repete a resposta gravada** (`Idempotency-Replayed: true`), sem reexecutar o turno (não dispara novo turno de chat, circuit breaker ou métricas de turno).
+- Mesma chave com corpo diferente: **409**.
+- **SSE:** a entrada só é finalizada quando o stream termina (`done`); o replay reenvia o SSE completo gravado (não há streaming “ao vivo” na repetição).
+- Requisição idempotente ainda em andamento: **409** (tente de novo em instantes).
+
+Persistência em `idempotency.sqlite` no mesmo `RIPPER_DATA` (WAL, compatível com vários processos). Só memória/process-local seria insuficiente para reinícios — por isso usamos SQLite como `usage.sqlite`.
 
 ## Desenvolvimento
 

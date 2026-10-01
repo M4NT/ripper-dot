@@ -108,6 +108,12 @@ import {
   mutatingOriginError
 } from './lib/security-headers.mjs';
 import { resolveHttpBudget, rejectOversizeBody, attachHttpTimeout } from './lib/http-budget.mjs';
+import {
+  chatIdempotencyContext,
+  replayIdempotentResponse,
+  captureResponseBody,
+  closeIdempotencyStore
+} from './lib/idempotency.mjs';
 
 function settingsForMcp(s, mcpSession) {
   return settingsForMcpSession(s, mcpSession);
@@ -1306,33 +1312,59 @@ const routes = [
     return {};
   }],
   ['POST', /^\/api\/chat$/, async (req, _, url, res) => {
-    const b = await body(req);
-    let c = db.chats.find(x => x.id === b.chatId);
-    const project = (c?.projectId || b.projectId) ? projectOr404(c?.projectId || b.projectId) : null;
-    // Participantes: conversa existente manda; nova conversa usa agentIds (grupo) ou agentId (individual).
-    const agentIds = c ? (c.agentIds || [c.agentId]) : [...new Set(Array.isArray(b.agentIds) && b.agentIds.length ? b.agentIds : [b.agentId])];
-    agentIds.forEach(agentOr404);
-    if (project && !c && agentIds.some(a => !project.agentIds.includes(a))) throw new HttpError(400, 'Agente fora do projeto.');
-    const agent = agentOr404(agentIds[0]);
-    const text = String(b.text || '').trim().slice(0, 32000) || 'Veja o anexo.';
-    if (!text && !(b.fileIds || []).length) throw new HttpError(400, 'Mensagem vazia.');
-    if (b.model && b.model !== 'agent' && !(b.model in MODELS)) throw new HttpError(400, 'Modelo desconhecido.');
-    if (b.effort && !EFFORTS.includes(b.effort)) throw new HttpError(400, 'Esforço desconhecido.');
-    if (!c) {
-      c = { id: id(), agentId: agent.id, title: 'Nova conversa', messages: [], createdAt: Date.now(), updatedAt: Date.now(),
-        ...(project ? { projectId: project.id } : {}), ...(agentIds.length > 1 ? { agentIds } : {}) };
-      db.chats.unshift(c);
+    const rawChat = await raw(req, MAX_JSON);
+    let idem;
+    try {
+      idem = chatIdempotencyContext(req, TOKEN, rawChat);
+    } catch (e) {
+      if (e.code === 400) throw new HttpError(400, e.message);
+      throw e;
     }
-    if (isChatStreaming(c.id)) throw new HttpError(409, 'Esta conversa já está respondendo. Aguarde ou interrompa a resposta atual.');
-    const quota = checkRunBudget(db, db.settings, { agentId: agent.id });
-    if (quota.blocked) throw new HttpError(429, quota.userMessage);
-    const fileIds = (b.fileIds || []).filter(fid => db.files.some(f => f.id === fid && agentIds.some(a => canUseFile(f, { id: a }, c))));
-    for (const fid of fileIds) { const f = db.files.find(x => x.id === fid); if (f && !f.chatId) f.chatId = c.id; }
-    if (b.model) c.model = b.model === 'agent' ? undefined : b.model;
-    if (b.effort) c.effort = b.effort;
-    beginChatRun(c, { runId: id(), userMessageId: null });
-    save();
-    return streamChatResponse(req, c, { text, fileIds, mcpSession: b.mcpSession, resume: false }, res);
+    if (idem?.decision.kind === 'replay') {
+      replayIdempotentResponse(res, idem.decision.record, hdr(req, { 'idempotency-replayed': 'true' }));
+      return undefined;
+    }
+    if (idem?.decision.kind === 'conflict') throw new HttpError(409, 'Idempotency-Key já usada com outro corpo de requisição.');
+    if (idem?.decision.kind === 'in_progress') throw new HttpError(409, 'Requisição idempotente ainda em processamento; repita em instantes.');
+    try {
+      let b;
+      if (!rawChat.length) b = {};
+      else {
+        try { b = JSON.parse(rawChat); } catch { throw new HttpError(400, 'JSON inválido.'); }
+      }
+      let c = db.chats.find(x => x.id === b.chatId);
+      const project = (c?.projectId || b.projectId) ? projectOr404(c?.projectId || b.projectId) : null;
+      // Participantes: conversa existente manda; nova conversa usa agentIds (grupo) ou agentId (individual).
+      const agentIds = c ? (c.agentIds || [c.agentId]) : [...new Set(Array.isArray(b.agentIds) && b.agentIds.length ? b.agentIds : [b.agentId])];
+      agentIds.forEach(agentOr404);
+      if (project && !c && agentIds.some(a => !project.agentIds.includes(a))) throw new HttpError(400, 'Agente fora do projeto.');
+      const agent = agentOr404(agentIds[0]);
+      const text = String(b.text || '').trim().slice(0, 32000) || 'Veja o anexo.';
+      if (!text && !(b.fileIds || []).length) throw new HttpError(400, 'Mensagem vazia.');
+      if (b.model && b.model !== 'agent' && !(b.model in MODELS)) throw new HttpError(400, 'Modelo desconhecido.');
+      if (b.effort && !EFFORTS.includes(b.effort)) throw new HttpError(400, 'Esforço desconhecido.');
+      if (!c) {
+        c = { id: id(), agentId: agent.id, title: 'Nova conversa', messages: [], createdAt: Date.now(), updatedAt: Date.now(),
+          ...(project ? { projectId: project.id } : {}), ...(agentIds.length > 1 ? { agentIds } : {}) };
+        db.chats.unshift(c);
+      }
+      if (isChatStreaming(c.id)) throw new HttpError(409, 'Esta conversa já está respondendo. Aguarde ou interrompa a resposta atual.');
+      const quota = checkRunBudget(db, db.settings, { agentId: agent.id });
+      if (quota.blocked) throw new HttpError(429, quota.userMessage);
+      const fileIds = (b.fileIds || []).filter(fid => db.files.some(f => f.id === fid && agentIds.some(a => canUseFile(f, { id: a }, c))));
+      for (const fid of fileIds) { const f = db.files.find(x => x.id === fid); if (f && !f.chatId) f.chatId = c.id; }
+      if (b.model) c.model = b.model === 'agent' ? undefined : b.model;
+      if (b.effort) c.effort = b.effort;
+      beginChatRun(c, { runId: id(), userMessageId: null });
+      save();
+      const idemCapture = idem ? captureResponseBody(res) : null;
+      await streamChatResponse(req, c, { text, fileIds, mcpSession: b.mcpSession, resume: false }, res);
+      if (idem && idemCapture) idem.complete(idemCapture.snapshot());
+    } catch (e) {
+      if (idem && !res.headersSent) idem.release();
+      throw e;
+    }
+    return undefined;
   }]
 ];
 
@@ -1499,6 +1531,7 @@ registerGracefulShutdown(server, {
     closeUsageEventsStore();
     closeJuliaEventsStore();
     closePersistCoordStore();
+    closeIdempotencyStore();
   }
 });
 
