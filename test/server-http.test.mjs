@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
@@ -35,7 +35,7 @@ async function withServer(envExtra, fn) {
   const base = `http://127.0.0.1:${port}`;
   try {
     await waitFor(base + '/api/health', env.RIPPER_TOKEN, 15_000);
-    await fn(base, env.RIPPER_TOKEN);
+    await fn(base, env.RIPPER_TOKEN, dataDir);
   } finally {
     child.kill('SIGTERM');
     await new Promise(r => child.on('exit', r));
@@ -63,7 +63,42 @@ test('GET /api/health exige RIPPER_TOKEN', async () => {
 
     const ok = await fetch(base + '/api/health', { headers: { authorization: 'Bearer test-http-token' } });
     assert.equal(ok.status, 200);
-    assert.deepEqual(await ok.json(), { ok: true });
+    const health = await ok.json();
+    assert.equal(health.ok, true);
+    assert.equal(health.version, '0.1.0');
+    assert.ok(typeof health.uptimeSeconds === 'number');
+  });
+});
+
+test('GET /healthz e /readyz respondem sem RIPPER_TOKEN', async () => {
+  await withServer({}, async base => {
+    const hz = await fetch(base + '/healthz');
+    assert.equal(hz.status, 200);
+    const hzBody = await hz.json();
+    assert.equal(hzBody.ok, true);
+    assert.equal(hzBody.version, '0.1.0');
+    assert.ok(hzBody.uptimeSeconds >= 0);
+
+    const rz = await fetch(base + '/readyz');
+    assert.equal(rz.status, 200);
+    const rzBody = await rz.json();
+    assert.equal(rzBody.ok, true);
+    assert.equal(rzBody.version, '0.1.0');
+  });
+});
+
+test('GET /readyz retorna 503 quando a pasta de dados fica inacessível', async () => {
+  await withServer({}, async (base, _token, dataDir) => {
+    chmodSync(dataDir, 0);
+    try {
+      const r = await fetch(base + '/readyz');
+      assert.equal(r.status, 503);
+      const body = await r.json();
+      assert.equal(body.ok, false);
+      assert.ok(body.reason);
+    } finally {
+      chmodSync(dataDir, 0o700);
+    }
   });
 });
 

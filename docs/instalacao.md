@@ -45,6 +45,23 @@ Abra `http://127.0.0.1:3000` (porta padrão). Variáveis úteis:
 
 Com token definido, acesse a UI com `?token=<segredo>` ou envie `Authorization: Bearer <segredo>`.
 
+### Healthcheck (Docker / Compose / Kubernetes)
+
+- **Liveness** — `GET /healthz` → `200` e `{ "ok": true, "version", "uptimeSeconds" }` (sem token).
+- **Readiness** — `GET /readyz` → `200` se `RIPPER_DATA` estiver legível/gravável; `503` se o volume ou `db.json` estiver inacessível.
+- A rota autenticada `GET /api/health` permanece para checagens da API com o mesmo payload.
+
+Exemplo de `healthcheck` no Compose (ajuste `PORT` se necessário):
+
+```yaml
+healthcheck:
+  test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/healthz | grep -q '\"ok\":true'"]
+  interval: 30s
+  timeout: 5s
+  retries: 3
+  start_period: 15s
+```
+
 ## Desenvolvimento
 
 Dois terminais (hot reload):

@@ -6,7 +6,7 @@ import { gzipSync } from 'node:zlib';
 import { extname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { authed as checkAuth } from './lib/auth.mjs';
-import { load, save, id, newAgent, patchAgent, dataUrl } from './lib/store.mjs';
+import { load, save, id, newAgent, patchAgent, dataUrl, checkStoreReady } from './lib/store.mjs';
 import { route, classifySpeaker, MODELS, EFFORTS } from './lib/router.mjs';
 import { computerFor } from './lib/boat.mjs';
 import { dockerAvailable, imageStatus, ensureImage, hostnameOf } from './lib/docker.mjs';
@@ -80,6 +80,8 @@ function settingsForMcp(s, mcpSession) {
   return settingsForMcpSession(s, mcpSession);
 }
 
+const APP_PKG = JSON.parse(await readFile(new URL('./package.json', import.meta.url), 'utf8'));
+const SERVER_STARTED_AT = Date.now();
 const db = load();
 for (const a of db.approvals || []) if (a.status === 'pending') { a.status = 'expired'; a.decidedAt = Date.now(); }
 await migrateInlineArtifacts(db.artifacts).catch(e => console.error('[artifacts] migração:', e.message));
@@ -110,6 +112,9 @@ const json = (res, data, code = 200, extra = {}) => {
   res.writeHead(code, { ...SECURITY, 'content-type': 'application/json; charset=utf-8', 'cache-control': extra['cache-control'] || 'no-store', ...extra });
   res.end(JSON.stringify(redactJsonPayload(data)));
 };
+function probePayload(extra = {}) {
+  return { ok: true, version: APP_PKG.version, uptimeSeconds: Math.floor((Date.now() - SERVER_STARTED_AT) / 1000), ...extra };
+}
 async function raw(req, limit) {
   const chunks = []; let n = 0;
   for await (const c of req) { n += c.length; if (n > limit) throw new HttpError(413, 'Arquivo grande demais.'); chunks.push(c); }
@@ -547,7 +552,7 @@ async function serveStatic(req, res, file) {
 }
 
 const routes = [
-  ['GET', /^\/api\/health$/, () => ({ ok: true })],
+  ['GET', /^\/api\/health$/, () => probePayload()],
   ['GET', /^\/api\/diagnostics$/, async () => collectDiagnostics({
     db,
     settings: db.settings,
@@ -1109,6 +1114,11 @@ createServer(async (req, res) => {
       if (meta.type === 'ping') return json(res, { ok: true, pong: true });
       const started = runRoutine(r, { ...meta, body: summarizeEvent(raw) });
       return json(res, { ok: true, started }, started ? 202 : 429);
+    }
+    if (req.method === 'GET' && (p === '/healthz' || p === '/readyz')) {
+      if (p === '/healthz') return json(res, probePayload());
+      const ready = checkStoreReady();
+      return json(res, ready.ok ? probePayload() : { ok: false, reason: ready.reason, version: APP_PKG.version, uptimeSeconds: Math.floor((Date.now() - SERVER_STARTED_AT) / 1000) }, ready.ok ? 200 : 503);
     }
     if (req.method === 'GET' && p === '/api/mcp/oauth/callback') {
       const code = url.searchParams.get('code');
