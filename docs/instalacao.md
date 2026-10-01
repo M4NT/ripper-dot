@@ -48,6 +48,9 @@ Abra `http://127.0.0.1:3000` (porta padrão). Variáveis úteis:
 | `RIPPER_RATE_API_PER_MINUTE` | (settings) | Máximo de backup/restore, export de metering e APIs pesadas por janela |
 | `RIPPER_RATE_WINDOW_MS` | `60000` | Duração da janela em ms (contadores só na memória deste processo) |
 | `RIPPER_METRICS_PUBLIC` | (vazio) | Se `1`, `GET /metrics` fica acessível sem token (scrape Prometheus/K8s); padrão segue o mesmo auth de `/api/*` |
+| `RIPPER_MAX_BODY_BYTES` | `1048576` (1 MiB) | Rejeita corpos JSON/API maiores com HTTP 413 (antes de parsear o JSON) |
+| `RIPPER_HTTP_TIMEOUT_MS` | `120000` | Encerra requisições HTTP comuns ociosas ou presas (408); não se aplica ao stream SSE do chat |
+| `RIPPER_SSE_TIMEOUT_MS` | `0` (sem limite) | Orçamento opcional só para `POST /api/chat`; `0` mantém o SSE aberto pelo tempo necessário |
 
 Em Docker/Kubernetes o orquestrador envia `SIGTERM` ao parar o container. O servidor deixa de aceitar conexões novas, responde **503** em rotas `/api/*` enquanto drena requisições em andamento, persiste `db.json` e fecha os SQLite de uso/Julia/coordenação.
 

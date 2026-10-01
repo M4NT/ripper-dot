@@ -106,6 +106,7 @@ import {
   handleApiCorsPreflight,
   mutatingOriginError
 } from './lib/security-headers.mjs';
+import { resolveHttpBudget, rejectOversizeBody, attachHttpTimeout } from './lib/http-budget.mjs';
 
 function settingsForMcp(s, mcpSession) {
   return settingsForMcpSession(s, mcpSession);
@@ -123,7 +124,9 @@ const PORT = +process.env.PORT || 3000;
 const HOST = process.env.HOST || '127.0.0.1';          // só a própria máquina, a não ser que você peça
 const TOKEN = process.env.RIPPER_TOKEN || '';            // obrigatório ao expor na rede
 const DIST = new URL('./dist/', import.meta.url);
-const MAX_JSON = 1 << 20, MAX_FILE = 25 << 20;
+const HTTP_BUDGET = resolveHttpBudget();
+const MAX_JSON = HTTP_BUDGET.maxBodyBytes;
+const MAX_FILE = 25 << 20;
 const TEXT_EXT = /\.(txt|md|csv|tsv|json|jsonl|xml|html|css|js|mjs|ts|tsx|jsx|py|rb|go|rs|java|c|cpp|h|sql|yaml|yml|toml|ini|log|sh)$/i;
 
 if (HOST !== '127.0.0.1' && HOST !== 'localhost' && !TOKEN) {
@@ -157,7 +160,7 @@ function probePayload(extra = {}) {
 }
 async function raw(req, limit) {
   const chunks = []; let n = 0;
-  for await (const c of req) { n += c.length; if (n > limit) throw new HttpError(413, 'Arquivo grande demais.'); chunks.push(c); }
+  for await (const c of req) { n += c.length; if (n > limit) throw new HttpError(413, `Corpo da requisição excede o limite de ${limit} bytes.`); chunks.push(c); }
   return Buffer.concat(chunks);
 }
 body.raw = req => raw(req, MAX_JSON);
@@ -1280,8 +1283,11 @@ const server = createServer(async (req, res) => {
       logger.info('http.request.end', { method: req.method, status: res.statusCode, ms: Date.now() - httpStarted });
     });
   }
+  const bodyLimits = { maxBodyBytes: MAX_JSON, maxFileBytes: MAX_FILE };
+  const clearHttpTimeout = attachHttpTimeout(req, res, req.method, p, HTTP_BUDGET, hdr(req, {}));
   try {
     if (isShuttingDown() && p.startsWith('/api/')) throw new HttpError(503, SHUTDOWN_MESSAGE);
+    if (rejectOversizeBody(req, res, req.method, p, bodyLimits, hdr(req, {}))) return;
     if (TOKEN && url.searchParams.get('token') === TOKEN) {
       res.writeHead(302, { 'set-cookie': `ripper_token=${encodeURIComponent(TOKEN)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`, location: '/' });
       return res.end();
@@ -1391,6 +1397,8 @@ const server = createServer(async (req, res) => {
       if (e.details?.length) payload.details = e.details;
       json(res, payload, code, {}, req);
     } else res.end();
+  } finally {
+    clearHttpTimeout();
   }
   });
 });
