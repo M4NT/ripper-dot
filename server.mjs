@@ -6,7 +6,7 @@ import { gzipSync } from 'node:zlib';
 import { extname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { authed as checkAuth } from './lib/auth.mjs';
-import { load, save, id, newAgent, patchAgent, dataUrl, checkStoreReady } from './lib/store.mjs';
+import { load, save, flush, id, newAgent, patchAgent, dataUrl, checkStoreReady } from './lib/store.mjs';
 import { route, classifySpeaker, MODELS, EFFORTS } from './lib/router.mjs';
 import { computerFor } from './lib/boat.mjs';
 import { dockerAvailable, imageStatus, ensureImage, hostnameOf } from './lib/docker.mjs';
@@ -85,6 +85,10 @@ import { runBootLint } from './lib/boot-lint.mjs';
 import { buildBackupPayload, restoreBackupPayload, listAutoBackups } from './lib/backup.mjs';
 import { memoAsync } from './lib/ttl-cache.mjs';
 import { attachRequestId } from './lib/request-id.mjs';
+import { isShuttingDown, registerGracefulShutdown, SHUTDOWN_MESSAGE } from './lib/shutdown.mjs';
+import { closeUsageEventsStore } from './lib/usage-events.mjs';
+import { closeJuliaEventsStore } from './lib/julia-events.mjs';
+import { closePersistCoordStore } from './lib/persist-coord.mjs';
 
 function settingsForMcp(s, mcpSession) {
   return settingsForMcpSession(s, mcpSession);
@@ -1215,7 +1219,7 @@ const routes = [
   }]
 ];
 
-createServer(async (req, res) => {
+const server = createServer(async (req, res) => {
   attachRequestId(req, res);
   const url = new URL(req.url, 'http://x');
   const p = url.pathname;
@@ -1229,6 +1233,7 @@ createServer(async (req, res) => {
     });
   }
   try {
+    if (isShuttingDown() && p.startsWith('/api/')) throw new HttpError(503, SHUTDOWN_MESSAGE);
     if (TOKEN && url.searchParams.get('token') === TOKEN) {
       res.writeHead(302, { 'set-cookie': `ripper_token=${encodeURIComponent(TOKEN)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`, location: '/' });
       return res.end();
@@ -1245,9 +1250,17 @@ createServer(async (req, res) => {
       return json(res, { ok: true, started }, started ? 202 : 429);
     }
     if (req.method === 'GET' && (p === '/healthz' || p === '/readyz')) {
-      if (p === '/healthz') return json(res, probePayload());
+      if (p === '/healthz') return json(res, probePayload(), 200, {}, req);
+      if (isShuttingDown()) {
+        return json(res, {
+          ok: false,
+          reason: 'shutting_down',
+          version: APP_PKG.version,
+          uptimeSeconds: Math.floor((Date.now() - SERVER_STARTED_AT) / 1000)
+        }, 503, {}, req);
+      }
       const ready = checkStoreReady();
-      return json(res, ready.ok ? probePayload() : { ok: false, reason: ready.reason, version: APP_PKG.version, uptimeSeconds: Math.floor((Date.now() - SERVER_STARTED_AT) / 1000) }, ready.ok ? 200 : 503);
+      return json(res, ready.ok ? probePayload() : { ok: false, reason: ready.reason, version: APP_PKG.version, uptimeSeconds: Math.floor((Date.now() - SERVER_STARTED_AT) / 1000) }, ready.ok ? 200 : 503, {}, req);
     }
     if (req.method === 'GET' && p === '/api/mcp/oauth/callback') {
       const code = url.searchParams.get('code');
@@ -1310,7 +1323,29 @@ createServer(async (req, res) => {
     if (!res.headersSent) json(res, { error: code === 500 ? 'Erro interno. Veja o log do servidor.' : e.message }, code, {}, req); else res.end();
   }
   });
-}).listen(PORT, HOST, () => console.log(`Ripper em http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`));
+});
+
+let activeHttpConnections = 0;
+server.on('connection', socket => {
+  activeHttpConnections++;
+  socket.on('close', () => {
+    activeHttpConnections--;
+  });
+});
+
+server.listen(PORT, HOST, () => console.log(`Ripper em http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`));
+
+registerGracefulShutdown(server, {
+  logger,
+  onBeginShutdown: () => clearInterval(routineTimer),
+  getActiveConnections: () => activeHttpConnections,
+  flush,
+  closeStores: () => {
+    closeUsageEventsStore();
+    closeJuliaEventsStore();
+    closePersistCoordStore();
+  }
+});
 
 // Rotinas: o agente dono acorda (por horário ou evento), executa e só deixa conversa se houver novidade.
 function runRoutine(r, event) {
@@ -1349,10 +1384,11 @@ function runRoutine(r, event) {
   return true;
 }
 
-setInterval(() => {
+const routineTimer = setInterval(() => {
   const now = new Date();
   for (const r of db.routines) if (routineDue(r, now)) runRoutine(r);
 }, 30_000);
+if (typeof routineTimer.unref === 'function') routineTimer.unref();
 
 process.on('unhandledRejection', e => console.error('unhandledRejection', ...redactForLog(e?.message || String(e))));
 if (!existsSync(DIST)) console.warn('Aviso: frontend não compilado. Rode `npm run build`.');

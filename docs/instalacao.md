@@ -42,6 +42,9 @@ Abra `http://127.0.0.1:3000` (porta padrão). Variáveis úteis:
 | `HOST` | `127.0.0.1` | Interface de escuta; valores diferentes de localhost exigem `RIPPER_TOKEN` |
 | `RIPPER_TOKEN` | (vazio) | Bearer/cookie para `/api/*`; **obrigatório** se `HOST` expõe na rede |
 | `RIPPER_DATA` | `./data/` relativo ao repo | Pasta de estado local (ver [privacidade-e-dados.md](./privacidade-e-dados.md)) |
+| `RIPPER_SHUTDOWN_MS` | `10000` | Tempo máximo (ms) para drenar conexões HTTP após `SIGTERM`/`SIGINT` antes de encerrar à força |
+
+Em Docker/Kubernetes o orquestrador envia `SIGTERM` ao parar o container. O servidor deixa de aceitar conexões novas, responde **503** em rotas `/api/*` enquanto drena requisições em andamento, persiste `db.json` e fecha os SQLite de uso/Julia/coordenação.
 
 Com token definido, acesse a UI com `?token=<segredo>` ou envie `Authorization: Bearer <segredo>`.
 
