@@ -20,8 +20,11 @@ import { browserFor, browserRisk } from './lib/browser.mjs';
 import { runClaude, runCodex, systemPrompt } from './lib/providers.mjs';
 import { runTestProvider } from './lib/test-provider.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
-import { canUseFile, selectSpeakers, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent } from './lib/agent-flow.mjs';
+import { canUseFile, selectSpeakers, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent, turnPlanIds } from './lib/agent-flow.mjs';
 import { providerAttemptOrder, runProviderAttemptLoop } from './lib/provider-turn.mjs';
+import { normalizeProviderRetry } from './lib/provider-retry.mjs';
+import { applySettingsPatch, applyPluginsPatch, settingsMeta } from './lib/settings-patch.mjs';
+import { appendAudit, auditFromApproval, listAudit } from './lib/audit.mjs';
 import { newHookToken, verifySignature, eventMeta } from './lib/hooks.mjs';
 import { recordUsage, usageSummary, accountLimits, contextBreakdown, checkSendQuota, compactChat, parseProviderLimitFromError, recordProviderSignal } from './lib/usage.mjs';
 import { buildUsageContract, normalizeContextWindow } from './lib/usage-api.mjs';
@@ -221,7 +224,12 @@ repairInboxOnStartup(db.messages);
 save();
 dispatchInbox();
 
-const gate = new ApprovalGate({ onChange: () => save() });
+const gate = new ApprovalGate({
+  onChange: rec => {
+    if (rec.status !== 'pending') appendAudit(db, auditFromApproval(rec));
+    save();
+  }
+});
 const approvalView = a => ({ ...a, agentName: db.agents.find(x => x.id === a.agentId)?.name, chatTitle: db.chats.find(c => c.id === a.chatId)?.title });
 
 /** Computador com portão: comandos de risco (ou tudo, na máquina do usuário) esperam sua aprovação. */
@@ -448,6 +456,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
   await runProviderAttemptLoop({
     order,
     signal,
+    retry: normalizeProviderRetry(s),
     emit,
     runModel: m => {
       if (testProvider) return runTestProvider({ prompt, signal });
@@ -487,6 +496,7 @@ async function chat({ chat, text, fileIds, signal, mcpSession }, emit) {
   // Julia 1 (ou a heurística) escolhe quem abre; @menções definem a ordem; delegações entram na fila.
   const first = await selectSpeakers(chat, text, db.agents, (t, ms) => classifySpeaker(t, ms, db.settings, heuristicSpeaker));
   const floor = new Floor(first, members, group ? 5 : 1);
+  if (group) emit({ turnPlan: turnPlanIds(first, floor) });
   for (let agent = floor.next(); agent; agent = floor.next()) {
     if (signal?.aborted) break;
     emit({ speaker: agent.id });
@@ -497,7 +507,13 @@ async function chat({ chat, text, fileIds, signal, mcpSession }, emit) {
     await turn({ agent, chat, text, prompt: extra.text ? `${text}\n\n${extra.text}` : text, images: extra.images, signal, group, mcpSession }, emit);
     const reply = chat.messages.length > before ? chat.messages.at(-1) : null;
     if (group && reply && isPass(reply.content)) { chat.messages.pop(); emit({ passed: agent.id }); }
-    else if (group && reply) { const next = floor.afterReply(agent, reply.content); if (next.length) emit({ delegated: next.map(a => a.id) }); }
+    else if (group && reply) {
+      const next = floor.afterReply(agent, reply.content);
+      if (next.length) {
+        const ids = next.map(a => a.id);
+        emit({ delegated: ids, agentHandoff: { from: agent.id, to: ids } });
+      }
+    }
     emit({ turnDone: agent.id });
     save();
   }
@@ -733,31 +749,20 @@ const routes = [
       authStatus: plugin ? pluginOAuthStatus(plugin) : undefined
     };
   }],
+  ['GET', /^\/api\/settings$/, () => ({ settings: redact(db.settings), meta: settingsMeta() })],
   ['PUT', /^\/api\/settings$/, async req => {
     const b = await body(req), s = db.settings;
-    if (typeof b.name === 'string') s.name = b.name.slice(0, 80);
-    if (typeof b.customInstructions === 'string') s.customInstructions = b.customInstructions.slice(0, 8000);
-    if (b.defaultModel in MODELS) s.defaultModel = b.defaultModel;
-    if (typeof b.memory === 'boolean') s.memory = b.memory;
-    if (['risky', 'always', 'never'].includes(b.approvalPolicy)) s.approvalPolicy = b.approvalPolicy;
-    if (b.inbox) s.inbox = { maxPerHour: Math.max(1, Math.min(200, +b.inbox.maxPerHour || 20)), maxHops: Math.max(1, Math.min(10, +b.inbox.maxHops || 3)) };
-    if (b.memoryLogInContext != null) s.memoryLogInContext = Math.max(0, Math.min(50, +b.memoryLogInContext || 0));
-    if (b.claude) s.claude = { mode: b.claude.mode === 'api' ? 'api' : 'subscription', useConnectors: !!b.claude.useConnectors, apiKey: b.claude.apiKey === '••••' ? s.claude.apiKey : String(b.claude.apiKey || '') };
-    if (b.chatgpt) s.chatgpt = { useConnectedApps: !!b.chatgpt.useConnectedApps };
-    if (b.computer) s.computer = { mode: ['boat', 'docker', 'local', 'off'].includes(b.computer.mode) ? b.computer.mode : s.computer.mode, vmSize: ['small', 'default', 'large'].includes(b.computer.vmSize) ? b.computer.vmSize : 'default', idleStopMinutes: Math.max(1, Math.min(1440, +b.computer.idleStopMinutes || 10)), boatApiKey: b.computer.boatApiKey === '••••' ? s.computer.boatApiKey : String(b.computer.boatApiKey || ''), allowLocalCommands: b.computer.allowLocalCommands === true, dockerImage: /^[\w./:-]{1,120}$/.test(b.computer.dockerImage || '') ? b.computer.dockerImage : (s.computer.dockerImage || 'node:22-bookworm') };
-    if (b.julia?.url && /^https?:\/\//.test(b.julia.url)) s.julia = { url: b.julia.url };
-    if (Array.isArray(b.plugins)) s.plugins = b.plugins.filter(p => p?.name && /^[\w-]{1,40}$/.test(p.name)).map(p => {
-      const prev = s.plugins.find(x => x.name === p.name);
-      const auth = p.auth && typeof p.auth === 'object' ? mergePluginAuth(prev?.auth, p.auth) : prev?.auth;
-      let hdr;
-      if (Array.isArray(p.headers)) hdr = Object.fromEntries(p.headers.slice(0, 4).filter(h => h?.name).map(h => [String(h.name).slice(0, 80), String(h.value || '').slice(0, 500)]));
-      else if (p.headers && typeof p.headers === 'object') hdr = Object.fromEntries(Object.entries(p.headers).slice(0, 4).map(([k, v]) => [String(k).slice(0, 80), String(v ?? '').slice(0, 500)]));
-      return p.type === 'http'
-        ? { name: p.name, type: 'http', url: String(p.url), enabled: p.enabled !== false, ...(auth ? { auth } : {}), ...(hdr ? { headers: hdr } : {}) }
-        : { name: p.name, type: 'stdio', command: String(p.command), args: (p.args || []).map(String), enabled: p.enabled !== false };
-    });
+    try {
+      applySettingsPatch(s, b);
+      applyPluginsPatch(s, b.plugins, { mergePluginAuth });
+    } catch (e) {
+      throw new HttpError(400, e.message);
+    }
     save(); return redact(s);
   }],
+  ['GET', /^\/api\/audit$/, (req, _, url) => ({
+    entries: listAudit(db, { limit: +(url.searchParams.get('limit') || 50) })
+  })],
   ['GET', /^\/api\/artifacts\/([\w-]+)\/download$/, async (req, [aid], url, res) => {
     const a = db.artifacts.find(x => x.id === aid);
     if (!a) throw new HttpError(404, 'Artefato não encontrado.');

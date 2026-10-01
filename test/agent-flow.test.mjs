@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canUseFile, selectSpeakers, routineDue, mayFallback, mentionOrder, Floor, isPass, heuristicSpeaker, trimHistory } from '../lib/agent-flow.mjs';
+import { canUseFile, selectSpeakers, routineDue, mayFallback, mentionOrder, Floor, isPass, heuristicSpeaker, trimHistory, turnPlanIds } from '../lib/agent-flow.mjs';
 
 const agents = [
   { id: 'e', name: 'Estrategista', description: 'Define posicionamento e mensagem.' },
@@ -20,6 +20,13 @@ test('sem menção, fala só um agente (o escolhido pelo classificador)', async 
 
 test('conversa individual continua com o próprio agente', async () => {
   assert.deepEqual((await selectSpeakers({ agentId: 'e' }, 'oi', agents)).map(a => a.id), ['e']);
+});
+
+test('turnPlanIds deduplica fila inicial e inclui delegados', () => {
+  const floor = new Floor([agents[0]], agents);
+  assert.deepEqual(turnPlanIds([agents[0]], floor), ['e']);
+  floor.afterReply(agents[0], '@Redatora preciso de opções');
+  assert.deepEqual(turnPlanIds([], floor), ['e', 'r']);
 });
 
 test('delegação com @Nome coloca o colega na fila; PASSO não delega', () => {

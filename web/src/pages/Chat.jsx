@@ -256,7 +256,19 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
           if (e.turnDone) setBusy(b => { const n = { ...b }; delete n[e.turnDone]; return n; });
           if (e.route) { building.model = e.route.model; building.effort = e.route.effort; building.routed = e.route.by !== 'manual'; }
           if (e.tool) { building.steps.push({ kind: 'tool', tool: e.tool, label: STEP_LABEL[e.tool] || `Usando ${e.tool}`, detail: e.detail }); setPhase(e.tool); }
-          if (e.handoff) building.steps.push({ kind: 'warn', label: `Transferindo para ${S.models[e.handoff]?.label}` });
+          if (e.handoff) {
+            const lbl = S.models[e.handoff]?.label || e.handoff;
+            const fromLbl = e.from && (getAgent(e.from)?.name || S.models[e.from]?.label);
+            building.steps.push({ kind: 'warn', label: fromLbl ? `De ${fromLbl} para ${lbl}` : `Transferindo para ${lbl}` });
+          }
+          if (e.providerRetry) {
+            const sec = Math.max(1, Math.round(e.providerRetry.waitMs / 1000));
+            building.steps.push({ kind: 'warn', label: `Limite do provedor — tentativa ${e.providerRetry.attempt}/${e.providerRetry.maxAttempts} em ~${sec}s` });
+          }
+          if (e.delegated?.length) {
+            const names = e.delegated.map(id => getAgent(id)?.name || 'colega').join(', ');
+            building.steps.push({ kind: 'done', label: 'Palavra delegada', detail: names });
+          }
           if (e.warn) building.steps.push({ kind: 'warn', label: e.warn });
           if (e.memory) building.steps.push({ kind: 'done', label: 'Guardado na memória', detail: e.memory });
           if (e.approval) { building.steps.push({ kind: 'approval', rec: e.approval, status: 'pending' }); setPhase('approval'); }

@@ -96,6 +96,36 @@ test('GET /api/chats lista e busca conversas reais com paginação', async () =>
   });
 });
 
+test('GET /api/settings não vaza segredos', async () => {
+  await withServer({}, async (base, token) => {
+    const put = await fetch(base + '/api/settings', {
+      method: 'PUT',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ claude: { mode: 'api', apiKey: 'sk-ant-real-secret', useConnectors: false } })
+    });
+    assert.equal(put.status, 200);
+
+    const r = await fetch(base + '/api/settings', { headers: { authorization: `Bearer ${token}` } });
+    assert.equal(r.status, 200);
+    const body = await r.json();
+    assert.equal(body.settings.claude.apiKey, '••••');
+    assert.ok(body.meta.models.includes('codex'));
+    const raw = JSON.stringify(body);
+    assert.doesNotMatch(raw, /sk-ant-real-secret/);
+  });
+});
+
+test('PUT /api/settings com modelo inválido retorna 400', async () => {
+  await withServer({}, async (base, token) => {
+    const r = await fetch(base + '/api/settings', {
+      method: 'PUT',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ defaultModel: 'modelo-inexistente' })
+    });
+    assert.equal(r.status, 400);
+  });
+});
+
 test('GET /api/usage/limits retorna agregado', async () => {
   await withServer({}, async (base, token) => {
     const r = await fetch(base + '/api/usage/limits', { headers: { authorization: `Bearer ${token}` } });
