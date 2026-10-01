@@ -45,7 +45,7 @@ Com `dist/` já gerado:
    ```sh
    RIPPER_DATA=/tmp/ripper-acceptance-$$ npm start
    ```
-2. **Health** — `GET http://127.0.0.1:3000/api/health` retorna JSON (sem token se `HOST=127.0.0.1` e `RIPPER_TOKEN` vazio).
+2. **Health** — `GET http://127.0.0.1:3000/healthz` (liveness, sem token) e `GET /readyz` (readiness); `GET /api/health` exige `RIPPER_TOKEN` quando configurado.
 3. **UI** — abrir `/`, criar ou abrir um chat, enviar mensagem de teste.
 4. **Provedor de teste** (sem Claude/Codex):
    ```sh

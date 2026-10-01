@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, existsSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -94,6 +94,20 @@ test('vários load no mesmo processo compartilham o cache em memória', () =>
     const b = load();
     assert.equal(b.settings.name, 'Um');
     assert.ok(existsSync(join(dir, 'coord.sqlite')));
+  }));
+
+test('checkStoreReady reflete acesso à pasta de dados', () =>
+  withDataDir(async ({ load, checkStoreReady }, dir) => {
+    load();
+    assert.deepEqual(checkStoreReady(), { ok: true });
+    chmodSync(dir, 0);
+    try {
+      const bad = checkStoreReady();
+      assert.equal(bad.ok, false);
+      assert.ok(bad.reason);
+    } finally {
+      chmodSync(dir, 0o700);
+    }
   }));
 
 test('patchAgent filtra campos e ferramentas desconhecidas', async () => {
