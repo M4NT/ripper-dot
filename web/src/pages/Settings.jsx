@@ -283,6 +283,32 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
         </>}
 
         {tab === 'appearance' && <>
+          <Card title="Modo da interface" desc="O modo simples oculta o Centro admin. Enterprise expõe operações (auditoria, retenção, LGPD) sem mudar o núcleo do chat.">
+            <Row title="Experiência">
+              <div className="seg-choice">
+                {[['simple', 'Simples', 'Uso pessoal e equipes pequenas'], ['enterprise', 'Enterprise', 'Centro admin e visão de operações']].map(([k, l, h]) => {
+                  const ent = s.ui?.mode === 'enterprise' || s.enterprise?.enabled;
+                  const on = k === 'enterprise' ? ent : !ent;
+                  return (
+                  <button key={k} type="button" className={on ? 'on' : ''} onClick={() => {
+                    if (k === 'enterprise') {
+                      set('ui', { ...(s.ui || {}), mode: 'enterprise' });
+                      set('enterprise', { ...(s.enterprise || {}), enabled: true });
+                    } else {
+                      set('ui', { ...(s.ui || {}), mode: 'simple' });
+                      set('enterprise', { ...(s.enterprise || {}), enabled: false });
+                    }
+                  }}><b>{l}</b><small>{h}</small></button>
+                  );
+                })}
+              </div>
+            </Row>
+            {(s.ui?.mode === 'enterprise' || s.enterprise?.enabled) && (
+              <div className="set-actions">
+                <button type="button" className="btn" onClick={() => go('/admin')}><Icon name="grid" size={16} />Abrir Centro admin</button>
+              </div>
+            )}
+          </Card>
           <Card>
             <Row title="Tema" desc={`Agora: ${theme === 'dark' ? 'escuro' : 'claro'}. O padrão segue o sistema.`}><button className="btn" onClick={toggleTheme}><Icon name={theme === 'dark' ? 'sun' : 'moon'} size={16} />Usar tema {theme === 'dark' ? 'claro' : 'escuro'}</button></Row>
           </Card>

@@ -9,6 +9,7 @@ import { useChatMenu } from './actions.jsx';
 import { ApprovalTray } from './approvals.jsx';
 import { ResizeHandle } from './resize.jsx';
 import Chat from './pages/Chat.jsx';
+import { isEnterpriseMode } from './lib/enterprise.js';
 
 // Telas fora do caminho principal carregam sob demanda. Se o build mudou desde que a aba abriu,
 // o pedaço antigo não existe mais: recarrega uma vez para pegar a versão nova.
@@ -28,6 +29,7 @@ const Marketplace = lazy(() => import('./pages/Marketplace.jsx'));
 const Connectors = lazy(() => import('./pages/Connectors.jsx'));
 const SkillsHub = lazy(() => import('./pages/SkillsHub.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
+const AdminCenter = lazy(() => import('./pages/AdminCenter.jsx'));
 const NewAgent = lazy(() => import('./pages/NewAgent.jsx'));
 const AgentConfig = lazy(() => import('./pages/AgentConfig.jsx'));
 
@@ -130,6 +132,7 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
         )}>
           <div className="account-head"><span className="initial">{(S.settings.name || 'V')[0].toUpperCase()}</span><span><b>{S.settings.name || 'Você'}</b><small>{S.agents.length} agentes · {S.projects.length} projetos</small></span></div>
           <MenuItem icon="gear" onClick={() => { onNavigate(); go('/settings'); }}>Configurações</MenuItem>
+          {isEnterpriseMode(S.settings) && <MenuItem icon="grid" onClick={() => { onNavigate(); go('/admin'); }}>Centro admin<small className="menu-hint">RBAC, auditoria, LGPD</small></MenuItem>}
           <MenuItem icon="store" onClick={() => { onNavigate(); go('/marketplace'); }}>Marketplace</MenuItem>
           <MenuItem icon="plug" onClick={() => { onNavigate(); go('/connectors'); }}>Conectores</MenuItem>
           <MenuItem icon="bolt" onClick={() => { onNavigate(); go('/skills'); }}>Habilidades</MenuItem>
@@ -241,6 +244,7 @@ function Shell() {
     p0 === 'connectors' ? <Connectors /> :
     p0 === 'skills' ? <SkillsHub /> :
     p0 === 'settings' ? <Settings theme={theme} toggleTheme={toggleTheme} tab={p1} /> :
+    p0 === 'admin' ? <AdminCenter /> :
     <Home />;
 
   return (
