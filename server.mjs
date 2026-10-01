@@ -887,7 +887,8 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
   // Modelo desligado em Configurações → Modelos vira Auto (que só escolhe entre os liberados).
   const model = chosen === 'auto' || enabledModels(s).includes(chosen) ? chosen : 'auto';
   const requestedEffort = (chat.effort && chat.effort !== 'auto' ? chat.effort : null) || agent.effort || 'auto';
-  const pick = model === 'auto' ? await route(text, history, s, { effort: requestedEffort }) : { model, by: 'manual' };
+  const corrections = (db.juliaCorrections || []).filter(x => x.agentId === agent.id).slice(-20);
+  const pick = model === 'auto' ? await route(text, history, s, { effort: requestedEffort, corrections }) : { model, by: 'manual' };
   // A Julia pode ter escolhido o esforço; em todo caso, nunca passa do teto do modelo.
   const effort = clampEffort(s, pick.model, pick.effort || requestedEffort);
   const routedBy = pick.by;
@@ -969,7 +970,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
         : runClaude({ ...args, model: m, ctx });
     },
     onSuccess: ({ model: m, out, steps }) => {
-      push(out, steps, { model: m, effort });
+      push(out, steps, { model: m, effort, routedBy });
       recordUsage(db, m, {
         charsIn: (text?.length || 0) + (prompt?.length || 0),
         charsOut: out.length,
@@ -2180,6 +2181,14 @@ const routes = [
       if (quota.blocked) throw new HttpError(429, quota.userMessage);
       const fileIds = fileIdsRaw.filter(fid => db.files.some(f => f.id === fid && agentIds.some(a => canUseFile(f, { id: a }, c))));
       for (const fid of fileIds) { const f = db.files.find(x => x.id === fid); if (f && !f.chatId) f.chatId = c.id; }
+      if (b.model && b.model !== 'auto' && b.model !== 'agent' && (!c.model || c.model === 'auto')) {
+        const lastAuto = c.messages.findLast(m => m.role === 'assistant');
+        const lastAsk = c.messages.findLast(m => m.role === 'user');
+        // O Auto escolheu um modelo e você trocou: isso vira exemplo para a Julia nas próximas escolhas.
+        if (lastAuto?.routedBy && lastAuto.routedBy !== 'manual' && lastAuto.model !== b.model && lastAsk?.content) {
+          db.juliaCorrections = [...(db.juliaCorrections || []), { agentId: lastAuto.agentId, ask: lastAsk.content.slice(0, 160), from: lastAuto.model, to: b.model, at: Date.now() }].slice(-50);
+        }
+      }
       if (b.model) c.model = b.model === 'agent' ? undefined : b.model;
       if (b.effort) c.effort = b.effort;
       beginChatRun(c, { runId: id(), userMessageId: null });

@@ -36,3 +36,18 @@ test('Auto não escolhe modelo desligado e respeita o teto', async () => {
   const only = await route('oi', [], s({ enabled: { 'claude-opus-5-5': false, 'claude-fable-5-1': false, codex: false } }), { effort: 'auto' });
   assert.equal(only.model, 'claude-sonnet-5-5');
 });
+
+test('correção repetida em pedidos parecidos vence a classificação', async () => {
+  const { learnedModel } = await import('../lib/router.mjs');
+  const corr = [
+    { ask: 'revise este contrato de prestação de serviço', from: 'claude-sonnet-5-5', to: 'claude-opus-5-5' },
+    { ask: 'revise a cláusula do contrato de prestação', from: 'claude-sonnet-5-5', to: 'claude-opus-5-5' }
+  ];
+  const all = ['claude-sonnet-5-5', 'claude-opus-5-5'];
+  assert.equal(learnedModel('revise o aditivo do contrato de prestação', corr, all), 'claude-opus-5-5');
+  assert.equal(learnedModel('qual a previsão do tempo hoje', corr, all), null);           // pedido diferente
+  assert.equal(learnedModel('revise o contrato de prestação', corr.slice(0, 1), all), null); // uma correção só não basta
+  assert.equal(learnedModel('revise o contrato de prestação', corr, ['claude-sonnet-5-5']), null); // modelo desligado
+  const pick = await route('revise o aditivo do contrato de prestação', [], s({}), { effort: 'low', corrections: corr });
+  assert.deepEqual([pick.model, pick.by], ['claude-opus-5-5', 'learned']);
+});
