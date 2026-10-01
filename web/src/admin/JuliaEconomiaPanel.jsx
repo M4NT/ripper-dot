@@ -35,6 +35,21 @@ function CascadeTable({ rows }) {
 }
 
 /** Economia Julia (medida) — somente Admin; sem US$ ou % inventados. */
+const CHOOSER = { 'julia-1': 'Julia 1', heuristic: 'Regra de reserva', learned: 'Aprendido com você', policy: 'Único modelo liberado', cascade: 'Cascata' };
+const MODEL_LABEL = { 'claude-sonnet-5-5': 'Sonnet 5.5', 'claude-opus-5-5': 'Opus 5.5', 'claude-fable-5-1': 'Fable 5.1', codex: 'Codex' };
+const EFFORT_LABEL = { auto: 'Automático', low: 'Baixo', medium: 'Médio', high: 'Alto', xhigh: 'Muito alto', max: 'Máximo' };
+const PURPOSE = { route: 'Modelo', effort: 'Esforço', speaker: 'Quem fala no grupo', risk: 'Risco de comando', notify: 'Avisar ou silenciar', memory: 'Memória', unknown: 'Outras' };
+
+function TagRow({ title, data, labels }) {
+  const entries = Object.entries(data || {}).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+  if (!entries.length) return null;
+  return (
+    <div className="roi-row"><small className="muted">{title}</small>
+      <div className="roi-tags">{entries.map(([k, n]) => <span key={k} className="tag">{labels[k] || k} <b>{n}</b></span>)}</div>
+    </div>
+  );
+}
+
 export default function JuliaEconomiaPanel() {
   const [tokenRoi, setTokenRoi] = useState(null);
   const [err, setErr] = useState('');
@@ -55,8 +70,26 @@ export default function JuliaEconomiaPanel() {
     return <EmptyState title="sem dados" body={tokenRoi.emptyLabel || 'Sem telemetria Julia ou eventos de uso registrados ainda.'} />;
   }
 
+  const r = tokenRoi.routing;
+  const jd = tokenRoi.juliaDecisions;
   return (
     <div className="admin-uso-section">
+      {r && (
+        <>
+          <div className="metering-totals">
+            <div><b>{r.autoReplies}</b><small>respostas do Ripper Auto</small></div>
+            <div><b>{r.avoidedOpus}</b><small>sem precisar do Opus</small></div>
+            <div><b>{jd ? `${jd.answered}/${jd.decisions}` : '—'}</b><small>decisões respondidas pela Julia</small></div>
+            <div><b>{r.corrections}</b><small>correções suas aprendidas</small></div>
+          </div>
+          <div className="roi-breakdown">
+            <TagRow title="Quem escolheu o modelo" data={r.byChooser} labels={CHOOSER} />
+            <TagRow title="Modelo usado" data={r.byModel} labels={MODEL_LABEL} />
+            <TagRow title="Esforço" data={r.byEffort} labels={EFFORT_LABEL} />
+            {jd?.byPurpose && <TagRow title="Decisões da Julia por tipo" data={Object.fromEntries(Object.entries(jd.byPurpose).map(([k, v]) => [k, v.answered]))} labels={PURPOSE} />}
+          </div>
+        </>
+      )}
       {tokenRoi.usageEvents && (
         <p className="small">
           {tokenRoi.usageEvents.events} eventos de uso · ~{fmtTok(tokenRoi.usageEvents.estTokens)} tokens medidos

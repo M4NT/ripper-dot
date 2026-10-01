@@ -71,7 +71,7 @@ import { recordUsage, usageSummary, accountLimits, contextBreakdown, checkSendQu
 import { checkRunBudget, ToolLoopDetector, tokenBudgetAlertFromCheck } from './lib/token-budget-governor.mjs';
 import { buildUsageContract, normalizeContextWindow } from './lib/usage-api.mjs';
 import { buildMeteringReport, listMeteringEvents, usageEventsToCsv } from './lib/metering.mjs';
-import { buildTokenRoiContract } from './lib/token-roi.mjs';
+import { buildTokenRoiContract, routingSummary } from './lib/token-roi.mjs';
 import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStreaming, activeChatStreamCount } from './lib/chat-stream.mjs';
 import { beginChatRun, bumpChatRunSeq, finishChatRun, chatRunPublic, canResumeChatRun, trimPartialRepliesAfterLastUser } from './lib/chat-run.mjs';
 import { exportChatPayload, importChatPayload } from './lib/chat-transfer.mjs';
@@ -1224,7 +1224,7 @@ const routes = [
   }],
   ['GET', /^\/api\/usage\/token-roi$/, async () => {
     requireEnterpriseAdmin();
-    return buildTokenRoiContract();
+    return { ...buildTokenRoiContract(), routing: routingSummary(db) };
   }],
   ['GET', /^\/api\/metering$/, async (req, _, url) => {
     requireEnterpriseAdmin();

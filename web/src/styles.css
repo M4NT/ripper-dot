@@ -1484,3 +1484,7 @@ code, .mono, pre { overflow-wrap: anywhere; }
 .crow-top { flex-wrap: wrap; row-gap: 4px; }
 @media (max-width: 900px) { .na-top { top: 57px; } }
 @media (max-width: 640px) { .na-top h1, .na-top .btn:not(.btn-primary) { display: none; } }
+.roi-breakdown { display: flex; flex-direction: column; gap: 12px; margin: 16px 0 8px; }
+.roi-row { display: flex; flex-direction: column; gap: 6px; }
+.roi-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.roi-tags .tag b { font-weight: 600; margin-left: 4px; }
