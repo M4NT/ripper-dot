@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
-import { api, go, fmtTime, fmtSize, TOOL_INFO, STEP_LABEL, useMediaQuery, local, nameColor } from '../lib.js';
+import { api, go, fmtTime, fmtSize, STEP_LABEL, useMediaQuery, local, nameColor } from '../lib.js';
 import { markdown, closeOpen } from '../markdown.js';
 import { AgentAvatar, Icon, Menu, MenuItem, StatusDot, useConfirm, EmptyState } from '../ui.jsx';
 import { useApp } from '../app.jsx';
@@ -10,7 +10,7 @@ import { effortLabel } from '../modelPicker.jsx';
 import FileThumb from '../fileThumb.jsx';
 import ChatPanel from '../chatPanel.jsx';
 import { ResizeHandle } from '../resize.jsx';
-import { ApprovalCard } from '../approvals.jsx';
+import ActionLine from '../actionLine.jsx';
 import { useChatMenu } from '../actions.jsx';
 import { useOv } from '../overlay.jsx';
 import { botAvatarPalette } from 'bot-avatars';
@@ -46,25 +46,6 @@ function useSmoothText(target, live) {
   return shown;
 }
 
-function Steps({ steps, live }) {
-  if (!steps?.length) return null;
-  return (
-    <ol className="steps">
-      {steps.map((raw, i) => {
-        if (raw.kind === 'approval') return <li key={i} className="step step-approval"><ApprovalCard rec={raw.rec} status={raw.status} /></li>;
-        const s = raw.kind ? raw : { ...raw, kind: 'tool', label: STEP_LABEL[raw.tool] || `Usando ${raw.tool}` };
-        const running = live && i === steps.length - 1 && s.kind === 'tool';
-        return (
-          <li key={i} className={`step step-${s.kind} ${running ? 'running' : ''}`}>
-            {running ? <ThinkingOrb state={ORB[s.tool] || 'working'} size={20} /> : <Icon name={s.kind === 'warn' ? 'x' : 'check'} size={13} />}
-            <span>{s.label}</span>{s.detail && <code>{s.detail}</code>}
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
 function Markdown({ text, live }) {
   // Markdown só é recalculado quando o texto muda; mensagens antigas nunca são refeitas.
   const html = useMemo(() => markdown(text), [text]);
@@ -87,7 +68,7 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, mo
       <div className="msg-col">
         {group && <span className="speaker" style={{ color: agentColor(agent) }}>{agent.name}</span>}
         <div className="bubble bot-bubble">
-          <Steps steps={m.steps} live={live} />
+          <ActionLine steps={m.steps} live={live} />
           {m.content ? (live ? <LiveText text={m.content} /> : <Markdown text={m.content} />)
             : live ? <div className="thinking"><ThinkingOrb state={ORB[phase] || 'breathing'} size={20} /><span>{phase === 'route' ? 'Escolhendo o melhor modelo…' : phase === 'think' ? 'Pensando com calma…' : phase === 'approval' ? 'Aguardando sua aprovação…' : 'Pensando…'}</span></div>
             : m.error ? <p className="msg-error">Não consegui responder. {m.error}</p>
