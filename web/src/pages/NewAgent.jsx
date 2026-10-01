@@ -8,7 +8,7 @@ import { uploadFile } from '../composer.jsx';
 
 const TYPES = ['clover', 'flower', 'triangle', 'square', 'blob', 'ghost', 'circle', 'drop', 'star', 'droid', 'mech', 'alien', 'hexagon', 'cat', 'cloud', 'pill', 'pebble', 'puddle'];
 const COLORS = [null, '#1a1917', '#e8537a', '#f08a3c', '#f2c94c', '#3fae78', '#3aa7c9', '#5b6cf0', '#9b6cf0'];
-const BLANK = { name: '', description: '', category: 'Outro', instructions: '', tone: 'direto', tools: ['web', 'memory', 'files'], templateId: null };
+const BLANK = { name: '', description: '', category: 'Outro', instructions: '', tone: 'direto', tools: ['web', 'memory', 'files'], templateId: null, savedTemplateId: null };
 
 function Section({ n, title, hint, children, optional }) {
   return (
@@ -48,7 +48,9 @@ export default function NewAgent() {
     if (!v.name.trim()) { nameRef.current?.focus(); return toast('Dê um nome ao agente.', 'error'); }
     setSaving(true);
     try {
-      const a = await api('/api/agents', { method: 'POST', body: { ...v, name: v.name.trim() } });
+      const body = { ...v, name: v.name.trim() };
+      if (v.savedTemplateId) { body.savedTemplateId = v.savedTemplateId; delete body.templateId; }
+      const a = await api('/api/agents', { method: 'POST', body });
       for (const f of files) { try { await uploadFile(a.id, null, f); } catch (err) { toast(err.message, 'error'); } }
       await refresh();
       toast(`${a.name} está pronto`);
@@ -76,8 +78,30 @@ export default function NewAgent() {
                 <span className="na-tpl-ico"><Icon name="plus" size={18} /></span><span className="na-tpl-text"><b>Do zero</b><small>Em branco</small></span>
               </button>
               {S.templates.map(t => (
-                <button type="button" key={t.id} className={`na-tpl ${v.templateId === t.id ? 'on' : ''}`} onClick={() => applyTemplate(t)} title={t.description}>
+                <button type="button" key={t.id} className={`na-tpl ${v.templateId === t.id && !v.savedTemplateId ? 'on' : ''}`} onClick={() => { set({ savedTemplateId: null }); applyTemplate(t); }} title={t.description}>
                   <BotAvatar type={t.avatar.type} size={30} paused interactive={false} theme={dark ? 'dark' : 'light'} /><span className="na-tpl-text"><b>{t.name}</b><small>{t.category}</small></span>
+                </button>
+              ))}
+              {(S.savedAgentTemplates || []).map(t => (
+                <button type="button" key={t.id} className={`na-tpl ${v.savedTemplateId === t.id ? 'on' : ''}`} onClick={() => {
+                  setV(x => ({
+                    ...x,
+                    savedTemplateId: t.id,
+                    templateId: t.builtinTemplateId || null,
+                    name: t.name,
+                    description: t.description,
+                    category: t.category,
+                    instructions: t.instructions,
+                    tone: t.tone,
+                    tools: t.tools,
+                    model: t.model,
+                    effort: t.effort,
+                    avatar: { ...x.avatar, ...(t.avatar || {}) }
+                  }));
+                  setMore(true);
+                }} title={t.description || 'Modelo salvo'}>
+                  <AgentAvatar agent={{ ...t, status: 'online' }} size={30} paused />
+                  <span className="na-tpl-text"><b>{t.name}</b><small>Salvo · {t.category}</small></span>
                 </button>
               ))}
             </div>

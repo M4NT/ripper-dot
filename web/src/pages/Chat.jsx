@@ -266,6 +266,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
           if (e.skill) building.steps.push({ kind: 'done', label: 'Skill guardada', detail: e.skill });
           if (e.routine) building.steps.push({ kind: 'done', label: 'Rotina criada', detail: e.routine });
           if (e.text) { building.content += e.text; setPhase('text'); }
+          if (e.stopped) building.stopped = true;
           flush();
         }
       }
@@ -339,7 +340,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
         </div>
 
         <div className="chat-dock">
-          <Composer agent={agent} chatId={chatId} projectId={projectId} streaming={!!live} onSend={p => send(p)} onStop={() => ctrl.current?.abort()}
+          <Composer agent={agent} chatId={chatId} projectId={projectId} streaming={!!live} onSend={p => send(p)} onStop={() => { if (chatId) api(`/api/chats/${chatId}/cancel`, { method: 'POST' }).catch(() => {}); ctrl.current?.abort(); }}
             choice={choice} setChoice={setChoice} group={isGroup} mentions={isGroup ? members : null}
             placeholder={isGroup ? 'Mensagem para o grupo… use @Nome para chamar alguém' : `Mensagem para ${agent.name}…`} autoFocus draftKey={chatId || 'new-' + memberIds.join('-')} />
           {waiting > 0 && <p className="inbox-wait"><Icon name="clock" size={13} />Aguardando {waiting === 1 ? 'resposta de 1 mensagem' : `respostas de ${waiting} mensagens`} enviadas a colegas…</p>}

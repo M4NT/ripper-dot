@@ -141,6 +141,15 @@ export default function AgentConfig({ id }) {
         {tab === 'knowledge' && <Knowledge agent={agent} />}
         {tab === 'routines' && <Routines agent={agent} />}
         {tab === 'advanced' && <>
+          <div className="row" style={{ marginBottom: '1rem' }}>
+            <button type="button" className="btn" onClick={async () => {
+              try {
+                await api('/api/agent-templates', { method: 'POST', body: { ...v, builtinTemplateId: agent.templateId } });
+                await refresh();
+                toast('Modelo salvo — aparece em Novo agente');
+              } catch (e) { toast(e.message, 'error'); }
+            }}><Icon name="book" size={16} />Salvar como modelo</button>
+          </div>
           <dl className="facts">
             <dt>ID</dt><dd><code>{agent.id}</code></dd>
             <dt>Computador</dt><dd>{computer ? `${computer.kind === 'boat' ? 'VM boat.dev' : computer.kind === 'local' ? 'Pasta local' : 'Desligado'} · ${computer.status}` : '…'}</dd>
