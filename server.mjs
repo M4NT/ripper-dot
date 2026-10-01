@@ -10,6 +10,7 @@ import { load, save, flush, id, newAgent, patchAgent, dataUrl, safeCheckStoreRea
 import { route, classifySpeaker, MODELS, EFFORTS } from './lib/router.mjs';
 import { computerFor } from './lib/boat.mjs';
 import { dockerAvailable, imageStatus, ensureImage, hostnameOf } from './lib/docker.mjs';
+import { sandboxStatus } from './lib/exec-sandbox.mjs';
 import { ApprovalGate } from './lib/approvals.mjs';
 import { juliaOnline, juliaChoose, juliaStatus, measureTriagePromptChars, RISK_OPTIONS, NOTIFY_OPTIONS } from './lib/julia.mjs';
 import { checkSend, dueMessages, threadKey, inboxPrompt, repairInboxOnStartup, markInboxDeliveryFailed, inboxSummary } from './lib/inbox.mjs';
@@ -1477,6 +1478,7 @@ const routes = [
     return report;
   }],
   ['GET', /^\/api\/computer\/docker$/, async () => dockerStatusCached()],
+  ['GET', /^\/api\/sandbox\/status$/, async () => sandboxStatus(db.settings)],
   ['POST', /^\/api\/computer\/image$/, async () => { ensureImage().catch(e => console.error('imagem', e.message)); return { image: await imageStatus() }; }],
   ['GET', /^\/api\/agents\/([\w-]+)\/vnc$/, async (req, [aid]) => {
     const a = agentOr404(aid);
