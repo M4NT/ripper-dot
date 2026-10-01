@@ -9,6 +9,10 @@ restoreWidths();
 class Guard extends Component {
   state = { error: null };
   static getDerivedStateFromError(error) { return { error }; }
+  // Trocar de tela (voltar, atalho, link) sai do erro em vez de prender o app inteiro nele.
+  reset = () => this.state.error && this.setState({ error: null });
+  componentDidMount() { addEventListener('hashchange', this.reset); }
+  componentWillUnmount() { removeEventListener('hashchange', this.reset); }
   render() {
     if (!this.state.error) return this.props.children;
     return (

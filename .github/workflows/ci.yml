@@ -30,3 +30,11 @@ jobs:
 
       - name: Build web (Vite)
         run: npm run build
+
+      # Abre todas as telas num navegador de verdade e manda um prompt com ferramentas.
+      # Pega o que os testes de Node não veem (ex.: tela "Algo quebrou" no chat).
+      - name: Install Firefox (Playwright)
+        run: npx playwright install --with-deps firefox
+
+      - name: UI smoke
+        run: npm run test:ui

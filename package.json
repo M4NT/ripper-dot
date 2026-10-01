@@ -15,11 +15,12 @@
     "prod": "vite build && node server.mjs",
     "data:info": "node scripts/ripper-data.mjs info",
     "data:clear-usage": "node scripts/ripper-data.mjs clear-usage --confirm",
-    "data:clear-julia": "node scripts/ripper-data.mjs clear-julia --confirm"
+    "data:clear-julia": "node scripts/ripper-data.mjs clear-julia --confirm",
+    "test:ui": "node scripts/ui-smoke.mjs"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.31.0",
     "@anthropic-ai/claude-agent-sdk": "^0.3.285",
+    "@modelcontextprotocol/sdk": "^1.31.0",
     "border-beam": "^1.4.1",
     "bot-avatars": "^0.1.2",
     "liquid-gooey": "^0.2.2",
@@ -35,6 +36,7 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.1.1",
+    "playwright": "^1.63.0",
     "vite": "^8.3.1"
   }
 }
