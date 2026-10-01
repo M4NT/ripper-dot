@@ -38,6 +38,14 @@ test('delegação com @Nome coloca o colega na fila; PASSO não delega', () => {
   assert.equal(floor.next(), null);
   assert.equal(isPass('PASSO'), true);
   assert.equal(isPass('[passo].'), true);
+});
+
+test('afterReply respeita allowPeer antes de enfileirar', () => {
+  const floor = new Floor([agents[0]], agents);
+  const first = floor.next();
+  const added = floor.afterReply(first, '@Redatora ajuda', { allowPeer: () => false });
+  assert.deepEqual(added, []);
+  assert.equal(floor.next(), null);
   assert.equal(isPass('Passo 1: faça isso'), false);
 });
 
