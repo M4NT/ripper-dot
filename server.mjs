@@ -73,6 +73,7 @@ import {
 } from './lib/mcp-connectors.mjs';
 import { redactRoutine, redactSseEvent, redactJsonPayload, redactForLog } from './lib/redact.mjs';
 import { collectDiagnostics } from './lib/diagnostics.mjs';
+import { runBootLint } from './lib/boot-lint.mjs';
 import { buildBackupPayload, restoreBackupPayload, listAutoBackups } from './lib/backup.mjs';
 import { memoAsync } from './lib/ttl-cache.mjs';
 
@@ -96,6 +97,8 @@ if (HOST !== '127.0.0.1' && HOST !== 'localhost' && !TOKEN) {
   console.error('Recusado: HOST expõe o Ripper na rede sem RIPPER_TOKEN. Defina RIPPER_TOKEN=<segredo longo>.');
   process.exit(1);
 }
+
+runBootLint({ host: HOST, port: PORT, token: TOKEN });
 
 class HttpError extends Error { constructor(code, msg) { super(msg); this.code = code; } }
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.woff2': 'font/woff2', '.json': 'application/json', '.pdf': 'application/pdf', '.ico': 'image/x-icon' };

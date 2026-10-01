@@ -116,6 +116,8 @@ Os dados locais ficam em `data/` (ou em `RIPPER_DATA`), que não é enviado ao G
 
 Ao expor o servidor na rede, configure `RIPPER_TOKEN`. O modo de comandos locais exige ativação explícita em Integrações.
 
+Na subida, o Ripper valida variáveis críticas (`lib/boot-lint.mjs`): em desenvolvimento local, problemas geram **avisos** no log e o servidor continua; com `NODE_ENV=production` ou `RIPPER_STRICT=1`, falhas (token ausente, `PORT`/timeouts numéricos inválidos, `RIPPER_DATA` sem permissão de escrita) encerram o processo com código 1. Logs estruturados: `{"level","code","message"}`.
+
 **Backup:** em Configurações → Segurança, use *Baixar backup* (`GET /api/data/backup`) para exportar `db.json` com metadados. *Restaurar* (`POST /api/data/restore` com `confirm: true`) substitui o estado em memória e grava `db.pre-restore.<timestamp>.backup.json` antes. Para cópia completa (uploads, `usage.sqlite`, `julia.sqlite`), copie a pasta `RIPPER_DATA` no disco. Migrações de schema criam `db.pre-v2.backup.json` automaticamente.
 
 **Diagnóstico:** `GET /api/diagnostics` (autenticado) devolve contagem real de agentes/conversas, presença dos arquivos de dados e status do Julia/Docker/Codex — sem pontuações inventadas.
