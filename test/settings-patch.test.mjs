@@ -51,6 +51,15 @@ test('applySettingsPatch aceita ui.mode e sincroniza enterprise.enabled', () => 
   assert.equal(s.enterprise.enabled, false);
 });
 
+test('applySettingsPatch ativa modo enterprise via enterprise.enabled', () => {
+  const s = { defaultModel: 'auto', claude: {}, computer: {}, ui: { mode: 'simple' }, enterprise: { enabled: false } };
+  applySettingsPatch(s, { enterprise: { enabled: true } });
+  assert.equal(s.enterprise.enabled, true);
+  assert.equal(s.ui.mode, 'enterprise');
+  applySettingsPatch(s, { enterprise: { enabled: false } });
+  assert.equal(s.enterprise.enabled, false);
+});
+
 test('applySettingsPatch rejeita ui.mode inválido', () => {
   const s = { defaultModel: 'auto', claude: {}, computer: {} };
   assert.throws(() => applySettingsPatch(s, { ui: { mode: 'completa' } }), /interface/);

@@ -368,7 +368,7 @@ test('GET /api/admin/overview exige modo enterprise', async () => {
     assert.equal(ok.status, 200);
     const body = await ok.json();
     assert.equal(body.enterprise, true);
-    assert.equal(body.sections.auditTrail.worm, false);
+    assert.equal(body.sections.auditTrail.worm, true);
     assert.ok(body.sections.usage);
   });
 });
@@ -425,9 +425,11 @@ test('GET /api/usage/token-roi exige enterprise', async () => {
 
 test('GET /api/audit-trail e /api/lgpd/status', async () => {
   await withServer({}, async (base, token) => {
-    const auth = { authorization: `Bearer ${token}` };
+    const auth = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    assert.equal((await fetch(base + '/api/audit-trail', { headers: auth })).status, 403);
+    await enableEnterprise(base, auth);
     const trail = await fetch(base + '/api/audit-trail', { headers: auth }).then(r => r.json());
-    assert.equal(trail.worm, false);
+    assert.equal(trail.worm, true);
     assert.ok(Array.isArray(trail.entries));
     const lgpd = await fetch(base + '/api/lgpd/status', { headers: auth }).then(r => r.json());
     assert.equal(lgpd.productTelemetry, false);
