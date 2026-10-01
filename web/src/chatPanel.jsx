@@ -199,6 +199,7 @@ export default function ChatPanel({ members, project, chatId, messages, files, o
   // Nesta tela, "trabalhando" é desta conversa (não de outra em que o agente esteja).
   const busy = chatId && busyChats[chatId] ? busyAgents : {};
   const [tab, setTab] = useState('details');
+  useEffect(() => { const show = () => setTab('computer'); addEventListener('ripper:computer', show); return () => removeEventListener('ripper:computer', show); }, []);
   const group = members.length > 1, a = members[0];
   const working = members.some(x => busy[x.id]);
   const arts = S.artifacts.filter(x => project ? x.projectId === project.id : chatId && x.chatId === chatId);

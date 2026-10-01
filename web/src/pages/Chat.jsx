@@ -293,6 +293,8 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
           if (e.passed) { building = { role: 'assistant', agentId: e.passed, content: '', steps: [], at: Date.now(), passed: true }; }
           if (e.turnDone) setBusy(b => { const n = { ...b }; delete n[e.turnDone]; return n; });
           if (e.route) { building.model = e.route.model; building.effort = e.route.effort; building.routed = e.route.by !== 'manual'; }
+          // Primeiro uso do computador/navegador nesta resposta: o painel abre a tela ao vivo.
+          if (e.tool && /^(computer_|browser_)/.test(e.tool) && !building.steps.some(s => /^(computer_|browser_)/.test(s.tool || ''))) dispatchEvent(new CustomEvent('ripper:computer'));
           if (e.tool) { building.steps.push({ kind: 'tool', tool: e.tool, label: STEP_LABEL[e.tool] || `Usando ${e.tool}`, detail: e.detail }); setPhase(e.tool); }
           if (e.handoff) {
             const lbl = S.models[e.handoff]?.label || e.handoff;
