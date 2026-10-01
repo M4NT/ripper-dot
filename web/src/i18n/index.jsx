@@ -40,6 +40,7 @@ export function settingsTabs(t) {
     ['computer', t('settings.tab.computer'), 'terminal', t('settings.tab.computerHint')],
     ['plugins', t('settings.tab.plugins'), 'plug', t('settings.tab.pluginsHint')],
     ['security', t('settings.tab.security'), 'key', t('settings.tab.securityHint')],
+    ['backup', t('settings.tab.backup'), 'archive', t('settings.tab.backupHint')],
     ['memory', t('settings.tab.memory'), 'brain', t('settings.tab.memoryHint')],
     ['appearance', t('settings.tab.appearance'), 'sun', t('settings.tab.appearanceHint')],
     ['advanced', t('settings.tab.advanced'), 'layers', t('settings.tab.advancedHint')]
