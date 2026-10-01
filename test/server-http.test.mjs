@@ -75,6 +75,27 @@ test('?token= define cookie e redireciona (sem auth header)', async () => {
   });
 });
 
+test('GET /api/chats lista e busca conversas reais com paginação', async () => {
+  await withServer({ RIPPER_TEST_PROVIDER: 'stream' }, async (base, token) => {
+    const auth = { authorization: `Bearer ${token}` };
+    const st = await (await fetch(base + '/api/state', { headers: auth })).json();
+    const agent = st.agents[0];
+    const chatRes = await fetch(base + '/api/chat', {
+      method: 'POST',
+      headers: { ...auth, 'content-type': 'application/json' },
+      body: JSON.stringify({ agentId: agent.id, text: 'marcador-unico-busca', model: 'claude-sonnet-5-5', effort: 'low' })
+    });
+    await chatRes.text();
+    await new Promise(r => setTimeout(r, 250));
+    const list = await (await fetch(base + '/api/chats?limit=5', { headers: auth })).json();
+    assert.ok(Array.isArray(list.items));
+    assert.ok(list.total >= 1);
+    const found = await (await fetch(base + '/api/chats?q=marcador-unico-busca', { headers: auth })).json();
+    assert.equal(found.total, 1);
+    assert.match(found.items[0].preview || '', /marcador-unico-busca/);
+  });
+});
+
 test('GET /api/usage/limits retorna agregado', async () => {
   await withServer({}, async (base, token) => {
     const r = await fetch(base + '/api/usage/limits', { headers: { authorization: `Bearer ${token}` } });
