@@ -142,6 +142,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   // Modelo + esforço da conversa. Em grupo, o padrão é deixar cada agente com o seu.
   const defaults = (c, a, group) => ({ model: c?.model || (group ? 'agent' : a?.model || S.settings.defaultModel), effort: c?.effort || a?.effort || 'auto' });
   const [choice, setChoice] = useState(() => defaults(null, agent, isGroup));
+  const [interrupted, setInterrupted] = useState(false);
 
   const idRef = useRef(chatId);
   idRef.current = chatId;
@@ -156,7 +157,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
     setLoading(true);
     let alive = true;
     api(`/api/chats/${initialId}`)
-      .then(c => { if (!alive) return; if (c.unread === false && S.chats.find(x => x.id === c.id)?.unread) refresh(); setChat(c); setChoice(defaults(c, getAgent(c.agentId), (c.agentIds || []).length > 1)); })
+      .then(c => { if (!alive) return; if (c.unread === false && S.chats.find(x => x.id === c.id)?.unread) refresh(); setChat(c); setInterrupted(!!c.interrupted); setChoice(defaults(c, getAgent(c.agentId), (c.agentIds || []).length > 1)); })
       .catch(() => alive && setNotFound(true))
       .finally(() => alive && setLoading(false));
     return () => { alive = false; };
@@ -172,6 +173,20 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
     }, 4000);
     return () => clearInterval(t);
   }, [waiting, chatId]);
+  useEffect(() => {
+    if (!chatId) return;
+    const refetch = async () => {
+      if (ctrl.current || document.visibilityState !== 'visible') return;
+      try {
+        const c = await api(`/api/chats/${chatId}`);
+        setChat(c);
+        setInterrupted(!!c.interrupted);
+      } catch {}
+    };
+    document.addEventListener('visibilitychange', refetch);
+    window.addEventListener('online', refetch);
+    return () => { document.removeEventListener('visibilitychange', refetch); window.removeEventListener('online', refetch); };
+  }, [chatId]);
   // Ctrl+. recolhe/mostra o painel da direita.
   useEffect(() => {
     const k = e => { if ((e.ctrlKey || e.metaKey) && e.key === '.') { e.preventDefault(); setPanel(p => { local.set('panel', !p); return !p; }); } };
@@ -191,20 +206,26 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   const onScroll = () => { const el = scroller.current; stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120; };
   useEffect(() => { if (stick.current) scroller.current?.scrollTo({ top: 1e9 }); }, [chat?.messages.length, live?.content, live?.steps?.length]);
 
-  async function send({ text, fileIds = [], previews, mcpSession }, forceChoice) {
+  async function send({ text, fileIds = [], previews, mcpSession, resume = false }, forceChoice) {
     const use = forceChoice || choice;
     if (ctrl.current || !agent) return;
-    const userMsg = { id: 'u' + Date.now(), role: 'user', content: text, files: fileIds, previews, at: Date.now() };
-    setChat(c => ({ ...(c || { title: 'Nova conversa', agentId: agent.id, agentIds: isGroup ? memberIds : undefined, projectId }), messages: [...(c?.messages || []), userMsg] }));
+    if (resume && !chatId) return;
+    if (!resume) {
+      const userMsg = { id: 'u' + Date.now(), role: 'user', content: text, files: fileIds, previews, at: Date.now() };
+      setChat(c => ({ ...(c || { title: 'Nova conversa', agentId: agent.id, agentIds: isGroup ? memberIds : undefined, projectId }), messages: [...(c?.messages || []), userMsg] }));
+    } else setInterrupted(false);
     let building = { role: 'assistant', agentId: agent.id, content: '', steps: [], at: Date.now() };
     setLive(building); setPhase(['xhigh', 'max'].includes(use.effort) ? 'think' : 'route');
     stick.current = true;
     const ac = new AbortController(); ctrl.current = ac;
-    let cid = chatId, pending = false, finished = false;
+    let cid = chatId, pending = false, finished = false, sawDone = false;
     const flush = () => { if (pending) return; pending = true; requestAnimationFrame(() => { pending = false; if (!finished) setLive({ ...building, steps: [...building.steps] }); }); };
     try {
-      const res = await fetch('/api/chat', { method: 'POST', signal: ac.signal, headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ agentId: agent.id, agentIds: isGroup ? memberIds : undefined, projectId, chatId: cid, text, fileIds, model: use.model, effort: use.effort, mcpSession: mcpSession || sessionPayload() }) });
+      const endpoint = resume ? `/api/chats/${chatId}/resume` : '/api/chat';
+      const payload = resume
+        ? { mcpSession: mcpSession || sessionPayload() }
+        : { agentId: agent.id, agentIds: isGroup ? memberIds : undefined, projectId, chatId: cid, text, fileIds, model: use.model, effort: use.effort, mcpSession: mcpSession || sessionPayload() };
+      const res = await fetch(endpoint, { method: 'POST', signal: ac.signal, headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
         const msg = errBody.error || `Erro ${res.status}`;
@@ -256,6 +277,8 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
           if (e.routine) building.steps.push({ kind: 'done', label: 'Rotina criada', detail: e.routine });
           if (e.text) { building.content += e.text; setPhase('text'); }
           if (e.stopped) building.stopped = true;
+          if (e.interrupted) { building.interrupted = true; setInterrupted(true); }
+          if (e.done) sawDone = true;
           flush();
         }
       }
@@ -268,8 +291,15 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
       setBusy(b => { const n = { ...b }; memberIds.forEach(id => delete n[id]); return n; });
       if (cid) setBusyChats(b => { const n = { ...b }; delete n[cid]; return n; });
       setLive(null); setPhase(null);
-      if (cid) { try { setChat(await api(`/api/chats/${cid}`)); } catch { setChat(c => ({ ...c, messages: [...c.messages, building] })); } }
-      else setChat(c => ({ ...c, messages: [...c.messages, building] }));
+      if (cid) {
+        try {
+          const c = await api(`/api/chats/${cid}`);
+          setChat(c);
+          setInterrupted(!!c.interrupted);
+        } catch {
+          if (sawDone && building.content) setChat(c => ({ ...c, messages: [...c.messages, building] }));
+        }
+      } else if (sawDone) setChat(c => ({ ...c, messages: [...c.messages, building] }));
       refresh();
     }
   }
@@ -330,6 +360,12 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
         </div>
 
         <div className="chat-dock">
+          {interrupted && !live && (
+            <div className="chat-recovery-banner" role="status">
+              <p>Conexão interrompida — retome ou reenvie.</p>
+              <button type="button" className="btn sm" onClick={() => send({ resume: true })}>Retomar resposta</button>
+            </div>
+          )}
           <Composer agent={agent} chatId={chatId} projectId={projectId} streaming={!!live} onSend={p => send(p)} onStop={() => { if (chatId) api(`/api/chats/${chatId}/cancel`, { method: 'POST' }).catch(() => {}); ctrl.current?.abort(); }}
             choice={choice} setChoice={setChoice} group={isGroup} mentions={isGroup ? members : null}
             placeholder={isGroup ? 'Mensagem para o grupo… use @Nome para chamar alguém' : `Mensagem para ${agent.name}…`} autoFocus draftKey={chatId || 'new-' + memberIds.join('-')} />

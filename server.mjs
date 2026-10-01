@@ -37,6 +37,7 @@ import { buildUsageContract, normalizeContextWindow } from './lib/usage-api.mjs'
 import { buildMeteringReport, listMeteringEvents, usageEventsToCsv } from './lib/metering.mjs';
 import { buildTokenRoiContract } from './lib/token-roi.mjs';
 import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStreaming, activeChatStreamCount } from './lib/chat-stream.mjs';
+import { beginChatRun, bumpChatRunSeq, finishChatRun, chatRunPublic, canResumeChatRun, trimPartialRepliesAfterLastUser } from './lib/chat-run.mjs';
 import { exportChatPayload, importChatPayload } from './lib/chat-transfer.mjs';
 import { listAgentTemplates, createSavedTemplate, patchSavedTemplate, agentFromSavedTemplate } from './lib/agent-templates.mjs';
 import { ripperBuiltinSchemaChars, listRipperBuiltinToolNames } from './lib/ripper-builtin-tools.mjs';
@@ -179,6 +180,59 @@ function publicBaseUrl(req) {
 // Prévias em texto puro: nada de ** ou # aparecendo nas listas.
 const plain = s => String(s || '').replace(/```[\s\S]*?```/g, ' ').replace(/[*_`#>]+/g, '').replace(/\s+/g, ' ').trim();
 const summary = ({ messages, ...c }) => ({ ...c, preview: plain(messages.at(-1)?.content).slice(0, 90), count: messages.length });
+
+function chatDetail(c, cid) {
+  return {
+    ...c,
+    streaming: isChatStreaming(cid),
+    run: chatRunPublic(c.run),
+    interrupted: c.run?.status === 'interrupted'
+  };
+}
+
+async function streamChatResponse(req, c, { text, fileIds, mcpSession, resume = false }, res) {
+  res.writeHead(200, hdr(req, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store', 'x-accel-buffering': 'no' }));
+  const emitRaw = e => {
+    if (!res.writable) return;
+    bumpChatRunSeq(c);
+    const payload = e?.error && req.requestId ? { ...e, requestId: req.requestId } : e;
+    res.write(`data: ${JSON.stringify(redactSseEvent(payload))}\n\n`);
+  };
+  emitRaw({ chatId: c.id, runId: c.run?.runId, eventSeq: c.run?.lastEventSeq, resume: !!resume });
+  const clientAc = new AbortController();
+  res.on('close', () => { if (!res.writableFinished) clientAc.abort(); });
+  const { signal: streamSignal } = registerChatStream(c.id, { signal: clientAc.signal, emit: emitRaw });
+  const ping = setInterval(() => res.writable && res.write(': ping\n\n'), 15_000);
+  let completed = false;
+  let turnMetricRecorded = false;
+  const chatEmit = e => {
+    if (e?.speaker) turnMetricRecorded = true;
+    emitRaw(e);
+  };
+  try {
+    await chat({ chat: c, text, fileIds, signal: streamSignal, mcpSession, skipUserPush: resume }, chatEmit);
+    completed = !streamSignal.aborted;
+  } finally {
+    clearInterval(ping);
+    unregisterChatStream(c.id);
+    let status = completed ? 'done' : 'interrupted';
+    if (streamSignal.aborted) {
+      const last = c.messages.at(-1);
+      if (last?.role === 'assistant' && (last.stopped || last.error)) status = 'done';
+    }
+    finishChatRun(c, status);
+    if (!turnMetricRecorded && status === 'interrupted') recordChatTurn('interrupted');
+    save();
+  }
+  if (completed) {
+    emitRaw({ done: true, title: c.title, runId: c.run?.runId, eventSeq: c.run?.lastEventSeq });
+    res.end();
+  } else {
+    emitRaw({ interrupted: true, runId: c.run?.runId, eventSeq: c.run?.lastEventSeq });
+    res.end();
+  }
+  return undefined;
+}
 const projectOr404 = pid => db.projects.find(p => p.id === pid) || (() => { throw new HttpError(404, 'Projeto não encontrado.'); })();
 const agentOr404 = aid => db.agents.find(a => a.id === aid) || (() => { throw new HttpError(404, 'Agente não encontrado.'); })();
 const syncedBoatFiles = new Set();
@@ -592,10 +646,14 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
   else recordChatTurn('error');
 }
 
-async function chat({ chat, text, fileIds, signal, mcpSession }, emit) {
-  logger.info('chat.turn.start', { chatId: chat.id });
+async function chat({ chat, text, fileIds, signal, mcpSession, skipUserPush = false }, emit) {
+  logger.info('chat.turn.start', { chatId: chat.id, resume: skipUserPush });
   try {
-  chat.messages.push({ id: id(), role: 'user', content: text, files: fileIds?.length ? fileIds : undefined, at: Date.now() });
+  if (!skipUserPush) {
+    const uid = id();
+    chat.messages.push({ id: uid, role: 'user', content: text, files: fileIds?.length ? fileIds : undefined, at: Date.now() });
+    if (chat.run?.status === 'running' && !chat.run.userMessageId) chat.run.userMessageId = uid;
+  }
   const members = groupMembers(chat, db.agents);
   const group = members.length > 1 ? members : null;
   // Julia 1 (ou a heurística) escolhe quem abre; @menções definem a ordem; delegações entram na fila.
@@ -1144,7 +1202,13 @@ const routes = [
     const c = db.chats.find(c => c.id === cid);
     if (!c) throw new HttpError(404, 'Conversa não encontrada.');
     if (c.unread) { c.unread = false; save(); }
-    return { ...c, streaming: isChatStreaming(cid) };
+    return chatDetail(c, cid);
+  }],
+  ['GET', /^\/api\/conversations\/([\w-]+)$/, (req, [cid]) => {
+    const c = db.chats.find(c => c.id === cid);
+    if (!c) throw new HttpError(404, 'Conversa não encontrada.');
+    if (c.unread) { c.unread = false; save(); }
+    return chatDetail(c, cid);
   }],
   ['GET', /^\/api\/chats\/([\w-]+)\/export$/, (req, [cid]) => {
     const c = db.chats.find(c => c.id === cid);
@@ -1171,6 +1235,30 @@ const routes = [
     }
     c.updatedAt = Date.now();
     save(); return summary(c);
+  }],
+  ['POST', /^\/api\/chats\/([\w-]+)\/resume$/, async (req, [cid], url, res) => {
+    const c = db.chats.find(x => x.id === cid);
+    if (!c) throw new HttpError(404, 'Conversa não encontrada.');
+    if (isChatStreaming(cid)) throw new HttpError(409, 'Esta conversa já está respondendo.');
+    const check = canResumeChatRun(c, { streaming: false });
+    if (!check.ok) throw new HttpError(check.reason?.includes('já tem resposta') ? 409 : 400, check.reason);
+    check.ok && trimPartialRepliesAfterLastUser(c);
+    const { text, fileIds } = check;
+    beginChatRun(c, { runId: id(), userMessageId: c.messages[check.at]?.id });
+    save();
+    return streamChatResponse(req, c, { text, fileIds, mcpSession: (await body(req)).mcpSession, resume: true }, res);
+  }],
+  ['POST', /^\/api\/conversations\/([\w-]+)\/resume$/, async (req, [cid], url, res) => {
+    const c = db.chats.find(x => x.id === cid);
+    if (!c) throw new HttpError(404, 'Conversa não encontrada.');
+    if (isChatStreaming(cid)) throw new HttpError(409, 'Esta conversa já está respondendo.');
+    const check = canResumeChatRun(c, { streaming: false });
+    if (!check.ok) throw new HttpError(check.reason?.includes('já tem resposta') ? 409 : 400, check.reason);
+    trimPartialRepliesAfterLastUser(c);
+    const { text, fileIds } = check;
+    beginChatRun(c, { runId: id(), userMessageId: c.messages[check.at]?.id });
+    save();
+    return streamChatResponse(req, c, { text, fileIds, mcpSession: (await body(req)).mcpSession, resume: true }, res);
   }],
   ['POST', /^\/api\/chats\/([\w-]+)\/cancel$/, (req, [cid]) => {
     db.chats.find(c => c.id === cid) || (() => { throw new HttpError(404, 'Conversa não encontrada.'); })();
@@ -1238,24 +1326,11 @@ const routes = [
     if (quota.blocked) throw new HttpError(429, quota.userMessage);
     const fileIds = (b.fileIds || []).filter(fid => db.files.some(f => f.id === fid && agentIds.some(a => canUseFile(f, { id: a }, c))));
     for (const fid of fileIds) { const f = db.files.find(x => x.id === fid); if (f && !f.chatId) f.chatId = c.id; }
-    res.writeHead(200, hdr(req, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store', 'x-accel-buffering': 'no' }));
-    const emit = e => {
-      if (!res.writable) return;
-      const payload = e?.error && req.requestId ? { ...e, requestId: req.requestId } : e;
-      res.write(`data: ${JSON.stringify(redactSseEvent(payload))}\n\n`);
-    };
-    emit({ chatId: c.id });
-    const clientAc = new AbortController();
-    res.on('close', () => { if (!res.writableFinished) clientAc.abort(); });
-    const { signal } = registerChatStream(c.id, { signal: clientAc.signal, emit });
-    const ping = setInterval(() => res.writable && res.write(': ping\n\n'), 15_000);
-    // Modelo e esforço ficam gravados na conversa ('agent' = usar o padrão de cada agente).
     if (b.model) c.model = b.model === 'agent' ? undefined : b.model;
     if (b.effort) c.effort = b.effort;
-    try { await chat({ chat: c, text, fileIds, signal, mcpSession: b.mcpSession }, emit); }
-    finally { clearInterval(ping); unregisterChatStream(c.id); save(); }
-    emit({ done: true, title: c.title }); res.end();
-    return undefined;
+    beginChatRun(c, { runId: id(), userMessageId: null });
+    save();
+    return streamChatResponse(req, c, { text, fileIds, mcpSession: b.mcpSession, resume: false }, res);
   }]
 ];
 
