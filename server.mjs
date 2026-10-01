@@ -946,7 +946,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
       if (hit.loop) {
         emit({ tokenBudget: { kind: 'tool_loop', tool: hit.tool, count: hit.count, message: hit.message }, stopped: true });
         emit({ warn: hit.message });
-        signal?.abort?.();
+        cancelChatStream(chat.id, 'tool_loop'); // antes era signal.abort(), que não existe em AbortSignal: o loop nunca parava
         return;
       }
     }
@@ -992,7 +992,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
       }
     },
     onAttemptFailed: async ({ model: m, error: e, aborted, canFallback, out, steps }) => {
-      if (aborted) { push(out, steps, { model: m, stopped: true }); return; }
+      if (aborted) { push(out, steps, { model: m, stopped: true, stopReason: typeof signal?.reason === 'string' ? signal.reason : 'user' }); return; }
       const prov = MODELS[m].provider;
       const limitSig = parseProviderLimitFromError(e);
       if (limitSig) {

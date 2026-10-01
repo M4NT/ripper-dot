@@ -19,6 +19,13 @@ import { FirstRunChecklist } from '../firstRunChecklist.jsx';
 
 const agentColor = a => nameColor(a, botAvatarPalette);
 // Qual "verbo" o orb mostra para cada fase da resposta.
+// Por que a resposta parou (gravado pelo servidor em message.stopReason).
+const STOP_REASON = {
+  user: 'Você interrompeu a resposta.',
+  connection: 'A conexão caiu antes do fim (aba fechada ou rede).',
+  tool_loop: 'Parada automática: o agente repetiu a mesma ferramenta em loop.',
+  budget: 'Parada pelo orçamento de tokens.'
+};
 const ORB = { route: 'connecting', WebSearch: 'searching', WebFetch: 'searching', computer_exec: 'working', computer_share: 'working', remember: 'weaving', schedule_routine: 'shaping', think: 'solving', text: 'composing' };
 
 /**
@@ -73,7 +80,7 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, mo
           {m.content ? (live ? <LiveText text={m.content} /> : <Markdown text={m.content} />)
             : live ? <div className="thinking"><ThinkingOrb state={ORB[phase] || 'breathing'} size={20} /><span>{phase === 'route' ? 'Escolhendo o melhor modelo…' : phase === 'think' ? 'Pensando com calma…' : phase === 'approval' ? 'Aguardando sua aprovação…' : 'Pensando…'}</span></div>
             : m.error ? <p className="msg-error">Não consegui responder. {m.error}</p>
-            : m.stopped ? <p className="muted">Resposta interrompida.</p> : null}
+            : m.stopped ? <p className="muted">{STOP_REASON[m.stopReason] || 'Resposta interrompida.'}</p> : null}
         </div>
         <div className="msg-meta">
           {m.at && <time>{fmtTime(m.at)}</time>}

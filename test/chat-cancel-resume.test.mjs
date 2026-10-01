@@ -145,6 +145,12 @@ test('cancel via API e retomar nova mensagem sem 409', async () => {
 
     await new Promise(r => setTimeout(r, 450));
 
+    // A mensagem cortada guarda o motivo (a UI mostra "Você interrompeu a resposta.").
+    const saved = await (await fetch(base + `/api/chats/${chatId}`, { headers: auth })).json();
+    const cut = saved.messages.filter(m => m.role === 'assistant').at(-1);
+    assert.equal(cut?.stopped, true);
+    assert.equal(cut?.stopReason, 'user');
+
     const res2 = await fetch(base + '/api/chat', {
       method: 'POST',
       headers: { ...auth, 'content-type': 'application/json' },
