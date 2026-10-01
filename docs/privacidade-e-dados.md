@@ -44,10 +44,13 @@ Credenciais Anthropic/OpenAI em Configurações ficam em `db.json` (não vão pa
 | --- | --- |
 | Eventos de uso (`usage.sqlite`) | Ring buffer de no máximo `800` linhas (`USAGE_EVENTS_MAX` em `lib/usage-events.mjs`); entradas mais antigas são apagadas ao inserir novas |
 | Decisões Julia (`julia.sqlite`) | Mesmo limite de `800` (`JULIA_EVENTS_MAX` em `lib/julia-events.mjs`) |
-| Histórico de chat | Mantido em `db.json` até você apagar conversas/agentes na UI ou editar/remover dados manualmente |
+| Histórico de chat | Mantido em `db.json` até você apagar conversas/agentes na UI, editar/remover dados manualmente, ou **retenção TTL** (Configurações → Segurança) |
 | Contadores `usage.byModel` | Persistidos em `db.json` (mesclados entre processos) |
+| TTL configurável (`settings.retention` / `RIPPER_RETENTION_*`) | Job periódico no servidor (`lib/retention-ttl.mjs`): **hard-delete** de conversas, eventos de uso por idade, `auditLog` em `db.json`, artefatos e anexos órfãos. **Não** apaga linhas de `audit-trail.sqlite` (WORM), se existir |
 
-Não há job agendado para apagar chats antigos automaticamente.
+Variáveis de ambiente opcionais: `RIPPER_RETENTION_ENABLED`, `RIPPER_RETENTION_CHAT_DAYS`, `RIPPER_RETENTION_USAGE_EVENTS_DAYS`, `RIPPER_RETENTION_AUDIT_DAYS`, `RIPPER_RETENTION_ARTIFACTS_DAYS`, `RIPPER_RETENTION_INTERVAL_MS`.
+
+API autenticada: `GET/PUT /api/retention`, `POST /api/retention/run` (purga imediata).
 
 ## Controles opt-in (CLI)
 
@@ -92,8 +95,8 @@ Testes: `test/lgpd-pii.test.mjs` e rotas em `test/server-http.test.mjs`.
 
 ## O que ainda não existe (planejado / fora de escopo)
 
-- Exportação GDPR one-click, criptografia at-rest de `db.json`, ou política de retenção configurável por variável de ambiente.
+- Exportação GDPR one-click ou criptografia at-rest de `db.json`.
 - Anonimização automática de logs do servidor.
 - Sincronização multi-dispositivo ou backup na nuvem pelo Ripper.
 
-Se adicionarmos helpers ou políticas novas, este arquivo e os testes em `test/data-retention.test.mjs` devem ser atualizados junto.
+Se adicionarmos helpers ou políticas novas, este arquivo e os testes em `test/data-retention.test.mjs` e `test/retention-ttl.test.mjs` devem ser atualizados junto.

@@ -399,6 +399,18 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
               </Card>
             </AdvancedBlock>
           </>}
+          <Card title="Retenção de dados" desc="Apaga automaticamente conversas, eventos de uso, histórico de aprovações em db.json, artefatos e anexos órfãos após o prazo. Hard-delete no disco. Não altera audit-trail.sqlite (WORM), se existir.">
+            <Row title="Retenção automática" desc="Job periódico no servidor (padrão a cada 6 h)."><Switch checked={!!s.retention?.enabled} onChange={v => set('retention', { ...(s.retention || {}), enabled: v })} label="Ativar retenção" /></Row>
+            <Row title="Conversas" desc="Usa a data da última mensagem (updatedAt)."><div className="input-unit"><input className="input" type="number" min={1} max={3650} value={s.retention?.chatDays ?? 90} onChange={e => set('retention', { ...(s.retention || {}), chatDays: +e.target.value })} /><span>dias</span></div></Row>
+            <Row title="Eventos de uso" desc="Linhas em usage.sqlite (não os contadores em db.json)."><div className="input-unit"><input className="input" type="number" min={1} max={3650} value={s.retention?.usageEventsDays ?? 90} onChange={e => set('retention', { ...(s.retention || {}), usageEventsDays: +e.target.value })} /><span>dias</span></div></Row>
+            <Row title="Auditoria local" desc="Entradas em db.json (auditLog). WORM audit-trail.sqlite nunca é apagado aqui."><div className="input-unit"><input className="input" type="number" min={1} max={3650} value={s.retention?.auditDays ?? 180} onChange={e => set('retention', { ...(s.retention || {}), auditDays: +e.target.value })} /><span>dias</span></div></Row>
+            <Row title="Artefatos e anexos" desc="Metadados em db.json, blobs em artifacts/ e uploads órfãos."><div className="input-unit"><input className="input" type="number" min={1} max={3650} value={s.retention?.artifactsDays ?? 90} onChange={e => set('retention', { ...(s.retention || {}), artifactsDays: +e.target.value })} /><span>dias</span></div></Row>
+            {s.retention?.lastPurgeAt && (
+              <Row title="Última purga" desc={s.retention.lastReport ? `${s.retention.lastReport.chats ?? 0} conversas, ${s.retention.lastReport.usageEvents ?? 0} eventos de uso, ${s.retention.lastReport.auditLog ?? 0} auditoria, ${s.retention.lastReport.artifacts ?? 0} artefatos.` : ''}>
+                <span className="muted">{new Date(s.retention.lastPurgeAt).toLocaleString('pt-BR')}</span>
+              </Row>
+            )}
+          </Card>
         </>}
 
         {tab === 'backup' && <DataBackup s={s} set={set} />}
