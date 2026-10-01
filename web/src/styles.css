@@ -492,6 +492,19 @@ a.row-main:hover b { text-decoration: underline; text-underline-offset: 3px; }
 .config-hero { display: flex; align-items: center; gap: 22px; margin-bottom: 28px; }
 .config-hero h1 { font-size: 32px; font-weight: 400; letter-spacing: -.035em; margin-bottom: 4px; }
 .config-hero .lede { margin-top: 6px; }
+.config-hero-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 4px; }
+.autonomy-sem { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+.autonomy-lights { display: inline-flex; flex-direction: column; gap: 3px; padding: 4px 5px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line); }
+.autonomy-lights i { display: block; width: 8px; height: 8px; border-radius: 50%; background: color-mix(in srgb, var(--muted) 35%, var(--line)); opacity: .45; }
+.autonomy-lights i.on { opacity: 1; }
+.autonomy-sem-red .autonomy-lights i.on:first-child { background: #e24d4d; box-shadow: 0 0 6px color-mix(in srgb, #e24d4d 50%, transparent); }
+.autonomy-sem-yellow .autonomy-lights i.on:nth-child(2) { background: #d4a017; box-shadow: 0 0 6px color-mix(in srgb, #d4a017 45%, transparent); }
+.autonomy-sem-green .autonomy-lights i.on:nth-child(3) { background: var(--ok); box-shadow: 0 0 6px color-mix(in srgb, var(--ok) 45%, transparent); }
+.autonomy-sem-sm .autonomy-lights { padding: 3px 4px; gap: 2px; }
+.autonomy-sem-sm .autonomy-lights i { width: 6px; height: 6px; }
+.autonomy-label { font-weight: 500; color: var(--ink-2); }
+.autonomy-mode .tag-muted { font-weight: 500; font-size: 11px; color: var(--muted); border: 0; background: transparent; padding: 0; }
+.autonomy-grid { padding-top: 4px; }
 .config-tabs { margin-bottom: 28px; }
 .config-body { max-width: 680px; }
 .sub { font-size: 15px; font-weight: 500; margin: 26px 0 12px; }

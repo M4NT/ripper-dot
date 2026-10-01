@@ -3,6 +3,7 @@ import { TOOL_INFO, TONES, useDark } from './lib.js';
 import { AgentAvatar, Icon, Switch } from './ui.jsx';
 import { useApp } from './app.jsx';
 import { EffortScale } from './modelPicker.jsx';
+import { AutonomyPick } from './autonomy.jsx';
 
 const TYPES = ['clover', 'flower', 'triangle', 'square', 'blob', 'ghost', 'circle', 'drop', 'star', 'droid', 'mech', 'alien', 'hexagon', 'cat', 'cloud', 'pill', 'pebble', 'puddle'];
 const COLORS = [null, '#1a1917', '#f2efe9', '#e8537a', '#f08a3c', '#f2c94c', '#3fae78', '#3aa7c9', '#5b6cf0', '#9b6cf0'];
@@ -21,6 +22,7 @@ export function Basics({ v, set, categories }) {
 
 export function Behavior({ v, set }) {
   return <>
+    <AutonomyPick value={v.autonomyLevel} onChange={autonomyLevel => set({ autonomyLevel })} />
     <label className="field">Instruções<textarea rows={8} value={v.instructions} maxLength={8000} onChange={e => set({ instructions: e.target.value })} placeholder="Defina o comportamento, as regras e o que ele nunca deve fazer." /><small>Entram em toda conversa, junto das suas instruções gerais.</small></label>
     <div className="field"><span>Tom</span>
       <div className="pills" role="radiogroup" aria-label="Tom">
