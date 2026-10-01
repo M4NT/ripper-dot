@@ -32,7 +32,8 @@ export const ENTERPRISE_ONLY_ROUTES = new Set([
   'library',
   'projects',
   'connectors',
-  'skills'
+  'skills',
+  'admin'
 ]);
 
 export function isRouteAllowed(parts, settings) {
