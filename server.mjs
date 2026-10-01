@@ -21,8 +21,9 @@ import { canUseFile, selectSpeakers, routineDue, Floor, isPass, heuristicSpeaker
 import { providerAttemptOrder, runProviderAttemptLoop } from './lib/provider-turn.mjs';
 import { newHookToken, verifySignature, eventMeta } from './lib/hooks.mjs';
 import { recordUsage, usageSummary, accountLimits, contextBreakdown, checkSendQuota, compactChat, parseProviderLimitFromError, recordProviderSignal } from './lib/usage.mjs';
-import { refreshClaudeSubscriptionUsage } from './lib/claude-subscription-usage.mjs';
+import { buildUsageContract, normalizeContextWindow } from './lib/usage-api.mjs';
 import { ripperBuiltinSchemaChars, listRipperBuiltinToolNames } from './lib/ripper-builtin-tools.mjs';
+import { refreshClaudeSubscriptionUsage } from './lib/claude-subscription-usage.mjs';
 import { verifyMcpServer } from './lib/mcp-probe.mjs';
 import {
   applyOAuthTokensToPlugin,
@@ -117,6 +118,29 @@ function patchProject(p, b) {
 // O que cada conversa enxerga: artefatos do projeto (ou da própria conversa) e skills globais + do projeto.
 const visibleArtifacts = chat => db.artifacts.filter(x => chat.projectId ? x.projectId === chat.projectId : x.chatId === chat.id);
 const visibleSkills = chat => db.skills.filter(k => !k.projectId || k.projectId === chat.projectId);
+
+function usageContextMeasures(chatId) {
+  const chat = chatId && db.chats.find(c => c.id === chatId);
+  const agentId = chat?.agentId || chat?.agentIds?.[0];
+  const agent = agentId ? db.agents.find(a => a.id === agentId) : null;
+  const memories = agent ? db.memories.filter(m => m.agentId === agent.id && m.tier === 'profile') : [];
+  const skills = chat ? visibleSkills(chat) : [];
+  const skillsListChars = skills.reduce((n, k) => n + String(k.name).length + String(k.description || '').length, 0);
+  const plugins = (db.settings.plugins || []).filter(p => p.enabled !== false);
+  const pluginsChars = plugins.reduce((n, p) => n + JSON.stringify({ name: p.name, type: p.type, url: p.url, command: p.command }).length, 0);
+  const members = chat ? groupMembers(chat, db.agents) : [];
+  const groupContextChars = members.length > 1
+    ? members.reduce((n, a) => n + String(a.name).length + String(a.description || '').length, 0) : 0;
+  return {
+    systemChars: agent ? systemPrompt(agent, db.settings, memories).length : 0,
+    skillsListChars,
+    pluginsChars,
+    mcpPluginCount: plugins.length,
+    builtinToolCount: agent ? listRipperBuiltinToolNames(agent, db.settings).length : 0,
+    builtinSchemaChars: agent ? ripperBuiltinSchemaChars(agent, db.settings) : 0,
+    groupContextChars
+  };
+}
 
 // Aprovações: pedidos pendentes vivem em memória (a promessa que segura o agente) e no banco (histórico).
 // Verificado uma vez: o CLI do Codex está instalado nesta máquina?
@@ -478,36 +502,39 @@ const routes = [
     chats: db.chats.map(summary), routines: db.routines.map(({ hookSecret, ...r }) => ({ ...r, hasSecret: !!hookSecret })),
     files: db.files.map(({ path, ...f }) => f), memoriesCount: db.memories.length, pendingInbox: db.messages.filter(m => m.status === 'queued' || m.status === 'delivering').reduce((o, m) => (o[m.originChatId] = (o[m.originChatId] || 0) + 1, o), {}), approvals: db.approvals.filter(a => a.status === 'pending').map(approvalView), artifacts: db.artifacts.map(({ content, ...a }) => ({ ...a, size: content.length })),     skills: db.skills, memoriesByAgent: db.memories.reduce((o, x) => (o[x.agentId] = (o[x.agentId] || 0) + 1, o), {}), projects: db.projects,
     usage: usageSummary(db),
-    limits: accountLimits(db, db.settings)
+    limits: accountLimits(db, db.settings),
+    usageContract: (() => {
+      const b = buildUsageContract(db, db.settings);
+      return {
+        contractVersion: b.contractVersion,
+        summary: b.summary,
+        accountUsage: b.accountUsage,
+        providerSnapshot: b.providerSnapshot,
+        contextWindow: { ...b.contextWindow, emptyLabel: 'sem dados', available: false, hasData: false }
+      };
+    })()
   })],
+  ['GET', /^\/api\/usage$/, async (req, _, url) => {
+    const chatId = url.searchParams.get('chatId') || undefined;
+    await refreshClaudeSubscriptionUsage(db, db.settings).catch(() => {});
+    save();
+    return buildUsageContract(db, db.settings, { chatId, measures: usageContextMeasures(chatId) });
+  }],
   ['GET', /^\/api\/usage\/limits$/, async () => {
     await refreshClaudeSubscriptionUsage(db, db.settings).catch(() => {});
     save();
-    return accountLimits(db, db.settings);
+    const bundle = buildUsageContract(db, db.settings);
+    return {
+      contractVersion: bundle.contractVersion,
+      accountUsage: bundle.accountUsage,
+      providerSnapshot: bundle.providerSnapshot,
+      limits: bundle.limits
+    };
   }],
   ['GET', /^\/api\/usage\/context$/, (req, _, url) => {
     const chatId = url.searchParams.get('chatId') || undefined;
-    const chat = chatId && db.chats.find(c => c.id === chatId);
-    const agentId = chat?.agentId || chat?.agentIds?.[0];
-    const agent = agentId ? db.agents.find(a => a.id === agentId) : null;
-    const memories = agent ? db.memories.filter(m => m.agentId === agent.id && m.tier === 'profile') : [];
-    const skills = chat ? visibleSkills(chat) : [];
-    const skillsListChars = skills.reduce((n, k) => n + String(k.name).length + String(k.description || '').length, 0);
-    const plugins = (db.settings.plugins || []).filter(p => p.enabled !== false);
-    const pluginsChars = plugins.reduce((n, p) => n + JSON.stringify({ name: p.name, type: p.type, url: p.url, command: p.command }).length, 0);
-    const members = chat ? groupMembers(chat, db.agents) : [];
-    const groupContextChars = members.length > 1
-      ? members.reduce((n, a) => n + String(a.name).length + String(a.description || '').length, 0) : 0;
-    const measures = {
-      systemChars: agent ? systemPrompt(agent, db.settings, memories).length : 0,
-      skillsListChars,
-      pluginsChars,
-      mcpPluginCount: plugins.length,
-      builtinToolCount: agent ? listRipperBuiltinToolNames(agent, db.settings).length : 0,
-      builtinSchemaChars: agent ? ripperBuiltinSchemaChars(agent, db.settings) : 0,
-      groupContextChars
-    };
-    return contextBreakdown(db, db.settings, { chatId, measures });
+    const raw = contextBreakdown(db, db.settings, { chatId, measures: usageContextMeasures(chatId) });
+    return normalizeContextWindow(raw, { chatId });
   }],
   ['POST', /^\/api\/usage\/compact$/, async req => {
     const b = await body(req);

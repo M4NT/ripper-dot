@@ -80,8 +80,22 @@ test('GET /api/usage/limits retorna agregado', async () => {
     const r = await fetch(base + '/api/usage/limits', { headers: { authorization: `Bearer ${token}` } });
     assert.equal(r.status, 200);
     const body = await r.json();
-    assert.equal(body.source, 'ripper_local');
-    assert.equal(body.ripperQuota.rolling5h, null);
-    assert.ok(body.localUsage);
+    assert.ok(body.contractVersion);
+    assert.ok(body.accountUsage);
+    assert.ok(body.providerSnapshot);
+    assert.equal(body.limits.ripperQuota.rolling5h, null);
+    assert.ok(body.limits.localUsage);
+  });
+});
+
+test('GET /api/usage unifica contrato', async () => {
+  await withServer({}, async (base, token) => {
+    const r = await fetch(base + '/api/usage', { headers: { authorization: `Bearer ${token}` } });
+    assert.equal(r.status, 200);
+    const body = await r.json();
+    assert.ok(body.accountUsage);
+    assert.ok(body.providerSnapshot);
+    assert.ok(body.contextWindow);
+    assert.equal(body.contextWindow.emptyLabel, 'sem dados');
   });
 });
