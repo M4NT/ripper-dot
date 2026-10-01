@@ -97,7 +97,7 @@ test('route usa Julia quando no ar e heurística com fallbackReason quando não'
   withJuliaTelemetry(async () => {
   resetJuliaProbe();
   const down = await route('resuma isto', [], { julia: { url: 'http://127.0.0.1:1' } });
-  assert.equal(down.by, 'heuristic');
+  assert.equal(down.by, 'heuristic+cascade');
   assert.ok(down.fallbackReason);
 
   resetJuliaProbe();
@@ -106,7 +106,7 @@ test('route usa Julia quando no ar e heurística com fallbackReason quando não'
   }).listen(0);
   const settings = { julia: { url: `http://127.0.0.1:${srv.address().port}` } };
   const up = await route('qualquer', [], settings);
-  assert.equal(up.by, 'julia-1');
+  assert.equal(up.by, 'julia-1+cascade');
   assert.equal(up.model, 'codex');
   srv.close();
   }));

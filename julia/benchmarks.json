@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "defaultMinSuccessRate": 0.8,
+  "taskCategories": [
+    "chat_quick",
+    "reasoning_deep",
+    "coding",
+    "creative_writing"
+  ],
+  "models": {
+    "claude-fable-5-1": {
+      "provider": "claude",
+      "costPerMillionInput": 1,
+      "costPerMillionOutput": 5,
+      "avgLatencyMs": 750,
+      "estimateSource": "catalog_seed_v1 — preços ilustrativos; atualize via Julia ou substitua este arquivo",
+      "updatedAt": "2026-10-01",
+      "competencies": {
+        "chat_quick": 0.9,
+        "reasoning_deep": 0.55,
+        "coding": 0.42,
+        "creative_writing": 0.93
+      }
+    },
+    "claude-sonnet-5-5": {
+      "provider": "claude",
+      "costPerMillionInput": 3,
+      "costPerMillionOutput": 15,
+      "avgLatencyMs": 1200,
+      "estimateSource": "catalog_seed_v1",
+      "updatedAt": "2026-10-01",
+      "competencies": {
+        "chat_quick": 0.92,
+        "reasoning_deep": 0.86,
+        "coding": 0.84,
+        "creative_writing": 0.8
+      }
+    },
+    "claude-opus-5-5": {
+      "provider": "claude",
+      "costPerMillionInput": 15,
+      "costPerMillionOutput": 75,
+      "avgLatencyMs": 2800,
+      "estimateSource": "catalog_seed_v1",
+      "updatedAt": "2026-10-01",
+      "competencies": {
+        "chat_quick": 0.94,
+        "reasoning_deep": 0.96,
+        "coding": 0.9,
+        "creative_writing": 0.88
+      }
+    },
+    "codex": {
+      "provider": "codex",
+      "costPerMillionInput": 2.5,
+      "costPerMillionOutput": 10,
+      "avgLatencyMs": 2000,
+      "estimateSource": "catalog_seed_v1",
+      "updatedAt": "2026-10-01",
+      "competencies": {
+        "chat_quick": 0.7,
+        "reasoning_deep": 0.75,
+        "coding": 0.94,
+        "creative_writing": 0.5
+      }
+    }
+  }
+}
