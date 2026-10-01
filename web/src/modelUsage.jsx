@@ -22,6 +22,15 @@ function UsageBar({ pct, tone = 'blue', label, resetLabel, sublabel }) {
   );
 }
 
+function p95Label(latency) {
+  return latency?.p95 != null ? ` · p95 ${latency.p95} ms` : '';
+}
+
+function juliaFallbackLines(byReason) {
+  if (!byReason || typeof byReason !== 'object') return [];
+  return Object.entries(byReason).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+}
+
 function ContextRing({ pct, size = 36 }) {
   const r = (size - 6) / 2;
   const c = 2 * Math.PI * r;
@@ -247,8 +256,35 @@ export default function ModelUsage({ chatId }) {
 
         {lim?.juliaRouting && (
           <section className="usage-julia">
-            <p className="pop-label">Roteamento Julia / heurística</p>
-            <p className="small">{lim.juliaRouting.routedRequests} pedidos roteados localmente. Sem estimativa de economia em US$ — não há fatura do provedor aqui.</p>
+            <p className="pop-label">Julia 1 (telemetria local)</p>
+            {lim.juliaRouting.decisions != null ? (
+              <>
+                <p className="small">
+                  {lim.juliaRouting.answered} decisões pela Julia · {lim.juliaRouting.fallbacks} reservas (heurística/regra)
+                  {lim.juliaRouting.latencyMs?.p50 != null && (
+                    <> · latência p50 {lim.juliaRouting.latencyMs.p50} ms{p95Label(lim.juliaRouting.latencyMs)}</>
+                  )}
+                </p>
+                {lim.juliaRouting.avoidedPromptChars?.sum > 0 && (
+                  <p className="small muted">
+                    ~{lim.juliaRouting.avoidedPromptChars.sum.toLocaleString('pt-BR')} caracteres de prompt de triagem medidos ({lim.juliaRouting.avoidedPromptChars.eventsWithMeasurement} eventos) — não é custo em US$.
+                  </p>
+                )}
+                {juliaFallbackLines(lim.juliaRouting.fallbacksByReason).length > 0 && (
+                  <ul className="usage-list">
+                    {juliaFallbackLines(lim.juliaRouting.fallbacksByReason).map(([reason, n]) => (
+                      <li key={reason}><span><b>{reason}</b><small>{n} fallback{n === 1 ? '' : 's'}</small></span></li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            ) : (
+              <p className="muted small">Sem decisões Julia registradas ainda.</p>
+            )}
+            {lim.juliaRouting.usageRoutedByJulia > 0 && (
+              <p className="muted small">{lim.juliaRouting.usageRoutedByJulia} respostas do modelo grande com roteamento Julia/heurística (uso local).</p>
+            )}
+            <p className="muted small usage-hint">Sem estimativa de economia em US$ — só eventos medidos nesta instalação.</p>
           </section>
         )}
 
