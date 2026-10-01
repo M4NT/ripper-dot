@@ -2,7 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import { MetalBadge } from 'metal-fx';
 import { useApp } from '../app.jsx';
 import { api, go, useDark } from '../lib.js';
-import { Icon, Switch, Select, EmptyState } from '../ui.jsx';
+import { Icon, Switch, Select, EmptyState, Segmented } from '../ui.jsx';
+import { AdvancedBlock, HelpTip } from '../disclosure.jsx';
 import { ApprovalHistory } from '../approvals.jsx';
 import { MODEL_DESC, EffortScale } from '../modelPicker.jsx';
 import { useSettingsDraft } from '../settingsForm.js';
@@ -55,7 +56,7 @@ function DataBackup() {
       <Row title="Exportar" desc="JSON com chaves de API e tokens OAuth (sensível).">
         <button type="button" className="btn" disabled={!!busy} onClick={download} aria-busy={busy === 'export'}>{busy === 'export' ? 'Gerando…' : 'Baixar backup'}</button>
       </Row>
-      <Row title="Restaurar" desc="Grava db.pre-restore.*.backup.json antes de substituir.">
+      <Row title="Restaurar" desc="Grava db.pre-restore.*.backup.json antes de substituir." tip="Substitui conversas e configurações atuais. Guarde o JSON em lugar seguro.">
         <div className="row">
           <input ref={fileRef} type="file" accept="application/json,.json" aria-label="Arquivo de backup JSON" onChange={e => restore(e.target.files?.[0])} disabled={!!busy} />
           {busy === 'import' && <span className="muted" role="status">Restaurando…</span>}
@@ -81,10 +82,10 @@ export const SETTINGS_TABS = [
 ];
 
 /** Linha de configuração: rótulo e explicação à esquerda, controle à direita. */
-function Row({ title, desc, children, stack }) {
+function Row({ title, desc, children, stack, tip }) {
   return (
     <div className={`set-row ${stack ? 'stack' : ''}`}>
-      <div className="set-label"><b>{title}</b>{desc && <small>{desc}</small>}</div>
+      <div className="set-label"><b>{title}</b>{tip && <HelpTip text={tip} />}{desc && <small>{desc}</small>}</div>
       <div className="set-control">{children}</div>
     </div>
   );
@@ -123,14 +124,16 @@ function Plugins({ s, set }) {
           </li>
         ))}</ul>}
     </Card>
-    <Card title="Adicionar plugin">
-      <form onSubmit={add}>
-        <Row title="Nome" desc="Letras, números, - e _."><input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="github" /></Row>
-        <Row title="URL ou comando" desc="Endereço HTTP do servidor MCP ou o comando que o inicia."><input className="input" value={target} onChange={e => setTarget(e.target.value)} placeholder="npx -y @modelcontextprotocol/server-github" /></Row>
-        {err && <p className="form-error" role="alert">{err}</p>}
-        <div className="set-actions"><button className="btn"><Icon name="plus" size={16} />Adicionar plugin</button></div>
-      </form>
-    </Card>
+    <AdvancedBlock settings={s} hint="URL, comando stdio e nome técnico">
+      <Card title="Adicionar plugin">
+        <form onSubmit={add}>
+          <Row title="Nome" desc="Letras, números, - e _."><input className="input" value={name} onChange={e => setName(e.target.value)} placeholder="github" /></Row>
+          <Row title="URL ou comando" desc="Endereço HTTP do servidor MCP ou o comando que o inicia."><input className="input" value={target} onChange={e => setTarget(e.target.value)} placeholder="npx -y @modelcontextprotocol/server-github" /></Row>
+          {err && <p className="form-error" role="alert">{err}</p>}
+          <div className="set-actions"><button className="btn"><Icon name="plus" size={16} />Adicionar plugin</button></div>
+        </form>
+      </Card>
+    </AdvancedBlock>
   </>;
 }
 
@@ -189,26 +192,27 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
             {s.claude.mode === 'api' && <Row title="Anthropic API key"><input className="input" type="password" autoComplete="off" value={s.claude.apiKey} onChange={e => set('claude.apiKey', e.target.value)} placeholder="sk-ant-…" /></Row>}
             <Row title="Conectores do claude.ai" desc="Gmail, Drive e outros. Carregar custa tokens: só vale para agentes com Plugins MCP."><Switch checked={s.claude.useConnectors} onChange={v => set('claude.useConnectors', v)} label="Conectores do claude.ai" /></Row>
           </Card>
-          <Card title="Limites do provedor" desc="Quando a API devolve rate limit (429), o Ripper espera de forma honesta antes de tentar de novo ou mudar de modelo. Não inventamos cotas — só usamos o que o erro informar.">
-            <Row title="Tentativas por modelo" desc="Inclui a primeira chamada. Depois disso, pode haver fallback para outro provedor.">
-              <div className="input-unit"><input className="input" type="number" min={1} max={6} value={s.providerRetry?.maxAttempts ?? 3} onChange={e => set('providerRetry', { ...(s.providerRetry || {}), maxAttempts: +e.target.value })} /><span>tentativas</span></div>
-            </Row>
-            <Row title="Espera máxima entre tentativas"><div className="input-unit"><input className="input" type="number" min={1} max={120} value={Math.round((s.providerRetry?.maxDelayMs ?? 60000) / 1000)} onChange={e => set('providerRetry', { ...(s.providerRetry || {}), maxDelayMs: +e.target.value * 1000 })} /><span>segundos</span></div></Row>
-          </Card>
           <Card title="ChatGPT" badge={<span className="tag">Codex</span>}>
             <Row title="Login" desc="Rode codex login uma vez nesta máquina. Sem o Codex instalado, o Ripper Auto usa só o Claude."><code className="inline-code">npm i -g @openai/codex</code></Row>
-            <Row title="Ferramentas Ripper" desc="Com o Codex, remember, artefatos, inbox e o resto do MCP ripper vão por stdio (como plugins). WebSearch do Claude e conectores claude.ai não existem no Codex; plugins HTTP MCP funcionam nos dois." />
             <Row title="Apps conectados do ChatGPT" desc="Quando houver suporte."><Switch checked={s.chatgpt.useConnectedApps} onChange={v => set('chatgpt.useConnectedApps', v)} label="Apps do ChatGPT" /></Row>
           </Card>
-          <Card title="Ripper Auto" badge={<><MetalBadge theme={dark ? 'dark' : 'light'}>Julia 1</MetalBadge>{julia === null ? <span className="tag" role="status">Verificando…</span> : <span className={`tag ${julia ? 'tag-ok' : 'tag-warn'}`}>{julia ? 'no ar' : 'fora do ar'}</span>}</>} desc="A Julia 1 decide rápido e barato, antes do modelo grande: qual modelo usar, quem do time responde, se um comando é arriscado e se uma rotina deve notificar, silenciar ou escalar. Fora do ar, as regras de reserva decidem.">
-            <Row title="Endereço do Julia 1" desc="Suba com npm run julia."><input className="input" value={s.julia.url} onChange={e => set('julia.url', e.target.value)} /></Row>
+          <Card title="Ripper Auto" badge={<><MetalBadge theme={dark ? 'dark' : 'light'}>Julia 1</MetalBadge>{julia === null ? <span className="tag" role="status">Verificando…</span> : <span className={`tag ${julia ? 'tag-ok' : 'tag-warn'}`}>{julia ? 'no ar' : 'fora do ar'}</span>}</>} desc="A Julia 1 escolhe modelo e prioridades antes do modelo grande. Fora do ar, as regras de reserva decidem.">
+            <AdvancedBlock settings={s} hint="Limites de API, Julia e detalhes do Codex" className="in-card">
+              <p className="set-card-desc">Quando a API devolve rate limit (429), o Ripper espera antes de tentar de novo ou mudar de modelo.</p>
+              <Row title="Tentativas por modelo" desc="Inclui a primeira chamada. Depois disso, pode haver fallback para outro provedor.">
+                <div className="input-unit"><input className="input" type="number" min={1} max={6} value={s.providerRetry?.maxAttempts ?? 3} onChange={e => set('providerRetry', { ...(s.providerRetry || {}), maxAttempts: +e.target.value })} /><span>tentativas</span></div>
+              </Row>
+              <Row title="Espera máxima entre tentativas"><div className="input-unit"><input className="input" type="number" min={1} max={120} value={Math.round((s.providerRetry?.maxDelayMs ?? 60000) / 1000)} onChange={e => set('providerRetry', { ...(s.providerRetry || {}), maxDelayMs: +e.target.value * 1000 })} /><span>segundos</span></div></Row>
+              <Row title="Endereço do Julia 1" desc="Serviço local de triagem (npm run julia)."><input className="input" value={s.julia.url} onChange={e => set('julia.url', e.target.value)} /></Row>
+              <Row title="Ferramentas Ripper no Codex" desc="Com o Codex, remember, artefatos, inbox e o MCP ripper vão por stdio. WebSearch do Claude e conectores claude.ai não existem no Codex." />
+            </AdvancedBlock>
           </Card>
         </>}
 
         {tab === 'computer' && <>
           <Card title="Onde os agentes executam">
             <div className="mode-grid">
-              {[['docker', 'Docker', 'Grátis', 'Um contêiner Linux por agente nesta máquina. Isolado.', 'terminal'],
+              {[['docker', 'Docker', 'Grátis', 'Um contêiner Linux por agente nesta máquina (sandbox).', 'terminal'],
                 ['boat', 'boat.dev', 'Pago', 'Uma VM na nuvem por agente, com links públicos.', 'globe'],
                 ['local', 'Pasta local', 'Sem isolamento', 'Roda na sua máquina. Todo comando pede aprovação.', 'folder'],
                 ['off', 'Desligado', '', 'Sem computador. Ainda pesquisam e lembram.', 'x']].map(([k, t, tag, dsc, ic]) => (
@@ -223,12 +227,14 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
           {s.computer.mode === 'docker' && (
             <Card title="Docker" badge={docker === undefined ? <span className="tag" role="status">Verificando…</span> : docker ? <span className="tag tag-ok">Docker {docker} ativo</span> : <span className="tag tag-warn">Docker não encontrado</span>} aria-busy={docker === undefined}>
               {docker === null && <p className="form-error">Abra o Docker Desktop e recarregue esta página.</p>}
-              <Row title="Imagem de referência" desc="ripper-agent:1 já vem com Chromium, tela virtual (noVNC), Node 22 e Python 3. Criar a VM de um agente leva segundos. Todos ficam na rede ripper-net e compartilham /shared.">
+              <Row title="Imagem de referência" desc="ripper-agent:1 já vem com Chromium, tela virtual (noVNC), Node 22 e Python 3." tip="Cada agente ganha um contêiner isolado; arquivos ficam na pasta do agente, não na sua máquina.">
                 <div className="row">{image && <span className={`tag ${image === 'ready' ? 'tag-ok' : 'tag-warn'}`}>{image === 'ready' ? 'pronta' : image === 'building' ? 'construindo…' : 'não construída'}</span>}
                   {image === 'missing' && <button className="btn btn-sm" onClick={() => api('/api/computer/image', { method: 'POST' }).then(r => setImage(r.image))}>Construir agora</button>}</div>
               </Row>
-              <Row title="Imagem usada" desc="Deixe ripper-agent:1, a não ser que você tenha uma imagem própria."><input className="input" value={['', 'node:22-bookworm'].includes(s.computer.dockerImage || '') ? 'ripper-agent:1' : s.computer.dockerImage} onChange={e => set('computer.dockerImage', e.target.value)} /></Row>
-              <Row title="Parar ocioso após" desc="O contêiner para; os arquivos ficam na pasta do agente."><div className="input-unit"><input className="input" type="number" min={1} max={1440} value={s.computer.idleStopMinutes} onChange={e => set('computer.idleStopMinutes', +e.target.value)} /><span>min</span></div></Row>
+              <AdvancedBlock settings={s} hint="Imagem customizada e tempo ocioso" className="in-card">
+                <Row title="Imagem usada" desc="Deixe ripper-agent:1, a não ser que você tenha uma imagem própria."><input className="input" value={['', 'node:22-bookworm'].includes(s.computer.dockerImage || '') ? 'ripper-agent:1' : s.computer.dockerImage} onChange={e => set('computer.dockerImage', e.target.value)} /></Row>
+                <Row title="Parar ocioso após" desc="O contêiner para; os arquivos ficam na pasta do agente."><div className="input-unit"><input className="input" type="number" min={1} max={1440} value={s.computer.idleStopMinutes} onChange={e => set('computer.idleStopMinutes', +e.target.value)} /><span>min</span></div></Row>
+              </AdvancedBlock>
             </Card>
           )}
           {s.computer.mode === 'boat' && (
@@ -243,7 +249,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
           )}
           {s.computer.mode === 'local' && (
             <Card title="Pasta local">
-              <Row title="Permitir comandos locais" desc="Os agentes acessam arquivos e programas desta máquina. Cada comando pede sua aprovação."><Switch checked={!!s.computer.allowLocalCommands} onChange={v => set('computer.allowLocalCommands', v)} label="Permitir comandos locais" /></Row>
+              <Row title="Permitir comandos locais" desc="Os agentes acessam arquivos e programas desta máquina. Cada comando pede sua aprovação." tip="Sem sandbox Docker: um comando errado pode alterar arquivos reais. Mantenha aprovações ligadas."><Switch checked={!!s.computer.allowLocalCommands} onChange={v => set('computer.allowLocalCommands', v)} label="Permitir comandos locais" /></Row>
             </Card>
           )}
         </>}
@@ -256,7 +262,8 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
               {[['risky', 'Só ações de risco', 'Recomendado', 'Apagar em massa, sudo, git push, publicar, scripts da internet.'],
                 ['always', 'Toda ação', '', 'Você aprova cada comando no computador.'],
                 ['never', 'Nunca pedir', 'Não recomendado', 'Na sua máquina (pasta local), sempre pede.']].map(([k, t, tag, dsc]) => (
-                <button key={k} type="button" className={`mode ${(s.approvalPolicy || 'risky') === k ? 'on' : ''}`} onClick={() => set('approvalPolicy', k)} aria-pressed={(s.approvalPolicy || 'risky') === k}>
+                <button key={k} type="button" className={`mode ${(s.approvalPolicy || 'risky') === k ? 'on' : ''}`} onClick={() => set('approvalPolicy', k)} aria-pressed={(s.approvalPolicy || 'risky') === k}
+                  title={k === 'never' ? 'Comandos destrutivos podem rodar sem pausa. Use só se confia em tudo que o agente faz.' : undefined}>
                   <b>{t}{tag && <span className={`tag ${k === 'risky' ? 'tag-ok' : 'tag-warn'}`}>{tag}</span>}</b><small>{dsc}</small>
                 </button>
               ))}
@@ -265,17 +272,23 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
           <Card title="Histórico de aprovações" desc="Decisões recentes nesta instalação (aprovado, negado ou expirado).">
             <ApprovalHistory limit={15} />
           </Card>
-          <Card title="Mensagens entre agentes" desc="Limites para os agentes não entrarem em conversa infinita entre si.">
-            <Row title="Máximo por agente, por hora"><div className="input-unit"><input className="input" type="number" min={1} max={200} value={s.inbox?.maxPerHour ?? 20} onChange={e => set('inbox', { ...(s.inbox || {}), maxPerHour: +e.target.value })} /><span>mensagens</span></div></Row>
-            <Row title="Profundidade máxima de uma troca" desc="Quantas vezes uma resposta pode gerar outra mensagem."><div className="input-unit"><input className="input" type="number" min={1} max={10} value={s.inbox?.maxHops ?? 3} onChange={e => set('inbox', { ...(s.inbox || {}), maxHops: +e.target.value })} /><span>saltos</span></div></Row>
-          </Card>
-          <DataBackup />
+          <AdvancedBlock settings={s} hint="Limites de mensagens entre agentes">
+            <Card title="Mensagens entre agentes" desc="Limites para os agentes não entrarem em conversa infinita entre si.">
+              <Row title="Máximo por agente, por hora"><div className="input-unit"><input className="input" type="number" min={1} max={200} value={s.inbox?.maxPerHour ?? 20} onChange={e => set('inbox', { ...(s.inbox || {}), maxPerHour: +e.target.value })} /><span>mensagens</span></div></Row>
+              <Row title="Profundidade máxima de uma troca" desc="Quantas vezes uma resposta pode gerar outra mensagem (saltos inbox)." tip="Valores altos podem gerar longas cadeias de mensagens automáticas entre agentes."><div className="input-unit"><input className="input" type="number" min={1} max={10} value={s.inbox?.maxHops ?? 3} onChange={e => set('inbox', { ...(s.inbox || {}), maxHops: +e.target.value })} /><span>saltos</span></div></Row>
+            </Card>
+          </AdvancedBlock>
+          <AdvancedBlock settings={s} hint="Backup completo com segredos">
+            <DataBackup />
+          </AdvancedBlock>
         </>}
 
         {tab === 'memory' && <>
           <Card>
             <Row title="Memória" desc="Deixa os agentes guardarem fatos úteis e usarem em conversas futuras."><Switch checked={s.memory} onChange={v => set('memory', v)} label="Memória" /></Row>
-            <Row title="Registro recente no contexto" desc="Quantas anotações datadas (as mais novas) entram em cada conversa. O perfil estável entra sempre."><div className="input-unit"><input className="input" type="number" min={0} max={50} value={s.memoryLogInContext ?? 10} onChange={e => set('memoryLogInContext', +e.target.value)} /><span>itens</span></div></Row>
+            <AdvancedBlock settings={s} hint="Quantos registros entram no contexto" className="in-card">
+              <Row title="Registro recente no contexto" desc="Quantas anotações datadas (as mais novas) entram em cada conversa. O perfil estável entra sempre."><div className="input-unit"><input className="input" type="number" min={0} max={50} value={s.memoryLogInContext ?? 10} onChange={e => set('memoryLogInContext', +e.target.value)} /><span>itens</span></div></Row>
+            </AdvancedBlock>
           </Card>
           <Card title="Como funciona" desc="Perfil: fatos estáveis sobre você (preferências, contexto). Registro: anotações datadas do que aconteceu. Gerencie tudo na Biblioteca.">
             <div className="set-actions"><button className="btn" onClick={() => go('/library')}><Icon name="book" size={16} />Abrir Biblioteca</button></div>
@@ -284,6 +297,10 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
 
         {tab === 'appearance' && <>
           <Card>
+            <Row title="Interface" desc="Simples esconde opções técnicas; Completa abre seções Avançado por padrão.">
+              <Segmented label="Modo da interface" value={s.ui?.mode || 'simple'} onChange={v => set('ui.mode', v)}
+                items={[['simple', 'Simples'], ['enterprise', 'Completa']]} />
+            </Row>
             <Row title="Tema" desc={`Agora: ${theme === 'dark' ? 'escuro' : 'claro'}. O padrão segue o sistema.`}><button className="btn" onClick={toggleTheme}><Icon name={theme === 'dark' ? 'sun' : 'moon'} size={16} />Usar tema {theme === 'dark' ? 'claro' : 'escuro'}</button></Row>
           </Card>
           <Card title="Atalhos">

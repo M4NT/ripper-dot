@@ -4,8 +4,9 @@ import { api, go, useRoute, fmtSize, fmtAgo } from '../lib.js';
 import { AgentAvatar, Icon, Segmented, StatusDot, EmptyState, useConfirm, Select, Switch } from '../ui.jsx';
 import { Basics, Behavior, Tools, Appearance, ModelPick } from '../agentForm.jsx';
 import { uploadFile } from '../composer.jsx';
+import { isEnterpriseUi } from '../uiMode.js';
 
-const TABS = [['general', 'Geral'], ['model', 'Modelo'], ['behavior', 'Comportamento'], ['tools', 'Ferramentas'], ['knowledge', 'Conhecimento'], ['look', 'Aparência'], ['routines', 'Rotinas'], ['advanced', 'Avançado']];
+const ALL_TABS = [['general', 'Geral'], ['model', 'Modelo'], ['behavior', 'Comportamento'], ['tools', 'Ferramentas'], ['knowledge', 'Conhecimento'], ['look', 'Aparência'], ['routines', 'Rotinas'], ['advanced', 'Avançado']];
 const pick = a => ({ name: a.name, description: a.description, category: a.category, status: a.status, instructions: a.instructions, tone: a.tone, model: a.model, effort: a.effort || 'auto', tools: a.tools, avatar: a.avatar });
 
 function Knowledge({ agent }) {
@@ -86,7 +87,11 @@ export default function AgentConfig({ id }) {
   const { S, agent: get, updateAgent, refresh, toast } = useApp();
   const { query } = useRoute();
   const agent = get(id);
-  const [tab, setTab] = useState(query.get('tab') || 'general');
+  const tabs = isEnterpriseUi(S.settings) ? ALL_TABS : ALL_TABS.filter(([k]) => k !== 'advanced');
+  const [tab, setTab] = useState(() => {
+    const t = query.get('tab') || 'general';
+    return tabs.some(([k]) => k === t) ? t : 'general';
+  });
   const [v, setV] = useState(() => agent && pick(agent));
   const [saving, setSaving] = useState(false);
   const [confirm, confirmNode] = useConfirm();
@@ -124,7 +129,7 @@ export default function AgentConfig({ id }) {
         <AgentAvatar agent={{ ...agent, ...v }} size={80} interactive animate />
         <div><h1>{v.name || 'Sem nome'}</h1><StatusDot status={v.status} /><p className="lede">{v.description || 'Sem descrição.'}</p></div>
       </div>
-      <Segmented label="Seções" value={tab} onChange={setTab} items={TABS} className="seg-scroll config-tabs" />
+      <Segmented label="Seções" value={tab} onChange={setTab} items={tabs} className="seg-scroll config-tabs" />
       <div className="config-body">
         {tab === 'general' && <>
           <Basics v={v} set={set} categories={S.categories} />

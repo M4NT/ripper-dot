@@ -19,3 +19,10 @@ test('settingsMeta lista modelos e esforços', () => {
   assert.ok(m.efforts.includes('high'));
   assert.equal(m.providerRetry.maxAttempts, 3);
 });
+
+test('applySettingsPatch aceita ui.mode', () => {
+  const s = { defaultModel: 'auto', claude: {}, computer: {}, ui: { mode: 'simple' } };
+  applySettingsPatch(s, { ui: { mode: 'enterprise' } });
+  assert.equal(s.ui.mode, 'enterprise');
+  assert.throws(() => applySettingsPatch(s, { ui: { mode: 'turbo' } }), /interface/);
+});

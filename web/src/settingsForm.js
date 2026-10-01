@@ -14,8 +14,13 @@ export function useSettingsDraft() {
     addEventListener('beforeunload', f); return () => removeEventListener('beforeunload', f);
   }, [dirty]);
   const set = (path, value) => setS(x => {
-    const n = structuredClone(x); const [a, b] = path.split('.');
-    if (b) n[a][b] = value; else n[a] = value;
+    const n = structuredClone(x);
+    const parts = path.split('.');
+    if (parts.length === 1) n[parts[0]] = value;
+    else {
+      if (!n[parts[0]] || typeof n[parts[0]] !== 'object') n[parts[0]] = {};
+      n[parts[0]][parts[1]] = value;
+    }
     return n;
   });
   async function save(extra) {
