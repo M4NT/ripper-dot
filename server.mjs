@@ -45,6 +45,11 @@ import { exportChatPayload, importChatPayload } from './lib/chat-transfer.mjs';
 import { listAgentTemplates, createSavedTemplate, patchSavedTemplate, agentFromSavedTemplate } from './lib/agent-templates.mjs';
 import { ripperBuiltinSchemaChars, listRipperBuiltinToolNames } from './lib/ripper-builtin-tools.mjs';
 import { refreshClaudeSubscriptionUsage } from './lib/claude-subscription-usage.mjs';
+import {
+  lookupSemanticCache,
+  resolveSemanticCacheConfig,
+  storeSemanticCacheEntry
+} from './lib/semantic-cache.mjs';
 import { verifyMcpServer, verifyMcpConnector } from './lib/mcp-probe.mjs';
 import {
   applyOAuthTokensToPlugin,
@@ -603,6 +608,32 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
     id: id(), role: 'assistant', agentId: agent.id, content: out, at: Date.now(),
     ...(steps.length ? { steps } : {}), ...extra
   });
+
+  const semanticCacheCfg = resolveSemanticCacheConfig(s);
+  const cacheContext = history.join('\n').slice(-2000);
+  const canUseSemanticCache = semanticCacheCfg.enabled && !images?.length && !testProvider;
+  if (canUseSemanticCache) {
+    const cached = lookupSemanticCache({
+      agentId: agent.id,
+      model: pick.model,
+      question: text,
+      context: cacheContext,
+      config: semanticCacheCfg
+    });
+    if (cached.hit) {
+      emit({ semanticCache: { hit: true, score: cached.score } });
+      push(cached.answer, [], {
+        model: pick.model,
+        effort,
+        routedBy,
+        semanticCache: { hit: true, score: cached.score }
+      });
+      recordChatTurn('ok');
+      return;
+    }
+    emit({ semanticCache: { hit: false } });
+  }
+
   const loopDetector = new ToolLoopDetector(s.tokenBudget);
   const emitTurn = ev => {
     if (ev.circuitBreaker) {
@@ -648,6 +679,17 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
         routedBy,
         agentId: agent.id
       });
+      if (canUseSemanticCache) {
+        storeSemanticCacheEntry({
+          agentId: agent.id,
+          model: m,
+          question: text,
+          context: cacheContext,
+          answer: out,
+          effort,
+          config: semanticCacheCfg
+        });
+      }
       if (MODELS[m].provider === 'claude') {
         refreshClaudeSubscriptionUsage(db, s).then(() => save()).catch(() => {});
       }
