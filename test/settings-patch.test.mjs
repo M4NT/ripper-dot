@@ -56,3 +56,11 @@ test('applySettingsPatch normaliza flags', () => {
   applySettingsPatch(s, { flags: { allowCustom: true, evil: true } });
   assert.equal(s.flags.evil, true);
 });
+
+test('applySettingsPatch aceita contextPruning opt-in', () => {
+  const s = { defaultModel: 'auto', claude: {}, computer: {} };
+  applySettingsPatch(s, { contextPruning: { enabled: true, maxMessages: 30, maxTokens: 8000, keepRecent: 8 } });
+  assert.equal(s.contextPruning.enabled, true);
+  assert.equal(s.contextPruning.maxMessages, 30);
+  assert.equal(s.contextPruning.keepRecent, 8);
+});

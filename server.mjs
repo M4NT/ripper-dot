@@ -25,6 +25,7 @@ import { canUseFile, selectSpeakers, routineDue, Floor, isPass, heuristicSpeaker
 import { providerAttemptOrder, runProviderAttemptLoop } from './lib/provider-turn.mjs';
 import { normalizeProviderRetry } from './lib/provider-retry.mjs';
 import { patchSettings, settingsMeta, SettingsValidationError } from './lib/settings-patch.mjs';
+import { normalizeContextPruning, pruneContextMessages } from './lib/context-pruning.mjs';
 import { effectiveFeatureFlags } from './lib/feature-flags.mjs';
 import { appendAudit, auditFromApproval, listAudit } from './lib/audit.mjs';
 import { buildAdminOverview } from './lib/admin-overview.mjs';
@@ -453,7 +454,11 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
   const label = m => labelMessageForAgent(m, agent.id, name, { group });
   // Histórico = tudo antes da pergunta atual; o que os colegas já responderam nesta rodada vai depois dela.
   const at = lastUserTurnIndex(chat.messages);
-  const history = trimHistory(at >= 0 ? chat.messages.slice(0, at) : chat.messages).map(label);
+  const historySlice = at >= 0 ? chat.messages.slice(0, at) : chat.messages;
+  const pruneCfg = normalizeContextPruning(s);
+  const { messages: prunedSlice, pruned, stats: pruneStats } = pruneContextMessages(historySlice, pruneCfg);
+  if (pruned) emit({ contextPrune: pruneStats });
+  const history = trimHistory(prunedSlice).map(label);
   const round = at >= 0 ? chat.messages.slice(at + 1).filter(m => m.content && m.role === 'assistant') : [];
   if (round.length) prompt += '\n\n' + round.map(m => `[${name(m.agentId || agent.id)} respondeu nesta rodada]: ${m.content}`).join('\n\n') + `\n\nAgora é a sua vez, ${agent.name}.`;
   const memories = s.memory && agent.tools.includes('memory') ? db.memories.filter(m => m.agentId === agent.id) : [];
