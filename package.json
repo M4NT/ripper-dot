@@ -12,7 +12,10 @@
     "dev:web": "vite",
     "julia": "python julia/serve.py",
     "julia:dry": "python julia/serve.py --dry-run",
-    "prod": "vite build && node server.mjs"
+    "prod": "vite build && node server.mjs",
+    "data:info": "node scripts/ripper-data.mjs info",
+    "data:clear-usage": "node scripts/ripper-data.mjs clear-usage --confirm",
+    "data:clear-julia": "node scripts/ripper-data.mjs clear-julia --confirm"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.31.0",
