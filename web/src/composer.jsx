@@ -56,10 +56,12 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
     }
   }
 
-  function send() {
+  const intentionalRef = useRef(false);
+
+  function sendFromComposer(immediate = false) {
     if (!canSend) return;
     const ready = files.filter(f => f.id);
-    onSend({ text: text.trim(), fileIds: ready.map(f => f.id), previews: ready.map(f => ({ id: f.id, name: f.name, type: f.type, url: f.url || `/api/files/${f.id}` })) });
+    onSend({ text: text.trim(), fileIds: ready.map(f => f.id), previews: ready.map(f => ({ id: f.id, name: f.name, type: f.type, url: f.url || `/api/files/${f.id}` })) }, { immediate });
     setText(''); setFiles([]);
     if (listening) toggleVoice();
   }
@@ -111,7 +113,7 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
     <div className="composer-wrap">
       <VoiceBeam stream={listening ? mic.stream : null} processing={streaming && !listening} active={listening || streaming} idle={0}
         colorVariant="mono" theme={resolvedTheme} borderRadius={22} className="composer-voice">
-          <form className="composer" onSubmit={e => { e.preventDefault(); streaming ? onStop() : send(); }}
+          <form className="composer" onSubmit={e => { e.preventDefault(); if (streaming) onStop(); else { sendFromComposer(intentionalRef.current); intentionalRef.current = false; } }}
             onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('drag'); }}
             onDragLeave={e => e.currentTarget.classList.remove('drag')}
             onDrop={e => { e.preventDefault(); e.currentTarget.classList.remove('drag'); addFiles([...e.dataTransfer.files]); }}>
@@ -141,7 +143,7 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
             <textarea ref={ta} rows={1} value={text} autoFocus={autoFocus} placeholder={listening ? 'Ouvindo…' : placeholder}
               aria-label="Mensagem" onChange={e => setText(e.target.value)}
               onPaste={e => { const fs = [...e.clipboardData.files]; if (fs.length) { e.preventDefault(); addFiles(fs); } }}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } if (e.key === 'Escape' && streaming) onStop(); }} />
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); sendFromComposer(false); } if (e.key === 'Escape' && streaming) onStop(); }} />
             <div className="composer-row">
               <button ref={plusBtn} type="button" className={`round-btn ${plus ? 'open' : ''}`} aria-expanded={plus} aria-label="Mais opções" onClick={() => setPlus(p => !p)}>
                 <Icon name="plus" size={17} />
@@ -160,7 +162,8 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
               {SpeechRec && (
                 <button type="button" className={`icon-btn mic ${listening ? 'live' : ''}`} aria-pressed={listening} aria-label={listening ? 'Parar ditado' : 'Ditar mensagem'} onClick={toggleVoice}><Icon name="mic" /></button>
               )}
-                <button className={`send ${streaming ? 'stop' : ''}`} disabled={!canSend && !streaming} aria-label={streaming ? 'Parar resposta' : 'Enviar'}>
+                <button type="submit" className={`send ${streaming ? 'stop' : ''}`} disabled={!canSend && !streaming} aria-label={streaming ? 'Parar resposta' : 'Enviar'}
+                  onPointerDown={() => { if (!streaming) intentionalRef.current = true; }}>
                   <Icon name={streaming ? 'stop' : 'arrowUp'} size={17} />
                 </button>
             </div>

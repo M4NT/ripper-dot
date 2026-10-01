@@ -6,6 +6,7 @@ import { AgentAvatar, Icon, Menu, MenuItem, StatusDot, useConfirm, EmptyState } 
 import { useApp } from '../app.jsx';
 import Composer, { uploadFile } from '../composer.jsx';
 import { sessionPayload } from '../marketplace/sessionMcp.js';
+import { createInputQueue, normalizeInputQueue } from '../../../lib/input-queue.mjs';
 import { effortLabel } from '../modelPicker.jsx';
 import MessageAttachments from '../MessageAttachments.jsx';
 import ChatPanel from '../chatPanel.jsx';
@@ -130,6 +131,8 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   const [panel, setPanel] = useState(() => local.get('panel', true));
   const wide = useMediaQuery('(min-width: 1180px)');
   const ctrl = useRef(null), scroller = useRef(null), stick = useRef(true);
+  const queueRef = useRef(null);
+  const sendTurnRef = useRef(null);
   const [confirm, confirmNode] = useConfirm();
 
   const memberIds = chat ? (chat.agentIds || [chat.agentId]) : initialMembers?.length ? initialMembers : [initialAgent];
@@ -151,6 +154,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   useEffect(() => {
     if (initialId && initialId === idRef.current && chat) return;
     ctrl.current?.abort();
+    queueRef.current?.cancel();
     setLive(null); setNotFound(false);
     setChatId(initialId || null);
     if (!initialId) { setChat(null); setLoading(false); setChoice(defaults(null, getAgent(initialAgent || initialMembers?.[0]), (initialMembers || []).length > 1)); return; }
@@ -187,6 +191,33 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
     window.addEventListener('online', refetch);
     return () => { document.removeEventListener('visibilitychange', refetch); window.removeEventListener('online', refetch); };
   }, [chatId]);
+
+  useEffect(() => {
+    const { enabled, windowMs } = normalizeInputQueue(S.settings);
+    queueRef.current?.cancel();
+    queueRef.current = createInputQueue({
+      enabled,
+      windowMs,
+      onFlush: batch => sendTurnRef.current?.(batch),
+      schedule: (fn, ms) => setTimeout(fn, ms),
+      clearSchedule: clearTimeout
+    });
+    return () => queueRef.current?.cancel();
+  }, [S.settings.inputQueue?.enabled, S.settings.inputQueue?.windowMs]);
+
+  function queueSend(payload, { immediate = false } = {}) {
+    if (!queueRef.current) {
+      const { enabled, windowMs } = normalizeInputQueue(S.settings);
+      queueRef.current = createInputQueue({
+        enabled,
+        windowMs,
+        onFlush: batch => sendTurnRef.current?.(batch),
+        schedule: (fn, ms) => setTimeout(fn, ms),
+        clearSchedule: clearTimeout
+      });
+    }
+    queueRef.current.enqueue(payload, { immediate });
+  }
   // Ctrl+. recolhe/mostra o painel da direita.
   useEffect(() => {
     const k = e => { if ((e.ctrlKey || e.metaKey) && e.key === '.') { e.preventDefault(); setPanel(p => { local.set('panel', !p); return !p; }); } };
@@ -301,8 +332,10 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
         }
       } else if (sawDone) setChat(c => ({ ...c, messages: [...c.messages, building] }));
       refresh();
+      queueRef.current?.scheduleFlush();
     }
   }
+  sendTurnRef.current = send;
 
   if (loading) return <div className="page-loading" role="status" aria-live="polite" aria-label="Carregando conversa"><ThinkingOrb state="breathing" size={20} /></div>;
   if (notFound || !agent) return <div className="page"><EmptyState title="Conversa não encontrada" body="Ela pode ter sido apagada." action={<a className="btn" href="#/chats">Ver conversas</a>} /></div>;
@@ -366,7 +399,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
               <button type="button" className="btn sm" onClick={() => send({ resume: true })}>Retomar resposta</button>
             </div>
           )}
-          <Composer agent={agent} chatId={chatId} projectId={projectId} streaming={!!live} onSend={p => send(p)} onStop={() => { if (chatId) api(`/api/chats/${chatId}/cancel`, { method: 'POST' }).catch(() => {}); ctrl.current?.abort(); }}
+          <Composer agent={agent} chatId={chatId} projectId={projectId} streaming={!!live} onSend={queueSend} onStop={() => { queueRef.current?.cancel(); if (chatId) api(`/api/chats/${chatId}/cancel`, { method: 'POST' }).catch(() => {}); ctrl.current?.abort(); }}
             choice={choice} setChoice={setChoice} group={isGroup} mentions={isGroup ? members : null}
             placeholder={isGroup ? 'Mensagem para o grupo… use @Nome para chamar alguém' : `Mensagem para ${agent.name}…`} autoFocus draftKey={chatId || 'new-' + memberIds.join('-')} />
           {waiting > 0 && <p className="inbox-wait"><Icon name="clock" size={13} />Aguardando {waiting === 1 ? 'resposta de 1 mensagem' : `respostas de ${waiting} mensagens`} enviadas a colegas…</p>}

@@ -27,11 +27,19 @@ test('applySettingsPatch persiste settings.ui.locale', () => {
   assert.throws(() => applySettingsPatch(s, { ui: { locale: 'de' } }), /inválido/);
 });
 
+test('applySettingsPatch aceita inputQueue', () => {
+  const s = { defaultModel: 'auto', claude: {}, computer: {} };
+  applySettingsPatch(s, { inputQueue: { enabled: false, windowMs: 1200 } });
+  assert.equal(s.inputQueue.enabled, false);
+  assert.equal(s.inputQueue.windowMs, 1200);
+});
+
 test('settingsMeta lista modelos e esforços', () => {
   const m = settingsMeta();
   assert.ok(m.models.includes('auto'));
   assert.ok(m.efforts.includes('high'));
   assert.equal(m.providerRetry.maxAttempts, 3);
+  assert.equal(m.inputQueue.windowMs, 2500);
 });
 
 test('applySettingsPatch aceita ui.mode e sincroniza enterprise.enabled', () => {
