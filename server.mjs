@@ -38,6 +38,7 @@ import { providerAttemptOrder, runProviderAttemptLoop } from './lib/provider-tur
 import { normalizeProviderRetry } from './lib/provider-retry.mjs';
 import { patchSettings, settingsMeta, SettingsValidationError } from './lib/settings-patch.mjs';
 import { normalizeContextPruning, pruneContextMessages } from './lib/context-pruning.mjs';
+import { coalesceSendParts } from './lib/input-queue.mjs';
 import { effectiveFeatureFlags } from './lib/feature-flags.mjs';
 import { applyAccessControlPatch } from './lib/access-control-patch.mjs';
 import { canDelegate, delegationDeniedMessage, normalizeAccessControl, accessControlMeta } from './lib/rbac.mjs';
@@ -1668,8 +1669,11 @@ const routes = [
       agentIds.forEach(agentOr404);
       if (project && !c && agentIds.some(a => !project.agentIds.includes(a))) throw new HttpError(400, 'Agente fora do projeto.');
       const agent = agentOr404(agentIds[0]);
-      const text = String(b.text || '').trim().slice(0, 32000) || 'Veja o anexo.';
-      if (!text && !(b.fileIds || []).length) throw new HttpError(400, 'Mensagem vazia.');
+      const rawParts = Array.isArray(b.parts) ? b.parts : null;
+      const coalesced = rawParts?.length ? coalesceSendParts(rawParts.map(p => ({ text: p.text ?? p, fileIds: p.fileIds }))) : null;
+      const text = String(coalesced?.text ?? b.text ?? '').trim().slice(0, 32000) || 'Veja o anexo.';
+      const fileIdsRaw = coalesced?.fileIds?.length ? coalesced.fileIds : (b.fileIds || []);
+      if (!text && !fileIdsRaw.length) throw new HttpError(400, 'Mensagem vazia.');
       if (b.model && b.model !== 'agent' && !(b.model in MODELS)) throw new HttpError(400, 'Modelo desconhecido.');
       if (b.effort && !EFFORTS.includes(b.effort)) throw new HttpError(400, 'Esforço desconhecido.');
       if (!c) {
@@ -1680,7 +1684,7 @@ const routes = [
       if (isChatStreaming(c.id)) throw new HttpError(409, 'Esta conversa já está respondendo. Aguarde ou interrompa a resposta atual.');
       const quota = checkRunBudget(db, db.settings, { agentId: agent.id });
       if (quota.blocked) throw new HttpError(429, quota.userMessage);
-      const fileIds = (b.fileIds || []).filter(fid => db.files.some(f => f.id === fid && agentIds.some(a => canUseFile(f, { id: a }, c))));
+      const fileIds = fileIdsRaw.filter(fid => db.files.some(f => f.id === fid && agentIds.some(a => canUseFile(f, { id: a }, c))));
       for (const fid of fileIds) { const f = db.files.find(x => x.id === fid); if (f && !f.chatId) f.chatId = c.id; }
       if (b.model) c.model = b.model === 'agent' ? undefined : b.model;
       if (b.effort) c.effort = b.effort;

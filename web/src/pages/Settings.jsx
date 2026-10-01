@@ -193,6 +193,12 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
             {s.claude.mode === 'api' && <Row title="Anthropic API key"><input className="input" type="password" autoComplete="off" value={s.claude.apiKey} onChange={e => set('claude.apiKey', e.target.value)} placeholder="sk-ant-…" /></Row>}
             <Row title="Conectores do claude.ai" desc="Gmail, Drive e outros. Carregar custa tokens: só vale para agentes com Plugins MCP."><Switch checked={s.claude.useConnectors} onChange={v => set('claude.useConnectors', v)} label="Conectores do claude.ai" /></Row>
           </Card>
+          <Card title="Fila de entrada" desc="Mensagens seguidas no composer são agrupadas num único turno. Enter reinicia a janela; o botão Enviar manda na hora.">
+            <Row title="Agrupar mensagens consecutivas"><Switch checked={s.inputQueue?.enabled !== false} onChange={v => set('inputQueue', { ...(s.inputQueue || {}), enabled: v })} label="Coalescing ativo" /></Row>
+            <Row title="Janela de agrupamento" desc="Tempo de espera após Enter antes de mandar ao agente (0 desliga o atraso quando o coalescing está ativo).">
+              <div className="input-unit"><input className="input" type="number" min={0} max={10} step={0.5} value={(s.inputQueue?.windowMs ?? 2500) / 1000} onChange={e => set('inputQueue', { ...(s.inputQueue || {}), windowMs: Math.round(+e.target.value * 1000) })} /><span>segundos</span></div>
+            </Row>
+          </Card>
           <Card title="ChatGPT" badge={<span className="tag">Codex</span>}>
             <Row title="Login" desc="Rode codex login uma vez nesta máquina. Sem o Codex instalado, o Ripper Auto usa só o Claude."><code className="inline-code">npm i -g @openai/codex</code></Row>
             <Row title="Apps conectados do ChatGPT" desc="Quando houver suporte."><Switch checked={s.chatgpt.useConnectedApps} onChange={v => set('chatgpt.useConnectedApps', v)} label="Apps do ChatGPT" /></Row>
