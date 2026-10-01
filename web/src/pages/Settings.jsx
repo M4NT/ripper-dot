@@ -3,6 +3,7 @@ import { MetalBadge } from 'metal-fx';
 import { useApp } from '../app.jsx';
 import { api, go, useDark } from '../lib.js';
 import { Icon, Switch, Select, EmptyState } from '../ui.jsx';
+import { ApprovalHistory } from '../approvals.jsx';
 import { MODEL_DESC, EffortScale } from '../modelPicker.jsx';
 import { useSettingsDraft } from '../settingsForm.js';
 
@@ -188,6 +189,12 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
             {s.claude.mode === 'api' && <Row title="Anthropic API key"><input className="input" type="password" autoComplete="off" value={s.claude.apiKey} onChange={e => set('claude.apiKey', e.target.value)} placeholder="sk-ant-…" /></Row>}
             <Row title="Conectores do claude.ai" desc="Gmail, Drive e outros. Carregar custa tokens: só vale para agentes com Plugins MCP."><Switch checked={s.claude.useConnectors} onChange={v => set('claude.useConnectors', v)} label="Conectores do claude.ai" /></Row>
           </Card>
+          <Card title="Limites do provedor" desc="Quando a API devolve rate limit (429), o Ripper espera de forma honesta antes de tentar de novo ou mudar de modelo. Não inventamos cotas — só usamos o que o erro informar.">
+            <Row title="Tentativas por modelo" desc="Inclui a primeira chamada. Depois disso, pode haver fallback para outro provedor.">
+              <div className="input-unit"><input className="input" type="number" min={1} max={6} value={s.providerRetry?.maxAttempts ?? 3} onChange={e => set('providerRetry', { ...(s.providerRetry || {}), maxAttempts: +e.target.value })} /><span>tentativas</span></div>
+            </Row>
+            <Row title="Espera máxima entre tentativas"><div className="input-unit"><input className="input" type="number" min={1} max={120} value={Math.round((s.providerRetry?.maxDelayMs ?? 60000) / 1000)} onChange={e => set('providerRetry', { ...(s.providerRetry || {}), maxDelayMs: +e.target.value * 1000 })} /><span>segundos</span></div></Row>
+          </Card>
           <Card title="ChatGPT" badge={<span className="tag">Codex</span>}>
             <Row title="Login" desc="Rode codex login uma vez nesta máquina. Sem o Codex instalado, o Ripper Auto usa só o Claude."><code className="inline-code">npm i -g @openai/codex</code></Row>
             <Row title="Ferramentas Ripper" desc="Com o Codex, remember, artefatos, inbox e o resto do MCP ripper vão por stdio (como plugins). WebSearch do Claude e conectores claude.ai não existem no Codex; plugins HTTP MCP funcionam nos dois." />
@@ -254,6 +261,9 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
                 </button>
               ))}
             </div>
+          </Card>
+          <Card title="Histórico de aprovações" desc="Decisões recentes nesta instalação (aprovado, negado ou expirado).">
+            <ApprovalHistory limit={15} />
           </Card>
           <Card title="Mensagens entre agentes" desc="Limites para os agentes não entrarem em conversa infinita entre si.">
             <Row title="Máximo por agente, por hora"><div className="input-unit"><input className="input" type="number" min={1} max={200} value={s.inbox?.maxPerHour ?? 20} onChange={e => set('inbox', { ...(s.inbox || {}), maxPerHour: +e.target.value })} /><span>mensagens</span></div></Row>

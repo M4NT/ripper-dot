@@ -22,7 +22,7 @@ async function* okGen(text) {
 
 async function* partialThenFail(partial) {
   yield { text: partial };
-  throw new Error('limite');
+  throw new Error('falha após texto');
 }
 
 test('runProviderAttemptLoop: erro sem texto streamed permite fallback', async () => {
@@ -30,9 +30,10 @@ test('runProviderAttemptLoop: erro sem texto streamed permite fallback', async (
   const events = [];
   const result = await runProviderAttemptLoop({
     order: ['claude-sonnet-5-5', 'codex'],
+    retry: { maxAttempts: 1 },
     runModel: async function* (m) {
       calls.push(m);
-      if (m === 'claude-sonnet-5-5') throw new Error('rate limit');
+      if (m === 'claude-sonnet-5-5') throw new Error('provedor indisponível');
       yield* okGen('via codex');
     },
     emit: ev => events.push(ev),
@@ -42,7 +43,7 @@ test('runProviderAttemptLoop: erro sem texto streamed permite fallback', async (
   assert.equal(result.model, 'codex');
   assert.equal(result.out, 'via codex');
   assert.deepEqual(calls, ['claude-sonnet-5-5', 'codex']);
-  assert.deepEqual(events.filter(e => e.handoff), [{ handoff: 'codex' }]);
+  assert.deepEqual(events.filter(e => e.handoff).map(e => e.handoff), ['codex']);
 });
 
 test('runProviderAttemptLoop: texto parcial bloqueia fallback', async () => {
@@ -58,7 +59,7 @@ test('runProviderAttemptLoop: texto parcial bloqueia fallback', async () => {
     }
   });
   assert.equal(result.ok, false);
-  assert.equal(result.error, 'limite');
+  assert.equal(result.error, 'falha após texto');
   assert.equal(result.out, 'começo da resposta');
   assert.deepEqual(calls, ['claude-sonnet-5-5']);
 });
@@ -91,7 +92,7 @@ test('runProviderAttemptLoop: Codex falha e repassa para Claude', async () => {
   });
   assert.equal(result.ok, true);
   assert.equal(result.model, 'claude-sonnet-5-5');
-  assert.deepEqual(events.filter(e => e.handoff), [{ handoff: 'claude-sonnet-5-5' }]);
+  assert.deepEqual(events.filter(e => e.handoff).map(e => e.handoff), ['claude-sonnet-5-5']);
 });
 
 test('runProviderAttemptLoop: última tentativa falha sem texto — sem handoff', async () => {
@@ -124,6 +125,26 @@ test('runProviderAttemptLoop: abort interrompe sem fallback', async () => {
   });
   assert.equal(result.aborted, true);
   assert.deepEqual(calls, ['claude-sonnet-5-5']);
+});
+
+test('runProviderAttemptLoop: rate limit sem texto faz backoff antes do fallback', async () => {
+  const delays = [];
+  const calls = [];
+  const result = await runProviderAttemptLoop({
+    order: ['claude-sonnet-5-5', 'codex'],
+    retry: { maxAttempts: 3, baseDelayMs: 10, maxDelayMs: 50 },
+    runModel: async function* (m) {
+      calls.push(m);
+      if (m === 'claude-sonnet-5-5' && calls.filter(x => x === m).length < 2) throw new Error('429 rate_limit');
+      yield { text: 'depois do retry' };
+    },
+    emit: ev => { if (ev.providerRetry) delays.push(ev.providerRetry.waitMs); }
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.model, 'claude-sonnet-5-5');
+  assert.equal(calls.filter(x => x === 'claude-sonnet-5-5').length, 2);
+  assert.equal(delays.length, 1);
+  assert.ok(delays[0] >= 10);
 });
 
 test('runProviderAttemptLoop: abort após stream sem throw marca aborted', async () => {

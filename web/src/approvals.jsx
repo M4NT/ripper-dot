@@ -43,6 +43,27 @@ export function ApprovalCard({ rec, status, compact, onDone }) {
  * Bandeja global: pedidos de outras conversas e de rotinas (que rodam sem ninguém olhando).
  * Consulta o servidor a cada poucos segundos enquanto a aba está visível.
  */
+/** Histórico recente de aprovações (decisões já tomadas). */
+export function ApprovalHistory({ limit = 20 }) {
+  const { agent } = useApp();
+  const [rows, setRows] = useState(null);
+  useEffect(() => {
+    api('/api/approvals').then(r => setRows((r.recent || []).slice(0, limit))).catch(() => setRows([]));
+  }, [limit]);
+  if (rows === null) return <p className="muted">Carregando histórico…</p>;
+  if (!rows.length) return <p className="muted">Nenhuma decisão registrada ainda.</p>;
+  return (
+    <ul className="rows flat approval-history">
+      {rows.map(rec => (
+        <li key={rec.id} className="row-item">
+          <ApprovalCard rec={rec} status={rec.status} compact />
+          <small className="muted">{fmtAgo(rec.decidedAt || rec.createdAt)}</small>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function ApprovalTray() {
   const { parts } = useRoute();
   const [pending, setPending] = useState([]);
