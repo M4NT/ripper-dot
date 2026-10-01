@@ -80,7 +80,7 @@ import {
   resolveSemanticCacheConfig,
   storeSemanticCacheEntry
 } from './lib/semantic-cache.mjs';
-import { verifyMcpServer, verifyMcpConnector } from './lib/mcp-probe.mjs';
+import { verifyMcpConnector } from './lib/mcp-probe.mjs';
 import { shutdownStdioSupervisors } from './lib/mcp-stdio-supervisor.mjs';
 import {
   applyOAuthTokensToPlugin,
@@ -212,6 +212,13 @@ import {
   startRetentionScheduler,
   envRetentionOverrides
 } from './lib/retention-ttl.mjs';
+import {
+  chaosStatusPayload,
+  maybeChaosProviderFailure,
+  chaosSseBeforeEmit,
+  resolveEffectiveChaos,
+  scheduleChaosFire
+} from './lib/chaos.mjs';
 
 installLogRedactionMiddleware();
 
@@ -311,14 +318,19 @@ function chatDetail(c, cid) {
 
 async function streamChatResponse(req, c, { text, fileIds, mcpSession, resume = false, credentialRefs }, res) {
   res.writeHead(200, hdr(req, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store', 'x-accel-buffering': 'no' }));
+  const clientAc = new AbortController();
+  const chaosCfg = resolveEffectiveChaos(db.settings);
+  let emitChain = Promise.resolve();
   const emitRaw = e => {
-    if (!res.writable) return;
-    bumpChatRunSeq(c);
-    const payload = e?.error && req.requestId ? { ...e, requestId: req.requestId } : e;
-    res.write(`data: ${JSON.stringify(redactSseEvent(payload, db.settings))}\n\n`);
+    emitChain = emitChain.then(async () => {
+      await chaosSseBeforeEmit(chaosCfg, clientAc.signal);
+      if (!res.writable) return;
+      bumpChatRunSeq(c);
+      const payload = e?.error && req.requestId ? { ...e, requestId: req.requestId } : e;
+      res.write(`data: ${JSON.stringify(redactSseEvent(payload, db.settings))}\n\n`);
+    });
   };
   emitRaw({ chatId: c.id, runId: c.run?.runId, eventSeq: c.run?.lastEventSeq, resume: !!resume });
-  const clientAc = new AbortController();
   res.on('close', () => { if (!res.writableFinished) clientAc.abort(); });
   const { signal: streamSignal } = registerChatStream(c.id, { signal: clientAc.signal, emit: emitRaw });
   const ping = setInterval(() => res.writable && res.write(': ping\n\n'), 15_000);
@@ -347,11 +359,11 @@ async function streamChatResponse(req, c, { text, fileIds, mcpSession, resume = 
   }
   if (completed) {
     emitRaw({ done: true, title: c.title, runId: c.run?.runId, eventSeq: c.run?.lastEventSeq });
-    res.end();
   } else {
     emitRaw({ interrupted: true, runId: c.run?.runId, eventSeq: c.run?.lastEventSeq });
-    res.end();
   }
+  await emitChain;
+  res.end();
   return undefined;
 }
 const projectOr404 = pid => db.projects.find(p => p.id === pid) || (() => { throw new HttpError(404, 'Projeto não encontrado.'); })();
@@ -841,6 +853,8 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
     retry: normalizeProviderRetry(s),
     emit: emitTurn,
     runModel: m => {
+      const chaosErr = maybeChaosProviderFailure(resolveEffectiveChaos(db.settings));
+      if (chaosErr) throw chaosErr;
       if (testProvider) return runTestProvider({ prompt, signal });
       const providerSystem = MODELS[m].provider === 'codex' && s.computer.mode !== 'local'
         ? `${system}\n\nNesta execução do Codex, o computador está em modo somente leitura; não prometa executar comandos nem acessar a VM Boat.` : system;
@@ -1120,7 +1134,7 @@ const routes = [
         type: 'stdio',
         command: String(b.command || ''),
         args: b.args || []
-      }, { listTools: b.listTools !== false });
+      }, { listTools: b.listTools !== false, chaosSettings: db.settings });
     }
     if (!b.url || !/^https:\/\//.test(String(b.url))) throw new HttpError(400, 'URL HTTPS do servidor MCP é obrigatória.');
     let plugin;
@@ -1129,7 +1143,7 @@ const routes = [
     } else if (b.plugin && typeof b.plugin === 'object') {
       plugin = b.plugin;
     }
-    return verifyMcpServer(b.url, { plugin, listTools: b.listTools !== false });
+    return verifyMcpConnector(b.url, { plugin, listTools: b.listTools !== false, chaosSettings: db.settings });
   }],
   ['GET', /^\/api\/mcp\/connectors$/, () => ({ connectors: listConnectorRecords(db.settings) })],
   ['POST', /^\/api\/mcp\/connectors$/, async req => {
@@ -1399,6 +1413,15 @@ const routes = [
       return out;
     } catch (e) {
       throw new HttpError(vaultConfigured() ? 400 : 503, e.message);
+    }
+  }],
+  ['GET', /^\/api\/chaos\/status$/, () => chaosStatusPayload(db.settings)],
+  ['POST', /^\/api\/chaos\/fire$/, async req => {
+    const b = await body(req);
+    try {
+      return scheduleChaosFire(b.kind);
+    } catch (e) {
+      throw new HttpError(400, e.message);
     }
   }],
   ['GET', /^\/api\/settings$/, () => ({ settings: redact(db.settings), meta: settingsMeta() })],

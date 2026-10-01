@@ -148,6 +148,8 @@ code { font: .88em var(--mono); }
 .search-field input { flex: 1; border: 0; outline: 0; background: none; min-width: 0; color: var(--ink); }
 .search-field:focus-within { border-color: var(--ink-2); }
 .form-error { color: var(--err); font-size: 13px; margin: -8px 0 12px; }
+.chaos-banner { padding: 12px 14px; margin-bottom: 16px; border-radius: var(--radius); border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--line)); background: color-mix(in srgb, var(--warn) 12%, var(--surface)); color: var(--text); font-size: 13px; line-height: 1.45; }
+.chaos-banner strong { color: var(--warn); }
 
 /* abas com indicador líquido */
 .seg { position: relative; display: inline-flex; gap: 2px; padding: 4px; border-radius: 12px; background: color-mix(in srgb, var(--line) 55%, transparent); isolation: isolate; max-width: 100%; }
