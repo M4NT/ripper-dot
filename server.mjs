@@ -134,6 +134,7 @@ import {
   captureResponseBody,
   closeIdempotencyStore
 } from './lib/idempotency.mjs';
+import { buildOpenApiDocument, OPENAPI_DOCS_HTML } from './lib/openapi.mjs';
 
 function settingsForMcp(s, mcpSession) {
   return settingsForMcpSession(s, mcpSession);
@@ -1596,6 +1597,15 @@ const server = createServer(async (req, res) => {
       res.writeHead(200, hdr(req, { 'content-type': prometheusContentType(), 'cache-control': 'no-store' }));
       res.end(metricsBody);
       return;
+    }
+    if (req.method === 'GET' && p === '/openapi.json') {
+      const doc = buildOpenApiDocument({ port: PORT, host: HOST, version: APP_PKG.version });
+      doc.servers = [{ url: publicBaseUrl(req), description: 'Esta instância' }];
+      return json(res, doc, 200, { 'cache-control': 'public, max-age=300' }, req);
+    }
+    if (req.method === 'GET' && p === '/docs') {
+      res.writeHead(200, hdr(req, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'public, max-age=3600' }));
+      return res.end(OPENAPI_DOCS_HTML);
     }
     const hook = req.method === 'POST' && /^\/api\/hooks\/([a-f0-9]{48})$/.exec(p);
     if (hook) {
