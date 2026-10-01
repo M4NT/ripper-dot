@@ -64,6 +64,7 @@ import {
   storeSemanticCacheEntry
 } from './lib/semantic-cache.mjs';
 import { verifyMcpServer, verifyMcpConnector } from './lib/mcp-probe.mjs';
+import { shutdownStdioSupervisors } from './lib/mcp-stdio-supervisor.mjs';
 import {
   applyOAuthTokensToPlugin,
   discoverMcpOAuth,
@@ -1903,7 +1904,10 @@ server.listen(PORT, HOST, () => console.log(`Ripper em http://${HOST === '0.0.0.
 
 registerGracefulShutdown(server, {
   logger,
-  onBeginShutdown: () => clearInterval(routineTimer),
+  onBeginShutdown: () => {
+    clearInterval(routineTimer);
+    shutdownStdioSupervisors().catch(() => {});
+  },
   getActiveConnections: () => activeHttpConnections,
   flush,
   closeStores: () => {
