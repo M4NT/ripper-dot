@@ -6,7 +6,9 @@ import { api, apiUpload, go, useDark, brandLogoSrc, TONES, FORMALITIES } from '.
 import { Icon, Switch, Select, EmptyState } from '../ui.jsx';
 import { AdvancedBlock, HelpTip } from '../disclosure.jsx';
 import { ApprovalHistory } from '../approvals.jsx';
-import { MODEL_DESC, EffortScale } from '../modelPicker.jsx';
+import { MODEL_DESC, EffortScale, EFFORTS } from '../modelPicker.jsx';
+
+const EFFORT_CAPS = EFFORTS.filter(([k]) => k !== 'auto');
 import { useSettingsDraft } from '../settingsForm.js';
 import UiModeToggle from '../uiModeToggle.jsx';
 import { isEnterpriseMode, isSettingsTabAllowed } from '../uiMode.js';
@@ -246,6 +248,7 @@ function Plugins({ s, set }) {
 
 export default function Settings({ theme, toggleTheme, tab: initial }) {
   const { S, refresh, toast } = useApp();
+  const ov = useOv();
   const tr = useT();
   const SETTINGS_TABS = settingsTabs(tr);
   const d = useSettingsDraft();
@@ -307,9 +310,28 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
         </>}
 
         {tab === 'models' && <>
+          <Card title="Modelos disponíveis" desc="Desligue as IAs que você não quer usar e limite o esforço de cada uma. O Ripper Auto e a Julia 1 só escolhem dentro disso, e nenhum pedido passa do teto.">
+            {Object.entries(S.models).filter(([k]) => k !== 'auto').map(([k, m]) => {
+              const on = s.models?.enabled?.[k] !== false;
+              const connected = m.provider === 'codex' ? S.meta?.codexInstalled : true;
+              const others = Object.keys(S.models).filter(x => x !== 'auto' && x !== k && s.models?.enabled?.[x] !== false);
+              const setModels = patch => set('models', { enabled: { ...(s.models?.enabled || {}) }, maxEffort: { ...(s.models?.maxEffort || {}) }, ...patch(s.models || {}) });
+              return (
+                <Row key={k} title={<>{m.label}{!connected && <span className="tag warn model-conn">não instalado</span>}</>} desc={MODEL_DESC[k]}>
+                  <div className="model-policy-ctrl">
+                    <Select label={`Esforço máximo de ${m.label}`} value={s.models?.maxEffort?.[k] || ''} disabled={!on}
+                      onChange={v => setModels(cur => ({ maxEffort: { ...(cur.maxEffort || {}), [k]: v || undefined } }))}
+                      options={[{ value: '', label: 'Sem limite' }, ...EFFORT_CAPS.map(([v, l]) => ({ value: v, label: `Até ${l.toLowerCase()}` }))]} />
+                    <Switch checked={on} disabled={on && !others.length} label={`Usar ${m.label}`}
+                      onChange={v => setModels(cur => ({ enabled: { ...(cur.enabled || {}), [k]: v } }))} />
+                  </div>
+                </Row>
+              );
+            })}
+          </Card>
           <Card title="Padrão para agentes novos">
             <Row title="Modelo" desc="Cada agente e cada conversa podem trocar depois.">
-              <Select label="Modelo padrão" value={s.defaultModel} onChange={v => set('defaultModel', v)} options={Object.entries(S.models).map(([k, m]) => ({ value: k, label: m.label, hint: MODEL_DESC[k] }))} />
+              <Select label="Modelo padrão" value={s.defaultModel} onChange={v => set('defaultModel', v)} options={Object.entries(S.models).filter(([k]) => k === 'auto' || s.models?.enabled?.[k] !== false).map(([k, m]) => ({ value: k, label: m.label, hint: MODEL_DESC[k] }))} />
             </Row>
           </Card>
           <Card title="Claude" badge={<span className="tag">Opus 5.5 · Sonnet 5.5 · Fable 5.1</span>}>
@@ -431,7 +453,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
               <Row title="Também em avisos do servidor" desc="SSE warn/erro e logs do Node quando ligado."><Switch checked={!!s.lgpd?.redactInLogs} onChange={v => set('lgpd', { ...(s.lgpd || {}), redactInLogs: v })} label="Mascarar PII em logs" /></Row>
               <Row title="Eliminar meus dados" desc="Direito de eliminação (art. 18): apaga conversas, memórias, anexos e telemetria local. Agentes e plugins permanecem.">
                 <button type="button" className="btn btn-danger" onClick={async () => {
-                  if (!window.confirm('Apagar conversas, memórias, anexos e seu nome/instruções? Não dá para desfazer.')) return;
+                  if (!(await ov.confirm({ title: 'Eliminar meus dados?', body: 'Apaga conversas, memórias, anexos e seu nome/instruções. Não dá para desfazer.', action: 'Eliminar', danger: true }))) return;
                   try {
                     await api('/api/lgpd/erasure', { method: 'POST', body: { confirm: 'ERASE', scope: 'all' } });
                     await refresh();

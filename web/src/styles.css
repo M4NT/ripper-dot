@@ -1469,3 +1469,18 @@ code, .mono, pre { overflow-wrap: anywhere; }
 .metering-table td:first-child, .metering-table th:first-child { padding-left: 10px; }
 .metering-subhead { font-weight: 500; }
 .admin-budget-form { gap: 0; margin-top: 16px; }
+/* Configurações → Modelos: teto de esforço + liga/desliga por IA */
+.model-policy-ctrl { display: flex; align-items: center; gap: 12px; }
+.model-policy-ctrl .select-wrap { min-width: 168px; }
+.model-conn { margin-left: 8px; vertical-align: middle; }
+.select-btn:disabled, .effort-step:disabled { opacity: .4; cursor: not-allowed; }
+.effort-step:disabled:hover { color: var(--muted); }
+/* rádios do conector personalizado no mesmo padrão de cartão das escolhas de modelo */
+.conn-radio { padding: 10px 12px; margin: 0 0 6px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); transition: border-color .15s; }
+.conn-radio:has(input:checked) { border-color: var(--ink); }
+.conn-radio input { accent-color: var(--ink); }
+/* revisão mobile: ações quebram linha, barra do "Novo agente" abaixo da barra do topo, título da conversa não é esmagado pelas tags */
+.set-actions { flex-wrap: wrap; }
+.crow-top { flex-wrap: wrap; row-gap: 4px; }
+@media (max-width: 900px) { .na-top { top: 57px; } }
+@media (max-width: 640px) { .na-top h1, .na-top .btn:not(.btn-primary) { display: none; } }

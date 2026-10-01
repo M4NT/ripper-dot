@@ -134,7 +134,7 @@ export default function AdminCenter() {
           {s.auditTrail?.worm === false && <p className="muted small">Store: local · WORM: não</p>}
           {audit?.entries?.length
             ? <ul className="admin-list mono small">{audit.entries.map(e => (
-              <li key={e.id}><time>{new Date(e.at).toLocaleString('pt-BR')}</time> · {e.type || 'evento'} · {e.status || e.kind || '—'}</li>
+              <li key={e.id}><time>{new Date(e.at).toLocaleString('pt-BR')}</time> · {e.action || e.type || 'evento'}{e.category ? ` · ${e.category}` : ''}</li>
             ))}</ul>
             : <p className="muted small">{s.auditTrail?.emptyLabel || 'Indisponível'}</p>}
         </AdminCard>

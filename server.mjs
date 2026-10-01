@@ -7,7 +7,7 @@ import { extname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { authed as checkAuth } from './lib/auth.mjs';
 import { load, save, flush, id, newAgent, patchAgent, dataUrl, safeCheckStoreReady } from './lib/store.mjs';
-import { route, classifySpeaker, MODELS, EFFORTS } from './lib/router.mjs';
+import { route, classifySpeaker, MODELS, EFFORTS, enabledModels, clampEffort } from './lib/router.mjs';
 import { computerFor } from './lib/boat.mjs';
 import { dockerAvailable, imageStatus, ensureImage, hostnameOf } from './lib/docker.mjs';
 import { sandboxStatus } from './lib/exec-sandbox.mjs';
@@ -455,7 +455,8 @@ const codexInstalled = new Promise(resolve => {
   p.on('close', code => resolve(code === 0));
   setTimeout(() => resolve(false), 8000);
 });
-codexInstalled.then(ok => { if (!ok) console.log('Codex não encontrado: o Ripper Auto usa só o Claude. Instale com: npm i -g @openai/codex'); });
+let codexOk = false; // espelho síncrono para o estado da UI
+codexInstalled.then(ok => { codexOk = ok; if (!ok) console.log('Codex não encontrado: o Ripper Auto usa só o Claude. Instale com: npm i -g @openai/codex'); });
 
 const dockerStatusCached = memoAsync(async () => ({ version: await dockerAvailable(), image: await imageStatus() }), 30_000);
 
@@ -882,18 +883,22 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
   ].filter(Boolean).join('\n\n');
 
   // A escolha da conversa vale para todos; sem ela, cada agente usa o seu padrão.
-  const model = (chat.model && chat.model in MODELS ? chat.model : null) || agent.model || s.defaultModel;
-  const effort = (chat.effort && chat.effort !== 'auto' ? chat.effort : null) || agent.effort || 'auto';
-  const pick = model === 'auto' ? await route(text, history, s, { effort }) : { model, by: 'manual' };
+  const chosen = (chat.model && chat.model in MODELS ? chat.model : null) || agent.model || s.defaultModel;
+  // Modelo desligado em Configurações → Modelos vira Auto (que só escolhe entre os liberados).
+  const model = chosen === 'auto' || enabledModels(s).includes(chosen) ? chosen : 'auto';
+  const requestedEffort = (chat.effort && chat.effort !== 'auto' ? chat.effort : null) || agent.effort || 'auto';
+  const pick = model === 'auto' ? await route(text, history, s, { effort: requestedEffort }) : { model, by: 'manual' };
+  // A Julia pode ter escolhido o esforço; em todo caso, nunca passa do teto do modelo.
+  const effort = clampEffort(s, pick.model, pick.effort || requestedEffort);
   const routedBy = pick.by;
   // Sem o CLI do Codex instalado, o Auto nunca o escolhe (evita uma falha e um desvio a cada pedido de código).
-  if (pick.model === 'codex' && !(await codexInstalled)) pick.model = 'claude-sonnet-5-5';
+  if (pick.model === 'codex' && !(await codexInstalled)) pick.model = enabledModels(s).find(m => MODELS[m].provider === 'claude') || 'claude-sonnet-5-5';
   emit({ route: { ...pick, effort } });
 
   const testProvider = process.env.RIPPER_TEST_PROVIDER;
   const order = testProvider
     ? [pick.model]
-    : providerAttemptOrder(pick.model, await codexInstalled);
+    : providerAttemptOrder(pick.model, await codexInstalled).filter((m, i) => i === 0 || enabledModels(s).includes(m));
   const push = (out, steps, extra) => chat.messages.push({
     id: id(), role: 'assistant', agentId: agent.id, content: out, at: Date.now(),
     ...(steps.length ? { steps } : {}), ...extra
@@ -958,7 +963,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
       if (testProvider) return runTestProvider({ prompt, signal });
       const providerSystem = MODELS[m].provider === 'codex' && s.computer.mode !== 'local'
         ? `${system}\n\nNesta execução do Codex, o computador está em modo somente leitura; não prometa executar comandos nem acessar a VM Boat.` : system;
-      const args = { agent, effort, prompt, images, history, system: providerSystem, settings: s, signal };
+      const args = { agent, effort: clampEffort(s, m, effort), prompt, images, history, system: providerSystem, settings: s, signal };
       return MODELS[m].provider === 'codex'
         ? runCodex({ ...args, cwd: sandboxDir(agent), ctx })
         : runClaude({ ...args, model: m, ctx });
@@ -1169,7 +1174,7 @@ const routes = [
         contextWindow: { ...b.contextWindow, emptyLabel: 'sem dados', available: false, hasData: false }
       };
     })(),
-    meta: settingsMeta()
+    meta: { ...settingsMeta(), codexInstalled: codexOk }
   })],
   ['GET', /^\/api\/usage$/, async (req, _, url) => {
     const chatId = url.searchParams.get('chatId') || undefined;

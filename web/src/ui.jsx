@@ -237,7 +237,7 @@ export const MenuItem = ({ icon, children, danger, ...rest }) => (
  * Seleção no padrão do Ripper (substitui o <select> do navegador).
  * options: [{ value, label, hint?, icon?, node? }]
  */
-export function Select({ value, onChange, options, label, placeholder, className = '', size = 'md' }) {
+export function Select({ value, onChange, options, label, placeholder, className = '', size = 'md', disabled = false }) {
   const t = useT();
   const ph = placeholder ?? t('common.select');
   const [open, setOpen] = useState(false);
@@ -259,7 +259,7 @@ export function Select({ value, onChange, options, label, placeholder, className
   };
   return (
     <div className={`select-wrap ${className}`} ref={anchor}>
-      <button type="button" className={`select-btn select-${size}`} aria-haspopup="listbox" aria-expanded={open} aria-label={label}
+      <button type="button" disabled={disabled} className={`select-btn select-${size}`} aria-haspopup="listbox" aria-expanded={open} aria-label={label}
         onClick={() => setOpen(o => !o)} onKeyDown={onKey}>
         {current?.icon}{current?.node || <span className={current ? '' : 'muted'}>{current?.label || ph}</span>}
         <Icon name="down" size={15} className={`select-caret ${open ? 'up' : ''}`} />

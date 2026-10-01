@@ -18,7 +18,7 @@ function Section({ id, title, desc, children }) {
   );
 }
 
-/** Superfície unificada: medição (#50), economia Julia (#37), orçamento (#34). */
+/** Superfície unificada: medição, economia Julia e orçamento de tokens. */
 export default function AdminUso() {
   const { S } = useApp();
   const enterprise = isEnterpriseMode(S.settings);
