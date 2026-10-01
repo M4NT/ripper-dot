@@ -448,6 +448,22 @@ test('GET /api/audit-trail e /api/lgpd/status', async () => {
   });
 });
 
+test('POST /api/x9/scan exige enterprise e retorna findings', async () => {
+  await withServer({}, async (base, token) => {
+    const auth = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const denied = await fetch(base + '/api/x9/scan', { method: 'POST', headers: auth, body: '{}' });
+    assert.equal(denied.status, 403);
+    await enableEnterprise(base, auth);
+    const r = await fetch(base + '/api/x9/scan', { method: 'POST', headers: auth, body: '{}' });
+    assert.equal(r.status, 200);
+    const body = await r.json();
+    assert.ok(Array.isArray(body.findings));
+    assert.ok(body.sources?.ripperSettings?.available);
+    assert.equal(body.sources.adminOverview.available, true);
+    assert.equal(body.sources.lgpd.available, true);
+  });
+});
+
 test('GET /api/data/backup e restore', async () => {
   await withServer({}, async (base, token) => {
     const auth = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
