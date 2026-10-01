@@ -184,7 +184,7 @@ function Plugins({ s, set }) {
 }
 
 export default function Settings({ theme, toggleTheme, tab: initial }) {
-  const { S } = useApp();
+  const { S, refresh, toast } = useApp();
   const tr = useT();
   const SETTINGS_TABS = settingsTabs(tr);
   const d = useSettingsDraft();
@@ -348,6 +348,22 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
                 </button>
               ))}
             </div>
+          </Card>
+          <Card title="LGPD — dados pessoais" desc="Opt-in: antes de enviar texto a Claude, Codex ou Julia 1, o Ripper pode substituir CPF, contas, documentos e contatos por [PII]. Conversas locais continuam com o texto original.">
+            <Row title="Mascaramento antes do modelo" desc="Recomendado se você cola dados de clientes no chat."><Switch checked={!!s.lgpd?.enabled} onChange={v => set('lgpd', { ...(s.lgpd || {}), enabled: v })} label="Ativar mascaramento LGPD" /></Row>
+            {s.lgpd?.enabled && <>
+              <Row title="Também em avisos do servidor" desc="SSE warn/erro e logs do Node quando ligado."><Switch checked={!!s.lgpd?.redactInLogs} onChange={v => set('lgpd', { ...(s.lgpd || {}), redactInLogs: v })} label="Mascarar PII em logs" /></Row>
+              <Row title="Eliminar meus dados" desc="Direito de eliminação (art. 18): apaga conversas, memórias, anexos e telemetria local. Agentes e plugins permanecem.">
+                <button type="button" className="btn btn-danger" onClick={async () => {
+                  if (!window.confirm('Apagar conversas, memórias, anexos e seu nome/instruções? Não dá para desfazer.')) return;
+                  try {
+                    await api('/api/lgpd/erasure', { method: 'POST', body: { confirm: 'ERASE', scope: 'all' } });
+                    await refresh();
+                    toast('Dados pessoais eliminados nesta instalação');
+                  } catch (e) { toast(e.message, 'error'); }
+                }}>Solicitar eliminação</button>
+              </Row>
+            </>}
           </Card>
           {enterprise && <>
             <Card title={tr('settings.security.historyTitle')} desc={tr('settings.security.historyDesc')}>

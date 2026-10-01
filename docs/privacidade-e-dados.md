@@ -76,6 +76,20 @@ Faça backup copiando o diretório inteiro antes de apagar, ou use **Configuraç
 - Cookies `ripper_token` e query `?token=` são suportados para a UI (ver `lib/auth.mjs`).
 - Modo **comandos locais** no host (`allowLocalCommands`) fica **desligado** por padrão; ativação explícita em Integrações.
 
+## Controles opt-in (LGPD)
+
+Com **Segurança → LGPD** (ou `PUT /api/settings` com `lgpd.enabled`) você pode:
+
+- Mascarar CPF, documentos, dados financeiros e contato por `[PII]` **antes** de enviar texto a Claude, Codex ou Julia 1 (`lib/lgpd-pii.mjs`, middleware em `lib/providers.mjs` e `lib/julia.mjs`). O histórico local em `db.json` **não** é alterado.
+- Opcionalmente mascarar o mesmo padrão em avisos SSE e logs do servidor (`lgpd.redactInLogs`).
+
+**Eliminação de dados (direito do titular):**
+
+- `POST /api/lgpd/erasure` com `{ "confirm": true }` ou `"confirm": "ERASE"`. Corpo opcional `{ "scope": "profile" }` apaga só nome e instruções gerais; `"all"` (padrão) remove conversas, memórias, anexos, artefatos, fila inbox, aprovações, audit log local e zera telemetria SQLite de uso/Julia. Agentes, plugins e chaves de API **permanecem** — faça backup antes.
+- `GET /api/lgpd/status` — estado das flags opt-in.
+
+Testes: `test/lgpd-pii.test.mjs` e rotas em `test/server-http.test.mjs`.
+
 ## O que ainda não existe (planejado / fora de escopo)
 
 - Exportação GDPR one-click, criptografia at-rest de `db.json`, ou política de retenção configurável por variável de ambiente.

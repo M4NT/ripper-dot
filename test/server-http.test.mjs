@@ -498,3 +498,41 @@ test('RIPPER_LOG_JSON: requisição API emite linhas JSON sem token', async () =
     await new Promise(r => child.on('exit', r));
   }
 });
+
+test('POST /api/lgpd/erasure exige confirmação e apaga perfil', async () => {
+  await withServer({}, async (base, token) => {
+    const auth = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const denied = await fetch(base + '/api/lgpd/erasure', { method: 'POST', headers: auth, body: '{}' });
+    assert.equal(denied.status, 400);
+    await fetch(base + '/api/settings', {
+      method: 'PUT',
+      headers: auth,
+      body: JSON.stringify({ name: 'Titular LGPD' })
+    });
+    const st0 = await fetch(base + '/api/state', { headers: auth }).then(r => r.json());
+    assert.equal(st0.settings.name, 'Titular LGPD');
+    const ok = await fetch(base + '/api/lgpd/erasure', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ confirm: true, scope: 'profile' })
+    });
+    assert.equal(ok.status, 200);
+    const body = await ok.json();
+    assert.equal(body.ok, true);
+    assert.equal(body.report.profileCleared, true);
+    const st1 = await fetch(base + '/api/state', { headers: auth }).then(r => r.json());
+    assert.equal(st1.settings.name, '');
+  });
+});
+
+test('GET /api/lgpd/status expõe meta', async () => {
+  await withServer({}, async (base, token) => {
+    const r = await fetch(base + '/api/lgpd/status', { headers: { authorization: `Bearer ${token}` } });
+    assert.equal(r.status, 200);
+    const body = await r.json();
+    assert.equal(body.productTelemetry, false);
+    assert.equal(body.lgpd.enabled, false);
+    assert.equal(body.lgpd.placeholder, '[PII]');
+  });
+});
+
