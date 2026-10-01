@@ -27,7 +27,7 @@ import { recordUsage, usageSummary, accountLimits, contextBreakdown, checkSendQu
 import { buildUsageContract, normalizeContextWindow } from './lib/usage-api.mjs';
 import { ripperBuiltinSchemaChars, listRipperBuiltinToolNames } from './lib/ripper-builtin-tools.mjs';
 import { refreshClaudeSubscriptionUsage } from './lib/claude-subscription-usage.mjs';
-import { verifyMcpServer } from './lib/mcp-probe.mjs';
+import { verifyMcpServer, verifyMcpConnector } from './lib/mcp-probe.mjs';
 import {
   applyOAuthTokensToPlugin,
   discoverMcpOAuth,
@@ -36,7 +36,7 @@ import {
   getOAuthFlow,
   mergePluginAuth,
   oauthRedirectUri,
-  redactPluginAuth,
+  pluginOAuthStatus,
   startMcpOAuthFlow
 } from './lib/mcp-oauth.mjs';
 import {
@@ -54,15 +54,20 @@ import {
   removeProjectSandboxDir
 } from './lib/sandbox-lifecycle.mjs';
 import { releaseBoatSandbox, clearBoatIdleTimer } from './lib/boat.mjs';
+import {
+  activePlugins,
+  createPluginRecord,
+  listConnectorRecords,
+  listMcpToolCatalog,
+  redactSettingsSecrets,
+  refreshConnectorOAuth,
+  settingsForMcpSession,
+  updatePluginRecord,
+  redactPlugin
+} from './lib/mcp-connectors.mjs';
 
 function settingsForMcp(s, mcpSession) {
-  if (!mcpSession) return s;
-  const disabled = new Set(mcpSession.disabledPlugins || []);
-  return {
-    ...s,
-    plugins: (s.plugins || []).map(p => ({ ...p, enabled: disabled.has(p.name) ? false : p.enabled !== false })),
-    claude: { ...s.claude, useConnectors: mcpSession.claudeConnectors === false ? false : !!s.claude.useConnectors }
-  };
+  return settingsForMcpSession(s, mcpSession);
 }
 
 const db = load();
@@ -103,12 +108,7 @@ async function body(req) {
   if (!b.length) return {};
   try { return JSON.parse(b); } catch { throw new HttpError(400, 'JSON inválido.'); }
 }
-const redact = s => ({
-  ...s,
-  claude: { ...s.claude, apiKey: s.claude.apiKey ? '••••' : '' },
-  computer: { ...s.computer, boatApiKey: s.computer.boatApiKey ? '••••' : '' },
-  plugins: (s.plugins || []).map(p => (p.auth ? { ...p, auth: redactPluginAuth(p.auth) } : p))
-});
+const redact = redactSettingsSecrets;
 
 function publicBaseUrl(req) {
   const host = req.headers.host || `127.0.0.1:${PORT}`;
@@ -570,12 +570,102 @@ const routes = [
   }],
   ['POST', /^\/api\/mcp\/verify$/, async req => {
     const b = await body(req);
+    if (b.type === 'stdio' || b.command) {
+      return verifyMcpConnector({
+        name: String(b.name || 'probe'),
+        type: 'stdio',
+        command: String(b.command || ''),
+        args: b.args || []
+      }, { listTools: b.listTools !== false });
+    }
     if (!b.url || !/^https:\/\//.test(String(b.url))) throw new HttpError(400, 'URL HTTPS do servidor MCP é obrigatória.');
     let plugin;
     if (b.pluginName) {
       plugin = (db.settings.plugins || []).find(p => p.name === b.pluginName);
+    } else if (b.plugin && typeof b.plugin === 'object') {
+      plugin = b.plugin;
     }
-    return verifyMcpServer(b.url, { plugin });
+    return verifyMcpServer(b.url, { plugin, listTools: b.listTools !== false });
+  }],
+  ['GET', /^\/api\/mcp\/connectors$/, () => ({ connectors: listConnectorRecords(db.settings) })],
+  ['POST', /^\/api\/mcp\/connectors$/, async req => {
+    const b = await body(req);
+    const prev = db.settings.plugins || [];
+    let created;
+    try {
+      created = createPluginRecord(b, prev);
+    } catch (e) {
+      throw new HttpError(400, e.message);
+    }
+    if (b.auth) created.auth = mergePluginAuth(undefined, b.auth);
+    if (b.headers && typeof b.headers === 'object') {
+      created.headers = Object.fromEntries(Object.entries(b.headers).slice(0, 4).map(([k, v]) => [String(k).slice(0, 80), String(v).slice(0, 500)]));
+    }
+    db.settings.plugins = [...prev, created];
+    save();
+    return { connector: redactPlugin(created) };
+  }],
+  ['PUT', /^\/api\/mcp\/connectors\/([\w-]{1,40})$/, async (req, [name]) => {
+    const idx = (db.settings.plugins || []).findIndex(p => p.name === name);
+    if (idx < 0) throw new HttpError(404, 'Conector não encontrado.');
+    const b = await body(req);
+    const prev = db.settings.plugins[idx];
+    let next = updatePluginRecord(prev, b);
+    if (b.auth) next.auth = mergePluginAuth(prev.auth, b.auth);
+    if (b.headers) {
+      next.headers = Object.fromEntries(
+        (Array.isArray(b.headers)
+          ? b.headers.filter(h => h?.name).map(h => [String(h.name).slice(0, 80), String(h.value || '').slice(0, 500)])
+          : Object.entries(b.headers)
+        ).slice(0, 4)
+      );
+    }
+    db.settings.plugins[idx] = next;
+    save();
+    return { connector: redactPlugin(next), authStatus: pluginOAuthStatus(next) };
+  }],
+  ['DELETE', /^\/api\/mcp\/connectors\/([\w-]{1,40})$/, (req, [name]) => {
+    const before = (db.settings.plugins || []).length;
+    db.settings.plugins = (db.settings.plugins || []).filter(p => p.name !== name);
+    if (db.settings.plugins.length === before) throw new HttpError(404, 'Conector não encontrado.');
+    save();
+    return { ok: true };
+  }],
+  ['GET', /^\/api\/mcp\/tools$/, async (req, _, url) => {
+    let mcpSession;
+    const raw = url.searchParams.get('mcpSession');
+    if (raw) {
+      try { mcpSession = JSON.parse(raw); } catch { throw new HttpError(400, 'mcpSession JSON inválido.'); }
+    }
+    return listMcpToolCatalog(db.settings, mcpSession);
+  }],
+  ['POST', /^\/api\/mcp\/tools$/, async req => {
+    const b = await body(req);
+    return listMcpToolCatalog(db.settings, b.mcpSession);
+  }],
+  ['GET', /^\/api\/mcp\/session\/connectors$/, (req, _, url) => {
+    let mcpSession;
+    const raw = url.searchParams.get('mcpSession');
+    if (raw) {
+      try { mcpSession = JSON.parse(raw); } catch { throw new HttpError(400, 'mcpSession JSON inválido.'); }
+    }
+    const s = settingsForMcp(db.settings, mcpSession);
+    return {
+      connectors: listConnectorRecords(s),
+      active: activePlugins(db.settings, mcpSession).map(p => p.name)
+    };
+  }],
+  ['POST', /^\/api\/mcp\/oauth\/refresh$/, async req => {
+    const b = await body(req);
+    const name = String(b.pluginName || '').trim();
+    if (!name) throw new HttpError(400, 'Informe pluginName.');
+    try {
+      const out = await refreshConnectorOAuth(db, name);
+      save();
+      return out;
+    } catch (e) {
+      throw new HttpError(400, e.message || 'Falha ao atualizar OAuth.');
+    }
   }],
   ['POST', /^\/api\/mcp\/oauth\/start$/, async (req, _, url) => {
     const b = await body(req);
@@ -598,11 +688,13 @@ const routes = [
   ['GET', /^\/api\/mcp\/oauth\/status\/([\w-]+)$/, (req, [flowId]) => {
     const flow = getOAuthFlow(flowId);
     if (!flow) throw new HttpError(404, 'Fluxo OAuth não encontrado ou expirado.');
+    const plugin = (db.settings.plugins || []).find(p => p.name === flow.pluginName);
     return {
       flowId,
       status: flow.status,
       pluginName: flow.pluginName,
-      error: flow.error || undefined
+      error: flow.error || undefined,
+      authStatus: plugin ? pluginOAuthStatus(plugin) : undefined
     };
   }],
   ['PUT', /^\/api\/settings$/, async req => {
@@ -621,7 +713,9 @@ const routes = [
     if (Array.isArray(b.plugins)) s.plugins = b.plugins.filter(p => p?.name && /^[\w-]{1,40}$/.test(p.name)).map(p => {
       const prev = s.plugins.find(x => x.name === p.name);
       const auth = p.auth && typeof p.auth === 'object' ? mergePluginAuth(prev?.auth, p.auth) : prev?.auth;
-      const hdr = Array.isArray(p.headers) ? Object.fromEntries(p.headers.slice(0, 4).filter(h => h?.name).map(h => [String(h.name).slice(0, 80), String(h.value || '').slice(0, 500)])) : p.headers;
+      let hdr;
+      if (Array.isArray(p.headers)) hdr = Object.fromEntries(p.headers.slice(0, 4).filter(h => h?.name).map(h => [String(h.name).slice(0, 80), String(h.value || '').slice(0, 500)]));
+      else if (p.headers && typeof p.headers === 'object') hdr = Object.fromEntries(Object.entries(p.headers).slice(0, 4).map(([k, v]) => [String(k).slice(0, 80), String(v ?? '').slice(0, 500)]));
       return p.type === 'http'
         ? { name: p.name, type: 'http', url: String(p.url), enabled: p.enabled !== false, ...(auth ? { auth } : {}), ...(hdr ? { headers: hdr } : {}) }
         : { name: p.name, type: 'stdio', command: String(p.command), args: (p.args || []).map(String), enabled: p.enabled !== false };

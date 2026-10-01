@@ -24,7 +24,8 @@ test('verifyMcpServer detecta OAuth em 401 com metadados', async () => {
     return { ok: true, status: 200, headers: new Headers(), text: async () => '', json: async () => null };
   };
   const r = await verifyMcpServer('https://mcp.example.com/mcp', { fetch });
-  assert.equal(r.ok, true);
+  assert.equal(r.ok, false);
+  assert.equal(r.oauthRequired, true);
   assert.equal(r.login.found, true);
   assert.equal(r.login.discovery.authorizationServer.token_endpoint, 'https://idp.test/token');
 });
