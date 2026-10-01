@@ -189,6 +189,10 @@ test('PUT /api/settings com modelo inválido retorna 400', async () => {
       body: JSON.stringify({ defaultModel: 'modelo-inexistente' })
     });
     assert.equal(r.status, 400);
+    const body = await r.json();
+    assert.match(body.error, /inválid/i);
+    assert.ok(Array.isArray(body.details));
+    assert.ok(body.details.some(d => d.path === 'defaultModel'));
   });
 });
 
