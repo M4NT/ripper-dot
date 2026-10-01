@@ -27,6 +27,7 @@ import { applySettingsPatch, applyPluginsPatch, settingsMeta } from './lib/setti
 import { appendAudit, auditFromApproval, listAudit } from './lib/audit.mjs';
 import { newHookToken, verifySignature, eventMeta } from './lib/hooks.mjs';
 import { recordUsage, usageSummary, accountLimits, contextBreakdown, checkSendQuota, compactChat, parseProviderLimitFromError, recordProviderSignal } from './lib/usage.mjs';
+import { checkRunBudget, ToolLoopDetector, tokenBudgetAlertFromCheck } from './lib/token-budget-governor.mjs';
 import { buildUsageContract, normalizeContextWindow } from './lib/usage-api.mjs';
 import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStreaming, activeChatStreamCount } from './lib/chat-stream.mjs';
 import { exportChatPayload, importChatPayload } from './lib/chat-transfer.mjs';
@@ -453,11 +454,24 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
     id: id(), role: 'assistant', agentId: agent.id, content: out, at: Date.now(),
     ...(steps.length ? { steps } : {}), ...extra
   });
+  const loopDetector = new ToolLoopDetector(s.tokenBudget);
+  const emitTurn = ev => {
+    if (ev.tool) {
+      const hit = loopDetector.observe(ev.tool);
+      if (hit.loop) {
+        emit({ tokenBudget: { kind: 'tool_loop', tool: hit.tool, count: hit.count, message: hit.message }, stopped: true });
+        emit({ warn: hit.message });
+        signal?.abort?.();
+        return;
+      }
+    }
+    emit(ev);
+  };
   await runProviderAttemptLoop({
     order,
     signal,
     retry: normalizeProviderRetry(s),
-    emit,
+    emit: emitTurn,
     runModel: m => {
       if (testProvider) return runTestProvider({ prompt, signal });
       const providerSystem = MODELS[m].provider === 'codex' && s.computer.mode !== 'local'
@@ -469,7 +483,12 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
     },
     onSuccess: ({ model: m, out, steps }) => {
       push(out, steps, { model: m, effort });
-      recordUsage(db, m, { charsIn: (text?.length || 0) + (prompt?.length || 0), charsOut: out.length, routedBy });
+      recordUsage(db, m, {
+        charsIn: (text?.length || 0) + (prompt?.length || 0),
+        charsOut: out.length,
+        routedBy,
+        agentId: agent.id
+      });
       if (MODELS[m].provider === 'claude') {
         refreshClaudeSubscriptionUsage(db, s).then(() => save()).catch(() => {});
       }
@@ -499,6 +518,13 @@ async function chat({ chat, text, fileIds, signal, mcpSession }, emit) {
   if (group) emit({ turnPlan: turnPlanIds(first, floor) });
   for (let agent = floor.next(); agent; agent = floor.next()) {
     if (signal?.aborted) break;
+    const runBudget = checkRunBudget(db, db.settings, { agentId: agent.id });
+    if (runBudget.blocked) {
+      const alert = tokenBudgetAlertFromCheck(runBudget) || { kind: runBudget.kind, message: runBudget.userMessage };
+      emit({ tokenBudget: alert, stopped: true });
+      if (runBudget.userMessage) emit({ warn: runBudget.userMessage });
+      break;
+    }
     emit({ speaker: agent.id });
     await syncLocalFiles(agent, chat);
     const extra = await buildMessageAttachments(db, agent, chat, fileIds);
@@ -1070,7 +1096,7 @@ const routes = [
       db.chats.unshift(c);
     }
     if (isChatStreaming(c.id)) throw new HttpError(409, 'Esta conversa já está respondendo. Aguarde ou interrompa a resposta atual.');
-    const quota = checkSendQuota(db);
+    const quota = checkRunBudget(db, db.settings, { agentId: agent.id });
     if (quota.blocked) throw new HttpError(429, quota.userMessage);
     const fileIds = (b.fileIds || []).filter(fid => db.files.some(f => f.id === fid && agentIds.some(a => canUseFile(f, { id: a }, c))));
     for (const fid of fileIds) { const f = db.files.find(x => x.id === fid); if (f && !f.chatId) f.chatId = c.id; }

@@ -269,6 +269,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
             const names = e.delegated.map(id => getAgent(id)?.name || 'colega').join(', ');
             building.steps.push({ kind: 'done', label: 'Palavra delegada', detail: names });
           }
+          if (e.tokenBudget?.message) building.steps.push({ kind: 'warn', label: e.tokenBudget.message });
           if (e.warn) building.steps.push({ kind: 'warn', label: e.warn });
           if (e.memory) building.steps.push({ kind: 'done', label: 'Guardado na memória', detail: e.memory });
           if (e.approval) { building.steps.push({ kind: 'approval', rec: e.approval, status: 'pending' }); setPhase('approval'); }
