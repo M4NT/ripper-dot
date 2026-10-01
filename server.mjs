@@ -24,7 +24,7 @@ import {
 } from './lib/manager-worker-protocol.mjs';
 import { trackInboxDelegation, taskItemsSummary } from './lib/task-items.mjs';
 import { closeTaskFromInboxReply } from './lib/task-closure.mjs';
-import { noopGoogleTasksSync } from './lib/google-tasks-sync.mjs';
+import { createGoogleTasksSync } from './lib/google-tasks-sync.mjs';
 import { rememberAllowedCommand, execNeedsApproval } from './lib/permissions.mjs';
 import { browserAutonomyGate, shareAutonomyGate, effectiveApprovalPolicy, sanitizeAutonomyLevel } from './lib/autonomy.mjs';
 import { listChatsPage } from './lib/history.mjs';
@@ -138,6 +138,24 @@ import {
   closeIdempotencyStore
 } from './lib/idempotency.mjs';
 import { buildOpenApiDocument, OPENAPI_DOCS_HTML } from './lib/openapi.mjs';
+import {
+  applyGoogleTokensToSettings,
+  exchangeGoogleTasksCode,
+  findGoogleTasksOAuthFlowByState,
+  getGoogleTasksOAuthFlow,
+  googleTasksOAuthStatus,
+  googleTasksRedirectUri,
+  startGoogleTasksOAuthFlow
+} from './lib/google-tasks-oauth.mjs';
+import {
+  listTaskDelegations,
+  pullFromGoogleTasks,
+  pushAllLinkedTasks,
+  pushTaskToGoogle,
+  syncTaskRecord,
+  taskSyncBridgeStatus,
+  upsertTaskDelegation
+} from './lib/task-sync-bridge.mjs';
 
 function settingsForMcp(s, mcpSession) {
   return settingsForMcpSession(s, mcpSession);
@@ -147,6 +165,18 @@ const APP_PKG = JSON.parse(await readFile(new URL('./package.json', import.meta.
 const SERVER_STARTED_AT = Date.now();
 const db = load();
 configureLogger({ settings: db.settings });
+
+function googleTokenRefreshHook(tokens) {
+  db.settings = applyGoogleTokensToSettings(db.settings, tokens);
+  save();
+}
+
+const syncBridgeOpts = () => ({ onTokensRefreshed: googleTokenRefreshHook });
+const googleTasksRuntime = () => ({ db, ...syncBridgeOpts() });
+const googleTasksSync = createGoogleTasksSync({
+  enabled: db.settings?.taskSync?.google?.enabled !== false,
+  runtime: googleTasksRuntime()
+});
 for (const a of db.approvals || []) if (a.status === 'pending') { a.status = 'expired'; a.decidedAt = Date.now(); }
 await migrateInlineArtifacts(db.artifacts).catch(e => console.error('[artifacts] migração:', e.message));
 const _storageCleanup = await startupStorageCleanup(db).catch(e => ({ error: e.message }));
@@ -335,7 +365,6 @@ const dockerStatusCached = memoAsync(async () => ({ version: await dockerAvailab
 
 // ---------- mensagens entre agentes ----------
 const inboxBusy = new Set();
-const googleTasksSync = noopGoogleTasksSync();
 const inboxLimits = () => ({ maxPerHour: 20, maxHops: 3, ...(db.settings?.inbox || {}) });
 
 async function deliver(m) {
@@ -1080,6 +1109,95 @@ const routes = [
       authStatus: plugin ? pluginOAuthStatus(plugin) : undefined
     };
   }],
+  ['GET', /^\/api\/task-sync\/status$/, () => taskSyncBridgeStatus(db.settings)],
+  ['GET', /^\/api\/task-sync\/tasks$/, () => ({ tasks: listTaskDelegations(db) })],
+  ['POST', /^\/api\/task-sync\/tasks$/, async req => {
+    const b = await body(req);
+    if (!b.title) throw new HttpError(400, 'Informe title.');
+    const row = upsertTaskDelegation(db, {
+      title: b.title,
+      notes: b.notes,
+      status: b.status,
+      agentId: b.agentId,
+      chatId: b.chatId,
+      delegation: b.delegation
+    }, { id });
+    save();
+    if (b.pushToGoogle) {
+      try {
+        const pushed = await pushTaskToGoogle(db, db.settings, row.id, syncBridgeOpts());
+        save();
+        return { task: row, push: pushed };
+      } catch (e) {
+        throw new HttpError(e.status || 400, e.message);
+      }
+    }
+    return { task: row };
+  }],
+  ['PATCH', /^\/api\/task-sync\/tasks\/([\w-]+)$/, async (req, [tid]) => {
+    const prev = (db.taskDelegations || []).find(t => t.id === tid);
+    if (!prev) throw new HttpError(404, 'Tarefa não encontrada.');
+    const b = await body(req);
+    const row = upsertTaskDelegation(db, {
+      ...prev,
+      ...(b.title != null ? { title: b.title } : {}),
+      ...(b.notes != null ? { notes: b.notes } : {}),
+      ...(b.status != null ? { status: b.status } : {})
+    }, { id });
+    save();
+    if (b.pushToGoogle !== false) {
+      try {
+        const pushed = await pushTaskToGoogle(db, db.settings, row.id, syncBridgeOpts());
+        save();
+        return { task: row, push: pushed };
+      } catch (e) {
+        if (e.code === 'NOT_AUTHENTICATED' || e.code === 'NOT_CONFIGURED') {
+          return { task: row, push: { ok: false, error: e.message, code: e.code } };
+        }
+        throw new HttpError(e.status || 400, e.message);
+      }
+    }
+    return { task: row };
+  }],
+  ['POST', /^\/api\/task-sync\/sync$/, async req => {
+    const b = await body(req);
+    const direction = b.direction || 'both';
+    try {
+      if (b.recordId) {
+        const out = await syncTaskRecord(db, db.settings, b.recordId, { direction, ...syncBridgeOpts() });
+        save();
+        return out;
+      }
+      const pull = b.pull !== false
+        ? await pullFromGoogleTasks(db, db.settings, { importNew: !!b.importNew, ...syncBridgeOpts() })
+        : null;
+      const push = b.push !== false
+        ? await pushAllLinkedTasks(db, db.settings, { allRecords: !!b.allRecords, ...syncBridgeOpts() })
+        : null;
+      save();
+      return { pull, push };
+    } catch (e) {
+      throw new HttpError(e.status || 400, e.message);
+    }
+  }],
+  ['POST', /^\/api\/task-sync\/google\/oauth\/start$/, async (req, _, url) => {
+    const redirectUri = googleTasksRedirectUri(publicBaseUrl(req));
+    try {
+      return await startGoogleTasksOAuthFlow({ redirectUri, settings: db.settings });
+    } catch (e) {
+      throw new HttpError(400, e.message);
+    }
+  }],
+  ['GET', /^\/api\/task-sync\/google\/oauth\/status\/([\w-]+)$/, (req, [flowId]) => {
+    const flow = getGoogleTasksOAuthFlow(flowId);
+    if (!flow) throw new HttpError(404, 'Fluxo OAuth Google não encontrado ou expirado.');
+    return {
+      flowId,
+      status: flow.status,
+      error: flow.error || undefined,
+      auth: googleTasksOAuthStatus(db.settings)
+    };
+  }],
   ['GET', /^\/api\/settings$/, () => ({ settings: redact(db.settings), meta: settingsMeta() })],
   ['GET', /^\/api\/flags$/, () => ({ flags: effectiveFeatureFlags(db.settings) })],
   ['PUT', /^\/api\/settings$/, async req => {
@@ -1656,6 +1774,43 @@ const server = createServer(async (req, res) => {
       } catch (e) {
         return notReady(e?.code || e?.message || 'store_unavailable');
       }
+    }
+    if (req.method === 'GET' && p === '/api/task-sync/google/oauth/callback') {
+      const code = url.searchParams.get('code');
+      const state = url.searchParams.get('state') || '';
+      const err = url.searchParams.get('error');
+      const flow = findGoogleTasksOAuthFlowByState(state);
+      if (!flow) {
+        res.writeHead(400, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
+        res.end('<!doctype html><meta charset=utf-8><title>Ripper · Google Tasks</title><p>Fluxo inválido ou expirado. Feche esta janela e tente de novo no Ripper.</p>');
+        return;
+      }
+      if (err) {
+        flow.status = 'error';
+        flow.error = url.searchParams.get('error_description') || err;
+        res.writeHead(400, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
+        res.end(`<!doctype html><meta charset=utf-8><title>Ripper · Google Tasks</title><p>Login negado: ${flow.error}</p><script>setTimeout(()=>window.close(),1200)</script>`);
+        return;
+      }
+      if (!code) {
+        res.writeHead(400, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
+        res.end('<!doctype html><meta charset=utf-8><title>Ripper · Google Tasks</title><p>Código OAuth ausente.</p>');
+        return;
+      }
+      try {
+        const tokens = await exchangeGoogleTasksCode(flow, code);
+        db.settings = applyGoogleTokensToSettings(db.settings, tokens);
+        save();
+        flow.status = 'complete';
+        res.writeHead(200, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
+        res.end('<!doctype html><meta charset=utf-8><title>Ripper · Google Tasks</title><p>Google Tasks conectado. Você pode fechar esta janela.</p><script>setTimeout(()=>window.close(),800)</script>');
+      } catch (e) {
+        flow.status = 'error';
+        flow.error = e.message;
+        res.writeHead(500, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
+        res.end('<!doctype html><meta charset=utf-8><title>Ripper · Google Tasks</title><p>Falha ao trocar o código por token. Veja o Ripper e tente novamente.</p>');
+      }
+      return;
     }
     if (req.method === 'GET' && p === '/api/mcp/oauth/callback') {
       const code = url.searchParams.get('code');
