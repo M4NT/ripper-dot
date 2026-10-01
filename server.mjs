@@ -25,6 +25,9 @@ import { providerAttemptOrder, runProviderAttemptLoop } from './lib/provider-tur
 import { normalizeProviderRetry } from './lib/provider-retry.mjs';
 import { applySettingsPatch, applyPluginsPatch, settingsMeta } from './lib/settings-patch.mjs';
 import { appendAudit, auditFromApproval, listAudit } from './lib/audit.mjs';
+import { buildAdminOverview } from './lib/admin-overview.mjs';
+import { buildLgpdStatus } from './lib/lgpd-status.mjs';
+import { isEnterpriseMode } from './lib/enterprise.mjs';
 import { newHookToken, verifySignature, eventMeta } from './lib/hooks.mjs';
 import { recordUsage, usageSummary, accountLimits, contextBreakdown, checkSendQuota, compactChat, parseProviderLimitFromError, recordProviderSignal } from './lib/usage.mjs';
 import { buildUsageContract, normalizeContextWindow } from './lib/usage-api.mjs';
@@ -763,6 +766,17 @@ const routes = [
   ['GET', /^\/api\/audit$/, (req, _, url) => ({
     entries: listAudit(db, { limit: +(url.searchParams.get('limit') || 50) })
   })],
+  ['GET', /^\/api\/audit-trail$/, (req, _, url) => ({
+    store: 'local',
+    worm: false,
+    entryCount: (db.auditLog || []).length,
+    entries: listAudit(db, { limit: +(url.searchParams.get('limit') || 50) })
+  })],
+  ['GET', /^\/api\/lgpd\/status$/, () => buildLgpdStatus({ settings: db.settings })],
+  ['GET', /^\/api\/admin\/overview$/, () => {
+    if (!isEnterpriseMode(db.settings)) throw new HttpError(403, 'Centro admin disponível apenas no modo enterprise.');
+    return buildAdminOverview(db, db.settings);
+  }],
   ['GET', /^\/api\/artifacts\/([\w-]+)\/download$/, async (req, [aid], url, res) => {
     const a = db.artifacts.find(x => x.id === aid);
     if (!a) throw new HttpError(404, 'Artefato não encontrado.');

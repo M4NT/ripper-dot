@@ -14,6 +14,7 @@ import ActionLine from '../actionLine.jsx';
 import { useChatMenu } from '../actions.jsx';
 import { useOv } from '../overlay.jsx';
 import { botAvatarPalette } from 'bot-avatars';
+import { FirstRunChecklist } from '../firstRunChecklist.jsx';
 
 const agentColor = a => nameColor(a, botAvatarPalette);
 // Qual "verbo" o orb mostra para cada fase da resposta.
@@ -317,6 +318,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
                 <p>{isGroup ? 'Fale com o time: quem é da área responde e chama os colegas quando precisa. Use @Nome para chamar alguém direto.' : agent.description || 'Pronto para ajudar.'}</p>
                 {project && <p className="muted small">No projeto {project.name}: instruções e arquivos do projeto entram no contexto.</p>}
                 {agent.status === 'paused' && <p className="note">Este agente está pausado: conversas funcionam, rotinas não.</p>}
+                {!isGroup && <FirstRunChecklist settings={S.settings} agentCount={S.agents.length} />}
               </div>
             )}
             {messages.map((m, i) => m.inbox ? <InboxMessage key={m.id || i} m={m} from={getAgent(m.inbox.from)} /> : m.role === 'user'

@@ -19,3 +19,17 @@ test('settingsMeta lista modelos e esforços', () => {
   assert.ok(m.efforts.includes('high'));
   assert.equal(m.providerRetry.maxAttempts, 3);
 });
+
+test('applySettingsPatch aceita ui.mode e sincroniza enterprise.enabled', () => {
+  const s = { defaultModel: 'auto', claude: {}, computer: {}, ui: { mode: 'simple' }, enterprise: { enabled: false } };
+  applySettingsPatch(s, { ui: { mode: 'enterprise' } });
+  assert.equal(s.ui.mode, 'enterprise');
+  assert.equal(s.enterprise.enabled, true);
+  applySettingsPatch(s, { ui: { mode: 'simple' } });
+  assert.equal(s.enterprise.enabled, false);
+});
+
+test('applySettingsPatch rejeita ui.mode inválido', () => {
+  const s = { defaultModel: 'auto', claude: {}, computer: {} };
+  assert.throws(() => applySettingsPatch(s, { ui: { mode: 'completa' } }), /interface/);
+});
