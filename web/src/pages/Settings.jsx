@@ -403,6 +403,25 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
                 <Row title="Profundidade máxima de uma troca" desc="Quantas vezes uma resposta pode gerar outra mensagem (saltos inbox)." tip="Valores altos podem gerar longas cadeias de mensagens automáticas entre agentes."><div className="input-unit"><input className="input" type="number" min={1} max={10} value={s.inbox?.maxHops ?? 3} onChange={e => set('inbox', { ...(s.inbox || {}), maxHops: +e.target.value })} /><span>saltos</span></div></Row>
               </Card>
             </AdvancedBlock>
+            <AdvancedBlock settings={s} hint="Chaos / testes de resiliência">
+              <Card title="Chaos / testes de resiliência" desc="Simula falhas controladas para validar fallbacks. Desligado por padrão; nunca use em produção real.">
+                <div className="chaos-banner" role="alert">
+                  <strong>Atenção:</strong> com chaos ativo, conversas e conectores MCP podem falhar ou ficar lentos de propósito. Só ligue em ambiente de desenvolvimento ou teste.
+                </div>
+                <Row title="Ativar chaos" desc="Requer NODE_ENV ≠ production ou RIPPER_CHAOS_ALLOW_PROD=1 no servidor.">
+                  <Switch checked={!!s.chaos?.enabled} onChange={v => set('chaos', { ...(s.chaos || {}), enabled: v })} label="Chaos ativo" />
+                </Row>
+                <Row title="Taxa de falha do provedor" desc="0 = nunca; 1 = sempre (antes de chamar o modelo).">
+                  <div className="input-unit"><input className="input" type="number" min={0} max={1} step={0.05} disabled={!s.chaos?.enabled} value={s.chaos?.providerFailRate ?? 0} onChange={e => set('chaos', { ...(s.chaos || {}), providerFailRate: +e.target.value })} /><span>0–1</span></div>
+                </Row>
+                <Row title="Atraso SSE" desc="Milissegundos extras antes de cada evento enviado ao navegador.">
+                  <div className="input-unit"><input className="input" type="number" min={0} max={60000} disabled={!s.chaos?.enabled} value={s.chaos?.sseDelayMs ?? 0} onChange={e => set('chaos', { ...(s.chaos || {}), sseDelayMs: +e.target.value })} /><span>ms</span></div>
+                </Row>
+                <Row title="Desconectar MCP" desc="Próximas sondas MCP e chamadas da ponte ripper falham como se a sessão tivesse caído.">
+                  <Switch checked={!!s.chaos?.mcpDisconnect} disabled={!s.chaos?.enabled} onChange={v => set('chaos', { ...(s.chaos || {}), mcpDisconnect: v })} label="Simular queda MCP" />
+                </Row>
+              </Card>
+            </AdvancedBlock>
           </>}
           <Card title="Retenção de dados" desc="Apaga automaticamente conversas, eventos de uso, histórico de aprovações em db.json, artefatos e anexos órfãos após o prazo. Hard-delete no disco. Não altera audit-trail.sqlite (WORM), se existir.">
             <Row title="Retenção automática" desc="Job periódico no servidor (padrão a cada 6 h)."><Switch checked={!!s.retention?.enabled} onChange={v => set('retention', { ...(s.retention || {}), enabled: v })} label="Ativar retenção" /></Row>
