@@ -43,7 +43,7 @@ export default function CustomConnectorModal({ open, onClose, onSaved }) {
     try {
       const r = await api('/api/mcp/verify', { method: 'POST', body: { url: url.trim() } });
       setVerify(r);
-      if (r.ok) setStep('auth');
+      if (r.ok || r.oauthRequired) setStep('auth');
     } catch (e) {
       setVerify({ ok: false, steps: [{ id: 'connect', status: 'error', detail: e.message }], warning: e.message });
     }
@@ -53,25 +53,24 @@ export default function CustomConnectorModal({ open, onClose, onSaved }) {
   async function save() {
     setBusy(true);
     try {
-      const state = await api('/api/state');
-      const plugins = [...(state.settings.plugins || [])];
       const trimmed = name.trim();
-      if (plugins.some(p => p.name === trimmed)) throw new Error('Já existe um conector com esse nome.');
-      plugins.push({
-        name: trimmed,
-        type: 'http',
-        url: url.trim(),
-        enabled: true,
-        auth: {
-          mode: authMode,
-          oauthClient,
-          clientId: oauthClient === 'custom' ? clientId : '',
-          clientSecret: oauthClient === 'custom' ? clientSecret : '',
-          headers: headers.filter(h => h.name)
-        },
-        headers: Object.fromEntries(headers.filter(h => h.name).map(h => [h.name, h.value]))
+      const hdr = Object.fromEntries(headers.filter(h => h.name).map(h => [h.name, h.value]));
+      await api('/api/mcp/connectors', {
+        method: 'POST',
+        body: {
+          name: trimmed,
+          type: 'http',
+          url: url.trim(),
+          enabled: true,
+          auth: {
+            mode: authMode,
+            oauthClient,
+            clientId: oauthClient === 'custom' ? clientId : '',
+            clientSecret: oauthClient === 'custom' ? clientSecret : ''
+          },
+          headers: hdr
+        }
       });
-      await api('/api/settings', { method: 'PUT', body: { ...state.settings, plugins } });
 
       if (oauthNeeded && authMode === 'oauth_now' && verify?.login?.discovery?.authorizationServer) {
         await runMcpOAuthLogin({
@@ -125,7 +124,7 @@ export default function CustomConnectorModal({ open, onClose, onSaved }) {
                   </li>
                 ))}
               </ul>
-              {!verify.ok && verify.warning && (
+              {!verify.ok && !verify.oauthRequired && verify.warning && (
                 <div className="conn-warn">
                   <Icon name="stop" size={18} />
                   <div><b>Não foi possível verificar o servidor</b><p>{verify.warning} Selecione <b>Continuar mesmo assim</b> para configurar manualmente.</p></div>
@@ -137,8 +136,8 @@ export default function CustomConnectorModal({ open, onClose, onSaved }) {
           <footer className="conn-modal-foot">
             <button type="button" className="btn" onClick={close}>Cancelar</button>
             {step === 'form' && <button type="button" className="btn btn-primary" disabled={!canContinue || busy} onClick={runVerify}>Continuar</button>}
-            {step === 'verify' && !verify?.ok && <button type="button" className="btn btn-primary" onClick={() => setStep('auth')}>Continuar mesmo assim</button>}
-            {step === 'verify' && verify?.ok && <button type="button" className="btn btn-primary" onClick={() => setStep('auth')}>Continuar</button>}
+            {step === 'verify' && !verify?.ok && !verify?.oauthRequired && <button type="button" className="btn btn-primary" onClick={() => setStep('auth')}>Continuar mesmo assim</button>}
+            {step === 'verify' && (verify?.ok || verify?.oauthRequired) && <button type="button" className="btn btn-primary" onClick={() => setStep('auth')}>Continuar</button>}
           </footer>
         </>
       )}
