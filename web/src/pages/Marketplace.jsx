@@ -5,8 +5,9 @@ import { Icon } from '../ui.jsx';
 import HubShell from '../marketplace/HubShell.jsx';
 import BrandIcon from '../marketplace/BrandIcon.jsx';
 import ConnectorDetail from '../marketplace/ConnectorDetail.jsx';
-import { BOT_CATALOG, CONNECTOR_DISCOVER, PLUGIN_CATALOG, marketplaceDetail } from '../marketplace/catalog.js';
+import { AGENT_PRESETS, BOT_CATALOG, CONNECTOR_DISCOVER, PLUGIN_CATALOG, marketplaceDetail } from '../marketplace/catalog.js';
 import { installPlugin, installedCount, isAuthed, isPluginInstalled, listInstalledPlugins, setAuthed, uninstallPlugin } from '../marketplace/state.js';
+import { isEnterpriseMode } from '../uiMode.js';
 
 function MpIcon({ id, size = 40 }) {
   if (id === 'plug') return <span className="mp-icon"><Icon name="plug" size={size * 0.45} /></span>;
@@ -42,7 +43,9 @@ function Browse({ settings, refresh, onOpenDetail }) {
   const forYou = PLUGIN_CATALOG.filter(p => p.forYou).filter(filter);
   const featured = PLUGIN_CATALOG.filter(p => p.featured).filter(filter);
   const bots = BOT_CATALOG.filter(filter);
+  const presets = AGENT_PRESETS.filter(filter);
   const count = installedCount(settings);
+  const enterprise = isEnterpriseMode(settings);
 
   return (
     <HubShell
@@ -59,6 +62,18 @@ function Browse({ settings, refresh, onOpenDetail }) {
         </button>
       }
     >
+      {enterprise && presets.length > 0 && (
+        <section className="mp-section">
+          <div className="mp-section-head"><h2>Enterprise hub</h2><span className="muted small">Templates advisory · Hub Architect</span></div>
+          <div className="mp-grid two">{presets.map(p => (
+            <div key={p.id} className="mp-card bot">
+              <span className="mp-bot" style={{ background: p.color }} aria-hidden="true" />
+              <div><b>{p.name}</b><small>{p.desc}</small><em>por {p.author}</em></div>
+              <button type="button" className="btn btn-sm" onClick={() => go(`/new?template=${p.templateId}`)}>Usar template</button>
+            </div>
+          ))}</div>
+        </section>
+      )}
       {forYou.length > 0 && (
         <section className="mp-section">
           <h2>Para você</h2>

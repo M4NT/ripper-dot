@@ -6,6 +6,7 @@ import { useApp } from './app.jsx';
 import { api } from './lib.js';
 import { listSessionConnectors, setSessionEnabled } from './marketplace/sessionMcp.js';
 import { isEnterpriseMode } from './uiMode.js';
+import { useT } from './i18n/index.jsx';
 
 function useFloating(anchorRef, open) {
   const [pos, setPos] = useState(null);
@@ -49,6 +50,8 @@ function SubMenu({ items, anchor, onClose }) {
 
 export default function ComposerPlusMenu({ open, onClose, anchorRef, onFiles, onFolder, onSlash, onTeach, onCredential }) {
   const { S, refresh } = useApp();
+  const t = useT();
+  const simple = !isEnterpriseMode(S.settings);
   const pos = useFloating(anchorRef, open);
   const [sub, setSub] = useState(null);
   const [, bump] = useState(0);
@@ -120,6 +123,11 @@ export default function ComposerPlusMenu({ open, onClose, anchorRef, onFiles, on
       {onCredential && (
         <button type="button" className="menu-item" onClick={() => { onClose(); onCredential(); }}>
           <Icon name="plug" size={16} />Credencial segura (cofre)
+        </button>
+      )}
+      {simple && (
+        <button type="button" className="menu-item" onClick={() => { onClose(); go('/new?template=architect'); }}>
+          <Icon name="agents" size={16} />{t('composer.architect')}<span className="muted small"> · advisory</span>
         </button>
       )}
       <hr className="menu-sep" />

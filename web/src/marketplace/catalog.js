@@ -20,6 +20,11 @@ export const PLUGIN_CATALOG = [
   { id: 'granola', name: 'Granola', author: 'Granola', icon: 'notion', desc: 'Notas de reunião e resumos.', featured: true }
 ];
 
+/** Presets Ripper (templates de agente, não plugins MCP). */
+export const AGENT_PRESETS = [
+  { id: 'architect', name: 'Architect', author: 'Ripper', color: '#5b6cf0', desc: 'Desenho de times multi-agente — papéis, ferramentas e trade-offs.', templateId: 'architect', hub: 'enterprise' }
+];
+
 export const BOT_CATALOG = [
   { id: 'dr-eggbot', name: 'dr eggbot', author: 'Lauren Tan', color: '#e85d5d', desc: 'Humor técnico e analogias culinárias.' },
   { id: 'overheard', name: 'Overheard', author: 'Ripper', color: '#e8a43d', desc: 'Captura frases marcantes do time.' },
