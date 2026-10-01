@@ -4,9 +4,12 @@ import {
   redactSettings,
   redactRoutine,
   redactSecretsInText,
+  redactSecretsInLogText,
   redactSseEvent,
   redactHeaders,
-  redactPlugin
+  redactPlugin,
+  redactJsonPayload,
+  LOG_REDACTED
 } from '../lib/redact.mjs';
 
 test('redactSettings mascara chaves e OAuth', () => {
@@ -40,6 +43,38 @@ test('redactSecretsInText limpa Bearer e sk-ant', () => {
   assert.match(t, /Bearer ••••/);
   assert.match(t, /sk-ant-••••/);
   assert.doesNotMatch(t, /abc\.def/);
+});
+
+test('redactSecretsInLogText usa [REDACTED] em logs', () => {
+  const secret = 'ghp_abcdefghijklmnopqrstuvwxyz1234567890ABCD';
+  const t = redactSecretsInLogText(`token ${secret} e Bearer abc.defghijklmnopqrstuvwxyz`);
+  assert.match(t, new RegExp(LOG_REDACTED));
+  assert.doesNotMatch(t, /ghp_abcdefghijklmnopqrstuvwxyz/);
+  assert.doesNotMatch(t, /abc\.defghijklmnopqrstuvwxyz/);
+});
+
+test('redactSecretsInText reconhece OpenAI e AWS', () => {
+  const raw = 'sk-proj-abcdefghijklmnopqrstuvwxyz1234567890ABCD AKIAIOSFODNN7EXAMPLE';
+  const t = redactSecretsInText(raw);
+  assert.doesNotMatch(t, /sk-proj-abcdefghijklmnopqrstuvwxyz1234567890ABCD/);
+  assert.match(t, /AKIA••••/);
+});
+
+test('redactSseEvent sanitiza debug e detail de ferramentas', () => {
+  const e = redactSseEvent({
+    debug: 'trace com sk-ant-api03-abcdefghijklmnopqrstuvwxyz',
+    tool: 'run',
+    detail: 'Authorization: Bearer abcdefghijklmnopqrstuvwxyz0123456789ABCD'
+  });
+  assert.doesNotMatch(JSON.stringify(e), /abcdefghijklmnopqrstuvwxyz0123456789/);
+});
+
+test('redactJsonPayload sanitiza erros aninhados', () => {
+  const body = redactJsonPayload({
+    error: 'falhou',
+    details: { message: 'Bearer abcdefghijklmnopqrstuvwxyz0123456789ABCD' }
+  });
+  assert.doesNotMatch(body.details.message, /abcdefghijklmnopqrstuvwxyz0123456789/);
 });
 
 test('redactSseEvent sanitiza warn', () => {

@@ -88,8 +88,11 @@ import {
   updatePluginRecord,
   redactPlugin
 } from './lib/mcp-connectors.mjs';
-import { redactRoutine, redactSseEvent, redactJsonPayload, redactForLog } from './lib/redact.mjs';
+import { redactRoutine, redactSseEvent, redactJsonPayload, redactForLog, redactSecretsInText } from './lib/redact.mjs';
+import { installLogRedactionMiddleware } from './lib/log-redact-middleware.mjs';
 import { logger, configureLogger, runWithRequestContext, shouldLogHttpRoute } from './lib/logger.mjs';
+
+installLogRedactionMiddleware();
 import { collectDiagnostics } from './lib/diagnostics.mjs';
 import { runBootLint } from './lib/boot-lint.mjs';
 import {
@@ -1607,7 +1610,7 @@ const server = createServer(async (req, res) => {
     const code = e instanceof HttpError ? e.code : 500;
     if (code === 500) console.error(`[${req.requestId}]`, ...redactForLog(e?.stack || e?.message || String(e)));
     if (!res.headersSent) {
-      const payload = { error: code === 500 ? 'Erro interno. Veja o log do servidor.' : e.message };
+      const payload = { error: code === 500 ? 'Erro interno. Veja o log do servidor.' : redactSecretsInText(e.message) };
       if (e.details?.length) payload.details = e.details;
       json(res, payload, code, {}, req);
     } else res.end();
