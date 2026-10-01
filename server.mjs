@@ -77,6 +77,16 @@ import { beginChatRun, bumpChatRunSeq, finishChatRun, chatRunPublic, canResumeCh
 import { exportChatPayload, importChatPayload } from './lib/chat-transfer.mjs';
 import { listAgentTemplates, createSavedTemplate, patchSavedTemplate, agentFromSavedTemplate } from './lib/agent-templates.mjs';
 import { architectSuggest } from './lib/architect-suggest.mjs';
+import {
+  parseTeamBrief,
+  normalizeTeamStructure,
+  createTeamProposal,
+  listTeamProposals,
+  applyTeamProposal,
+  orchestrateTeamStructure,
+  structureFromArchitectScaffold,
+  ORCHESTRATOR_SYSTEM
+} from './lib/team-orchestrator.mjs';
 import { ripperBuiltinSchemaChars, listRipperBuiltinToolNames } from './lib/ripper-builtin-tools.mjs';
 import { refreshClaudeSubscriptionUsage } from './lib/claude-subscription-usage.mjs';
 import {
@@ -1728,6 +1738,73 @@ const routes = [
   }],
   ['DELETE', /^\/api\/agent-templates\/([\w-]+)$/, (req, [tid]) => {
     db.agentTemplates = (db.agentTemplates || []).filter(x => x.id !== tid);
+    save();
+    return {};
+  }],
+  ['GET', /^\/api\/team-proposals$/, () => listTeamProposals(db)],
+  ['GET', /^\/api\/team-proposals\/([\w-]+)$/, (req, [pid]) => {
+    const p = (db.teamProposals || []).find(x => x.id === pid);
+    if (!p) throw new HttpError(404, 'Proposta de time não encontrada.');
+    return p;
+  }],
+  ['POST', /^\/api\/team-proposals$/, async req => {
+    const b = await body(req);
+    let structure;
+    let source = 'parse';
+    let brief = String(b.brief || b.goal || '').trim();
+    if (b.structure && typeof b.structure === 'object') {
+      structure = normalizeTeamStructure(b.structure);
+      source = 'structure';
+    } else if (b.goal) {
+      structure = structureFromArchitectScaffold(architectSuggest({ goal: b.goal, constraints: b.constraints }));
+      source = 'architect';
+    } else if (!brief) {
+      throw new HttpError(400, 'Envie goal, brief (texto) ou structure (JSON).');
+    } else if (b.orchestrate) {
+      const orchAgent = newAgent({ name: 'Orquestrador de times', tools: [], instructions: '', model: 'claude-sonnet-5-5' });
+      const runModel = process.env.RIPPER_TEST_PROVIDER
+        ? prompt => runTestProvider({ prompt })
+        : prompt => runClaude({
+          agent: orchAgent,
+          model: 'claude-sonnet-5-5',
+          effort: 'low',
+          prompt: brief,
+          history: [],
+          system: ORCHESTRATOR_SYSTEM,
+          settings: db.settings,
+          ctx: { db }
+        });
+      structure = await orchestrateTeamStructure(brief, { settings: db.settings, runModel });
+      if (!structure) throw new HttpError(422, 'O modelo não devolveu um time válido.');
+      source = 'model';
+    } else {
+      structure = parseTeamBrief(brief);
+      if (!structure) throw new HttpError(422, 'Não foi possível entender o brief. Use lista de agentes ou um bloco JSON.');
+    }
+    const proposal = createTeamProposal(db, { brief, structure, source });
+    save();
+    return proposal;
+  }],
+  ['POST', /^\/api\/team-proposals\/([\w-]+)\/apply$/, async (req, [pid]) => {
+    const b = await body(req);
+    try {
+      const out = applyTeamProposal(db, pid, {
+        createProject: b.createProject !== false,
+        projectName: b.projectName,
+        projectDescription: b.projectDescription
+      });
+      save();
+      return out;
+    } catch (e) {
+      if (e.code === 404) throw new HttpError(404, e.message);
+      if (e.code === 409) throw new HttpError(409, e.message);
+      throw e;
+    }
+  }],
+  ['DELETE', /^\/api\/team-proposals\/([\w-]+)$/, (req, [pid]) => {
+    const i = (db.teamProposals || []).findIndex(x => x.id === pid);
+    if (i < 0) throw new HttpError(404, 'Proposta de time não encontrada.');
+    db.teamProposals.splice(i, 1);
     save();
     return {};
   }],
