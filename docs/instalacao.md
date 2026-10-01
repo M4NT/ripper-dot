@@ -82,6 +82,7 @@ Rotas mutáveis selecionadas aceitam o header opcional **`Idempotency-Key`** (`[
 - Mesma chave com corpo diferente: **409**.
 - **SSE:** a entrada só é finalizada quando o stream termina (`done`); o replay reenvia o SSE completo gravado (não há streaming “ao vivo” na repetição).
 - Requisição idempotente ainda em andamento: **409** (tente de novo em instantes).
+- **Ordem no servidor:** `attachRequestId` → métricas HTTP → `attachHttpTimeout` / `rejectOversizeBody` (#73) → rate limit → handler (idempotência só dentro de `POST /api/chat`, após o 413 por `Content-Length`).
 
 Persistência em `idempotency.sqlite` no mesmo `RIPPER_DATA` (WAL, compatível com vários processos). Só memória/process-local seria insuficiente para reinícios — por isso usamos SQLite como `usage.sqlite`.
 

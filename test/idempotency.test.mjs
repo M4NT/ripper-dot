@@ -204,11 +204,46 @@ test('POST /api/chat com chatId existente respeita idempotência', async () => {
     assert.ok(chatId);
 
     const body = JSON.stringify({ agentId: agent.id, chatId, text: 'continuar', model: 'claude-sonnet-5-5' });
-    const headers = { ...auth, 'content-type': 'application/json', 'idempotency-key': 'resume-idem-01' };
+    const headers = { ...auth, 'content-type': 'application/json', 'idempotency-key': 'chatid-idem-01' };
     await drainSse(await fetch(base + '/api/chat', { method: 'POST', headers, body }));
     await drainSse(await fetch(base + '/api/chat', { method: 'POST', headers, body }));
 
     const chat = await (await fetch(base + `/api/chats/${chatId}`, { headers: auth })).json();
     assert.equal(chat.messages.filter(m => m.role === 'user' && m.content === 'continuar').length, 1);
+  });
+});
+
+test('413 por http-budget ocorre antes da idempotência; replay ecoa X-Request-Id', async () => {
+  await withServer({ RIPPER_MAX_BODY_BYTES: '64' }, async (base, auth) => {
+    const stRes = await fetch(base + '/api/state', { headers: auth });
+    assert.equal(stRes.status, 200);
+    const st = await stRes.json();
+    const agent = st.agents[0];
+    const huge = JSON.stringify({ agentId: agent.id, text: 'x'.repeat(200), model: 'claude-sonnet-5-5' });
+    const headers = {
+      ...auth,
+      'content-type': 'application/json',
+      'idempotency-key': 'budget-before-1',
+      'x-request-id': 'req-413-test-01'
+    };
+    const denied = await fetch(base + '/api/chat', { method: 'POST', headers, body: huge });
+    assert.equal(denied.status, 413);
+
+    const okBody = JSON.stringify({ agentId: agent.id, text: 'a' });
+    const okHeaders = { ...auth, 'content-type': 'application/json', 'idempotency-key': 'budget-before-1' };
+    const r1 = await fetch(base + '/api/chat', { method: 'POST', headers: okHeaders, body: okBody });
+    assert.equal(r1.status, 200);
+    assert.ok(r1.headers.get('x-request-id'));
+    await drainSse(r1);
+
+    const r2 = await fetch(base + '/api/chat', {
+      method: 'POST',
+      headers: { ...okHeaders, 'x-request-id': 'req-replay-02' },
+      body: okBody
+    });
+    assert.equal(r2.status, 200);
+    assert.equal(r2.headers.get('idempotency-replayed'), 'true');
+    assert.equal(r2.headers.get('x-request-id'), 'req-replay-02');
+    await drainSse(r2);
   });
 });
