@@ -465,6 +465,29 @@ test('GET /api/data/backup e restore', async () => {
   });
 });
 
+test('POST /api/team-proposals parse e apply', async () => {
+  await withServer({}, async (base, token) => {
+    const auth = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const created = await fetch(base + '/api/team-proposals', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ brief: 'Time: Demo\n- Analista: olha métricas\n- Redator: escreve resumos' })
+    });
+    assert.equal(created.status, 200);
+    const proposal = await created.json();
+    assert.equal(proposal.structure.agents.length, 2);
+    const applied = await fetch(base + `/api/team-proposals/${proposal.id}/apply`, {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({})
+    });
+    assert.equal(applied.status, 200);
+    const body = await applied.json();
+    assert.equal(body.agents.length, 2);
+    assert.ok(body.project?.id);
+  });
+});
+
 test('RIPPER_LOG_JSON: requisição API emite linhas JSON sem token', async () => {
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-http-log-'));
   const port = await freePort();
