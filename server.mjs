@@ -198,6 +198,13 @@ import {
   stripVaultPlaintextMarker,
   vaultCredentialApiResponse
 } from './lib/connection-vault.mjs';
+import {
+  resolveRetentionSettings,
+  applyRetentionSettingsPatch,
+  runRetentionPurge,
+  startRetentionScheduler,
+  envRetentionOverrides
+} from './lib/retention-ttl.mjs';
 
 installLogRedactionMiddleware();
 
@@ -482,6 +489,7 @@ if (typeof inboxTimer.unref === 'function') inboxTimer.unref();
 repairInboxOnStartup(db.messages);
 save();
 dispatchInbox();
+startRetentionScheduler({ db, save, isStreaming: isChatStreaming });
 
 const gate = new ApprovalGate({
   onChange: rec => {
@@ -1388,6 +1396,21 @@ const routes = [
     const report = await executeLgpdErasure(db, { scope });
     save();
     return { ok: true, scope, report };
+  }],
+  ['GET', /^\/api\/retention$/, () => ({
+    retention: resolveRetentionSettings(db.settings),
+    envOverrides: envRetentionOverrides()
+  })],
+  ['PUT', /^\/api\/retention$/, async req => {
+    const b = await body(req);
+    applyRetentionSettingsPatch(db.settings, b);
+    save();
+    return { retention: resolveRetentionSettings(db.settings) };
+  }],
+  ['POST', /^\/api\/retention\/run$/, async () => {
+    const report = await runRetentionPurge(db, { isStreaming: isChatStreaming, force: true });
+    if (report.changed) save();
+    return report;
   }],
   ['GET', /^\/api\/audit$/, (req, _, url) => ({
     entries: listAudit(db, { limit: +(url.searchParams.get('limit') || 50) })
