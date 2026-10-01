@@ -191,7 +191,10 @@ import {
   migrateLegacySecretsToVault,
   persistOAuthTokensInVault,
   putVaultCredential,
-  vaultConfigured
+  vaultConfigured,
+  isVaultPlaintextResponse,
+  stripVaultPlaintextMarker,
+  vaultCredentialApiResponse
 } from './lib/connection-vault.mjs';
 
 installLogRedactionMiddleware();
@@ -252,8 +255,9 @@ const json = (res, data, code = 200, extra = {}, req = null) => {
   if (req?.requestId && data && typeof data === 'object' && data !== null && 'error' in data) {
     payload = { ...data, requestId: req.requestId };
   }
+  const bodyOut = isVaultPlaintextResponse(payload) ? stripVaultPlaintextMarker(payload) : redactJsonPayload(payload);
   res.writeHead(code, hdr(req, { 'content-type': 'application/json; charset=utf-8', 'cache-control': extra['cache-control'] || 'no-store', ...extra }));
-  res.end(JSON.stringify(redactJsonPayload(payload)));
+  res.end(JSON.stringify(bodyOut));
 };
 function probePayload(extra = {}) {
   return { ok: true, version: APP_PKG.version, uptimeSeconds: Math.floor((Date.now() - SERVER_STARTED_AT) / 1000), ...extra };
@@ -1330,7 +1334,7 @@ const routes = [
     try {
       const cred = getVaultCredential(key, { agentId });
       if (!cred) throw new HttpError(404, 'Credencial não encontrada.');
-      return { key, agentId, credential: cred };
+      return vaultCredentialApiResponse(key, agentId, cred);
     } catch (e) {
       if (e.message?.includes('permissão')) throw new HttpError(403, e.message);
       throw new HttpError(vaultConfigured() ? 400 : 503, e.message);
