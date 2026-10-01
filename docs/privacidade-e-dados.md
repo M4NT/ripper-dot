@@ -30,6 +30,7 @@ Todos os processos Ripper que compartilham o mesmo diretório devem usar o **mes
 | `usage.sqlite` (+ `-wal`, `-shm`) | Até **800** eventos recentes de uso (`recordUsage`); retenção automática por poda |
 | `julia.sqlite` (+ `-wal`, `-shm`) | Até **800** decisões do classificador Julia (telemetria **local** para UI de limites) |
 | `coord.sqlite` | Mutex entre processos Node |
+| `idempotency.sqlite` (+ `-wal`, `-shm`) | Respostas cacheadas para `Idempotency-Key` (TTL `RIPPER_IDEMPOTENCY_TTL_MS`, padrão 24 h) |
 | `sandbox/<agentId>/` | Arquivos e uploads do computador do agente |
 | `shared/` | Compartilhado entre sandboxes Docker |
 | Caminhos em `db.files` | Anexos referenciados pelo banco |
