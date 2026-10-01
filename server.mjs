@@ -1904,7 +1904,10 @@ server.listen(PORT, HOST, () => console.log(`Ripper em http://${HOST === '0.0.0.
 
 registerGracefulShutdown(server, {
   logger,
-  onBeginShutdown: () => clearInterval(routineTimer),
+  onBeginShutdown: () => {
+    clearInterval(routineTimer);
+    shutdownStdioSupervisors().catch(() => {});
+  },
   getActiveConnections: () => activeHttpConnections,
   flush,
   closeStores: () => {
@@ -1963,9 +1966,4 @@ const routineTimer = setInterval(() => {
 if (typeof routineTimer.unref === 'function') routineTimer.unref();
 
 process.on('unhandledRejection', e => console.error('unhandledRejection', ...redactForLog(e?.message || String(e))));
-for (const sig of ['SIGINT', 'SIGTERM']) {
-  process.on(sig, () => {
-    shutdownStdioSupervisors().finally(() => process.exit(0));
-  });
-}
 if (!existsSync(DIST)) console.warn('Aviso: frontend não compilado. Rode `npm run build`.');
