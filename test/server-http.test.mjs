@@ -54,6 +54,60 @@ async function waitFor(url, token, ms) {
   throw new Error('servidor não subiu a tempo');
 }
 
+test('respostas da API incluem cabeçalhos de segurança', async () => {
+  await withServer({}, async (base, token) => {
+    const r = await fetch(base + '/api/health', { headers: { authorization: `Bearer ${token}` } });
+    assert.equal(r.status, 200);
+    assert.equal(r.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(r.headers.get('referrer-policy'), 'no-referrer');
+    assert.equal(r.headers.get('x-frame-options'), 'DENY');
+    assert.ok(r.headers.get('content-security-policy'));
+    assert.equal(r.headers.get('access-control-allow-origin'), null);
+  });
+});
+
+test('CORS: origem na allowlist recebe ACAO; desconhecida nega OPTIONS', async () => {
+  const allowed = 'http://127.0.0.1:5173';
+  await withServer({ RIPPER_CORS_ORIGIN: allowed }, async (base, token) => {
+    const ok = await fetch(base + '/api/health', {
+      headers: { authorization: `Bearer ${token}`, origin: allowed }
+    });
+    assert.equal(ok.status, 200);
+    assert.equal(ok.headers.get('access-control-allow-origin'), allowed);
+
+    const preflight = await fetch(base + '/api/health', {
+      method: 'OPTIONS',
+      headers: { origin: allowed, 'access-control-request-method': 'GET' }
+    });
+    assert.equal(preflight.status, 204);
+    assert.equal(preflight.headers.get('access-control-allow-origin'), allowed);
+
+    const denied = await fetch(base + '/api/health', {
+      method: 'OPTIONS',
+      headers: { origin: 'https://evil.example', 'access-control-request-method': 'GET' }
+    });
+    assert.equal(denied.status, 403);
+    assert.equal(denied.headers.get('access-control-allow-origin'), null);
+  });
+});
+
+test('CORS: POST com origem fora da allowlist retorna 403', async () => {
+  await withServer({ RIPPER_CORS_ORIGIN: 'http://127.0.0.1:5173' }, async (base, token) => {
+    const r = await fetch(base + '/api/settings', {
+      method: 'PUT',
+      headers: {
+        authorization: `Bearer ${token}`,
+        'content-type': 'application/json',
+        origin: 'https://evil.example'
+      },
+      body: JSON.stringify({ name: 'x' })
+    });
+    assert.equal(r.status, 403);
+    const body = await r.json();
+    assert.match(body.error, /Origem não permitida/);
+  });
+});
+
 test('GET /api/health exige RIPPER_TOKEN', async () => {
   await withServer({}, async base => {
     const denied = await fetch(base + '/api/health');
