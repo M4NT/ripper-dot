@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { MetalBadge } from 'metal-fx';
 import { useApp } from '../app.jsx';
 import { api, go, useDark } from '../lib.js';
@@ -14,6 +14,58 @@ export function SaveBar({ dirty, saving, save, reset }) {
       <button className="btn" onClick={reset}>Descartar</button>
       <button className="btn btn-primary" disabled={saving} onClick={() => save()}>{saving ? 'Salvando…' : 'Salvar alterações'}</button>
     </div>
+  );
+}
+
+function DataBackup() {
+  const { refresh, toast } = useApp();
+  const [auto, setAuto] = useState(null);
+  const [busy, setBusy] = useState('');
+  const fileRef = useRef(null);
+  useEffect(() => { api('/api/data/backups').then(r => setAuto(r.auto || [])).catch(() => setAuto([])); }, []);
+  const download = async () => {
+    setBusy('export');
+    try {
+      const snap = await api('/api/data/backup');
+      const blob = new Blob([JSON.stringify(snap, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `ripper-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      toast('Backup baixado (inclui segredos — guarde com cuidado)');
+    } catch (e) { toast(e.message, 'error'); }
+    finally { setBusy(''); }
+  };
+  const restore = async file => {
+    if (!file) return;
+    setBusy('import');
+    try {
+      const text = await file.text();
+      const backup = JSON.parse(text);
+      await api('/api/data/restore', { method: 'POST', body: { confirm: true, backup } });
+      await refresh();
+      toast('Estado restaurado a partir do backup');
+    } catch (e) { toast(e.message, 'error'); }
+    finally { setBusy(''); if (fileRef.current) fileRef.current.value = ''; }
+  };
+  return (
+    <Card title="Backup e restauração" desc="Exporta ou substitui db.json (agentes, conversas, configurações). Arquivos em sandbox/ e usage.sqlite não entram no JSON — copie a pasta RIPPER_DATA inteira para backup completo.">
+      <Row title="Exportar" desc="JSON com chaves de API e tokens OAuth (sensível).">
+        <button type="button" className="btn" disabled={!!busy} onClick={download} aria-busy={busy === 'export'}>{busy === 'export' ? 'Gerando…' : 'Baixar backup'}</button>
+      </Row>
+      <Row title="Restaurar" desc="Grava db.pre-restore.*.backup.json antes de substituir.">
+        <div className="row">
+          <input ref={fileRef} type="file" accept="application/json,.json" aria-label="Arquivo de backup JSON" onChange={e => restore(e.target.files?.[0])} disabled={!!busy} />
+          {busy === 'import' && <span className="muted" role="status">Restaurando…</span>}
+        </div>
+      </Row>
+      {auto?.length > 0 && (
+        <Row title="Backups automáticos" desc="Criados na migração de schema ou antes de restaurar.">
+          <ul className="mono small">{auto.map(n => <li key={n}>{n}</li>)}</ul>
+        </Row>
+      )}
+    </Card>
   );
 }
 
@@ -141,7 +193,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
             <Row title="Ferramentas Ripper" desc="Com o Codex, remember, artefatos, inbox e o resto do MCP ripper vão por stdio (como plugins). WebSearch do Claude e conectores claude.ai não existem no Codex; plugins HTTP MCP funcionam nos dois." />
             <Row title="Apps conectados do ChatGPT" desc="Quando houver suporte."><Switch checked={s.chatgpt.useConnectedApps} onChange={v => set('chatgpt.useConnectedApps', v)} label="Apps do ChatGPT" /></Row>
           </Card>
-          <Card title="Ripper Auto" badge={<><MetalBadge theme={dark ? 'dark' : 'light'}>Julia 1</MetalBadge>{julia !== null && <span className={`tag ${julia ? 'tag-ok' : 'tag-warn'}`}>{julia ? 'no ar' : 'fora do ar'}</span>}</>} desc="A Julia 1 decide rápido e barato, antes do modelo grande: qual modelo usar, quem do time responde, se um comando é arriscado e se uma rotina deve notificar, silenciar ou escalar. Fora do ar, as regras de reserva decidem.">
+          <Card title="Ripper Auto" badge={<><MetalBadge theme={dark ? 'dark' : 'light'}>Julia 1</MetalBadge>{julia === null ? <span className="tag" role="status">Verificando…</span> : <span className={`tag ${julia ? 'tag-ok' : 'tag-warn'}`}>{julia ? 'no ar' : 'fora do ar'}</span>}</>} desc="A Julia 1 decide rápido e barato, antes do modelo grande: qual modelo usar, quem do time responde, se um comando é arriscado e se uma rotina deve notificar, silenciar ou escalar. Fora do ar, as regras de reserva decidem.">
             <Row title="Endereço do Julia 1" desc="Suba com npm run julia."><input className="input" value={s.julia.url} onChange={e => set('julia.url', e.target.value)} /></Row>
           </Card>
         </>}
@@ -162,7 +214,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
             </div>
           </Card>
           {s.computer.mode === 'docker' && (
-            <Card title="Docker" badge={docker === undefined ? null : docker ? <span className="tag tag-ok">Docker {docker} ativo</span> : <span className="tag tag-warn">Docker não encontrado</span>}>
+            <Card title="Docker" badge={docker === undefined ? <span className="tag" role="status">Verificando…</span> : docker ? <span className="tag tag-ok">Docker {docker} ativo</span> : <span className="tag tag-warn">Docker não encontrado</span>} aria-busy={docker === undefined}>
               {docker === null && <p className="form-error">Abra o Docker Desktop e recarregue esta página.</p>}
               <Row title="Imagem de referência" desc="ripper-agent:1 já vem com Chromium, tela virtual (noVNC), Node 22 e Python 3. Criar a VM de um agente leva segundos. Todos ficam na rede ripper-net e compartilham /shared.">
                 <div className="row">{image && <span className={`tag ${image === 'ready' ? 'tag-ok' : 'tag-warn'}`}>{image === 'ready' ? 'pronta' : image === 'building' ? 'construindo…' : 'não construída'}</span>}
@@ -207,6 +259,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
             <Row title="Máximo por agente, por hora"><div className="input-unit"><input className="input" type="number" min={1} max={200} value={s.inbox?.maxPerHour ?? 20} onChange={e => set('inbox', { ...(s.inbox || {}), maxPerHour: +e.target.value })} /><span>mensagens</span></div></Row>
             <Row title="Profundidade máxima de uma troca" desc="Quantas vezes uma resposta pode gerar outra mensagem."><div className="input-unit"><input className="input" type="number" min={1} max={10} value={s.inbox?.maxHops ?? 3} onChange={e => set('inbox', { ...(s.inbox || {}), maxHops: +e.target.value })} /><span>saltos</span></div></Row>
           </Card>
+          <DataBackup />
         </>}
 
         {tab === 'memory' && <>

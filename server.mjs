@@ -25,7 +25,7 @@ import { providerAttemptOrder, runProviderAttemptLoop } from './lib/provider-tur
 import { newHookToken, verifySignature, eventMeta } from './lib/hooks.mjs';
 import { recordUsage, usageSummary, accountLimits, contextBreakdown, checkSendQuota, compactChat, parseProviderLimitFromError, recordProviderSignal } from './lib/usage.mjs';
 import { buildUsageContract, normalizeContextWindow } from './lib/usage-api.mjs';
-import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStreaming } from './lib/chat-stream.mjs';
+import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStreaming, activeChatStreamCount } from './lib/chat-stream.mjs';
 import { exportChatPayload, importChatPayload } from './lib/chat-transfer.mjs';
 import { listAgentTemplates, createSavedTemplate, patchSavedTemplate, agentFromSavedTemplate } from './lib/agent-templates.mjs';
 import { ripperBuiltinSchemaChars, listRipperBuiltinToolNames } from './lib/ripper-builtin-tools.mjs';
@@ -68,6 +68,10 @@ import {
   updatePluginRecord,
   redactPlugin
 } from './lib/mcp-connectors.mjs';
+import { redactRoutine, redactSseEvent, redactJsonPayload, redactForLog } from './lib/redact.mjs';
+import { collectDiagnostics } from './lib/diagnostics.mjs';
+import { buildBackupPayload, restoreBackupPayload, listAutoBackups } from './lib/backup.mjs';
+import { memoAsync } from './lib/ttl-cache.mjs';
 
 function settingsForMcp(s, mcpSession) {
   return settingsForMcpSession(s, mcpSession);
@@ -99,7 +103,10 @@ const SECURITY = {
   'content-security-policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; frame-src http://127.0.0.1:* http://localhost:*; frame-ancestors 'none'; base-uri 'none'"
 };
 
-const json = (res, data, code = 200) => { res.writeHead(code, { ...SECURITY, 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify(data)); };
+const json = (res, data, code = 200, extra = {}) => {
+  res.writeHead(code, { ...SECURITY, 'content-type': 'application/json; charset=utf-8', 'cache-control': extra['cache-control'] || 'no-store', ...extra });
+  res.end(JSON.stringify(redactJsonPayload(data)));
+};
 async function raw(req, limit) {
   const chunks = []; let n = 0;
   for await (const c of req) { n += c.length; if (n > limit) throw new HttpError(413, 'Arquivo grande demais.'); chunks.push(c); }
@@ -175,6 +182,8 @@ const codexInstalled = new Promise(resolve => {
 });
 codexInstalled.then(ok => { if (!ok) console.log('Codex não encontrado: o Ripper Auto usa só o Claude. Instale com: npm i -g @openai/codex'); });
 
+const dockerStatusCached = memoAsync(async () => ({ version: await dockerAvailable(), image: await imageStatus() }), 30_000);
+
 // ---------- mensagens entre agentes ----------
 const inboxBusy = new Set();
 async function deliver(m) {
@@ -201,7 +210,7 @@ async function deliver(m) {
       origin.messages.push({ id: id(), role: 'assistant', agentId: to.id, content: reply.content, model: reply.model, via: { type: 'inbox', from: from.id, messageId: m.id, threadChatId: c.id }, at: Date.now() });
       origin.updatedAt = Date.now(); origin.unread = true;
     }
-  } catch (e) { markInboxDeliveryFailed(m, e.message); console.error('mensagem', e.message); }
+  } catch (e) { markInboxDeliveryFailed(m, e.message); console.error('mensagem', ...redactForLog(e.message)); }
   finally { inboxBusy.delete(m.to); save(); setTimeout(dispatchInbox, 50); }
 }
 function dispatchInbox() {
@@ -523,9 +532,34 @@ async function serveStatic(req, res, file) {
 
 const routes = [
   ['GET', /^\/api\/health$/, () => ({ ok: true })],
+  ['GET', /^\/api\/diagnostics$/, async () => collectDiagnostics({
+    db,
+    settings: db.settings,
+    host: HOST,
+    port: PORT,
+    tokenConfigured: !!TOKEN,
+    frontendBuilt: existsSync(DIST),
+    codexInstalled: () => codexInstalled,
+    juliaStatus: async () => ({ online: await juliaOnline(db.settings), reason: juliaStatus.reason }),
+    dockerProbe: () => dockerStatusCached(),
+    activeChatCount: activeChatStreamCount(),
+    pendingApprovals: db.approvals.filter(a => a.status === 'pending').length
+  })],
+  ['GET', /^\/api\/catalog$/, (req, m, url, res) => {
+    json(res, { models: MODELS, templates: TEMPLATES, categories: CATEGORIES }, 200, { 'cache-control': 'public, max-age=3600' });
+    return undefined;
+  }],
+  ['GET', /^\/api\/data\/backup$/, () => buildBackupPayload(db)],
+  ['GET', /^\/api\/data\/backups$/, () => ({ auto: listAutoBackups() })],
+  ['POST', /^\/api\/data\/restore$/, async req => {
+    const b = await body(req);
+    if (!b.confirm) throw new HttpError(400, 'Envie confirm: true para substituir o estado local.');
+    const payload = b.backup && b.backup.db ? b.backup : b;
+    return restoreBackupPayload(db, payload);
+  }],
   ['GET', /^\/api\/state$/, () => ({
     settings: redact(db.settings), agents: db.agents, models: MODELS, templates: TEMPLATES, savedAgentTemplates: listAgentTemplates(db), categories: CATEGORIES,
-    chats: db.chats.map(summary), routines: db.routines.map(({ hookSecret, ...r }) => ({ ...r, hasSecret: !!hookSecret })),
+    chats: db.chats.map(summary), routines: db.routines.map(redactRoutine),
     files: db.files.map(({ path, ...f }) => f), memoriesCount: db.memories.length, pendingInbox: db.messages.filter(m => m.status === 'queued' || m.status === 'delivering').reduce((o, m) => (o[m.originChatId] = (o[m.originChatId] || 0) + 1, o), {}), approvals: db.approvals.filter(a => a.status === 'pending').map(approvalView), artifacts: db.artifacts.map(({ content, size, blob, ...a }) => ({ ...a, size: size ?? content?.length ?? 0, stored: blob ? 'disk' : 'inline' })),     skills: db.skills, memoriesByAgent: db.memories.reduce((o, x) => (o[x.agentId] = (o[x.agentId] || 0) + 1, o), {}), projects: db.projects,
     usage: usageSummary(db),
     limits: accountLimits(db, db.settings),
@@ -782,7 +816,7 @@ const routes = [
     if (report.files?.removedRecords?.length) save();
     return report;
   }],
-  ['GET', /^\/api\/computer\/docker$/, async () => ({ version: await dockerAvailable(), image: await imageStatus() })],
+  ['GET', /^\/api\/computer\/docker$/, async () => dockerStatusCached()],
   ['POST', /^\/api\/computer\/image$/, async () => { ensureImage().catch(e => console.error('imagem', e.message)); return { image: await imageStatus() }; }],
   ['GET', /^\/api\/agents\/([\w-]+)\/vnc$/, async (req, [aid]) => {
     const a = agentOr404(aid);
@@ -914,7 +948,7 @@ const routes = [
       quiet: b.quiet !== false,
       ...(b.trigger === 'webhook' ? { trigger: 'webhook', hookToken: newHookToken(), hookSecret: String(b.hookSecret || '').slice(0, 200) || undefined }
         : b.everyMinutes ? { everyMinutes: Math.max(5, +b.everyMinutes) } : { dailyAt: /^\d\d:\d\d$/.test(b.dailyAt) ? b.dailyAt : '08:00', weekday: b.weekday ?? undefined }) };
-    db.routines.push(r); save(); return r;
+    db.routines.push(r); save(); return redactRoutine(r);
   }],
   ['DELETE', /^\/api\/routines\/([\w-]+)$/, (req, [rid]) => { db.routines = db.routines.filter(x => x.id !== rid); save(); return {}; }],
   ['GET', /^\/api\/chats$/, (req, _, url) => {
@@ -1036,7 +1070,7 @@ const routes = [
     const fileIds = (b.fileIds || []).filter(fid => db.files.some(f => f.id === fid && agentIds.some(a => canUseFile(f, { id: a }, c))));
     for (const fid of fileIds) { const f = db.files.find(x => x.id === fid); if (f && !f.chatId) f.chatId = c.id; }
     res.writeHead(200, { ...SECURITY, 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store', 'x-accel-buffering': 'no' });
-    const emit = e => res.writable && res.write(`data: ${JSON.stringify(e)}\n\n`);
+    const emit = e => res.writable && res.write(`data: ${JSON.stringify(redactSseEvent(e))}\n\n`);
     emit({ chatId: c.id });
     const clientAc = new AbortController();
     res.on('close', () => { if (!res.writableFinished) clientAc.abort(); });
@@ -1128,7 +1162,7 @@ createServer(async (req, res) => {
     return await serveStatic(req, res, p === '/' ? '/index.html' : p);
   } catch (e) {
     const code = e instanceof HttpError ? e.code : 500;
-    if (code === 500) console.error(e);
+    if (code === 500) console.error(...redactForLog(e?.stack || e?.message || String(e)));
     if (!res.headersSent) json(res, { error: code === 500 ? 'Erro interno. Veja o log do servidor.' : e.message }, code); else res.end();
   }
 }).listen(PORT, HOST, () => console.log(`Ripper em http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`));
@@ -1165,7 +1199,7 @@ function runRoutine(r, event) {
     }
     r.lastChatId = r.lastStatus === 'quiet' ? r.lastChatId : c.id;
     save();
-  }).catch(e => { r.lastStatus = 'failed'; r.lastError = e.message; save(); console.error('rotina', r.name, e.message); })
+  }).catch(e => { r.lastStatus = 'failed'; r.lastError = e.message; save(); console.error('rotina', r.name, ...redactForLog(e.message)); })
     .finally(() => releaseRoutineClaim(r.id));
   return true;
 }
@@ -1175,5 +1209,5 @@ setInterval(() => {
   for (const r of db.routines) if (routineDue(r, now)) runRoutine(r);
 }, 30_000);
 
-process.on('unhandledRejection', e => console.error('unhandledRejection', e));
+process.on('unhandledRejection', e => console.error('unhandledRejection', ...redactForLog(e?.message || String(e))));
 if (!existsSync(DIST)) console.warn('Aviso: frontend não compilado. Rode `npm run build`.');

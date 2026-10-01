@@ -285,7 +285,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
     }
   }
 
-  if (loading) return <div className="page-loading"><ThinkingOrb state="breathing" size={20} /></div>;
+  if (loading) return <div className="page-loading" role="status" aria-live="polite" aria-label="Carregando conversa"><ThinkingOrb state="breathing" size={20} /></div>;
   if (notFound || !agent) return <div className="page"><EmptyState title="Conversa não encontrada" body="Ela pode ter sido apagada." action={<a className="btn" href="#/chats">Ver conversas</a>} /></div>;
 
   const messages = chat?.messages || [];

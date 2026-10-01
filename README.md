@@ -115,3 +115,7 @@ Variáveis opcionais: `RIPPER_PLAN_NAME` (rótulo, não altera fatura), `RIPPER_
 Os dados locais ficam em `data/` (ou em `RIPPER_DATA`), que não é enviado ao Git. O estado principal continua em `db.json`; eventos de uso (`recordUsage`) vão para `usage.sqlite` no mesmo diretório (até ~800 eventos, para cotas locais 5 h/semanal sem inflar o JSON). Decisões do classificador Julia ficam em `julia.sqlite` (mesmo limite). Detalhes, retenção e limpeza opt-in: **[docs/privacidade-e-dados.md](docs/privacidade-e-dados.md)**. Checklist antes de taguear release: **[docs/release.md](docs/release.md)**.
 
 Ao expor o servidor na rede, configure `RIPPER_TOKEN`. O modo de comandos locais exige ativação explícita em Integrações.
+
+**Backup:** em Configurações → Segurança, use *Baixar backup* (`GET /api/data/backup`) para exportar `db.json` com metadados. *Restaurar* (`POST /api/data/restore` com `confirm: true`) substitui o estado em memória e grava `db.pre-restore.<timestamp>.backup.json` antes. Para cópia completa (uploads, `usage.sqlite`, `julia.sqlite`), copie a pasta `RIPPER_DATA` no disco. Migrações de schema criam `db.pre-v2.backup.json` automaticamente.
+
+**Diagnóstico:** `GET /api/diagnostics` (autenticado) devolve contagem real de agentes/conversas, presença dos arquivos de dados e status do Julia/Docker/Codex — sem pontuações inventadas.
