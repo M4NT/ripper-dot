@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, fmtAgo } from './lib.js';
 import { Dialog, Icon, AgentAvatar, EmptyState, Select } from './ui.jsx';
 import { useOv } from './overlay.jsx';
@@ -70,5 +70,38 @@ export function SkillList({ projectId }) {
           </li>
         );
       })}</ul>}
+  </>;
+}
+
+/** Context Pool: scripts que funcionaram, compartilhados entre os agentes (lib/script-pool.mjs). */
+export function ScriptPool() {
+  const { agent, toast } = useApp();
+  const ov = useOv();
+  const [rows, setRows] = useState(null);
+  const [open, setOpen] = useState(null);
+  const load = () => api('/api/scripts').then(r => setRows(r.scripts)).catch(e => { toast(e.message, 'error'); setRows([]); });
+  useEffect(() => { load(); }, []);
+  if (rows === null) return <p className="muted">Carregando scripts…</p>;
+  const remove = async s => {
+    if (!(await ov.confirm({ title: `Apagar o script “${s.task}”?`, body: 'Os agentes deixam de encontrá-lo no pool.', action: 'Apagar', danger: true }))) return;
+    await api(`/api/scripts/${s.id}`, { method: 'DELETE' }); load();
+  };
+  return <>
+    <p className="muted">Scripts que já funcionaram. Antes de escrever código, os agentes procuram aqui; quando um script dá certo, eles guardam. Aprende uma vez, reaproveita sempre.</p>
+    {rows.length === 0 ? <EmptyState title="Nenhum script ainda" body="Aparece aqui quando um agente com computador resolve uma tarefa e guarda o script que funcionou." /> :
+      <ul className="skill-list">{rows.map(s => (
+        <li key={s.id} onContextMenu={e => ov.menu(e, [
+          { label: 'Copiar código', icon: 'copy', onSelect: () => { navigator.clipboard.writeText(s.code); toast('Copiado'); } },
+          { sep: true },
+          { label: 'Apagar script', icon: 'trash', danger: true, onSelect: () => remove(s) }
+        ], s.task)}>
+          <button className="skill-card" onClick={() => setOpen(open === s.id ? null : s.id)} aria-expanded={open === s.id}>
+            <span className="skill-ico"><Icon name="terminal" size={17} /></span>
+            <span className="skill-text"><b>{s.task}</b><small>{s.notes || `${s.lang} · ${s.code.split('\n').length} linhas`}</small>
+              <em>{s.lang} · usado {s.uses}x · {agent(s.agentId) ? <>guardado por {agent(s.agentId).name}</> : 'guardado'} · {fmtAgo(s.updatedAt)}</em></span>
+          </button>
+          {open === s.id && <pre className="script-code"><code>{s.code}</code></pre>}
+        </li>
+      ))}</ul>}
   </>;
 }

@@ -5,7 +5,7 @@ import { api, fmtSize, fmtAgo } from '../lib.js';
 
 import FileThumb from '../fileThumb.jsx';
 import { ArtifactList } from '../actions.jsx';
-import { SkillList } from '../skills.jsx';
+import { SkillList, ScriptPool } from '../skills.jsx';
 const isImage = t => /^image\/(png|jpe?g|webp|gif)$/.test(t);
 
 /** Memória em dois níveis: perfil (estável, sempre no contexto) e registro (datado, só o recente entra). */
@@ -74,7 +74,7 @@ export default function Library() {
   return (
     <div className="page narrow">
       <header className="page-head"><div><h1>Biblioteca</h1><p className="lede">Tudo o que seus agentes guardam e compartilham: artefatos, skills, arquivos, memórias e rotinas.</p></div></header>
-      <Segmented label="Seção" value={tab} onChange={setTab} items={[['artifacts', 'Artefatos', S.artifacts.length], ['skills', 'Skills', S.skills.length], ['messages', 'Mensagens'], ['files', 'Arquivos', files.length], ['memories', 'Memórias', S.memoriesCount], ['routines', 'Rotinas', routines.length]]} className="seg-scroll" />
+      <Segmented label="Seção" value={tab} onChange={setTab} items={[['artifacts', 'Artefatos', S.artifacts.length], ['skills', 'Skills', S.skills.length], ['scripts', 'Scripts'], ['messages', 'Mensagens'], ['files', 'Arquivos', files.length], ['memories', 'Memórias', S.memoriesCount], ['routines', 'Rotinas', routines.length]]} className="seg-scroll" />
       <div className="library">
         {tab === 'files' && (files.length === 0 ? <EmptyState title="Nenhum arquivo" body="Anexe arquivos numa conversa: eles aparecem aqui e ficam no computador do agente." /> :
           <ul className="rows">{files.map(f => (
@@ -88,6 +88,7 @@ export default function Library() {
         {tab === 'memories' && <MemoryTiers memories={memories} setMemories={setMemories} />}
         {tab === 'artifacts' && <ArtifactList items={S.artifacts} empty="Nenhum artefato ainda. Numa conversa, peça: “salve isso como artefato”." />}
         {tab === 'skills' && <SkillList />}
+        {tab === 'scripts' && <ScriptPool />}
         {tab === 'messages' && <MessageLog />}
         {tab === 'routines' && (routines.length === 0 ? <EmptyState title="Nenhuma rotina" body="Crie nas configurações de um agente ou peça no chat: “todo dia às 9, me mande…”." /> :
           <ul className="rows">{routines.map(r => (

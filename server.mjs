@@ -72,6 +72,7 @@ import { checkRunBudget, ToolLoopDetector, tokenBudgetAlertFromCheck } from './l
 import { buildUsageContract, normalizeContextWindow } from './lib/usage-api.mjs';
 import { buildMeteringReport, listMeteringEvents, usageEventsToCsv } from './lib/metering.mjs';
 import { buildTokenRoiContract, routingSummary } from './lib/token-roi.mjs';
+import { listScripts, deleteScript } from './lib/script-pool.mjs';
 import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStreaming, activeChatStreamCount } from './lib/chat-stream.mjs';
 import { beginChatRun, bumpChatRunSeq, finishChatRun, chatRunPublic, canResumeChatRun, trimPartialRepliesAfterLastUser } from './lib/chat-run.mjs';
 import { exportChatPayload, importChatPayload } from './lib/chat-transfer.mjs';
@@ -1672,6 +1673,11 @@ const routes = [
     const result = canDelegate(actor, target, action, db.accessControl, { agents: db.agents });
     if (!result.ok) return { allowed: false, code: result.code, error: result.error };
     return { allowed: true };
+  }],
+  ['GET', /^\/api\/scripts$/, () => ({ scripts: listScripts() })],
+  ['DELETE', /^\/api\/scripts\/(\d+)$/, (req, [sid]) => {
+    if (!deleteScript(sid)) throw new HttpError(404, 'Script não encontrado.');
+    return { ok: true };
   }],
   ['GET', /^\/api\/artifacts\/([\w-]+)\/download$/, async (req, [aid], url, res) => {
     const a = db.artifacts.find(x => x.id === aid);

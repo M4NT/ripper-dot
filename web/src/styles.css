@@ -1488,3 +1488,5 @@ code, .mono, pre { overflow-wrap: anywhere; }
 .roi-row { display: flex; flex-direction: column; gap: 6px; }
 .roi-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .roi-tags .tag b { font-weight: 600; margin-left: 4px; }
+.skill-list li:has(.script-code) { grid-column: 1 / -1; }
+.script-code { margin: 8px 0 0; padding: 12px 14px; max-height: 360px; overflow: auto; border-radius: var(--r); border: 1px solid var(--line); background: var(--chip); font: 12.5px/1.5 var(--mono); white-space: pre; }
