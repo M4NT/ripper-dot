@@ -1271,9 +1271,9 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === 'GET' && p === '/metrics') {
       if (!metricsAccessAllowed(req, TOKEN)) throw new HttpError(401, 'Não autorizado.');
-      const body = formatPrometheusExposition();
-      res.writeHead(200, { ...SECURITY, 'content-type': prometheusContentType(), 'cache-control': 'no-store' });
-      res.end(body);
+      const metricsBody = formatPrometheusExposition();
+      res.writeHead(200, hdr(req, { 'content-type': prometheusContentType(), 'cache-control': 'no-store' }));
+      res.end(metricsBody);
       return;
     }
     const hook = req.method === 'POST' && /^\/api\/hooks\/([a-f0-9]{48})$/.exec(p);
