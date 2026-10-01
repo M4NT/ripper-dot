@@ -1237,6 +1237,8 @@ const routes = [
     save(); return summary(c);
   }],
   ['POST', /^\/api\/chats\/([\w-]+)\/resume$/, async (req, [cid], url, res) => {
+    // Retoma a última pergunta do usuário sem duplicá-la: só quando run.status === interrupted,
+    // remove respostas parciais (stopped/vazias) e reabre o SSE como um POST /api/chat.
     const c = db.chats.find(x => x.id === cid);
     if (!c) throw new HttpError(404, 'Conversa não encontrada.');
     if (isChatStreaming(cid)) throw new HttpError(409, 'Esta conversa já está respondendo.');
