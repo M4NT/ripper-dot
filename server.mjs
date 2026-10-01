@@ -45,7 +45,15 @@ import { canDelegate, delegationDeniedMessage, normalizeAccessControl, accessCon
 import { appendAudit, auditFromApproval, listAudit } from './lib/audit.mjs';
 import { buildAdminOverview } from './lib/admin-overview.mjs';
 import { buildLgpdStatus } from './lib/lgpd-status.mjs';
+import { listAuditTrail, countAuditTrail } from './lib/audit-trail.mjs';
 import { isEnterpriseMode } from './lib/enterprise.mjs';
+import {
+  recordCorporateAudit,
+  auditFromApprovalRecord,
+  auditSettingsPatch,
+  auditAgentLifecycle,
+  auditDataRestore
+} from './lib/corporate-audit.mjs';
 import { newHookToken, verifySignature, eventMeta } from './lib/hooks.mjs';
 import { recordUsage, usageSummary, accountLimits, contextBreakdown, checkSendQuota, compactChat, parseProviderLimitFromError, recordProviderSignal } from './lib/usage.mjs';
 import { checkRunBudget, ToolLoopDetector, tokenBudgetAlertFromCheck } from './lib/token-budget-governor.mjs';
@@ -439,7 +447,10 @@ dispatchInbox();
 
 const gate = new ApprovalGate({
   onChange: rec => {
-    if (rec.status !== 'pending') appendAudit(db, auditFromApproval(rec));
+    if (rec.status !== 'pending') {
+      appendAudit(db, auditFromApproval(rec));
+      recordCorporateAudit(db.settings, auditFromApprovalRecord(rec));
+    }
     save();
   }
 });
@@ -904,6 +915,11 @@ const routes = [
     const b = await body(req);
     if (!b.confirm) throw new HttpError(400, 'Envie confirm: true para substituir o estado local.');
     const payload = b.backup && b.backup.db ? b.backup : b;
+    recordCorporateAudit(db.settings, auditDataRestore({
+      schemaVersion: payload?.db?.schemaVersion,
+      agents: payload?.db?.agents?.length,
+      chats: payload?.db?.chats?.length
+    }));
     return restoreBackupPayload(db, payload);
   }],
   ['GET', /^\/api\/state$/, () => ({
@@ -1204,12 +1220,14 @@ const routes = [
   ['GET', /^\/api\/flags$/, () => ({ flags: effectiveFeatureFlags(db.settings) })],
   ['PUT', /^\/api\/settings$/, async req => {
     const b = await body(req), s = db.settings;
+    const before = structuredClone(s);
     try {
       patchSettings(s, b, { mergePluginAuth });
     } catch (e) {
       if (e instanceof SettingsValidationError) throw new HttpError(400, e.message, e.details);
       throw new HttpError(400, e.message);
     }
+    recordCorporateAudit(s, auditSettingsPatch(before, s, b));
     save();
     configureLogger({ settings: s });
     return redact(s);
@@ -1217,12 +1235,20 @@ const routes = [
   ['GET', /^\/api\/audit$/, (req, _, url) => ({
     entries: listAudit(db, { limit: +(url.searchParams.get('limit') || 50) })
   })],
-  ['GET', /^\/api\/audit-trail$/, (req, _, url) => ({
-    store: 'local',
-    worm: false,
-    entryCount: (db.auditLog || []).length,
-    entries: listAudit(db, { limit: +(url.searchParams.get('limit') || 50) })
-  })],
+  ['GET', /^\/api\/audit-trail$/, (req, _, url) => {
+    if (!isEnterpriseMode(db.settings)) throw new HttpError(403, 'Trilha de auditoria corporativa exige modo enterprise.');
+    const since = +(url.searchParams.get('since') || 0);
+    return {
+      store: 'sqlite',
+      worm: true,
+      enterprise: true,
+      entryCount: countAuditTrail(),
+      entries: listAuditTrail({
+        limit: +(url.searchParams.get('limit') || 50),
+        since: Number.isFinite(since) ? since : 0
+      })
+    };
+  }],
   ['GET', /^\/api\/lgpd\/status$/, () => buildLgpdStatus({ settings: db.settings })],
   ['GET', /^\/api\/admin\/overview$/, () => {
     if (!isEnterpriseMode(db.settings)) throw new HttpError(403, 'Centro admin disponível apenas no modo enterprise.');
@@ -1392,17 +1418,21 @@ const routes = [
       const t = TEMPLATES.find(t => t.id === b.templateId);
       a = patchAgent(newAgent({ ...(t || {}), templateId: t?.id }), b);
     }
-    db.agents.push(a); save(); return a;
+    db.agents.push(a);
+    recordCorporateAudit(db.settings, auditAgentLifecycle('create', a));
+    save(); return a;
   }],
   ['PUT', /^\/api\/agents\/([\w-]+)$/, async (req, [aid]) => {
     const b = await body(req);
     if (b.autonomyLevel) b.autonomyLevel = sanitizeAutonomyLevel(b.autonomyLevel, db.settings);
     const a = patchAgent(agentOr404(aid), b);
+    recordCorporateAudit(db.settings, auditAgentLifecycle('update', a));
     save();
     return a;
   }],
   ['DELETE', /^\/api\/agents\/([\w-]+)$/, async (req, [aid]) => {
     const a = agentOr404(aid);
+    recordCorporateAudit(db.settings, auditAgentLifecycle('delete', a));
     if (db.agents.length === 1) throw new HttpError(409, 'Mantenha pelo menos um agente.');
     browsers.delete(aid);
     clearBoatIdleTimer(aid);
