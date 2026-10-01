@@ -10,7 +10,7 @@ Aplicação local para criar agentes de IA, conversar individualmente ou em grup
 
 ## Claude e Codex: ferramentas Ripper
 
-Os agentes usam o mesmo conjunto de **ferramentas builtin** do Ripper (`remember`, `schedule_routine`, navegador, computador, artefatos, skills, `send_message`, `post_social` / `send_webhook` quando há webhooks configurados) quando o modelo e as permissões do agente permitem:
+Os agentes usam o mesmo conjunto de **ferramentas builtin** do Ripper (`remember`, `schedule_routine`, navegador, computador, artefatos, skills, `call_agent`, `send_message`, `post_social` / `send_webhook` quando há webhooks configurados) quando o modelo e as permissões do agente permitem:
 
 | Capacidade | Claude (Agent SDK) | Codex (CLI `codex exec`) |
 | --- | --- | --- |
