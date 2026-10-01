@@ -195,9 +195,16 @@ function Palette({ open, onClose, toggleTheme }) {
       { g: tr('palette.group.actions'), label: tr('palette.action.toggleTheme'), icon: 'moon', run: toggleTheme },
       { g: tr('palette.group.actions'), label: tr('palette.action.settings'), icon: 'gear', run: () => go('/settings') },
       ...S.agents.map(a => ({ g: tr('palette.group.agents'), label: tr('palette.chatWith', { name: a.name }), agent: a, run: () => go(`/a/${a.id}`) })),
-      ...chats.map(c => ({ g: tr('palette.group.chats'), label: c.title, hint: agent(c.agentId)?.name, icon: 'chat', run: () => go(`/c/${c.id}`) }))
+      // Resultado do servidor já casou no conteúdo da conversa: não pode ser descartado por não estar no título.
+      ...chats.map(c => ({ g: tr('palette.group.chats'), label: c.title, hint: agent(c.agentId)?.name, icon: 'chat', match: chats === chatHits, run: () => go(`/c/${c.id}`) })),
+      ...(term.length >= 2 ? [
+        ...S.artifacts.filter(a => (a.title + ' ' + (a.kind || '')).toLowerCase().includes(term))
+          .map(a => ({ g: 'Artefatos', label: a.title, hint: a.kind, icon: 'file', match: true, run: () => go('/library') })),
+        ...S.skills.filter(k => `${k.name} ${k.description || ''} ${k.content || ''}`.toLowerCase().includes(term))
+          .map(k => ({ g: 'Skills', label: k.name, hint: k.description, icon: 'bolt', match: true, run: () => go('/library') }))
+      ] : [])
     ];
-    return all.filter(x => !term || x.label.toLowerCase().includes(term) || x.hint?.toLowerCase().includes(term)).slice(0, 30);
+    return all.filter(x => !term || x.match || x.label.toLowerCase().includes(term) || x.hint?.toLowerCase().includes(term)).slice(0, 30);
   }, [q, S, agent, toggleTheme, chatHits, enterprise, tr]);
   const listRef = useRef(null);
   useEffect(() => { listRef.current?.querySelector('.on')?.scrollIntoView({ block: 'nearest' }); }, [i]);
