@@ -196,9 +196,11 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
   const [docker, setDocker] = useState(undefined);
   const [image, setImage] = useState(null);
   const [julia, setJulia] = useState(null);
+  const [sandboxSt, setSandboxSt] = useState(null);
   useEffect(() => {
     if (tab === 'computer') api('/api/computer/docker').then(r => { setDocker(r.version); setImage(r.image); }).catch(() => setDocker(null));
     if (tab === 'models') api('/api/julia/status').then(r => setJulia(r.online)).catch(() => setJulia(false));
+    if (tab === 'security') api('/api/sandbox/status').then(setSandboxSt).catch(() => setSandboxSt(null));
   }, [tab]);
   const current = allowedTabs.find(([k]) => k === tab) || allowedTabs[0];
 
@@ -316,6 +318,25 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
         {tab === 'plugins' && <Plugins s={s} set={set} />}
 
         {tab === 'security' && <>
+          <Card
+            title="Sandbox Docker"
+            badge={sandboxSt == null ? <span className="tag" role="status">Verificando…</span> : sandboxSt.ready ? <span className="tag tag-ok">Pronto</span> : <span className="tag tag-warn">Docker ausente</span>}
+            desc="Isola comandos do modo Pasta local em contêiner efêmero (sem privileged, sem rede do host por padrão). Modos Docker e boat.dev já rodam fora do host.">
+            <Row title="Ativar sandbox" desc="Comandos no computador local usam docker run --rm em vez do shell do host.">
+              <Switch checked={!!s.sandbox?.enabled} onChange={v => set('sandbox', { enabled: false, image: 'node:22-alpine', network: 'none', memory: '512m', cpus: '1', timeoutSeconds: 300, ...s.sandbox, enabled: v })} label="Sandbox Docker" />
+            </Row>
+            {s.sandbox?.enabled && (
+              <>
+                {sandboxSt?.fallback && <p className="form-error" role="alert">{sandboxSt.fallback}</p>}
+                <Row title="Imagem" desc="Padrão leve com Node (node:22-alpine)."><input className="input mono" value={s.sandbox?.image || 'node:22-alpine'} onChange={e => set('sandbox', { ...s.sandbox, image: e.target.value })} /></Row>
+                <Row title="Rede" desc="none isola da rede; bridge permite saída (menos seguro).">
+                  <Select label="Rede do contêiner" value={s.sandbox?.network || 'none'} onChange={v => set('sandbox', { ...s.sandbox, network: v })} options={[{ value: 'none', label: 'Nenhuma (recomendado)' }, { value: 'bridge', label: 'Bridge' }]} />
+                </Row>
+                <Row title="Memória / CPUs"><div className="row gap"><input className="input" value={s.sandbox?.memory || '512m'} onChange={e => set('sandbox', { ...s.sandbox, memory: e.target.value })} aria-label="Limite de memória" /><input className="input" value={s.sandbox?.cpus ?? '1'} onChange={e => set('sandbox', { ...s.sandbox, cpus: e.target.value })} aria-label="Limite de CPUs" /></div></Row>
+                <Row title="Timeout por comando"><div className="input-unit"><input className="input" type="number" min={5} max={3600} value={s.sandbox?.timeoutSeconds ?? 300} onChange={e => set('sandbox', { ...s.sandbox, timeoutSeconds: +e.target.value })} /><span>seg</span></div></Row>
+              </>
+            )}
+          </Card>
           <Card title={tr('settings.security.approvalTitle')} desc={tr('settings.security.approvalDesc')}>
             <div className="mode-grid three">
               {[['risky', tr('settings.security.approval.risky'), tr('settings.security.approval.riskyTag'), tr('settings.security.approval.riskyDesc')],
