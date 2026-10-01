@@ -80,7 +80,8 @@ export const SETTINGS_TABS = [
   ['plugins', 'Plugins', 'plug', 'Servidores MCP'],
   ['security', 'Segurança', 'key', 'Aprovações e limites'],
   ['memory', 'Memória', 'brain', 'O que os agentes lembram'],
-  ['appearance', 'Aparência', 'sun', 'Tema e atalhos']
+  ['appearance', 'Aparência', 'sun', 'Tema e atalhos'],
+  ['advanced', 'Avançado', 'layers', 'Enterprise — flags experimentais']
 ];
 
 /** Linha de configuração: rótulo e explicação à esquerda, controle à direita. */
@@ -312,6 +313,27 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
               <div className="set-actions"><button className="btn" onClick={() => go('/library')}><Icon name="book" size={16} />Abrir Biblioteca</button></div>
             </Card>
           )}
+        </>}
+
+        {tab === 'advanced' && <>
+          <Card title="Enterprise" desc="Flags locais desta instalação. Úteis para liberar UI ou APIs experimentais sem trocar de branch.">
+            {(S.meta?.flags?.catalog || []).map(({ key, label, desc }) => (
+              <Row key={key} title={label} desc={desc}>
+                <Switch
+                  checked={s.flags?.[key] === true}
+                  onChange={v => set('flags', { ...(s.flags || {}), [key]: v })}
+                  label={label}
+                />
+              </Row>
+            ))}
+            <Row title="Flags personalizadas" desc="Quando ligado, chaves extras booleanas em settings.flags são preservadas (via API ou backup). A interface só lista as conhecidas.">
+              <Switch
+                checked={s.flags?.allowCustom === true}
+                onChange={v => set('flags', { ...(s.flags || {}), allowCustom: v })}
+                label="Permitir flags personalizadas"
+              />
+            </Row>
+          </Card>
         </>}
 
         {tab === 'appearance' && <>

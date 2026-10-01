@@ -6,7 +6,7 @@ import { gzipSync } from 'node:zlib';
 import { extname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { authed as checkAuth } from './lib/auth.mjs';
-import { load, save, flush, id, newAgent, patchAgent, dataUrl, checkStoreReady } from './lib/store.mjs';
+import { load, save, flush, id, newAgent, patchAgent, dataUrl, safeCheckStoreReady } from './lib/store.mjs';
 import { route, classifySpeaker, MODELS, EFFORTS } from './lib/router.mjs';
 import { computerFor } from './lib/boat.mjs';
 import { dockerAvailable, imageStatus, ensureImage, hostnameOf } from './lib/docker.mjs';
@@ -25,6 +25,7 @@ import { canUseFile, selectSpeakers, routineDue, Floor, isPass, heuristicSpeaker
 import { providerAttemptOrder, runProviderAttemptLoop } from './lib/provider-turn.mjs';
 import { normalizeProviderRetry } from './lib/provider-retry.mjs';
 import { patchSettings, settingsMeta, SettingsValidationError } from './lib/settings-patch.mjs';
+import { effectiveFeatureFlags } from './lib/feature-flags.mjs';
 import { appendAudit, auditFromApproval, listAudit } from './lib/audit.mjs';
 import { buildAdminOverview } from './lib/admin-overview.mjs';
 import { buildLgpdStatus } from './lib/lgpd-status.mjs';
@@ -673,7 +674,8 @@ const routes = [
         providerSnapshot: b.providerSnapshot,
         contextWindow: { ...b.contextWindow, emptyLabel: 'sem dados', available: false, hasData: false }
       };
-    })()
+    })(),
+    meta: settingsMeta()
   })],
   ['GET', /^\/api\/usage$/, async (req, _, url) => {
     const chatId = url.searchParams.get('chatId') || undefined;
@@ -863,6 +865,7 @@ const routes = [
     };
   }],
   ['GET', /^\/api\/settings$/, () => ({ settings: redact(db.settings), meta: settingsMeta() })],
+  ['GET', /^\/api\/flags$/, () => ({ flags: effectiveFeatureFlags(db.settings) })],
   ['PUT', /^\/api\/settings$/, async req => {
     const b = await body(req), s = db.settings;
     try {
@@ -1267,7 +1270,7 @@ const server = createServer(async (req, res) => {
           uptimeSeconds: Math.floor((Date.now() - SERVER_STARTED_AT) / 1000)
         }, 503, {}, req);
       }
-      const ready = checkStoreReady();
+      const ready = safeCheckStoreReady();
       return json(res, ready.ok ? probePayload() : { ok: false, reason: ready.reason, version: APP_PKG.version, uptimeSeconds: Math.floor((Date.now() - SERVER_STARTED_AT) / 1000) }, ready.ok ? 200 : 503, {}, req);
     }
     if (req.method === 'GET' && p === '/api/mcp/oauth/callback') {
