@@ -13,7 +13,10 @@ import { dockerAvailable, imageStatus, ensureImage, hostnameOf } from './lib/doc
 import { sandboxStatus } from './lib/exec-sandbox.mjs';
 import { ApprovalGate } from './lib/approvals.mjs';
 import { juliaOnline, juliaChoose, juliaStatus, measureTriagePromptChars, RISK_OPTIONS, NOTIFY_OPTIONS } from './lib/julia.mjs';
-import { checkSend, dueMessages, threadKey, inboxPrompt, repairInboxOnStartup, markInboxDeliveryFailed, inboxSummary } from './lib/inbox.mjs';
+import {
+  checkSend, dueMessages, threadKey, inboxPrompt, callAgentPrompt, repairInboxOnStartup, markInboxDeliveryFailed, inboxSummary,
+  findAgentByName, clampCallTimeoutMs, interpretInboxReply, formatCallAgentResult, peerAllowed
+} from './lib/inbox.mjs';
 import {
   PROTOCOL_ID,
   delegateTask,
@@ -440,52 +443,70 @@ const dockerStatusCached = memoAsync(async () => ({ version: await dockerAvailab
 const inboxBusy = new Set();
 const inboxLimits = () => ({ maxPerHour: 20, maxHops: 3, ...(db.settings?.inbox || {}) });
 
+/** Entrega uma mensagem/call na thread A2A e roda o turno do destinatário. */
+async function runInboxDelivery(m, { signal } = {}) {
+  const to = db.agents.find(a => a.id === m.to), from = db.agents.find(a => a.id === m.from);
+  if (!to || !from) return { ok: false, error: 'Agente não existe mais.', threadChatId: null };
+  const key = threadKey(from.id, to.id);
+  let c = db.chats.find(x => x.inboxKey === key);
+  if (!c) {
+    c = { id: id(), agentId: to.id, agentIds: [from.id, to.id], inboxKey: key, title: `${from.name} ↔ ${to.name}`, messages: [], createdAt: Date.now(), updatedAt: Date.now() };
+    db.chats.unshift(c);
+  }
+  const prompt = m.kind === 'call'
+    ? callAgentPrompt(m, from.name)
+    : m.protocol?.id === PROTOCOL_ID
+      ? `${m.body}\n\nResponda de forma direta; para delegações use JSON manager-worker na primeira linha (accept, progress, complete ou reject).`
+      : inboxPrompt(m, from.name);
+  c.messages.push({
+    id: id(), role: 'user', content: prompt,
+    inbox: { from: from.id, messageId: m.id, priority: m.priority, kind: m.kind || 'message' },
+    at: Date.now()
+  });
+  const lenBeforeTurn = c.messages.length;
+  await turn({ agent: to, chat: c, text: m.body, prompt, images: [], group: null, hops: m.hops, signal }, () => {});
+  const parsed = interpretInboxReply(c.messages, lenBeforeTurn);
+  c.updatedAt = Date.now(); c.unread = true;
+  m.threadChatId = c.id;
+  m.deliveredAt = Date.now();
+  return { ...parsed, threadChatId: c.id, reply: parsed.ok ? { content: parsed.content, model: parsed.model } : null };
+}
+
 async function deliver(m) {
   const to = db.agents.find(a => a.id === m.to), from = db.agents.find(a => a.id === m.from);
   if (!to || !from) { markInboxDeliveryFailed(m, 'Agente não existe mais.'); save(); return; }
   inboxBusy.add(to.id); m.status = 'delivering'; save();
   try {
-    // A troca entre os dois fica numa conversa própria; o destinatário não vê a conversa de origem.
-    const key = threadKey(from.id, to.id);
-    let c = db.chats.find(x => x.inboxKey === key);
-    if (!c) { c = { id: id(), agentId: to.id, agentIds: [from.id, to.id], inboxKey: key, title: `${from.name} ↔ ${to.name}`, messages: [], createdAt: Date.now(), updatedAt: Date.now() }; db.chats.unshift(c); }
-    const prompt = m.protocol?.id === PROTOCOL_ID
-      ? `${m.body}\n\nResponda de forma direta; para delegações use JSON manager-worker na primeira linha (accept, progress, complete ou reject).`
-      : inboxPrompt(m, from.name);
-    c.messages.push({ id: id(), role: 'user', content: prompt, inbox: { from: from.id, messageId: m.id, priority: m.priority }, at: Date.now() });
-    const before = c.messages.length;
-    await turn({ agent: to, chat: c, text: m.body, prompt, images: [], group: null, hops: m.hops }, () => {});
-    const reply = c.messages.length > before ? c.messages.at(-1) : null;
-    c.updatedAt = Date.now(); c.unread = true;
-    m.threadChatId = c.id; m.deliveredAt = Date.now();
-    if (reply && !reply.error) { m.status = 'delivered'; m.error = null; }
-    else markInboxDeliveryFailed(m, reply?.error || 'Sem resposta do destinatário.');
-    if (reply?.content && m.protocol?.id === PROTOCOL_ID && m.protocol.delegationId && to.id === findDelegation(db, m.protocol.delegationId)?.workerId) {
-      const s = db.settings;
-      const limits = { maxPerHour: 20, maxHops: 3, ...(s.inbox || {}) };
+    const result = await runInboxDelivery(m, {});
+    if (result.ok) { m.status = 'delivered'; m.error = null; }
+    else markInboxDeliveryFailed(m, result.error || 'Sem resposta do destinatário.');
+    if (result.reply?.content && m.protocol?.id === PROTOCOL_ID && m.protocol.delegationId && to.id === findDelegation(db, m.protocol.delegationId)?.workerId) {
+      const limits = { maxPerHour: 20, maxHops: 3, ...(db.settings.inbox || {}) };
       ingestWorkerInboxReply({
         db,
         id,
         worker: to,
         manager: from,
         delegationId: m.protocol.delegationId,
-        replyText: reply.content,
+        replyText: result.reply.content,
         hops: m.hops,
         limits
       });
     }
-    // A resposta volta para onde o pedido nasceu, sem gastar um turno de quem pediu.
     const origin = db.chats.find(x => x.id === m.originChatId);
-    if (origin && reply?.content) {
-      origin.messages.push({ id: id(), role: 'assistant', agentId: to.id, content: reply.content, model: reply.model, via: { type: 'inbox', from: from.id, messageId: m.id, threadChatId: c.id }, at: Date.now() });
+    if (origin && result.reply?.content) {
+      origin.messages.push({
+        id: id(), role: 'assistant', agentId: to.id, content: result.reply.content, model: result.reply.model,
+        via: { type: 'inbox', from: from.id, messageId: m.id, threadChatId: result.threadChatId }, at: Date.now()
+      });
       origin.updatedAt = Date.now(); origin.unread = true;
     }
-    if (reply?.content && !reply.error) {
+    if (result.reply?.content && result.ok) {
       try {
         await closeTaskFromInboxReply({
           db,
           inboxMessage: m,
-          replyText: reply.content,
+          replyText: result.reply.content,
           id,
           limits: inboxLimits(),
           hops: m.hops || 0,
@@ -671,9 +692,9 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
     remember: (t, tier = 'profile') => { if (s.memory) { db.memories.push({ id: id(), agentId: agent.id, text: t, tier: tier === 'log' ? 'log' : 'profile', createdAt: Date.now() }); save(); emit({ memory: t, tier }); } },
     inbox: {
       send: a => {
-        const to = db.agents.find(x => x.name.toLowerCase() === String(a.to).trim().replace(/^@/, '').toLowerCase());
+        const to = findAgentByName(a.to, db.agents);
         const limits = { maxPerHour: 20, maxHops: 3, ...(s.inbox || {}) };
-        const chk = checkSend({ from: agent, to, messages: db.messages, hops: hops + 1, limits });
+        const chk = checkSend({ from: agent, to, messages: db.messages, hops: hops + 1, limits, busyToIds: inboxBusy });
         if (chk.error) return chk.error;
         if (to) {
           const gate = canDelegate(
@@ -692,6 +713,57 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
         if (db.messages.length > 1000) db.messages.splice(0, db.messages.length - 1000);
         save(); emit({ sent: { to: to.name, priority: m.priority } }); setTimeout(dispatchInbox, 50);
         return `Mensagem enviada para ${to.name}${m.priority === 'now' ? ' (urgente)' : ''}. A resposta aparece nesta conversa quando chegar; não espere por ela nem invente o que ${to.name} vai dizer.`;
+      },
+      call: async a => {
+        const to = findAgentByName(a.to, db.agents);
+        const limits = { maxPerHour: 20, maxHops: 3, ...(s.inbox || {}) };
+        const chk = checkSend({ from: agent, to, messages: db.messages, hops: hops + 1, limits, busyToIds: inboxBusy });
+        if (chk.error) return formatCallAgentResult({ ok: false, error: chk.error });
+        if (to) {
+          const gate = canDelegate(
+            { type: 'agent', id: agent.id },
+            { type: 'agent', id: to.id },
+            'send_message',
+            db.accessControl,
+            { agents: db.agents }
+          );
+          const denied = delegationDeniedMessage(gate);
+          if (denied) return formatCallAgentResult({ ok: false, error: denied });
+        }
+        const timeoutMs = clampCallTimeoutMs(a.timeout_seconds, s.inbox || {});
+        const m = {
+          id: id(), from: agent.id, to: to.id, kind: 'call',
+          body: String(a.message).slice(0, 4000), priority: 'now', status: 'delivering',
+          hops: hops + 1, originChatId: chat.id, createdAt: Date.now()
+        };
+        db.messages.push(m);
+        if (db.messages.length > 1000) db.messages.splice(0, db.messages.length - 1000);
+        inboxBusy.add(to.id);
+        save();
+        emit({ callAgent: { to: to.name, timeoutMs } });
+        const ac = new AbortController();
+        const timer = setTimeout(() => ac.abort(), timeoutMs);
+        let result;
+        try {
+          result = await runInboxDelivery(m, { signal: ac.signal });
+          if (result.ok) { m.status = 'delivered'; m.error = null; }
+          else {
+            const err = ac.signal.aborted && !result.error?.includes('interrompida')
+              ? `Tempo esgotado (${Math.round(timeoutMs / 1000)}s) aguardando ${to.name}.`
+              : (result.error || 'Sem resposta do destinatário.');
+            markInboxDeliveryFailed(m, err);
+            result = { ok: false, error: err };
+          }
+        } catch (e) {
+          markInboxDeliveryFailed(m, e.message);
+          result = { ok: false, error: e.message };
+        } finally {
+          clearTimeout(timer);
+          inboxBusy.delete(to.id);
+          save();
+          setTimeout(dispatchInbox, 50);
+        }
+        return formatCallAgentResult(result);
       }
     },
     artifacts: {
@@ -767,7 +839,11 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
     systemPrompt(agent, s, memories),
     await projectContext(project),
     visibleArtifacts(chat).length && `Artefatos do time (leia com read_artifact; salve entregas com save_artifact): ${visibleArtifacts(chat).slice(-20).map(x => `"${x.title}" (${x.kind}, v${x.version})`).join('; ')}`,
-    (() => { const others = db.agents.filter(a => a.id !== agent.id && a.status !== 'paused'); return others.length ? `Colegas para mensagem assíncrona (send_message): ${others.map(a => `${a.name} (${a.description || a.category})`).join('; ')}.` : ''; })(),
+    (() => {
+      const others = db.agents.filter(a => a.id !== agent.id && a.status !== 'paused' && peerAllowed(agent, a));
+      if (!others.length) return '';
+      return `Colegas A2A — call_agent (resposta imediata, espere o retorno) ou send_message (assíncrono, não espere): ${others.map(a => `${a.name} (${a.description || a.category})`).join('; ')}.`;
+    })(),
     visibleSkills(chat).length ? `Skills no banco (use_skill / list_skills): ${visibleSkills(chat).map(k => `${k.name}: ${k.description}`).join(' | ')}` : 'Skills extras podem vir de skills/ ou ~/.cursor/skills-cursor — use list_skills. Quando um passo a passo funcionar, guarde com save_skill.',
     group && [
       `Você trabalha num time: ${group.map(a => `${a.name} (${a.description || a.category})`).join('; ')}.`,

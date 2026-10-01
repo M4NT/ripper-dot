@@ -401,6 +401,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
               <Card title={tr('settings.security.inboxTitle')} desc={tr('settings.security.inboxDesc')}>
                 <Row title="Máximo por agente, por hora"><div className="input-unit"><input className="input" type="number" min={1} max={200} value={s.inbox?.maxPerHour ?? 20} onChange={e => set('inbox', { ...(s.inbox || {}), maxPerHour: +e.target.value })} /><span>mensagens</span></div></Row>
                 <Row title="Profundidade máxima de uma troca" desc="Quantas vezes uma resposta pode gerar outra mensagem (saltos inbox)." tip="Valores altos podem gerar longas cadeias de mensagens automáticas entre agentes."><div className="input-unit"><input className="input" type="number" min={1} max={10} value={s.inbox?.maxHops ?? 3} onChange={e => set('inbox', { ...(s.inbox || {}), maxHops: +e.target.value })} /><span>saltos</span></div></Row>
+                <Row title="Timeout de call_agent" desc="Quanto esperar por uma chamada síncrona entre agentes (5–300 s)."><div className="input-unit"><input className="input" type="number" min={5} max={300} value={s.inbox?.callTimeoutSeconds ?? 120} onChange={e => set('inbox', { ...(s.inbox || {}), callTimeoutSeconds: +e.target.value })} /><span>segundos</span></div></Row>
               </Card>
             </AdvancedBlock>
             <AdvancedBlock settings={s} hint="Chaos / testes de resiliência">
