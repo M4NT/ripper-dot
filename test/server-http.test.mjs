@@ -120,3 +120,58 @@ test('GET /api/usage unifica contrato', async () => {
     assert.equal(body.contextWindow.emptyLabel, 'sem dados');
   });
 });
+
+test('GET /api/diagnostics retorna fatos sem score inventado', async () => {
+  await withServer({}, async (base, token) => {
+    const r = await fetch(base + '/api/diagnostics', { headers: { authorization: `Bearer ${token}` } });
+    assert.equal(r.status, 200);
+    const body = await r.json();
+    assert.equal(body.ok, true);
+    assert.ok(body.data.schemaVersion);
+    assert.equal(body.score, undefined);
+  });
+});
+
+test('GET /api/catalog permite cache público', async () => {
+  await withServer({}, async (base, token) => {
+    const r = await fetch(base + '/api/catalog', { headers: { authorization: `Bearer ${token}` } });
+    assert.equal(r.status, 200);
+    assert.match(r.headers.get('cache-control') || '', /max-age=3600/);
+    const body = await r.json();
+    assert.ok(body.templates?.length);
+  });
+});
+
+test('POST /api/routines não devolve hookSecret', async () => {
+  await withServer({}, async (base, token) => {
+    const auth = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const st = await fetch(base + '/api/state', { headers: auth }).then(r => r.json());
+    const agentId = st.agents[0].id;
+    const r = await fetch(base + '/api/routines', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ agentId, name: 'wh', prompt: 'ping', trigger: 'webhook', hookSecret: 'topsecret' })
+    });
+    assert.equal(r.status, 200);
+    const body = await r.json();
+    assert.equal(body.hasSecret, true);
+    assert.equal(body.hookSecret, undefined);
+  });
+});
+
+test('GET /api/data/backup e restore', async () => {
+  await withServer({}, async (base, token) => {
+    const auth = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const snap = await fetch(base + '/api/data/backup', { headers: auth }).then(r => r.json());
+    assert.equal(snap.format, 1);
+    snap.db.settings.name = 'restaurado-teste';
+    const res = await fetch(base + '/api/data/restore', {
+      method: 'POST',
+      headers: auth,
+      body: JSON.stringify({ confirm: true, backup: snap })
+    });
+    assert.equal(res.status, 200);
+    const st = await fetch(base + '/api/state', { headers: auth }).then(r => r.json());
+    assert.equal(st.settings.name, 'restaurado-teste');
+  });
+});
