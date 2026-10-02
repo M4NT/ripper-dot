@@ -58,7 +58,7 @@ export function WhatsappWebPanel({ w, setW, Row }) {
   return <>
     <div className="wa-risk">
       <Icon name="key" size={16} />
-      <p><b>Conexão não oficial.</b> A sessão lida pelo QR dá controle total do número, e a Meta pode banir números que usam cliente não oficial. Por isso o agente <b>só responde números da lista</b>, nunca inicia conversa, tem limite por hora e roda sem computador, navegador e plugins. Use um número dedicado ao atendimento.</p>
+      <p><b>Conexão não oficial.</b> A sessão lida pelo QR dá controle total do número, e a Meta pode banir números que usam cliente não oficial. Por isso o agente só responde sozinho quem você liberar, rascunha para aprovação o resto, tem limite por hora e roda sem computador, navegador e plugins. Use um número dedicado ao atendimento.</p>
     </div>
     <Row title="Conexão" desc={st?.docker === false ? 'O Docker precisa estar rodando.' : 'A Evolution roda no Docker, presa a esta máquina (127.0.0.1); a chave dela nunca sai do servidor.'}>
       <div className="row wa-conn">
@@ -83,10 +83,55 @@ export function WhatsappWebPanel({ w, setW, Row }) {
     <Row title="Agente que responde" desc="Neste canal ele roda sem computador, navegador, plugins e rotinas.">
       <Select label="Agente do WhatsApp por QR" value={w.agentId || ''} onChange={v => setW('agentId', v)} options={S.agents.map(a => ({ value: a.id, label: a.name }))} />
     </Row>
-    <Row title="Números permitidos" desc="Um por linha, com DDI e DDD (ex.: +55 11 98888-7777). Quem não está aqui é ignorado e a mensagem não é guardada." stack>
+    <Row title="Ler conversas" desc="Opt-in. Guarda no Ripper (não na Evolution) as conversas individuais, nunca grupos, por 30 dias. O agente passa a ler histórico e contatos, aprende o seu jeito de escrever com as SUAS mensagens e escreve rascunhos para contatos novos. Cada leitura vai para a auditoria.">
+      <Switch checked={!!w.readAll} onChange={async v => {
+        if (v && !(await ov.confirm({ title: 'Ler todas as conversas?', body: 'As conversas individuais deste número passam a ser guardadas nesta máquina por 30 dias e podem ser lidas pelo agente (o texto vai para o modelo de IA). São dados dos seus contatos: use para atendimento do seu negócio e apague quando não precisar mais.', action: 'Ligar leitura' }))) return;
+        setW('readAll', v);
+      }} label="Ler todas as conversas" />
+    </Row>
+    {w.readAll && st?.history && (
+      <div className="wa-history">
+        <span><b>{st.history.contacts}</b> contatos · <b>{st.history.messages}</b> mensagens guardadas{st.styleFrom ? <> · estilo aprendido com <b>{st.styleFrom}</b> mensagens suas</> : ' · o estilo aparece depois de 5 mensagens suas'}</span>
+        <button type="button" className="btn btn-sm btn-danger" onClick={async () => {
+          if (!(await ov.confirm({ title: 'Apagar o histórico do WhatsApp?', body: 'Apaga mensagens e contatos guardados e as conversas do WhatsApp no Ripper. A conexão continua.', action: 'Apagar histórico', danger: true }))) return;
+          await api('/api/whatsapp-web/history', { method: 'DELETE' }); await load(); toast('Histórico apagado');
+        }}>Apagar histórico</button>
+      </div>
+    )}
+    {w.readAll && <ContactModes w={w} setW={setW} Row={Row} />}
+    <Row title="Responde sozinho" desc="Um número por linha, com DDI e DDD (ex.: +55 11 98888-7777). Sem a leitura ligada, quem não está aqui é ignorado e a mensagem não é guardada." stack>
       <textarea className="input wa-allow" rows={4} value={(w.allowlist || []).join('\n')} placeholder={'+55 11 98888-7777\n+55 21 97777-6666'}
         onChange={e => setW('allowlist', e.target.value.split('\n'))} />
       <small className="muted">{(w.allowlist || []).filter(n => n.replace(/\D/g, '').length >= 10).length} número(s) válido(s)</small>
     </Row>
   </>;
+}
+
+const MODES = [
+  { value: 'auto', label: 'Responde sozinho' },
+  { value: 'draft', label: 'Rascunho para aprovar' },
+  { value: 'read', label: 'Só lê' }
+];
+
+/** Autonomia por contato. Contato novo começa em rascunho; a escolha aqui vence a lista "Responde sozinho". */
+function ContactModes({ w, setW, Row }) {
+  const [q, setQ] = useState('');
+  const [rows, setRows] = useState(null);
+  useEffect(() => {
+    const t = setTimeout(() => api(`/api/whatsapp-web/contacts?q=${encodeURIComponent(q)}`).then(r => setRows(r.contacts)).catch(() => setRows([])), 250);
+    return () => clearTimeout(t);
+  }, [q]);
+  const setMode = (phone, mode) => setW('contactModes', { ...(w.contactModes || {}), [phone]: mode });
+  return (
+    <Row title="Contatos" desc="Como o agente age com cada um. Novos começam em rascunho: ele escreve, você aprova na bandeja de aprovações." stack>
+      <label className="search-field"><Icon name="search" size={16} /><input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar por nome ou número" aria-label="Buscar contato" /></label>
+      {rows === null ? <p className="muted small">Carregando…</p> : rows.length === 0 ? <p className="muted small">Nenhum contato ainda: aparecem conforme as mensagens chegam.</p> :
+        <ul className="wa-contacts">{rows.map(c => (
+          <li key={c.phone}>
+            <span className="grow"><b>{c.name || 'Sem nome'}</b><small className="muted">+{c.phone}</small></span>
+            <Select label={`Modo de ${c.name || c.phone}`} size="sm" value={(w.contactModes || {})[c.phone] || c.mode || 'draft'} onChange={v => setMode(c.phone, v)} options={MODES} />
+          </li>
+        ))}</ul>}
+    </Row>
+  );
 }

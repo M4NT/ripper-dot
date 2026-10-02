@@ -12,7 +12,7 @@ import { computerFor } from './lib/boat.mjs';
 import { dockerAvailable, imageStatus, ensureImage, hostnameOf } from './lib/docker.mjs';
 import { sandboxStatus } from './lib/exec-sandbox.mjs';
 import { ApprovalGate } from './lib/approvals.mjs';
-import { autoStartJulia, juliaOnline, juliaChoose, juliaStatus, measureTriagePromptChars, RISK_OPTIONS, NOTIFY_OPTIONS, MEMORY_OPTIONS } from './lib/julia.mjs';
+import { autoStartJulia, juliaOnline, juliaChoose, juliaStatus, measureTriagePromptChars, RISK_OPTIONS, NOTIFY_OPTIONS, MEMORY_OPTIONS, REPLY_OPTIONS } from './lib/julia.mjs';
 import {
   checkSend, dueMessages, threadKey, inboxPrompt, callAgentPrompt, repairInboxOnStartup, markInboxDeliveryFailed, inboxSummary,
   findAgentByName, clampCallTimeoutMs, interpretInboxReply, formatCallAgentResult, peerAllowed
@@ -74,7 +74,8 @@ import { buildMeteringReport, listMeteringEvents, usageEventsToCsv } from './lib
 import { buildTokenRoiContract, routingSummary } from './lib/token-roi.mjs';
 import { listScripts, deleteScript } from './lib/script-pool.mjs';
 import { parseWhatsappMessages, whatsappPrompt, sendWhatsappText, whatsappReady } from './lib/whatsapp.mjs';
-import { evolutionSecrets, connectInstance, instanceState, disconnectInstance, sendText as sendEvolutionText, parseEvolutionMessage, isAllowed, makeRateLimiter, channelSafeAgent } from './lib/evolution.mjs';
+import { evolutionSecrets, connectInstance, instanceState, disconnectInstance, sendText as sendEvolutionText, parseEvolutionAny, contactMode, isAllowed, makeRateLimiter, channelSafeAgent } from './lib/evolution.mjs';
+import { recordMessage as recordWaMessage, listChats as waListChats, readChat as waReadChat, findContacts as waFindContacts, styleProfile as waStyleProfile, styleHint, stats as waStats, wipeHistory as waWipeHistory } from './lib/whatsapp-store.mjs';
 import { timingSafeEqual } from 'node:crypto';
 import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStreaming, activeChatStreamCount } from './lib/chat-stream.mjs';
 import { beginChatRun, bumpChatRunSeq, finishChatRun, chatRunPublic, canResumeChatRun, trimPartialRepliesAfterLastUser } from './lib/chat-run.mjs';
@@ -529,10 +530,14 @@ const waWebSeen = new Set();
 const waWebRate = makeRateLimiter({ perContact: 20, global: 60 });
 async function handleWhatsappWebMessage(msg) {
   const w = db.settings.whatsappWeb || {};
-  if (!w.enabled || !isEnterpriseMode(db.settings)) return;
+  if (!isEnterpriseMode(db.settings)) return;
   if (waWebSeen.has(msg.id)) return;
   waWebSeen.add(msg.id); if (waWebSeen.size > 500) waWebSeen.delete(waWebSeen.values().next().value);
-  if (!isAllowed(msg.from, w.allowlist)) return;
+  // Opt-in "Ler conversas": guarda tudo das conversas individuais (inclusive o que você mandou do celular).
+  if (w.readAll) recordWaMessage({ id: msg.id, phone: msg.from, fromMe: msg.fromMe, text: msg.text, name: msg.name, at: msg.at });
+  if (msg.fromMe || !w.enabled) return; // mensagem sua não gera resposta; "Responder mensagens" desligado também não
+  const mode = contactMode(msg.from, w);
+  if (!mode || mode === 'read') return; // fora da lista sem leitura ligada: nem guarda; "só lê": guardado acima
   const agent = db.agents.find(a => a.id === w.agentId);
   if (!agent) throw new Error('Agente do WhatsApp (QR) não existe mais.');
   const key = `waweb:${msg.from}`;
@@ -544,12 +549,27 @@ async function handleWhatsappWebMessage(msg) {
   c.messages.push({ id: id(), role: 'user', content: msg.text, via: { type: 'whatsapp-web', from: msg.from, messageId: msg.id }, at: Date.now() });
   c.updatedAt = Date.now(); c.unread = true;
   if (w.paused) { save(); return; } // pausado: registra, ninguém responde
+  // Rascunho: a Julia decide antes se precisa de resposta ("ok 👍" não precisa) — não gasta o modelo à toa.
+  if (mode === 'draft') {
+    const j = await juliaChoose(db.settings, { context: 'Mensagem recebida no WhatsApp do usuário.', question: msg.text, options: REPLY_OPTIONS }, { minScore: 0.6, purpose: 'whatsapp_reply' });
+    if (j && j.index === 1) { save(); return; }
+  }
   if (!waWebRate(msg.from)) { c.messages.push({ id: id(), role: 'assistant', agentId: agent.id, content: '', stopped: true, stopReason: 'rate_limit', at: Date.now() }); save(); return; }
   const before = c.messages.length;
-  await turn({ agent: channelSafeAgent(agent), chat: c, text: msg.text, prompt: whatsappPrompt(msg), images: [], group: null }, () => {});
+  const prompt = whatsappPrompt(msg) + (w.readAll ? styleHint(waStyleProfile()) : '');
+  await turn({ agent: channelSafeAgent(agent), chat: c, text: msg.text, prompt, images: [], group: null }, () => {});
   const reply = c.messages.slice(before).findLast(m => m.role === 'assistant' && m.content && !m.stopped);
   c.updatedAt = Date.now(); save();
-  if (reply) await sendEvolutionText(msg.from, reply.content);
+  if (!reply) return;
+  if (mode === 'draft') {
+    // Fica na bandeja de aprovações; só sai se você aprovar (expira sem resposta = não envia).
+    const ok = await askApproval({ agent, chat: c, emit: () => {}, signal: null }, 'whatsapp', `Para ${msg.name || ''} +${msg.from}:
+${reply.content}`, 'Rascunho de resposta no seu WhatsApp.', false);
+    reply.draft = ok ? 'sent' : 'discarded'; save();
+    if (!ok) return;
+  }
+  await sendEvolutionText(msg.from, reply.content);
+  if (w.readAll) recordWaMessage({ id: `out-${reply.id}`, phone: msg.from, fromMe: true, text: reply.content });
 }
 
 async function deliver(m) {
@@ -908,12 +928,31 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
     // Enviar WhatsApp pela API conectada (QR/Evolution ou Meta) — nunca pelo navegador.
     // Só em conversa sua com o agente (não em conversa de canal externo) e sempre com a sua aprovação.
     // Enviar não depende de 'Responder mensagens' (resposta automática): basta o QR com lista de números, ou a API oficial pronta.
-    whatsapp: !chat.channel && isEnterpriseMode(s) && (s.whatsappWeb?.allowlist?.length || whatsappReady(s.whatsapp)) ? {
+    whatsapp: !chat.channel && isEnterpriseMode(s) && (s.whatsappWeb?.allowlist?.length || s.whatsappWeb?.readAll || whatsappReady(s.whatsapp)) ? {
+      // Leitura (opt-in "Ler conversas"): cada leitura vai para a auditoria.
+      canRead: !!s.whatsappWeb?.readAll,
+      chats: a => {
+        recordCorporateAudit(db.settings, { category: 'whatsapp', action: 'whatsapp.list_chats', agentId: agent.id, chatId: chat.id, at: Date.now() });
+        const rows = waListChats(a.limit);
+        return rows.length ? rows.map(r => `+${r.phone}${r.name ? ` (${r.name})` : ''} · ${new Date(r.lastAt).toLocaleString('pt-BR')}${r.unread ? ` · ${r.unread} não lida(s)` : ''} · "${String(r.last || '').slice(0, 80)}"`).join(String.fromCharCode(10)) : 'Nenhuma conversa guardada ainda (só a partir de quando a leitura foi ligada).';
+      },
+      read: a => {
+        const typed = String(a.contact || '').replace(/\D/g, '');
+        const phone = typed.length >= 10 ? typed : waFindContacts(a.contact, 1)[0]?.phone;
+        if (!phone) return `Contato "${a.contact}" não encontrado.`;
+        recordCorporateAudit(db.settings, { category: 'whatsapp', action: 'whatsapp.read_chat', agentId: agent.id, chatId: chat.id, at: Date.now() });
+        const rows = waReadChat(phone, a.limit);
+        return rows.length ? rows.map(r => `[${new Date(r.at).toLocaleString('pt-BR')}] ${r.fromMe ? 'Você' : 'Contato'}: ${r.text}`).join(String.fromCharCode(10)) : 'Sem mensagens guardadas com esse contato.';
+      },
+      contacts: a => {
+        const rows = waFindContacts(a.query, a.limit);
+        return rows.length ? rows.map(r => `+${r.phone}${r.name ? ` — ${r.name}` : ''}`).join(String.fromCharCode(10)) : 'Nenhum contato encontrado.';
+      },
       send: async a => {
         const to = String(a.to || '').replace(/\D/g, ''), msgText = String(a.text || '').trim();
         if (to.length < 10 || !msgText) return 'Informe o número com DDI e DDD (ex.: +55 16 99999-9999) e o texto.';
         const viaQr = !!s.whatsappWeb?.allowlist?.length;
-        if (viaQr && !isAllowed(to, s.whatsappWeb.allowlist)) return `+${to} não está na lista de números permitidos do WhatsApp (Configurações → Plugins → Canal WhatsApp). Nada foi enviado.`;
+        if (viaQr && !contactMode(to, s.whatsappWeb)) return `+${to} não está na lista de números permitidos do WhatsApp (Configurações → Plugins → Canal WhatsApp). Nada foi enviado.`;
         const ok = await askApproval({ agent, chat, emit, signal }, 'whatsapp', `Para +${to}:\n${msgText}`, 'A mensagem sai no WhatsApp em seu nome.', false);
         if (!ok) return 'O usuário NÃO aprovou o envio. Nada foi enviado.';
         try { viaQr ? await sendEvolutionText(to, msgText) : await sendWhatsappText(s.whatsapp, to, msgText); }
@@ -1758,7 +1797,20 @@ const routes = [
   // WhatsApp por QR: só admin enterprise; segredos da Evolution nunca saem daqui.
   ['GET', /^\/api\/whatsapp-web\/status$/, async () => {
     requireEnterpriseAdmin();
-    return { state: await instanceState().catch(() => 'unknown'), docker: await dockerAvailable() };
+    const style = waStyleProfile();
+    return { state: await instanceState().catch(() => 'unknown'), docker: await dockerAvailable(), history: waStats(), styleFrom: style?.count || 0 };
+  }],
+  ['GET', /^\/api\/whatsapp-web\/contacts$/, (req, _, url) => {
+    requireEnterpriseAdmin();
+    const w = db.settings.whatsappWeb || {};
+    return { contacts: waFindContacts(url.searchParams.get('q') || '', 100).map(c => ({ ...c, mode: contactMode(c.phone, w) })) };
+  }],
+  ['DELETE', /^\/api\/whatsapp-web\/history$/, () => {
+    requireEnterpriseAdmin();
+    waWipeHistory();
+    db.chats = db.chats.filter(c => c.channel !== 'whatsapp-web'); save();
+    recordCorporateAudit(db.settings, { category: 'whatsapp', action: 'whatsapp_web.history_wiped', at: Date.now() });
+    return { ok: true };
   }],
   ['POST', /^\/api\/whatsapp-web\/connect$/, async () => {
     requireEnterpriseAdmin();
@@ -1771,6 +1823,7 @@ const routes = [
     requireEnterpriseAdmin();
     const { wipe } = await body(req).catch(() => ({}));
     await disconnectInstance({ wipe: wipe === true });
+    if (wipe === true) { waWipeHistory(); db.chats = db.chats.filter(c => c.channel !== 'whatsapp-web'); }
     db.settings.whatsappWeb = { ...(db.settings.whatsappWeb || {}), enabled: false }; save();
     recordCorporateAudit(db.settings, { category: 'whatsapp', action: wipe ? 'whatsapp_web.wiped' : 'whatsapp_web.disconnected', at: Date.now() });
     return { ok: true };
@@ -2388,7 +2441,7 @@ const server = createServer(async (req, res) => {
       if (ev?.event === 'connection.update' && ev.data?.state) {
         recordCorporateAudit(db.settings, { category: 'whatsapp', action: `whatsapp_web.${ev.data.state}`, at: Date.now() });
       }
-      const msg = parseEvolutionMessage(ev);
+      const msg = parseEvolutionAny(ev);
       if (msg) handleWhatsappWebMessage(msg).catch(e => console.error('whatsapp-web', ...redactForLog(db.settings, e.message)));
       return json(res, { ok: true }, 200, {}, req);
     }

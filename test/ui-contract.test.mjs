@@ -40,3 +40,10 @@ test('sem notas internas de PR em texto visível', () => {
     .map(([, n]) => `${f.p}:${n}`));
   assert.deepEqual(bad, []);
 });
+
+test('nenhuma regex com a barra engolida (ex.: /D/g no lugar de /\D/g)', () => {
+  const root = fileURLToPath(new URL('../', import.meta.url));
+  const srcs = [join(root, 'server.mjs'), ...readdirSync(join(root, 'lib')).filter(n => n.endsWith('.mjs')).map(n => join(root, 'lib', n)), ...files().filter(p => !p.endsWith('.css'))];
+  const bad = srcs.flatMap(p => [...readFileSync(p, 'utf8').matchAll(/\.replace\(\/[DWSdws]\/g/g)].map(() => p.slice(root.length)));
+  assert.deepEqual(bad, [], 'replace(/D/g) apaga a letra D, não os não-dígitos');
+});

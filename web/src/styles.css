@@ -1501,3 +1501,10 @@ code, .mono, pre { overflow-wrap: anywhere; }
 .wa-qr ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; color: var(--ink-2); }
 .wa-allow { width: 100%; font: 13px/1.5 var(--mono); }
 @media (max-width: 640px) { .wa-qr { flex-direction: column; } }
+.wa-history { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 10px 14px; margin: 4px 0; border-radius: var(--r); background: var(--chip); font-size: 13px; color: var(--ink-2); }
+.wa-contacts { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; max-height: 360px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--r); }
+.wa-contacts li { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.wa-contacts li:last-child { border-bottom: 0; }
+.wa-contacts li .grow { display: flex; flex-direction: column; min-width: 0; }
+.wa-contacts .select-wrap { min-width: 190px; }
+.wa-allow-wrap { display: flex; flex-direction: column; gap: 6px; width: 100%; }
