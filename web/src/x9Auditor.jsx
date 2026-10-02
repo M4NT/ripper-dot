@@ -67,7 +67,7 @@ export default function X9AuditorCard({ compact }) {
 
 export function X9MarketplaceTeaser() {
   return (
-    <a href="#/settings?tab=security" className="market-teaser x9-teaser">
+    <a href="#/settings/security" className="market-teaser x9-teaser">
       <Icon name="key" size={20} />
       <span><b>X9 — Auditor</b><small>Varredura de conformidade integrada (modo empresa)</small></span>
       <Icon name="arrowR" size={16} />

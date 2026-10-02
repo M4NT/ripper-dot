@@ -3,6 +3,7 @@ import { MetalFx } from 'metal-fx';
 import { go, local, useDark } from '../lib.js';
 import { AgentAvatar, Icon, Menu, Dialog } from '../ui.jsx';
 import { useApp } from '../app.jsx';
+import { isEnterpriseMode } from '../uiMode.js';
 import AgentCard, { NewAgentCard } from '../agentCard.jsx';
 import Composer from '../composer.jsx';
 import { sessionPayload } from '../marketplace/sessionMcp.js';
@@ -87,6 +88,7 @@ export default function Home() {
   const current = agent(agentId) || S.agents[0];
   const [choice, setChoice] = useState({ model: current.model || S.settings.defaultModel, effort: current.effort || 'auto' });
   const dark = useDark();
+  const enterprise = isEnterpriseMode(S.settings);
 
   function start({ text, fileIds }) {
     // A conversa nasce na tela de chat; a mensagem vai junto.
@@ -138,7 +140,7 @@ export default function Home() {
       </section>
 
       <section className="section">
-        <header className="section-head"><h2>Templates</h2><a href="#/explore" className="link">Ver todos<Icon name="arrowR" size={16} /></a></header>
+        <header className="section-head"><h2>Templates</h2><a href={enterprise ? '#/explore' : '#/new'} className="link">Ver todos<Icon name="arrowR" size={16} /></a></header>
         <div className="template-row">
           {S.templates.slice(0, 4).map(t => (
             <a key={t.id} href={`#/new?template=${t.id}`} className="template-line">
