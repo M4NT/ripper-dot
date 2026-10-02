@@ -1490,3 +1490,14 @@ code, .mono, pre { overflow-wrap: anywhere; }
 .roi-tags .tag b { font-weight: 600; margin-left: 4px; }
 .skill-list li:has(.script-code) { grid-column: 1 / -1; }
 .script-code { margin: 8px 0 0; padding: 12px 14px; max-height: 360px; overflow: auto; border-radius: var(--r); border: 1px solid var(--line); background: var(--chip); font: 12.5px/1.5 var(--mono); white-space: pre; }
+/* Canal WhatsApp: abas API/QR, aviso de risco e QR */
+.wa-mode { margin: 4px 0 8px; }
+.wa-risk { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; margin: 8px 0 4px; border: 1px solid var(--line); border-radius: var(--r); background: var(--chip); }
+.wa-risk p { margin: 0; font-size: 13px; color: var(--ink-2); }
+.wa-risk .icon { flex: none; margin-top: 2px; color: var(--muted); }
+.wa-conn { flex-wrap: wrap; gap: 8px; align-items: center; }
+.wa-qr { display: flex; gap: 20px; align-items: center; padding: 16px; margin: 8px 0; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
+.wa-qr img { flex: none; border-radius: var(--r); background: #fff; padding: 8px; }
+.wa-qr ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; color: var(--ink-2); }
+.wa-allow { width: 100%; font: 13px/1.5 var(--mono); }
+@media (max-width: 640px) { .wa-qr { flex-direction: column; } }

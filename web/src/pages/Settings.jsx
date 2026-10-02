@@ -2,8 +2,9 @@ import { useEffect, useState, useRef } from 'react';
 import { MetalBadge } from 'metal-fx';
 import { useApp } from '../app.jsx';
 import { useOv } from '../overlay.jsx';
+import { WhatsappWebPanel } from '../whatsappWeb.jsx';
 import { api, apiUpload, go, useDark, brandLogoSrc, TONES, FORMALITIES } from '../lib.js';
-import { Icon, Switch, Select, EmptyState } from '../ui.jsx';
+import { Icon, Switch, Select, EmptyState, Segmented } from '../ui.jsx';
 import { AdvancedBlock, HelpTip } from '../disclosure.jsx';
 import { ApprovalHistory } from '../approvals.jsx';
 import { MODEL_DESC, EffortScale, EFFORTS } from '../modelPicker.jsx';
@@ -249,6 +250,7 @@ function Plugins({ s, set }) {
 export default function Settings({ theme, toggleTheme, tab: initial }) {
   const { S, refresh, toast } = useApp();
   const ov = useOv();
+  const [waMode, setWaMode] = useState('api');
   const tr = useT();
   const SETTINGS_TABS = settingsTabs(tr);
   const d = useSettingsDraft();
@@ -419,7 +421,10 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
           const setW = (k, v) => set('whatsapp', { ...w, [k]: v });
           const hook = `${location.origin}/api/channels/whatsapp/webhook`;
           return (
-            <Card title="Canal WhatsApp" desc="Um agente responde quem escreve no seu número do WhatsApp Business (API oficial da Meta, WhatsApp Cloud API). Cada contato vira uma conversa aqui, que você acompanha e pode assumir.">
+            <Card title="Canal WhatsApp" desc="Um agente responde quem escreve no seu WhatsApp. Cada contato vira uma conversa aqui, que você acompanha e pode assumir.">
+              <Segmented label="Tipo de conexão" value={waMode} onChange={setWaMode} size="sm" className="wa-mode"
+                items={[['api', 'API oficial (Meta)'], ['qr', 'WhatsApp Web (QR)']]} />
+              {waMode === 'qr' ? <WhatsappWebPanel w={s.whatsappWeb || {}} setW={(k, v) => set('whatsappWeb', { ...(s.whatsappWeb || {}), [k]: v })} Row={Row} /> : <>
               <Row title="Ativar canal" desc="Desligado, o webhook responde 404 e nada é enviado.">
                 <Switch checked={!!w.enabled} onChange={v => setW('enabled', v)} label="Ativar canal WhatsApp" />
               </Row>
@@ -433,6 +438,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
               <Row title="URL do webhook" desc="Cole na Meta (assine o campo messages). Precisa ser HTTPS público: use um túnel (Cloudflare Tunnel, ngrok) apontando para esta porta." stack>
                 <div className="row"><code className="mono small grow">{hook}</code><button type="button" className="btn btn-sm" onClick={() => { navigator.clipboard.writeText(hook); toast('URL copiada'); }}><Icon name="copy" size={14} />Copiar</button></div>
               </Row>
+              </>}
             </Card>
           );
         })()}

@@ -74,6 +74,8 @@ import { buildMeteringReport, listMeteringEvents, usageEventsToCsv } from './lib
 import { buildTokenRoiContract, routingSummary } from './lib/token-roi.mjs';
 import { listScripts, deleteScript } from './lib/script-pool.mjs';
 import { parseWhatsappMessages, whatsappPrompt, sendWhatsappText, whatsappReady } from './lib/whatsapp.mjs';
+import { evolutionSecrets, connectInstance, instanceState, disconnectInstance, sendText as sendEvolutionText, parseEvolutionMessage, isAllowed, makeRateLimiter, channelSafeAgent } from './lib/evolution.mjs';
+import { timingSafeEqual } from 'node:crypto';
 import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStreaming, activeChatStreamCount } from './lib/chat-stream.mjs';
 import { beginChatRun, bumpChatRunSeq, finishChatRun, chatRunPublic, canResumeChatRun, trimPartialRepliesAfterLastUser } from './lib/chat-run.mjs';
 import { exportChatPayload, importChatPayload } from './lib/chat-transfer.mjs';
@@ -512,10 +514,42 @@ async function handleWhatsappMessage(msg) {
   const prompt = whatsappPrompt(msg);
   c.messages.push({ id: id(), role: 'user', content: msg.text, via: { type: 'whatsapp', from: msg.from, messageId: msg.id }, at: Date.now() });
   const before = c.messages.length;
-  await turn({ agent, chat: c, text: msg.text, prompt, images: [], group: null }, () => {});
+  await turn({ agent: channelSafeAgent(agent), chat: c, text: msg.text, prompt, images: [], group: null }, () => {});
   const reply = c.messages.slice(before).findLast(m => m.role === 'assistant' && m.content && !m.stopped);
   c.updatedAt = Date.now(); c.unread = true; save();
   if (reply) await sendWhatsappText(w, msg.from, reply.content);
+}
+
+/**
+ * WhatsApp por QR (Evolution). Só responde números da lista, nunca inicia conversa,
+ * respeita pausa e limite por hora, e o agente roda sem computador/navegador/plugins.
+ * Mensagem de quem não está na lista não é guardada (não acumula dados de terceiros).
+ */
+const waWebSeen = new Set();
+const waWebRate = makeRateLimiter({ perContact: 20, global: 60 });
+async function handleWhatsappWebMessage(msg) {
+  const w = db.settings.whatsappWeb || {};
+  if (!w.enabled || !isEnterpriseMode(db.settings)) return;
+  if (waWebSeen.has(msg.id)) return;
+  waWebSeen.add(msg.id); if (waWebSeen.size > 500) waWebSeen.delete(waWebSeen.values().next().value);
+  if (!isAllowed(msg.from, w.allowlist)) return;
+  const agent = db.agents.find(a => a.id === w.agentId);
+  if (!agent) throw new Error('Agente do WhatsApp (QR) não existe mais.');
+  const key = `waweb:${msg.from}`;
+  let c = db.chats.find(x => x.channelKey === key);
+  if (!c) {
+    c = { id: id(), agentId: agent.id, channelKey: key, channel: 'whatsapp-web', title: `WhatsApp · ${msg.name || '+' + msg.from}`, messages: [], createdAt: Date.now(), updatedAt: Date.now() };
+    db.chats.unshift(c);
+  }
+  c.messages.push({ id: id(), role: 'user', content: msg.text, via: { type: 'whatsapp-web', from: msg.from, messageId: msg.id }, at: Date.now() });
+  c.updatedAt = Date.now(); c.unread = true;
+  if (w.paused) { save(); return; } // pausado: registra, ninguém responde
+  if (!waWebRate(msg.from)) { c.messages.push({ id: id(), role: 'assistant', agentId: agent.id, content: '', stopped: true, stopReason: 'rate_limit', at: Date.now() }); save(); return; }
+  const before = c.messages.length;
+  await turn({ agent: channelSafeAgent(agent), chat: c, text: msg.text, prompt: whatsappPrompt(msg), images: [], group: null }, () => {});
+  const reply = c.messages.slice(before).findLast(m => m.role === 'assistant' && m.content && !m.stopped);
+  c.updatedAt = Date.now(); save();
+  if (reply) await sendEvolutionText(msg.from, reply.content);
 }
 
 async function deliver(m) {
@@ -1698,6 +1732,26 @@ const routes = [
     if (!result.ok) return { allowed: false, code: result.code, error: result.error };
     return { allowed: true };
   }],
+  // WhatsApp por QR: só admin enterprise; segredos da Evolution nunca saem daqui.
+  ['GET', /^\/api\/whatsapp-web\/status$/, async () => {
+    requireEnterpriseAdmin();
+    return { state: await instanceState().catch(() => 'unknown'), docker: await dockerAvailable() };
+  }],
+  ['POST', /^\/api\/whatsapp-web\/connect$/, async () => {
+    requireEnterpriseAdmin();
+    if (!(await dockerAvailable())) throw new HttpError(400, 'O Docker precisa estar rodando para o WhatsApp por QR.');
+    const r = await connectInstance(PORT);
+    recordCorporateAudit(db.settings, { category: 'whatsapp', action: 'whatsapp_web.connect_requested', at: Date.now() });
+    return r;
+  }],
+  ['POST', /^\/api\/whatsapp-web\/disconnect$/, async req => {
+    requireEnterpriseAdmin();
+    const { wipe } = await body(req).catch(() => ({}));
+    await disconnectInstance({ wipe: wipe === true });
+    db.settings.whatsappWeb = { ...(db.settings.whatsappWeb || {}), enabled: false }; save();
+    recordCorporateAudit(db.settings, { category: 'whatsapp', action: wipe ? 'whatsapp_web.wiped' : 'whatsapp_web.disconnected', at: Date.now() });
+    return { ok: true };
+  }],
   ['GET', /^\/api\/scripts$/, () => ({ scripts: listScripts() })],
   ['DELETE', /^\/api\/scripts\/(\d+)$/, (req, [sid]) => {
     if (!deleteScript(sid)) throw new HttpError(404, 'Script não encontrado.');
@@ -2300,6 +2354,20 @@ const server = createServer(async (req, res) => {
     if (req.method === 'GET' && p === '/docs') {
       res.writeHead(200, hdr(req, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'public, max-age=3600' }));
       return res.end(OPENAPI_DOCS_HTML);
+    }
+    // WhatsApp por QR: a Evolution (rede interna) avisa aqui. Sem o token aleatório (URL + cabeçalho), recusa.
+    const waWeb = req.method === 'POST' && /^\/api\/channels\/whatsapp-web\/([a-f0-9]{48})$/.exec(p);
+    if (waWeb) {
+      const expected = Buffer.from(evolutionSecrets().hookToken);
+      const ok = [waWeb[1], String(req.headers['x-ripper-token'] || '')].every(t => { const b = Buffer.from(t); return b.length === expected.length && timingSafeEqual(b, expected); });
+      if (!ok) throw new HttpError(401, 'Token inválido.');
+      let ev; try { ev = JSON.parse((await body.raw(req)).toString('utf8')); } catch { throw new HttpError(400, 'JSON inválido.'); }
+      if (ev?.event === 'connection.update' && ev.data?.state) {
+        recordCorporateAudit(db.settings, { category: 'whatsapp', action: `whatsapp_web.${ev.data.state}`, at: Date.now() });
+      }
+      const msg = parseEvolutionMessage(ev);
+      if (msg) handleWhatsappWebMessage(msg).catch(e => console.error('whatsapp-web', ...redactForLog(db.settings, e.message)));
+      return json(res, { ok: true }, 200, {}, req);
     }
     // Canal WhatsApp (Meta chama sem login): GET = verificação do webhook, POST = mensagens (assinadas).
     if (p === '/api/channels/whatsapp/webhook') {
