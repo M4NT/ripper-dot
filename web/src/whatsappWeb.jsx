@@ -100,9 +100,11 @@ export function WhatsappWebPanel({ w, setW, Row }) {
     )}
     {w.readAll && <ContactModes w={w} setW={setW} Row={Row} />}
     <Row title="Responde sozinho" desc="Um número por linha, com DDI e DDD (ex.: +55 11 98888-7777). Sem a leitura ligada, quem não está aqui é ignorado e a mensagem não é guardada." stack>
-      <textarea className="input wa-allow" rows={4} value={(w.allowlist || []).join('\n')} placeholder={'+55 11 98888-7777\n+55 21 97777-6666'}
-        onChange={e => setW('allowlist', e.target.value.split('\n'))} />
-      <small className="muted">{(w.allowlist || []).filter(n => n.replace(/\D/g, '').length >= 10).length} número(s) válido(s)</small>
+      <div className="wa-allow-wrap">
+        <textarea className="input wa-allow" rows={4} value={(w.allowlist || []).join('\n')} placeholder={'+55 11 98888-7777\n+55 21 97777-6666'}
+          onChange={e => setW('allowlist', e.target.value.split('\n'))} />
+        <small className="muted">{(w.allowlist || []).filter(n => n.replace(/\D/g, '').length >= 10).length} número(s) válido(s)</small>
+      </div>
     </Row>
   </>;
 }
