@@ -925,6 +925,26 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
       }
     },
     scheduleRoutine: a => { db.routines.push({ id: id(), agentId: agent.id, lastRun: 0, name: a.name, prompt: a.prompt, everyMinutes: a.everyMinutes, dailyAt: a.dailyAt, weekday: a.weekday }); save(); emit({ routine: a.name }); },
+    // Só em conversa de canal externo (WhatsApp): o agente leva o recado para o dono no Ripper.
+    // O dono responde lá, onde o agente tem conectores (agenda etc.) — quem é de fora nunca aciona nada.
+    ownerNotify: chat.channel ? {
+      send: a => {
+        const key = `owner:${agent.id}`;
+        let inbox = db.chats.find(x => x.channelKey === key);
+        if (!inbox) { inbox = { id: id(), agentId: agent.id, channelKey: key, title: `${agent.name} · Avisos`, messages: [], createdAt: Date.now(), updatedAt: Date.now() }; db.chats.unshift(inbox); }
+        const phone = String(chat.channelKey || '').split(':')[1] || '';
+        const name = chat.title.replace(/^WhatsApp · /, '');
+        const contact = name.includes(phone) ? `+${phone}` : `${name} (+${phone})`;
+        inbox.messages.push({
+          id: id(), role: 'assistant', agentId: agent.id, at: Date.now(),
+          content: `**Recado do WhatsApp — ${contact}**\n\n${String(a.summary || '').trim()}${a.action ? `\n\n**Ação sugerida:** ${String(a.action).trim()}` : ''}\n\nResponda aqui (ex.: "pode marcar") que eu cuido e confirmo com o contato.`,
+          via: { type: 'owner-notify', fromChatId: chat.id, contact }
+        });
+        inbox.updatedAt = Date.now(); inbox.unread = true; save();
+        recordCorporateAudit(db.settings, { category: 'whatsapp', action: 'whatsapp.owner_notified', agentId: agent.id, chatId: chat.id, at: Date.now() });
+        return 'Recado entregue ao responsável no Ripper. Diga ao contato que vai confirmar e retorna em breve; não confirme nada antes disso.';
+      }
+    } : null,
     // Enviar WhatsApp pela API conectada (QR/Evolution ou Meta) — nunca pelo navegador.
     // Só em conversa sua com o agente (não em conversa de canal externo) e sempre com a sua aprovação.
     // Enviar não depende de 'Responder mensagens' (resposta automática): basta o QR com lista de números, ou a API oficial pronta.
