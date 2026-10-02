@@ -67,7 +67,7 @@ function Ask({ ask, done }) {
         {ask.body && <p>{ask.body}</p>}
         {ask.multiline
           ? <textarea className="input ask-input" rows={ask.rows || 6} autoFocus value={v} onChange={e => setV(e.target.value)} placeholder={ask.placeholder} />
-          : <input className="input ask-input" autoFocus value={v} onChange={e => setV(e.target.value)} placeholder={ask.placeholder} onFocus={e => e.target.select()} />}
+          : <input className="input ask-input" type={ask.secret ? 'password' : 'text'} autoComplete={ask.secret ? 'off' : undefined} autoFocus value={v} onChange={e => setV(e.target.value)} placeholder={ask.placeholder} onFocus={e => e.target.select()} />}
         <div className="row end"><button type="button" className="btn" onClick={() => done(null)}>Cancelar</button><button className="btn btn-primary" disabled={!v.trim()}>{ask.action || 'Salvar'}</button></div>
       </form>
     </Dialog>

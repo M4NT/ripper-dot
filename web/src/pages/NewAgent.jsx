@@ -8,7 +8,7 @@ import { uploadFile } from '../composer.jsx';
 
 const TYPES = ['clover', 'flower', 'triangle', 'square', 'blob', 'ghost', 'circle', 'drop', 'star', 'droid', 'mech', 'alien', 'hexagon', 'cat', 'cloud', 'pill', 'pebble', 'puddle'];
 const COLORS = [null, '#1a1917', '#e8537a', '#f08a3c', '#f2c94c', '#3fae78', '#3aa7c9', '#5b6cf0', '#9b6cf0'];
-const BLANK = { name: '', description: '', category: 'Outro', instructions: '', tone: 'direto', tools: ['web', 'memory', 'files'], templateId: null, savedTemplateId: null };
+const BLANK = { name: '', description: '', category: 'Outro', instructions: '', tone: 'direto', tools: ['web', 'memory', 'files', 'plugins'], templateId: null, savedTemplateId: null };
 
 function Section({ n, title, hint, children, optional }) {
   return (

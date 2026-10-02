@@ -73,6 +73,7 @@ import { buildUsageContract, normalizeContextWindow } from './lib/usage-api.mjs'
 import { buildMeteringReport, listMeteringEvents, usageEventsToCsv } from './lib/metering.mjs';
 import { buildTokenRoiContract, routingSummary } from './lib/token-roi.mjs';
 import { listScripts, deleteScript } from './lib/script-pool.mjs';
+import { listClaudeConnectors } from './lib/claude-connectors.mjs';
 import { parseWhatsappMessages, whatsappPrompt, sendWhatsappText, whatsappReady } from './lib/whatsapp.mjs';
 import { evolutionSecrets, connectInstance, instanceState, disconnectInstance, sendText as sendEvolutionText, parseEvolutionAny, contactMode, isAllowed, makeRateLimiter, channelSafeAgent } from './lib/evolution.mjs';
 import { history as waHistory, recordMessage as recordWaMessage, listChats as waListChats, readChat as waReadChat, findContacts as waFindContacts, styleProfile as waStyleProfile, styleHint, stats as waStats, wipeHistory as waWipeHistory } from './lib/whatsapp-store.mjs';
@@ -103,6 +104,7 @@ import { verifyMcpConnector } from './lib/mcp-probe.mjs';
 import { shutdownStdioSupervisors } from './lib/mcp-stdio-supervisor.mjs';
 import {
   applyOAuthTokensToPlugin,
+  refreshPluginOAuthToken,
   discoverMcpOAuth,
   exchangeOAuthCode,
   findOAuthFlowByState,
@@ -220,6 +222,7 @@ import {
   listVaultEntries,
   migrateLegacySecretsToVault,
   persistOAuthTokensInVault,
+  resolvePluginWithVault,
   putVaultCredential,
   vaultConfigured,
   isVaultPlaintextResponse,
@@ -573,6 +576,29 @@ async function handleWhatsappWebMessage(msg) {
   }
   await sendEvolutionText(msg.from, reply.content);
   recordWaMessage({ id: `out-${reply.id}`, phone: msg.from, fromMe: true, text: reply.content });
+}
+
+/**
+ * Conectores prontos para o turno: credencial do cofre carregada e token OAuth renovado se estiver
+ * vencendo — e o token novo é SALVO (renovar só na memória perdia o refresh token rotativo).
+ */
+async function pluginsForTurn(s, agent) {
+  const out = [];
+  for (const orig of s.plugins || []) {
+    let pl = resolvePluginWithVault(orig, { agentId: agent.id });
+    const o = pl.auth?.oauth;
+    if (pl.type === 'http' && o?.refreshToken && o.expiresAt && o.expiresAt < Date.now() + 120_000) {
+      const r = await refreshPluginOAuthToken(pl).catch(e => ({ ok: false, error: e.message }));
+      if (r.ok && r.tokens?.accessToken) {
+        const flow = { clientId: pl.auth.clientId, clientSecret: pl.auth.clientSecret, tokenEndpoint: pl.auth.tokenEndpoint };
+        const idx = db.settings.plugins.findIndex(x => x.name === orig.name);
+        if (idx >= 0) { db.settings.plugins[idx] = persistOAuthTokensInVault(db.settings.plugins[idx], r.tokens, flow); save(); }
+        pl = applyOAuthTokensToPlugin(pl, r.tokens, flow);
+      } else console.warn('[conector] não renovou o token de', orig.name, r.error || '');
+    }
+    out.push(pl);
+  }
+  return out;
 }
 
 async function deliver(m) {
@@ -1108,6 +1134,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
     }
     emit(ev);
   };
+  const turnPlugins = await pluginsForTurn(s, agent); // cofre + token renovado, uma vez por turno
   const loopResult = await runProviderAttemptLoop({
     order,
     signal,
@@ -1119,7 +1146,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
       if (testProvider) return runTestProvider({ prompt, signal });
       const providerSystem = MODELS[m].provider === 'codex' && s.computer.mode !== 'local'
         ? `${system}\n\nNesta execução do Codex, o computador está em modo somente leitura; não prometa executar comandos nem acessar a VM Boat.` : system;
-      const args = { agent, effort: clampEffort(s, m, effort), prompt, images, history, system: providerSystem, settings: s, signal };
+      const args = { agent, effort: clampEffort(s, m, effort), prompt, images, history, system: providerSystem, settings: { ...s, plugins: turnPlugins }, signal };
       return MODELS[m].provider === 'codex'
         ? runCodex({ ...args, cwd: sandboxDir(agent), ctx })
         : runClaude({ ...args, model: m, ctx });
@@ -1846,6 +1873,11 @@ const routes = [
     db.settings.whatsappWeb = { ...(db.settings.whatsappWeb || {}), enabled: false }; save();
     recordCorporateAudit(db.settings, { category: 'whatsapp', action: wipe ? 'whatsapp_web.wiped' : 'whatsapp_web.disconnected', at: Date.now() });
     return { ok: true };
+  }],
+  // Conectores reais da conta claude.ai (para a tela Conectores mostrar o que os agentes vão poder usar).
+  ['GET', /^\/api\/claude\/connectors$/, async (req, _, url) => {
+    if (db.settings.claude?.mode === 'api') return { connectors: [], note: 'Conectores do claude.ai só existem no modo assinatura.' };
+    return { connectors: await listClaudeConnectors({ force: url.searchParams.get('refresh') === '1' }).catch(e => { throw new HttpError(502, `Não consegui ler os conectores do claude.ai: ${e.message}`); }) };
   }],
   ['GET', /^\/api\/scripts$/, () => ({ scripts: listScripts() })],
   ['DELETE', /^\/api\/scripts\/(\d+)$/, (req, [sid]) => {

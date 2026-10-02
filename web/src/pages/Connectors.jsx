@@ -5,7 +5,10 @@ import { Icon, Menu, MenuItem } from '../ui.jsx';
 import HubShell from '../marketplace/HubShell.jsx';
 import BrandIcon from '../marketplace/BrandIcon.jsx';
 import CustomConnectorModal from '../marketplace/CustomConnectorModal.jsx';
-import { listMyConnectors } from '../marketplace/state.js';
+import { listMyConnectors, uninstallPlugin } from '../marketplace/state.js';
+import { useClaudeConnectors } from './Marketplace.jsx';
+import { CLAUDE_CONNECTORS_URL } from '../marketplace/catalog.js';
+import { useOv } from '../overlay.jsx';
 import { authStatusLabel, refreshMcpOAuth, runMcpOAuthLogin } from '../marketplace/mcpOAuth.js';
 import SocialWebhooksPanel from '../marketplace/SocialWebhooksPanel.jsx';
 import { isEnterpriseMode } from '../uiMode.js';
@@ -16,12 +19,18 @@ function RowIcon({ id }) {
   return <BrandIcon id={id} size={32} />;
 }
 
-function Mine({ settings, authByName, onRefresh, busyAuth, refresh }) {
-  const [q, setQ] = useState('');
+function Mine({ settings, authByName, onRefresh, busyAuth, refresh, claudeList, q }) {
+  const ov = useOv();
   const rows = useMemo(() => {
     const t = q.trim().toLowerCase();
-    return listMyConnectors(settings).filter(r => !t || r.name.toLowerCase().includes(t));
-  }, [settings, q]);
+    return listMyConnectors(settings, claudeList).filter(r => !t || r.name.toLowerCase().includes(t));
+  }, [settings, q, claudeList]);
+
+  async function remove(pluginName, label) {
+    if (!(await ov.confirm({ title: `Remover ${label}?`, body: 'Os agentes deixam de usar este conector. O acesso salvo é apagado.', action: 'Remover', danger: true }))) return;
+    await api('/api/settings', { method: 'PUT', body: { plugins: uninstallPlugin(pluginName, settings) } });
+    await refresh();
+  }
 
   async function reauth(pluginName) {
     const plugin = settings.plugins?.find(p => p.name === pluginName);
@@ -30,6 +39,12 @@ function Mine({ settings, authByName, onRefresh, busyAuth, refresh }) {
     await refresh();
   }
 
+  if (!rows.length) return (
+    <div className="mp-conn-empty">
+      <p><b>Nenhum conector ainda.</b> Conecte Notion, Linear, GitHub e outros pelo Marketplace, ou Google Agenda, Gmail e Drive pela sua conta claude.ai.</p>
+      <div className="row"><button type="button" className="btn btn-primary btn-sm" onClick={() => go('/marketplace/discover')}>Abrir Marketplace</button><a className="btn btn-sm" href={CLAUDE_CONNECTORS_URL} target="_blank" rel="noopener">Conectores do claude.ai</a></div>
+    </div>
+  );
   return (
     <>
       <div className="mp-conn-table">
@@ -54,7 +69,8 @@ function Mine({ settings, authByName, onRefresh, busyAuth, refresh }) {
                   {auth.state === 'expired_refreshable' ? 'Atualizar token' : 'Entrar'}
                 </button>
               )}
-              {r.status === 'session' ? <span className="muted small">Conecta em sessões</span> : r.status === 'ok' ? <Icon name="check" size={18} /> : null}
+              {r.status === 'session' ? <span className="muted small">Conectando…</span> : r.status === 'ok' ? <Icon name="check" size={18} /> : null}
+              {pluginName && <button type="button" className="icon-btn" title="Remover" aria-label={`Remover ${r.name}`} onClick={() => remove(pluginName, r.name)}><Icon name="trash" size={15} /></button>}
             </div>
           </div>
         );})}
@@ -71,6 +87,7 @@ export default function Connectors() {
   const [customOpen, setCustomOpen] = useState(false);
   const [authByName, setAuthByName] = useState({});
   const [busyAuth, setBusyAuth] = useState(null);
+  const claudeList = useClaudeConnectors();
   useEffect(() => { if (tab === 'discover') go('/marketplace/discover'); }, [tab]);
   useEffect(() => {
     api('/api/mcp/connectors').then(r => {
@@ -115,7 +132,7 @@ export default function Connectors() {
           </Menu>
         }
       >
-        <Mine settings={S.settings} authByName={authByName} onRefresh={refreshOAuth} busyAuth={busyAuth} refresh={refresh} />
+        <Mine settings={S.settings} authByName={authByName} onRefresh={refreshOAuth} busyAuth={busyAuth} refresh={refresh} claudeList={claudeList} q={q} />
         {isEnterpriseMode(S.settings) && S.settings.flags?.socialWebhooks && <SocialWebhooksPanel />}
       </HubShell>
       <CustomConnectorModal open={customOpen} onClose={() => setCustomOpen(false)} onSaved={refresh} />

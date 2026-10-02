@@ -105,3 +105,12 @@ test('applySettingsPatch rejeita brand no modo simples', () => {
   const s = { defaultModel: 'auto', claude: {}, computer: {}, ui: { mode: 'simple' }, enterprise: { enabled: false } };
   assert.throws(() => applySettingsPatch(s, { brand: { displayName: 'X' } }), /enterprise/);
 });
+
+test('salvar plugins com headers mascarados mantém o valor real', async () => {
+  const { applyPluginsPatch } = await import('../lib/settings-patch.mjs');
+  const { mergePluginAuth } = await import('../lib/mcp-oauth.mjs');
+  const s = { plugins: [{ name: 'gh', type: 'http', url: 'https://x', headers: { Authorization: 'Bearer real' } }] };
+  applyPluginsPatch(s, [{ name: 'gh', type: 'http', url: 'https://x', headers: { Authorization: '••••' } }, { name: 'novo', type: 'http', url: 'https://y' }], { mergePluginAuth });
+  assert.equal(s.plugins[0].headers.Authorization, 'Bearer real');
+  assert.equal(s.plugins.length, 2);
+});

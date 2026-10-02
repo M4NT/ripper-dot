@@ -1508,3 +1508,5 @@ code, .mono, pre { overflow-wrap: anywhere; }
 .wa-contacts li .grow { display: flex; flex-direction: column; min-width: 0; }
 .wa-contacts .select-wrap { min-width: 190px; }
 .wa-allow-wrap { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.mp-conn-empty { padding: 24px; border: 1px dashed var(--line); border-radius: var(--r-lg); display: flex; flex-direction: column; gap: 12px; }
+.mp-conn-empty p { margin: 0; color: var(--ink-2); }

@@ -1,24 +1,42 @@
-/** Catálogo estático do Marketplace (plugins, bots, conectores descobríveis, skills de parceiros). */
+/**
+ * Catálogo do Marketplace: só o que conecta de verdade.
+ * connect.type:
+ *   'oauth'  — servidor MCP remoto oficial com login e registro automático do cliente (testado: 401 + DCR)
+ *   'token'  — servidor MCP remoto que usa token pessoal (ex.: GitHub)
+ *   'claude' — vem pela sua conta claude.ai (Google, Slack, Microsoft): conecte lá e os agentes já usam
+ */
+const C = (id, name, author, desc, connect, extra = {}) => ({
+  id, name, author, icon: extra.icon || id, desc, connect, verified: true,
+  ...(connect.url ? { mcp: { name: id, type: 'http', url: connect.url } } : {}),
+  ...extra
+});
 
-export const PLUGIN_CATALOG = [
-  { id: 'vercel', name: 'Vercel', author: 'Vercel', icon: 'vercel', desc: 'Deploy, logs, domínios e variáveis de ambiente.', connectors: 1, skills: 33,
-    mcp: { name: 'vercel', type: 'stdio', command: 'npx', args: ['-y', '@vercel/mcp-server'] }, featured: true, forYou: false },
-  { id: 'github', name: 'GitHub', author: 'GitHub', icon: 'github', desc: 'Issues, PRs, repositórios e ações.', connectors: 1, skills: 0,
-    mcp: { name: 'github', type: 'stdio', command: 'npx', args: ['-y', '@modelcontextprotocol/server-github'] }, featured: false, forYou: false },
-  { id: 'cloudflare', name: 'Cloudflare', author: 'Cloudflare', icon: 'cloudflare', desc: 'Workers, DNS, R2 e firewall.', connectors: 4, skills: 9, featured: false, forYou: false },
-  { id: 'origin', name: 'Origin', author: 'Origin', icon: 'origin', desc: 'PRs, CI e repositórios na Origin.', connectors: 1, skills: 0, featured: false, forYou: false },
-  { id: 'finance', name: 'Finance', author: 'Ripper', icon: 'finance', desc: 'Dados financeiros e relatórios (requer autenticação).', connectors: 1, skills: 0, needsAuth: true, featured: false, forYou: false },
-  { id: 'agent-compat', name: 'Agent Compatibility', author: 'Ripper', icon: 'agent-compat', desc: 'Auditoria de compatibilidade para agentes em repositórios.', connectors: 0, skills: 1, featured: false, forYou: false },
-  { id: 'aws-core', name: 'AWS Core', author: 'Amazon', icon: 'aws', desc: 'Serviços fundamentais da AWS via MCP.', forYou: true,
-    mcp: { name: 'aws', type: 'stdio', command: 'npx', args: ['-y', '@modelcontextprotocol/server-aws'] } },
-  { id: 'aws-amplify', name: 'AWS Amplify', author: 'Amazon', icon: 'aws', desc: 'Back-end e hospedagem full-stack.', forYou: true },
-  { id: 'aws-location', name: 'Amazon Location Service', author: 'Amazon', icon: 'aws', desc: 'Mapas, rotas e geolocalização.', forYou: true },
-  { id: 'appwrite', name: 'Appwrite', author: 'Appwrite', icon: 'appwrite', desc: 'Backend como serviço: auth, DB e storage.', forYou: true },
-  { id: 'gmail-plugin', name: 'Gmail', author: 'Google', icon: 'gmail', desc: 'Ler e enviar e-mail nos agentes.', featured: true },
-  { id: 'google-calendar', name: 'Google Calendar', author: 'Google', icon: 'google-calendar', desc: 'Eventos e disponibilidade.', featured: true },
-  { id: 'google-drive-plugin', name: 'Google Drive', author: 'Google', icon: 'google-drive', desc: 'Arquivos e pastas compartilhadas.', featured: true },
-  { id: 'granola', name: 'Granola', author: 'Granola', icon: 'notion', desc: 'Notas de reunião e resumos.', featured: true }
+export const CONNECTORS = [
+  C('google-calendar', 'Google Agenda', 'Google', 'Eventos, disponibilidade e convites.', { type: 'claude' }, { featured: true, forYou: true, claudeNames: ['Google Calendar'] }),
+  C('gmail', 'Gmail', 'Google', 'Ler, buscar e rascunhar e-mails.', { type: 'claude' }, { featured: true }),
+  C('google-drive', 'Google Drive', 'Google', 'Buscar e ler documentos e planilhas.', { type: 'claude' }, { featured: true }),
+  C('slack', 'Slack', 'Slack', 'Canais, mensagens e busca.', { type: 'claude' }),
+  C('microsoft-365', 'Microsoft 365', 'Microsoft', 'Outlook, Teams e OneDrive.', { type: 'claude' }, { icon: 'microsoft' }),
+  C('notion', 'Notion', 'Notion', 'Páginas, bases e tarefas.', { type: 'oauth', url: 'https://mcp.notion.com/mcp' }, { featured: true, forYou: true }),
+  C('linear', 'Linear', 'Linear', 'Issues, projetos e ciclos.', { type: 'oauth', url: 'https://mcp.linear.app/mcp' }, { forYou: true }),
+  C('asana', 'Asana', 'Asana', 'Projetos e tarefas.', { type: 'oauth', url: 'https://mcp.asana.com/sse' }),
+  C('monday', 'monday.com', 'monday.com', 'Quadros, itens e automações.', { type: 'oauth', url: 'https://mcp.monday.com/mcp' }),
+  C('atlassian', 'Jira e Confluence', 'Atlassian', 'Issues do Jira e páginas do Confluence.', { type: 'oauth', url: 'https://mcp.atlassian.com/v1/sse' }),
+  C('canva', 'Canva', 'Canva', 'Criar e exportar designs.', { type: 'oauth', url: 'https://mcp.canva.com/mcp' }),
+  C('zapier', 'Zapier', 'Zapier', 'Milhares de apps por ações do Zapier.', { type: 'oauth', url: 'https://mcp.zapier.com/api/mcp/mcp' }, { forYou: true }),
+  C('granola', 'Granola', 'Granola', 'Notas e resumos de reuniões.', { type: 'oauth', url: 'https://mcp.granola.ai/mcp' }),
+  C('stripe', 'Stripe', 'Stripe', 'Clientes, cobranças e assinaturas.', { type: 'oauth', url: 'https://mcp.stripe.com' }),
+  C('vercel', 'Vercel', 'Vercel', 'Projetos, deploys e logs.', { type: 'oauth', url: 'https://mcp.vercel.com' }, { featured: true }),
+  C('cloudflare', 'Cloudflare', 'Cloudflare', 'Logs e observabilidade de Workers.', { type: 'oauth', url: 'https://observability.mcp.cloudflare.com/mcp' }),
+  C('supabase', 'Supabase', 'Supabase', 'Banco, auth e storage.', { type: 'oauth', url: 'https://mcp.supabase.com/mcp' }),
+  C('sentry', 'Sentry', 'Sentry', 'Erros e performance.', { type: 'oauth', url: 'https://mcp.sentry.dev/mcp' }),
+  C('github', 'GitHub', 'GitHub', 'Repositórios, issues e pull requests.', { type: 'token', url: 'https://api.githubcopilot.com/mcp/',
+    tokenHelp: 'Crie um token em github.com/settings/tokens (fine-grained) com acesso aos repositórios que o agente pode ver.' }, { featured: true })
 ];
+
+/** Compatibilidade com as telas: plugins e "descobrir conectores" são a mesma lista. */
+export const PLUGIN_CATALOG = CONNECTORS;
+export const CONNECTOR_DISCOVER = CONNECTORS;
 
 /** Presets Ripper (templates de agente, não plugins MCP). */
 export const AGENT_PRESETS = [
@@ -32,101 +50,18 @@ export const BOT_CATALOG = [
   { id: 'projects-mana', name: 'Projects Mana…', author: 'Ripper', color: '#e85da8', desc: 'Organiza tarefas entre projetos Ripper.' }
 ];
 
-export const CONNECTOR_DISCOVER = [
-  { id: 'google-drive', name: 'Google Drive', author: 'Google', icon: 'google-drive', desc: 'Pesquise, leia e envie arquivos na hora.', verified: true, pluginId: 'google-drive-plugin' },
-  { id: 'gmail', name: 'Gmail', author: 'Google', icon: 'gmail', desc: 'Caixa de entrada e envio de mensagens.', verified: true, pluginId: 'gmail-plugin' },
-  { id: 'google-calendar', name: 'Google Calendar', author: 'Google', icon: 'google-calendar', desc: 'Agenda e convites.', verified: true, pluginId: 'google-calendar' },
-  { id: 'canva', name: 'Canva', author: 'Canva', icon: 'canva', desc: 'Designs e exportação de mídia.', verified: true },
-  { id: 'microsoft-365', name: 'Microsoft 365', author: 'Microsoft', icon: 'microsoft', desc: 'Outlook, Teams e arquivos OneDrive.', verified: true },
-  { id: 'notion', name: 'Notion', author: 'Notion', icon: 'notion', desc: 'Páginas, bases e tarefas.', verified: true },
-  { id: 'figma', name: 'Figma', author: 'Figma', icon: 'figma', desc: 'Arquivos, frames e comentários.', verified: true },
-  { id: 'slack', name: 'Slack', author: 'Slack', icon: 'slack', desc: 'Canais, mensagens e busca.', verified: true },
-  { id: 'hubspot', name: 'HubSpot', author: 'HubSpot', icon: 'hubspot', desc: 'CRM e contatos.', verified: true },
-  { id: 'asana', name: 'Asana', author: 'Asana', icon: 'asana', desc: 'Projetos e tarefas.', verified: true },
-  { id: 'linear', name: 'Linear', author: 'Linear', icon: 'linear', desc: 'Issues e ciclos de engenharia.', verified: true, pluginId: 'linear',
-    mcp: { name: 'linear', type: 'stdio', command: 'npx', args: ['-y', '@modelcontextprotocol/server-linear'] } },
-  { id: 'monday', name: 'monday.com', author: 'monday.com', icon: 'monday', desc: 'Quadros e automações.', verified: true }
-];
-
-const GOOGLE_DRIVE_TOOLS = ['copy_file', 'get_file_permissions', 'share_file', 'create_file', 'list_recent_files', 'trash_file', 'download_file_content', 'read_file_content', 'update_file', 'get_file_metadata', 'search_files'];
-
-const DETAIL = {
-  'google-drive': {
-    tagline: 'Pesquise, leia e envie arquivos na hora',
-    body: 'Conecte o Google Drive para buscar documentos, ler conteúdo, enviar arquivos e analisar dados com seus agentes — sem sair do Ripper.',
-    tools: GOOGLE_DRIVE_TOOLS,
-    connectorUrl: 'https://drivemcp.googleapis.com/mcp/v1',
-    kind: 'connector'
-  },
-  gmail: {
-    tagline: 'Caixa de entrada e envio na hora',
-    body: 'Leia threads, rascunhe respostas e envie e-mails pelos agentes com contexto da conversa.',
-    tools: ['list_messages', 'read_message', 'send_message', 'search_mail', 'list_labels'],
-    connectorUrl: 'https://gmailmcp.googleapis.com/mcp/v1',
-    kind: 'connector'
-  },
-  slack: {
-    tagline: 'Canais, mensagens e busca',
-    body: 'Publique updates, leia canais e pesquise histórico do Slack nos fluxos dos agentes.',
-    tools: ['post_message', 'list_channels', 'search_messages', 'read_thread'],
-    connectorUrl: 'https://slackmcp.example.com/mcp/v1',
-    kind: 'connector'
-  },
-  vercel: {
-    tagline: 'Deploy, logs e domínios',
-    body: 'Gerencie projetos Vercel, variáveis de ambiente, deployments e observabilidade via MCP.',
-    tools: ['list_projects', 'get_deployment', 'create_deployment', 'list_domains'],
-    connectorUrl: 'stdio://@vercel/mcp-server',
-    kind: 'plugin'
-  },
-  github: {
-    tagline: 'Issues, PRs e repositórios',
-    body: 'Integre GitHub para revisar PRs, issues e CI direto nos agentes.',
-    tools: ['search_repositories', 'create_issue', 'list_pull_requests', 'merge_pull_request'],
-    connectorUrl: 'stdio://@modelcontextprotocol/server-github',
-    kind: 'plugin'
-  }
-};
-
-/** Item unificado para a tela de detalhe antes de instalar. */
+/** Item para a tela de detalhe antes de conectar. */
 export function marketplaceDetail(id) {
-  const connector = CONNECTOR_DISCOVER.find(c => c.id === id);
-  const plugin = PLUGIN_CATALOG.find(p => p.id === id || p.id === connector?.pluginId);
-  const base = connector || plugin;
-  if (!base) return null;
-  const extra = DETAIL[connector?.id || id] || {};
-  const tools = extra.tools || (plugin?.skills ? ['use_skill', 'list_skills'] : ['connect', 'list_tools']);
+  const c = CONNECTORS.find(x => x.id === id);
+  if (!c) return null;
   return {
-    id: connector?.id || plugin.id,
-    installId: plugin?.id || connector?.pluginId || connector?.id,
-    name: base.name,
-    author: base.author,
-    icon: base.icon,
-    verified: base.verified !== false,
-    tagline: extra.tagline || base.desc,
-    body: extra.body || base.desc,
-    tools,
-    connectorUrl: extra.connectorUrl || (plugin?.mcp?.type === 'http' ? plugin.mcp.url : plugin?.mcp ? `stdio://${plugin.mcp.command}` : '—'),
-    mcp: connector?.mcp || plugin?.mcp,
-    pluginId: connector?.pluginId || plugin?.id,
-    kind: extra.kind || (plugin ? 'plugin' : 'connector')
+    ...c, installId: c.id, pluginId: c.id, tagline: c.desc, body: c.desc, tools: [],
+    connectorUrl: c.connect.url || 'Conta claude.ai', kind: c.connect.type === 'claude' ? 'claude' : 'connector'
   };
 }
 
 export function allMarketplaceProducts() {
-  const seen = new Set();
-  const out = [];
-  for (const p of PLUGIN_CATALOG) {
-    if (seen.has(p.id)) continue;
-    seen.add(p.id);
-    out.push({ ...p, productType: 'plugin' });
-  }
-  for (const c of CONNECTOR_DISCOVER) {
-    if (seen.has(c.id)) continue;
-    seen.add(c.id);
-    out.push({ ...c, productType: 'connector' });
-  }
-  return out;
+  return CONNECTORS.map(c => ({ ...c, productType: 'connector' }));
 }
 
 export const PARTNER_SKILLS = [
@@ -138,13 +73,11 @@ export const PARTNER_SKILLS = [
   { id: 'cloudflare', name: 'cloudflare', provider: 'Cloudflare', desc: 'por Cloudflare · Plataforma edge completa.' }
 ];
 
-export const BUILTIN_CONNECTORS = [
-  { id: 'claude-chrome', name: 'Claude in Chrome', icon: 'terminal', type: 'Desktop', badge: 'Incluído', status: 'ok' },
-  { id: 'inspo', name: 'Inspo', icon: 'bulb', type: 'Desktop', badge: 'Dev local', status: 'ok' },
-  { id: 'github-claude', name: 'Integração com o GitHub', icon: 'github', type: 'Web', status: 'ok', settingsKey: 'github' },
-  { id: 'multipli', name: 'Multipli MCP', icon: 'cube', type: 'Web', badge: 'Personalizado', status: 'ok', fromPlugin: 'multipli' }
-];
+/** Conectores que não são instalados aqui (os do claude.ai vêm de /api/claude/connectors). */
+export const BUILTIN_CONNECTORS = [];
 
 export function catalogById(id) {
-  return PLUGIN_CATALOG.find(p => p.id === id) || CONNECTOR_DISCOVER.find(c => c.id === id);
+  return CONNECTORS.find(c => c.id === id);
 }
+
+export const CLAUDE_CONNECTORS_URL = 'https://claude.ai/settings/connectors';
