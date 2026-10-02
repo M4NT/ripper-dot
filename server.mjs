@@ -905,6 +905,29 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
       }
     },
     scheduleRoutine: a => { db.routines.push({ id: id(), agentId: agent.id, lastRun: 0, name: a.name, prompt: a.prompt, everyMinutes: a.everyMinutes, dailyAt: a.dailyAt, weekday: a.weekday }); save(); emit({ routine: a.name }); },
+    // Enviar WhatsApp pela API conectada (QR/Evolution ou Meta) — nunca pelo navegador.
+    // Só em conversa sua com o agente (não em conversa de canal externo) e sempre com a sua aprovação.
+    // Enviar não depende de 'Responder mensagens' (resposta automática): basta o QR com lista de números, ou a API oficial pronta.
+    whatsapp: !chat.channel && isEnterpriseMode(s) && (s.whatsappWeb?.allowlist?.length || whatsappReady(s.whatsapp)) ? {
+      send: async a => {
+        const to = String(a.to || '').replace(/\D/g, ''), msgText = String(a.text || '').trim();
+        if (to.length < 10 || !msgText) return 'Informe o número com DDI e DDD (ex.: +55 16 99999-9999) e o texto.';
+        const viaQr = !!s.whatsappWeb?.allowlist?.length;
+        if (viaQr && !isAllowed(to, s.whatsappWeb.allowlist)) return `+${to} não está na lista de números permitidos do WhatsApp (Configurações → Plugins → Canal WhatsApp). Nada foi enviado.`;
+        const ok = await askApproval({ agent, chat, emit, signal }, 'whatsapp', `Para +${to}:\n${msgText}`, 'A mensagem sai no WhatsApp em seu nome.', false);
+        if (!ok) return 'O usuário NÃO aprovou o envio. Nada foi enviado.';
+        try { viaQr ? await sendEvolutionText(to, msgText) : await sendWhatsappText(s.whatsapp, to, msgText); }
+        catch (e) { return `Falha ao enviar pelo WhatsApp: ${e.message}${viaQr ? '' : ' (na API oficial, fora da janela de 24 h só vale mensagem de template)'}`; }
+        // A conversa com o contato continua no Ripper: a resposta dele cai no mesmo fio.
+        const key = `${viaQr ? 'waweb' : 'wa'}:${to}`;
+        let c = db.chats.find(x => x.channelKey === key);
+        if (!c) { c = { id: id(), agentId: agent.id, channelKey: key, channel: viaQr ? 'whatsapp-web' : 'whatsapp', title: `WhatsApp · +${to}`, messages: [], createdAt: Date.now(), updatedAt: Date.now() }; db.chats.unshift(c); }
+        c.messages.push({ id: id(), role: 'assistant', agentId: agent.id, content: msgText, via: { type: 'whatsapp-out', to }, at: Date.now() });
+        c.updatedAt = Date.now(); save();
+        recordCorporateAudit(db.settings, { category: 'whatsapp', action: 'whatsapp.sent', agentId: agent.id, chatId: chat.id, at: Date.now() });
+        return `Mensagem enviada para +${to}.`;
+      }
+    } : null,
     social: agent.tools.includes('social') && isFlagEnabled(s, 'socialWebhooks') ? {
       webhooks: enabledSocialWebhooks(s),
       list: () => {
