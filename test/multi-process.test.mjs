@@ -98,3 +98,13 @@ test('lock obsoleto (.lock legado) não impede segundo processo', async () => {
     { RIPPER_DATA: dir, RIPPER_MP_CMD: 'load' }
   ]);
 });
+
+test('apagar um item não volta do disco no próximo flush; item novo de outro processo continua', async () => {
+  const { mergePersistedDb } = await import('../lib/db-merge.mjs');
+  const defaults = { schemaVersion: 1, settings: {}, chats: [], agents: [] };
+  const disk = { settings: {}, chats: [{ id: 'a', updatedAt: 1 }, { id: 'b', updatedAt: 1 }, { id: 'c-outro-processo', updatedAt: 2 }], agents: [] };
+  const local = { settings: {}, chats: [{ id: 'a', updatedAt: 1 }], agents: [] }; // 'b' foi apagado aqui
+  const baseline = { chats: new Set(['a', 'b']) };                               // o que este processo tinha visto
+  const out = mergePersistedDb(defaults, disk, local, {}, baseline);
+  assert.deepEqual(out.chats.map(c => c.id).sort(), ['a', 'c-outro-processo']);
+});

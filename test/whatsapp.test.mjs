@@ -66,7 +66,7 @@ test('webhook WhatsApp: verifica, recusa sem assinatura e responde pela Graph AP
     assert.equal(sent[0].body.to, '5511999');
     assert.ok(sent[0].body.text.body.length > 0);
     const chats = (await (await fetch(base + '/api/state')).json()).chats;
-    assert.ok(chats.some(c => c.title === 'WhatsApp · Ana'));
+    assert.equal(chats.filter(c => c.title.startsWith('WhatsApp')).length, 0); // conversa do WhatsApp fica no WhatsApp
   } finally {
     child.kill(); graph.close();
   }

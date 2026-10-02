@@ -75,7 +75,7 @@ import { buildTokenRoiContract, routingSummary } from './lib/token-roi.mjs';
 import { listScripts, deleteScript } from './lib/script-pool.mjs';
 import { parseWhatsappMessages, whatsappPrompt, sendWhatsappText, whatsappReady } from './lib/whatsapp.mjs';
 import { evolutionSecrets, connectInstance, instanceState, disconnectInstance, sendText as sendEvolutionText, parseEvolutionAny, contactMode, isAllowed, makeRateLimiter, channelSafeAgent } from './lib/evolution.mjs';
-import { recordMessage as recordWaMessage, listChats as waListChats, readChat as waReadChat, findContacts as waFindContacts, styleProfile as waStyleProfile, styleHint, stats as waStats, wipeHistory as waWipeHistory } from './lib/whatsapp-store.mjs';
+import { history as waHistory, recordMessage as recordWaMessage, listChats as waListChats, readChat as waReadChat, findContacts as waFindContacts, styleProfile as waStyleProfile, styleHint, stats as waStats, wipeHistory as waWipeHistory } from './lib/whatsapp-store.mjs';
 import { timingSafeEqual } from 'node:crypto';
 import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStreaming, activeChatStreamCount } from './lib/chat-stream.mjs';
 import { beginChatRun, bumpChatRunSeq, finishChatRun, chatRunPublic, canResumeChatRun, trimPartialRepliesAfterLastUser } from './lib/chat-run.mjs';
@@ -251,6 +251,7 @@ function settingsForMcp(s, mcpSession) {
 const APP_PKG = JSON.parse(await readFile(new URL('./package.json', import.meta.url), 'utf8'));
 const SERVER_STARTED_AT = Date.now();
 const db = load();
+if (db.chats.some(c => c.channel)) { db.chats = db.chats.filter(c => !c.channel); save(); } // conversa de WhatsApp fica no WhatsApp (versões antigas criavam aqui)
 configureLogger({ settings: db.settings });
 
 function googleTokenRefreshHook(tokens) {
@@ -498,7 +499,31 @@ async function runInboxDelivery(m, { signal } = {}) {
   return { ...parsed, threadChatId: c.id, reply: parsed.ok ? { content: parsed.content, model: parsed.model } : null };
 }
 
-/** Uma conversa por contato do WhatsApp; o agente escolhido responde e a resposta volta pela Graph API. */
+/**
+ * Conversa do WhatsApp fica no WhatsApp: o agente só VÊ. Nada vira conversa no Ripper.
+ * A cada mensagem montamos uma conversa temporária com o histórico do contato (whatsapp.sqlite),
+ * rodamos o turno e descartamos. Modelo: o mais econômico liberado, esforço baixo — são só mensagens.
+ */
+function channelModel(s) {
+  return ['claude-haiku-4-5', 'claude-sonnet-5-5'].find(m => enabledModels(s).includes(m)) || enabledModels(s)[0];
+}
+function channelChat(kind, msg, agent) {
+  return {
+    id: `${kind}:${msg.from}`, agentId: agent.id, channel: kind, channelKey: `${kind}:${msg.from}`,
+    title: `WhatsApp · ${msg.name || '+' + msg.from}`, model: channelModel(db.settings), effort: 'low',
+    messages: waHistory(msg.from, 20).map((h, i) => ({ id: `h${i}`, role: h.fromMe ? 'assistant' : 'user', agentId: agent.id, content: h.text, at: h.at })),
+    createdAt: Date.now(), updatedAt: Date.now()
+  };
+}
+async function channelReply(kind, msg, agent, prompt) {
+  const c = channelChat(kind, msg, agent);
+  c.messages.push({ id: id(), role: 'user', content: msg.text, at: Date.now() });
+  const before = c.messages.length;
+  await turn({ agent: channelSafeAgent(agent), chat: c, text: msg.text, prompt, images: [], group: null }, () => {});
+  // só texto de verdade: erro ou resposta cortada nunca vai para o contato
+  return { chat: c, reply: c.messages.slice(before).findLast(m => m.role === 'assistant' && m.content && !m.stopped && !m.error) };
+}
+
 const waSeen = new Set(); // a Meta reentrega o mesmo evento; o id da mensagem evita responder duas vezes
 async function handleWhatsappMessage(msg) {
   if (waSeen.has(msg.id)) return;
@@ -506,25 +531,18 @@ async function handleWhatsappMessage(msg) {
   const w = db.settings.whatsapp;
   const agent = db.agents.find(a => a.id === w.agentId);
   if (!agent) throw new Error('Agente do canal WhatsApp não existe mais.');
-  const key = `wa:${msg.from}`;
-  let c = db.chats.find(x => x.channelKey === key);
-  if (!c) {
-    c = { id: id(), agentId: agent.id, channelKey: key, channel: 'whatsapp', title: `WhatsApp · ${msg.name || '+' + msg.from}`, messages: [], createdAt: Date.now(), updatedAt: Date.now() };
-    db.chats.unshift(c);
-  }
-  const prompt = whatsappPrompt(msg);
-  c.messages.push({ id: id(), role: 'user', content: msg.text, via: { type: 'whatsapp', from: msg.from, messageId: msg.id }, at: Date.now() });
-  const before = c.messages.length;
-  await turn({ agent: channelSafeAgent(agent), chat: c, text: msg.text, prompt, images: [], group: null }, () => {});
-  const reply = c.messages.slice(before).findLast(m => m.role === 'assistant' && m.content && !m.stopped);
-  c.updatedAt = Date.now(); c.unread = true; save();
-  if (reply) await sendWhatsappText(w, msg.from, reply.content);
+  recordWaMessage({ id: msg.id, phone: msg.from, fromMe: false, text: msg.text, name: msg.name });
+  const { reply } = await channelReply('whatsapp', msg, agent, whatsappPrompt(msg));
+  if (!reply) return;
+  await sendWhatsappText(w, msg.from, reply.content);
+  recordWaMessage({ id: `out-${reply.id}`, phone: msg.from, fromMe: true, text: reply.content });
 }
 
 /**
- * WhatsApp por QR (Evolution). Só responde números da lista, nunca inicia conversa,
+ * WhatsApp por QR (Evolution). Responde só quem você liberou, rascunha para aprovação o resto,
  * respeita pausa e limite por hora, e o agente roda sem computador/navegador/plugins.
- * Mensagem de quem não está na lista não é guardada (não acumula dados de terceiros).
+ * Guarda o histórico de quem está em "responde sozinho"/"rascunho" (o agente precisa do contexto);
+ * dos demais, só com "Ler conversas" ligado.
  */
 const waWebSeen = new Set();
 const waWebRate = makeRateLimiter({ perContact: 20, global: 60 });
@@ -533,43 +551,28 @@ async function handleWhatsappWebMessage(msg) {
   if (!isEnterpriseMode(db.settings)) return;
   if (waWebSeen.has(msg.id)) return;
   waWebSeen.add(msg.id); if (waWebSeen.size > 500) waWebSeen.delete(waWebSeen.values().next().value);
-  // Opt-in "Ler conversas": guarda tudo das conversas individuais (inclusive o que você mandou do celular).
-  if (w.readAll) recordWaMessage({ id: msg.id, phone: msg.from, fromMe: msg.fromMe, text: msg.text, name: msg.name, at: msg.at });
-  if (msg.fromMe || !w.enabled) return; // mensagem sua não gera resposta; "Responder mensagens" desligado também não
   const mode = contactMode(msg.from, w);
-  if (!mode || mode === 'read') return; // fora da lista sem leitura ligada: nem guarda; "só lê": guardado acima
+  if (w.readAll || mode === 'auto' || mode === 'draft') recordWaMessage({ id: msg.id, phone: msg.from, fromMe: msg.fromMe, text: msg.text, name: msg.name, at: msg.at });
+  if (msg.fromMe || !w.enabled || w.paused) return; // sua mensagem, canal desligado ou pausado: só registra
+  if (!mode || mode === 'read') return;
   const agent = db.agents.find(a => a.id === w.agentId);
   if (!agent) throw new Error('Agente do WhatsApp (QR) não existe mais.');
-  const key = `waweb:${msg.from}`;
-  let c = db.chats.find(x => x.channelKey === key);
-  if (!c) {
-    c = { id: id(), agentId: agent.id, channelKey: key, channel: 'whatsapp-web', title: `WhatsApp · ${msg.name || '+' + msg.from}`, messages: [], createdAt: Date.now(), updatedAt: Date.now() };
-    db.chats.unshift(c);
-  }
-  c.messages.push({ id: id(), role: 'user', content: msg.text, via: { type: 'whatsapp-web', from: msg.from, messageId: msg.id }, at: Date.now() });
-  c.updatedAt = Date.now(); c.unread = true;
-  if (w.paused) { save(); return; } // pausado: registra, ninguém responde
   // Rascunho: a Julia decide antes se precisa de resposta ("ok 👍" não precisa) — não gasta o modelo à toa.
   if (mode === 'draft') {
     const j = await juliaChoose(db.settings, { context: 'Mensagem recebida no WhatsApp do usuário.', question: msg.text, options: REPLY_OPTIONS }, { minScore: 0.6, purpose: 'whatsapp_reply' });
-    if (j && j.index === 1) { save(); return; }
+    if (j && j.index === 1) return;
   }
-  if (!waWebRate(msg.from)) { c.messages.push({ id: id(), role: 'assistant', agentId: agent.id, content: '', stopped: true, stopReason: 'rate_limit', at: Date.now() }); save(); return; }
-  const before = c.messages.length;
+  if (!waWebRate(msg.from)) return;
   const prompt = whatsappPrompt(msg) + (w.readAll ? styleHint(waStyleProfile()) : '');
-  await turn({ agent: channelSafeAgent(agent), chat: c, text: msg.text, prompt, images: [], group: null }, () => {});
-  const reply = c.messages.slice(before).findLast(m => m.role === 'assistant' && m.content && !m.stopped);
-  c.updatedAt = Date.now(); save();
+  const { chat: c, reply } = await channelReply('whatsapp-web', msg, agent, prompt);
   if (!reply) return;
   if (mode === 'draft') {
     // Fica na bandeja de aprovações; só sai se você aprovar (expira sem resposta = não envia).
-    const ok = await askApproval({ agent, chat: c, emit: () => {}, signal: null }, 'whatsapp', `Para ${msg.name || ''} +${msg.from}:
-${reply.content}`, 'Rascunho de resposta no seu WhatsApp.', false);
-    reply.draft = ok ? 'sent' : 'discarded'; save();
+    const ok = await askApproval({ agent, chat: c, emit: () => {}, signal: null }, 'whatsapp', `Para ${msg.name || ''} +${msg.from}:\n${reply.content}`, 'Rascunho de resposta no seu WhatsApp.', false);
     if (!ok) return;
   }
   await sendEvolutionText(msg.from, reply.content);
-  if (w.readAll) recordWaMessage({ id: `out-${reply.id}`, phone: msg.from, fromMe: true, text: reply.content });
+  recordWaMessage({ id: `out-${reply.id}`, phone: msg.from, fromMe: true, text: reply.content });
 }
 
 async function deliver(m) {
@@ -977,12 +980,8 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
         if (!ok) return 'O usuário NÃO aprovou o envio. Nada foi enviado.';
         try { viaQr ? await sendEvolutionText(to, msgText) : await sendWhatsappText(s.whatsapp, to, msgText); }
         catch (e) { return `Falha ao enviar pelo WhatsApp: ${e.message}${viaQr ? '' : ' (na API oficial, fora da janela de 24 h só vale mensagem de template)'}`; }
-        // A conversa com o contato continua no Ripper: a resposta dele cai no mesmo fio.
-        const key = `${viaQr ? 'waweb' : 'wa'}:${to}`;
-        let c = db.chats.find(x => x.channelKey === key);
-        if (!c) { c = { id: id(), agentId: agent.id, channelKey: key, channel: viaQr ? 'whatsapp-web' : 'whatsapp', title: `WhatsApp · +${to}`, messages: [], createdAt: Date.now(), updatedAt: Date.now() }; db.chats.unshift(c); }
-        c.messages.push({ id: id(), role: 'assistant', agentId: agent.id, content: msgText, via: { type: 'whatsapp-out', to }, at: Date.now() });
-        c.updatedAt = Date.now(); save();
+        // Vai para o histórico do WhatsApp (o agente vê a continuação); não vira conversa no Ripper.
+        recordWaMessage({ id: `out-${id()}`, phone: to, fromMe: true, text: msgText });
         recordCorporateAudit(db.settings, { category: 'whatsapp', action: 'whatsapp.sent', agentId: agent.id, chatId: chat.id, at: Date.now() });
         return `Mensagem enviada para +${to}.`;
       }

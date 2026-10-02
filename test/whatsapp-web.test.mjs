@@ -77,8 +77,9 @@ test('webhook interno: recusa sem token, guarda só quem está na lista e respon
     assert.equal(out[0].apikey, apiKey);
     assert.ok(out[0].body.delay >= 1500); // atraso humano
     const chats = (await (await fetch(base + '/api/state')).json()).chats;
-    assert.ok(chats.some(c => c.title === 'WhatsApp · Ana'));
-    assert.equal(chats.filter(c => c.title.startsWith('WhatsApp')).length, 1); // quem está fora da lista não vira conversa
+    assert.equal(chats.filter(c => c.title.startsWith('WhatsApp')).length, 0); // conversa do WhatsApp fica no WhatsApp
+    const hist = (await (await fetch(base + '/api/whatsapp-web/status')).json()).history;
+    assert.equal(hist.contacts, 1); // só o contato liberado entra no histórico (o de fora, não)
 
     // pausado: registra, não responde
     assert.equal((await put({ whatsappWeb: { paused: true } })).status, 200);
