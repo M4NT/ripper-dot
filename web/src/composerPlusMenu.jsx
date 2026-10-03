@@ -85,7 +85,7 @@ export default function ComposerPlusMenu({ open, onClose, anchorRef, onFiles, on
       <button type="button" className="menu-item" onClick={() => { onClose(); go('/marketplace/discover'); }}>
         <Icon name="compass" size={16} />Explorar {type === 'plugin' ? 'plugins' : 'conectores'}
       </button>
-      <button type="button" className="menu-item" onClick={() => { onClose(); go(type === 'plugin' ? '/marketplace/manage' : '/connectors'); }}>
+      <button type="button" className="menu-item" onClick={() => { onClose(); go(type === 'plugin' || simple ? '/marketplace/manage' : '/connectors'); }}>
         <Icon name="folder" size={16} />Gerenciar {type === 'plugin' ? 'plugins' : 'conectores'}
       </button>
       {type === 'connector' && isEnterpriseMode(S.settings) && S.settings.flags?.socialWebhooks && (

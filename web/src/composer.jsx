@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { VoiceBeam, useMicrophone } from 'voice-glow';
 import { api, fmtSize, go, local, useDark } from './lib.js';
 import { AgentAvatar, Icon, useToast } from './ui.jsx';
+import { useApp } from './app.jsx';
+import { isEnterpriseMode } from './uiMode.js';
 import ModelPicker from './modelPicker.jsx';
 import ComposerPlusMenu from './composerPlusMenu.jsx';
 import BlindCredentialInput from './vault/BlindCredentialInput.jsx';
@@ -17,6 +19,7 @@ export async function uploadFile(agentId, chatId, file, projectId, { batch } = {
 }
 
 export default function Composer({ agent, chatId, projectId, mentions, streaming, onSend, onStop, choice, setChoice, group, placeholder, autoFocus, draftKey }) {
+  const { S } = useApp();
   const toast = useToast();
   const [text, setText] = useState(() => local.get('draft.' + draftKey, ''));
   const [files, setFiles] = useState([]); // { key, name, size, file?, id?, status }
@@ -111,6 +114,11 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
   }
 
   function teachTask() {
+    if (!isEnterpriseMode(S.settings)) {
+      toast('Criar skills fica no modo Enterprise — use o Marketplace para plugins.');
+      go('/marketplace/discover');
+      return;
+    }
     local.set('skills.openCreate', true);
     go('/skills');
   }

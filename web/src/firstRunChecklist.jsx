@@ -1,4 +1,5 @@
 import { Icon } from './ui.jsx';
+import { isEnterpriseMode } from './uiMode.js';
 
 function modelConnected(settings) {
   if (settings.claude?.mode === 'api') return !!(settings.claude.apiKey || '').trim();
@@ -7,20 +8,25 @@ function modelConnected(settings) {
 
 /** Checklist curta para quem abre o chat vazio pela primeira vez. */
 export function FirstRunChecklist({ settings, agentCount }) {
+  const enterprise = isEnterpriseMode(settings);
   const steps = [
     {
       id: 'model',
       label: 'Conectar um modelo',
-      detail: 'Claude por assinatura ou chave de API em Configurações.',
+      detail: enterprise
+        ? 'Claude por assinatura ou chave de API em Configurações.'
+        : 'Use claude login nesta máquina ou ative o modo Enterprise em Configurações → Aparência para chave de API.',
       done: modelConnected(settings),
-      href: '#/settings/models'
+      href: enterprise ? '#/settings/models' : '#/settings/appearance'
     },
     {
       id: 'models',
       label: 'Escolher quais IAs usar',
-      detail: 'Ligue só as que você quer e limite o esforço de cada uma. O Ripper Auto escolhe dentro disso.',
+      detail: enterprise
+        ? 'Ligue só as que você quer e limite o esforço de cada uma. O Ripper Auto escolhe dentro disso.'
+        : 'Escolha modelos e limites de esforço no modo Enterprise (Configurações → Aparência).',
       done: Object.keys(settings.models?.enabled || {}).length + Object.keys(settings.models?.maxEffort || {}).length > 0,
-      href: '#/settings/models'
+      href: enterprise ? '#/settings/models' : null
     },
     {
       id: 'agent',

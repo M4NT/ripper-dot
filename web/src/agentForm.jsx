@@ -114,7 +114,7 @@ export function Tools({ v, set }) {
         <li key={k}>
           <label>
             <span className="toggle-ico"><Icon name={t.icon} /></span>
-            <span className="toggle-text"><b>{t.label}</b><small>{t.desc}</small>{notes[k] && <small className="note-inline">{notes[k]} {k !== 'memory' && <a href="#/integrations">Abrir Integrações</a>}</small>}</span>
+            <span className="toggle-text"><b>{t.label}</b><small>{t.desc}</small>{notes[k] && <small className="note-inline">{notes[k]} {k !== 'memory' && <a href="#/marketplace">Abrir Integrações</a>}</small>}</span>
             <Switch checked={v.tools.includes(k)} onChange={() => toggle(k)} label={t.label} />
           </label>
         </li>
