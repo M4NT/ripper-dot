@@ -4,7 +4,7 @@ import BrandIcon from './BrandIcon.jsx';
 const HOW = {
   oauth: 'Você faz login na conta do serviço numa janela; o Ripper guarda o acesso e renova sozinho.',
   token: 'Usa um token pessoal seu. Ele fica guardado no servidor do Ripper e nunca aparece na interface.',
-  claude: 'Este vem pela sua conta claude.ai: conecte lá uma vez e todos os agentes com "Plugins MCP" passam a usar.'
+  claude: 'Este vem pela sua conta claude.ai: conecte lá uma vez e todos os agentes com "Conectores" ligado passam a usar.'
 };
 
 export default function ConnectorDetail({ item, onBack, onConnect, connecting, connected }) {

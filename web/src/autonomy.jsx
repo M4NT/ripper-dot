@@ -40,7 +40,7 @@ export function displayAutonomyLevel(level, settings) {
 export function AutonomySemaphore({ level, settings, showLabel = true, size = 'md' }) {
   const m = autonomyMeta(displayAutonomyLevel(level, settings));
   return (
-    <span className={`autonomy-sem autonomy-sem-${m.sem} autonomy-sem-${size}`} title={`${m.label} · ${m.en}`}>
+    <span className={`autonomy-sem autonomy-sem-${m.sem} autonomy-sem-${size}`} title={m.label}>
       <span className="autonomy-lights" aria-hidden="true">
         <i className={m.sem === 'red' ? 'on' : ''} />
         <i className={m.sem === 'yellow' ? 'on' : ''} />
@@ -63,7 +63,7 @@ export function AutonomyPick({ value, onChange, allowFullyAutonomous = false }) 
         {levels.map(m => (
           <button key={m.id} type="button" role="radio" aria-checked={v === m.id} className={`mode autonomy-mode ${v === m.id ? 'on' : ''}`} onClick={() => onChange(m.id)}>
             <AutonomySemaphore level={m.id} showLabel={false} size="sm" />
-            <b>{m.label}<span className="tag tag-muted">{m.en}</span></b>
+            <b>{m.label}</b>
             <small>{m.desc}</small>
           </button>
         ))}

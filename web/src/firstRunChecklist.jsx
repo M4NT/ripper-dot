@@ -42,6 +42,8 @@ export function FirstRunChecklist({ settings, agentCount }) {
       done: false
     }
   ];
+  // Com modelo conectado e agente criado, o checklist é ruído numa conversa que já funciona.
+  if (steps[0].done && agentCount > 0) return null;
   const pending = steps.filter(s => !s.done).length;
   if (pending === 0) return null;
 

@@ -7,7 +7,26 @@ import { AutonomySemaphore } from '../autonomy.jsx';
 import { uploadFile } from '../composer.jsx';
 import { isEnterpriseMode } from '../uiMode.js';
 
-const ALL_TABS = [['general', 'Geral'], ['model', 'Modelo'], ['behavior', 'Comportamento'], ['voice', 'Voz e estilo'], ['tools', 'Ferramentas'], ['knowledge', 'Conhecimento'], ['look', 'Aparência'], ['routines', 'Rotinas'], ['advanced', 'Avançado']];
+// 4 abas pelo jeito que o dono pensa: quem ele é, o que sabe fazer, quanto decide sozinho, quando age sozinho.
+const TABS = [['identity', 'Identidade'], ['skills', 'Habilidades'], ['autonomy', 'Autonomia'], ['routines', 'Rotinas']];
+// links antigos (?tab=model etc.) continuam abrindo a aba certa
+const OLD_TAB = { general: 'identity', look: 'identity', voice: 'identity', advanced: 'identity', tools: 'skills', knowledge: 'skills', model: 'autonomy', behavior: 'autonomy' };
+
+/** Onde o agente atende além do chat do Ripper (canais configurados para ele). */
+function Channels({ agent }) {
+  const { S } = useApp();
+  const qr = S.settings.whatsappWeb?.agentId === agent.id, meta = S.settings.whatsapp?.agentId === agent.id;
+  const on = (qr && S.settings.whatsappWeb.enabled) || (meta && S.settings.whatsapp.enabled);
+  return <>
+    <h3 className="sub">Onde atende</h3>
+    <ul className="toggle-list">
+      <li><label><span className="toggle-ico"><Icon name="chat" /></span><span className="toggle-text"><b>Chat do Ripper</b><small>Você e seus times conversam com {agent.name} aqui.</small></span><span className="tag">sempre</span></label></li>
+      <li><label><span className="toggle-ico"><Icon name="inbox" /></span><span className="toggle-text"><b>WhatsApp</b>
+        <small>{qr || meta ? `${agent.name} responde ${qr ? 'pelo WhatsApp conectado por QR' : 'pela API oficial'}${on ? '' : ' (pausado: "Responder mensagens" está desligado)'}. Recados chegam na Caixa.` : `${agent.name} não atende no WhatsApp.`}</small></span>
+        <a className="btn btn-sm" href="#/settings/plugins">{qr || meta ? 'Configurar' : 'Conectar'}</a></label></li>
+    </ul>
+  </>;
+}
 const pick = a => ({
   name: a.name, description: a.description, category: a.category, status: a.status,
   instructions: a.instructions, tone: a.tone, style: agentStyleDraft(a),
@@ -93,13 +112,13 @@ export default function AgentConfig({ id }) {
   const { S, agent: get, updateAgent, refresh, toast } = useApp();
   const { query } = useRoute();
   const agent = get(id);
-  const tabs = isEnterpriseMode(S.settings) ? ALL_TABS : ALL_TABS.filter(([k]) => k !== 'advanced');
-  const [tab, setTab] = useState(query.get('tab') || 'general');
+  const enterprise = isEnterpriseMode(S.settings);
+  const [tab, setTab] = useState(() => { const q = query.get('tab'); return OLD_TAB[q] || (TABS.some(([k]) => k === q) ? q : 'identity'); });
   const [v, setV] = useState(() => agent && pick(agent));
   const [saving, setSaving] = useState(false);
   const [confirm, confirmNode] = useConfirm();
   const [computer, setComputer] = useState(null);
-  useEffect(() => { if (tab === 'advanced' && agent) api(`/api/agents/${agent.id}/computer`).then(setComputer).catch(() => {}); }, [tab]);
+  useEffect(() => { if (tab === 'identity' && enterprise && agent) api(`/api/agents/${agent.id}/computer`).then(setComputer).catch(() => {}); }, [tab]);
   const dirty = agent && JSON.stringify(v) !== JSON.stringify(pick(agent));
   useEffect(() => {
     if (!dirty) return;
@@ -132,24 +151,19 @@ export default function AgentConfig({ id }) {
         <AgentAvatar agent={{ ...agent, ...v }} size={80} interactive animate />
         <div><h1>{v.name || 'Sem nome'}</h1><div className="config-hero-meta"><StatusDot status={v.status} /><AutonomySemaphore level={v.autonomyLevel} settings={S.settings} /></div><p className="lede">{v.description || 'Sem descrição.'}</p></div>
       </div>
-      <Segmented label="Seções" value={tab} onChange={setTab} items={tabs} className="seg-scroll config-tabs" />
+      <Segmented label="Seções" value={tab} onChange={setTab} items={TABS} className="seg-scroll config-tabs" />
       <div className="config-body">
-        {tab === 'general' && <>
+        {tab === 'identity' && <>
+          <Appearance v={v} set={set} />
           <Basics v={v} set={set} categories={S.categories} />
           <div className="field"><span>Status</span>
             <Select label="Status" value={v.status} onChange={status => set({ status })} options={[
-              { value: 'online', label: 'Online', hint: 'Responde e roda rotinas', icon: <i className="dot dot-ok" /> },
+              { value: 'online', label: 'Ativo', hint: 'Responde e roda rotinas', icon: <i className="dot dot-ok" /> },
               { value: 'paused', label: 'Pausado', hint: 'Responde, mas as rotinas não rodam', icon: <i className="dot" /> }]} />
           </div>
-        </>}
-        {tab === 'model' && <ModelPick v={v} set={set} />}
-        {tab === 'behavior' && <Behavior v={v} set={set} settings={S.settings} />}
-        {tab === 'voice' && <VoiceStyle v={v} set={set} />}
-        {tab === 'tools' && <Tools v={v} set={set} />}
-        {tab === 'look' && <Appearance v={v} set={set} />}
-        {tab === 'knowledge' && <Knowledge agent={agent} />}
-        {tab === 'routines' && <Routines agent={agent} />}
-        {tab === 'advanced' && <>
+          <h3 className="sub">Voz e estilo</h3>
+          <VoiceStyle v={v} set={set} />
+          <h3 className="sub">Mais</h3>
           <div className="row" style={{ marginBottom: '1rem' }}>
             <button type="button" className="btn" onClick={async () => {
               try {
@@ -157,19 +171,32 @@ export default function AgentConfig({ id }) {
                 await refresh();
                 toast('Modelo salvo — aparece em Novo agente');
               } catch (e) { toast(e.message, 'error'); }
-            }}><Icon name="book" size={16} />Salvar como modelo</button>
+            }}><Icon name="book" size={16} />Salvar como modelo de agente</button>
           </div>
-          <dl className="facts">
+          {enterprise && <dl className="facts">
             <dt>ID</dt><dd><code>{agent.id}</code></dd>
-            <dt>Computador</dt><dd>{computer ? `${computer.kind === 'boat' ? 'VM boat.dev' : computer.kind === 'local' ? 'Pasta local' : 'Desligado'} · ${computer.status}` : '…'}</dd>
-            {agent.vmId && <><dt>VM</dt><dd><code>{agent.vmId}</code></dd></>}
+            <dt>Computador</dt><dd>{computer ? `${computer.kind === 'boat' ? 'VM boat.dev' : computer.kind === 'local' ? 'Pasta local' : computer.kind === 'docker' ? 'Docker' : 'Desligado'} · ${computer.status}` : '…'}</dd>
             <dt>Criado</dt><dd>{new Date(agent.createdAt).toLocaleString('pt-BR')}</dd>
-          </dl>
+          </dl>}
           <div className="danger-zone">
             <div><b>Excluir agente</b><small>Apaga o agente e as rotinas dele. As conversas ficam.</small></div>
             <button className="btn btn-danger" disabled={S.agents.length < 2} onClick={remove}>Excluir</button>
           </div>
         </>}
+        {tab === 'skills' && <>
+          <h3 className="sub">O que {v.name || 'ele'} sabe fazer</h3>
+          <Tools v={v} set={set} />
+          <Channels agent={agent} />
+          <Knowledge agent={agent} />
+        </>}
+        {tab === 'autonomy' && <>
+          <Behavior v={v} set={set} settings={S.settings} />
+          <details className="adv-model" open={enterprise}>
+            <summary><Icon name="down" size={14} className="adv-chev" />Modelo e esforço <small>Avançado · o Ripper Auto escolhe sozinho</small></summary>
+            <ModelPick v={v} set={set} />
+          </details>
+        </>}
+        {tab === 'routines' && <Routines agent={agent} />}
       </div>
       {confirmNode}
     </div>

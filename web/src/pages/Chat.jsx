@@ -16,6 +16,7 @@ import { useChatMenu } from '../actions.jsx';
 import { useOv } from '../overlay.jsx';
 import { botAvatarPalette } from 'bot-avatars';
 import { FirstRunChecklist } from '../firstRunChecklist.jsx';
+import { isEnterpriseMode } from '../uiMode.js';
 
 // Cor do agente como TEXTO: misturada com a tinta para passar contraste nos dois temas (a pura dava 3,3:1).
 const agentColor = a => `color-mix(in srgb, ${nameColor(a, botAvatarPalette)} 58%, var(--ink))`;
@@ -97,7 +98,7 @@ function LiveText({ text }) {
   return shown ? <Markdown text={closeOpen(shown)} live /> : null;
 }
 
-const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, models, group }) {
+const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, models, group, showModel }) {
   return (
     <div className="msg bot">
       <div className="msg-av"><AgentAvatar agent={agent} size={36} state={live ? 'working' : undefined} paused={!live} /></div>
@@ -113,7 +114,8 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, mo
         <div className="msg-meta">
           {m.at && <time>{fmtTime(m.at)}</time>}
           {m.via?.type === 'inbox' && <a className="badge via" href={`#/c/${m.via.threadChatId}`} title="Abrir a troca entre os agentes"><Icon name="chat" size={12} />Resposta por mensagem</a>}
-          {m.model && <span className="badge">{m.routed ? 'Auto → ' : ''}{models[m.model]?.label || m.model}{m.effort && m.effort !== 'auto' ? ` · ${effortLabel(m.effort)}` : ''}</span>}
+          {/* qual modelo respondeu: só no Enterprise — para os demais é ruído em toda mensagem */}
+          {m.model && showModel && <span className="badge">{m.routed ? 'Auto → ' : ''}{models[m.model]?.label || m.model}{m.effort && m.effort !== 'auto' ? ` · ${effortLabel(m.effort)}` : ''}</span>}
           {!live && m.content && <>
             <button className="meta-btn" onClick={() => navigator.clipboard.writeText(m.content)}><Icon name="copy" size={14} />Copiar</button>
             {onRetry && <button className="meta-btn" onClick={onRetry}><Icon name="retry" size={14} />Refazer</button>}
@@ -122,7 +124,7 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, mo
       </div>
     </div>
   );
-}, (a, b) => a.m === b.m && a.agent === b.agent && a.live === b.live && a.phase === b.phase && a.group === b.group && a.models === b.models && !!a.onRetry === !!b.onRetry);
+}, (a, b) => a.m === b.m && a.agent === b.agent && a.live === b.live && a.phase === b.phase && a.group === b.group && a.showModel === b.showModel && a.models === b.models && !!a.onRetry === !!b.onRetry);
 
 function InboxMessage({ m, from }) {
   return (
@@ -427,7 +429,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
             )}
             {messages.map((m, i) => m.inbox ? <InboxMessage key={m.id || i} m={m} from={getAgent(m.inbox.from)} /> : m.role === 'user'
               ? <UserMessage key={m.id || i} m={m} name={S.settings.name} files={S.files} />
-              : <BotMessage key={m.id || i} m={m} agent={getAgent(m.agentId) || agent} group={isGroup || (!!m.agentId && m.agentId !== agent.id)} models={S.models} onRetry={m === messages.at(-1) && lastUser ? () => send({ text: lastUser.content }) : null} />)}
+              : <BotMessage key={m.id || i} m={m} agent={getAgent(m.agentId) || agent} group={isGroup || (!!m.agentId && m.agentId !== agent.id)} models={S.models} showModel={isEnterpriseMode(S.settings)} onRetry={m === messages.at(-1) && lastUser ? () => send({ text: lastUser.content }) : null} />)}
             {live && <BotMessage m={live} agent={getAgent(live.agentId) || agent} group={isGroup} live phase={phase} models={S.models} />}
           </div>
         </div>

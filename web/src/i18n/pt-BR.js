@@ -7,7 +7,7 @@ export default {
   'common.discard': 'Descartar',
   'common.saving': 'Salvando…',
   'common.search': 'Buscar',
-  'common.online': 'Online',
+  'common.online': 'Ativo',
   'common.paused': 'Pausado',
   'common.you': 'Você',
 

@@ -75,12 +75,12 @@ export function fmtAgo(t) {
 /* ---------- ferramentas: rótulos humanos ---------- */
 export const TOOL_INFO = {
   web: { label: 'Pesquisa na web', icon: 'globe', desc: 'Busca e lê páginas, com as fontes.' },
-  browser: { label: 'Navegador', icon: 'compass', desc: 'Abre sites no computador dele; você vê a tela ao vivo. Precisa do modo Docker.' },
+  browser: { label: 'Navegador', icon: 'compass', desc: 'Abre sites no computador dele; você vê a tela ao vivo.' },
   computer: { label: 'Computador', icon: 'terminal', desc: 'VM própria: instala pacotes, roda código, compartilha links.' },
   memory: { label: 'Memória', icon: 'brain', desc: 'Guarda o que importa entre conversas.' },
   routines: { label: 'Rotinas', icon: 'clock', desc: 'Age sozinho em horários definidos.' },
   files: { label: 'Análise de arquivos', icon: 'file', desc: 'Lê documentos, planilhas e código enviados.' },
-  plugins: { label: 'Plugins MCP', icon: 'plug', desc: 'Usa as integrações que você conectou.' },
+  plugins: { label: 'Conectores', icon: 'plug', desc: 'Usa os apps que você conectou: Google Agenda, Gmail, Notion…' },
   social: { label: 'Publicação social', icon: 'share', desc: 'Envia rascunhos ou posts para webhooks configurados (Slack, HTTP).' }
 };
 export const STEP_LABEL = {

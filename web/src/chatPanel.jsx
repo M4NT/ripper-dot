@@ -5,7 +5,7 @@ import { AgentAvatar, Icon, Menu, Segmented, StatusDot } from './ui.jsx';
 import { useApp } from './app.jsx';
 import { uploadFile } from './composer.jsx';
 import { ResizeHandle } from './resize.jsx';
-import { effortLabel } from './modelPicker.jsx';
+import { AutonomySemaphore, autonomyMeta } from './autonomy.jsx';
 import { ArtifactList } from './actions.jsx';
 import ConversationMedia from './ConversationMedia.jsx';
 const COMP_LABEL = { running: 'Ligado', stopped: 'Parado', 'not started': 'Ainda não iniciado', local: 'Pasta local', off: 'Desligado', 'no key': 'Falta a chave do boat.dev', unknown: 'Sem resposta da VM' };
@@ -35,34 +35,39 @@ function ToolsMenu({ members }) {
   );
 }
 
+/** O que este agente faz e decide sozinho — o que importa durante a conversa. Modelo fica no composer. */
+function AgentBrief({ a, S }) {
+  const auto = autonomyMeta(a.autonomyLevel);
+  const routines = S.routines.filter(r => r.agentId === a.id).length;
+  return <>
+    <p className="panel-label">Pode fazer aqui</p>
+    <ul className="cap-chips">{Object.entries(TOOL_INFO).filter(([k]) => a.tools.includes(k)).map(([k, t]) => (
+      <li key={k} title={t.desc}><Icon name={t.icon} size={14} />{t.label}</li>
+    ))}</ul>
+    <p className="panel-label">Autonomia</p>
+    <div className="autonomy-brief"><AutonomySemaphore level={a.autonomyLevel} settings={S.settings} /><small>{auto.desc}</small></div>
+    {routines > 0 && <p className="muted small"><Icon name="clock" size={13} /> {routines} rotina{routines > 1 ? 's' : ''} ativa{routines > 1 ? 's' : ''}</p>}
+  </>;
+}
+
 function Details({ members, project, S }) {
   const group = members.length > 1;
-  const routines = S.routines.filter(r => members.some(a => a.id === r.agentId));
-  const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
   return (
     <div className="panel-tab">
-      {group ? (
+      {group ? <>
         <ul className="member-list">
           {members.map(a => (
-            <li key={a.id}><AgentAvatar agent={a} size={30} paused /><span><b>{a.name}</b><small>{a.description || a.category}</small></span></li>
+            <li key={a.id}><AgentAvatar agent={a} size={30} paused /><span><b>{a.name}</b><small>{a.description || a.category}</small></span>
+              <a className="icon-btn sm" href={`#/agents/${a.id}/settings`} aria-label={`Configurar ${a.name}`} title="Configurar"><Icon name="gear" size={15} /></a></li>
           ))}
         </ul>
-      ) : <p className="panel-desc">{members[0].description || 'Sem descrição.'}</p>}
-      {group && <p className="panel-note">Quem fala é escolhido pelo pedido. Com <b>@Nome</b> você chama alguém direto; eles se delegam entre si.</p>}
-
-      <dl className="facts compact">
-        {!group && <><dt>Modelo</dt><dd>{S.models[members[0].model]?.label || 'Ripper Auto'} · {effortLabel(members[0].effort)}</dd></>}
-        {project && <><dt>Projeto</dt><dd><a className="link" href={`#/p/${project.id}`}>{project.name}</a></dd></>}
-        <dt>Memórias</dt><dd>{S.memoriesByAgent ? members.reduce((n, a) => n + (S.memoriesByAgent[a.id] || 0), 0) : '—'}</dd>
-      </dl>
-
-      <p className="panel-label">Rotinas</p>
-      {routines.length === 0
-        ? <p className="muted small">Nenhuma. Peça no chat: “todo dia às 9, me mande…”.</p>
-        : <ul className="mini-list">{routines.map(r => (
-          <li key={r.id}><Icon name="clock" size={14} /><span><b>{r.name}</b><small>{r.everyMinutes ? `A cada ${r.everyMinutes} min` : `${r.weekday != null ? days[r.weekday] + ', ' : 'Todo dia, '}${r.dailyAt}`}</small></span></li>
-        ))}</ul>}
-      {!group && <a className="btn btn-block btn-sm" href={`#/agents/${members[0].id}/settings?tab=routines`}><Icon name="plus" size={14} />Nova rotina</a>}
+        <p className="panel-note">Quem responde é escolhido pelo pedido. Escreva <b>@Nome</b> para chamar alguém direto; eles também passam tarefas entre si.</p>
+      </> : <>
+        <p className="panel-desc">{members[0].description || 'Sem descrição.'}</p>
+        <AgentBrief a={members[0]} S={S} />
+      </>}
+      {project && <p className="panel-project"><Icon name="folder" size={14} /> Projeto <a className="link" href={`#/p/${project.id}`}>{project.name}</a></p>}
+      {!group && <a className="btn btn-block btn-sm" href={`#/agents/${members[0].id}/settings`}><Icon name="gear" size={14} />Configurar {members[0].name}</a>}
     </div>
   );
 }

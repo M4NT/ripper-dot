@@ -224,7 +224,7 @@ export default function Marketplace() {
       if (type === 'oauth') await runMcpOAuthLogin({ pluginName: detail.id });
       await refresh();
       const off = S.agents.filter(a => !a.tools.includes('plugins'));
-      if (off.length && await ov.confirm({ title: `${detail.name} conectado`, body: `${off.map(a => a.name).join(', ')} ainda não pode(m) usar conectores. Liberar a ferramenta "Plugins MCP" para ${off.length === 1 ? 'ele' : 'eles'}?`, action: 'Liberar' })) {
+      if (off.length && await ov.confirm({ title: `${detail.name} conectado`, body: `${off.map(a => a.name).join(', ')} ainda não pode(m) usar conectores. Ligar "Conectores" para ${off.length === 1 ? 'ele' : 'eles'}?`, action: 'Liberar' })) {
         await Promise.all(off.map(a => api(`/api/agents/${a.id}`, { method: 'PUT', body: { tools: [...a.tools, 'plugins'] } })));
         await refresh();
       }

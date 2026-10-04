@@ -78,7 +78,7 @@ export function Behavior({ v, set, settings }) {
   return <>
     <AutonomyPick value={v.autonomyLevel} onChange={autonomyLevel => set({ autonomyLevel })} allowFullyAutonomous={allowFully} />
     <label className="field">Instruções<textarea rows={8} value={v.instructions} maxLength={8000} onChange={e => set({ instructions: e.target.value })} placeholder="Defina o comportamento, as regras e o que ele nunca deve fazer." /><small>Entram em toda conversa, junto das suas instruções gerais.</small></label>
-    <p className="muted">Tom, formalidade e dicas de voz estão na aba «Voz e estilo».</p>
+    <p className="muted">Tom e voz ficam em «Identidade».</p>
   </>;
 }
 
@@ -105,8 +105,8 @@ export function Tools({ v, set }) {
   const { S } = useApp();
   const toggle = t => set({ tools: v.tools.includes(t) ? v.tools.filter(x => x !== t) : [...v.tools, t] });
   const notes = {
-    computer: S.settings.computer.mode === 'off' ? 'O computador está desligado em Integrações.' : S.settings.computer.mode === 'boat' && !S.settings.computer.boatApiKey ? 'Falta a chave do boat.dev em Integrações.' : null,
-    plugins: S.settings.plugins.length ? `${S.settings.plugins.length} plugin(s) conectado(s).` : 'Nenhum plugin conectado ainda.'
+    computer: S.settings.computer.mode === 'off' ? 'O computador está desligado em Configurações → Computador.' : S.settings.computer.mode === 'boat' && !S.settings.computer.boatApiKey ? 'Falta a chave do boat.dev em Configurações → Computador.' : null,
+    plugins: S.settings.plugins.length ? `${S.settings.plugins.length} app(s) conectado(s) no Ripper, mais os da sua conta claude.ai.` : 'Usa os apps conectados no Ripper e na sua conta claude.ai.'
   };
   return (
     <ul className="toggle-list">
@@ -114,7 +114,7 @@ export function Tools({ v, set }) {
         <li key={k}>
           <label>
             <span className="toggle-ico"><Icon name={t.icon} /></span>
-            <span className="toggle-text"><b>{t.label}</b><small>{t.desc}</small>{notes[k] && <small className="note-inline">{notes[k]} {k !== 'memory' && <a href="#/marketplace">Abrir Integrações</a>}</small>}</span>
+            <span className="toggle-text"><b>{t.label}</b><small>{t.desc}</small>{notes[k] && <small className={k === 'plugins' ? 'note-info' : 'note-inline'}>{notes[k]} {k === 'plugins' ? <a href="#/connectors">Ver conectores</a> : k === 'computer' ? <a href="#/settings/computer">Abrir</a> : null}</small>}</span>
             <Switch checked={v.tools.includes(k)} onChange={() => toggle(k)} label={t.label} />
           </label>
         </li>
