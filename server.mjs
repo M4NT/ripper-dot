@@ -77,7 +77,7 @@ import { listClaudeConnectors } from './lib/claude-connectors.mjs';
 import { buildInbox, resolveInboxItem } from './lib/inbox-feed.mjs';
 import { vmPathToData, mimeOf, inlineType } from './lib/deliver-file.mjs';
 import { parseWhatsappMessages, whatsappPrompt, sendWhatsappText, whatsappReady } from './lib/whatsapp.mjs';
-import { evolutionSecrets, connectInstance, instanceState, disconnectInstance, sendText as sendEvolutionText, parseEvolutionAny, contactMode, isAllowed, makeRateLimiter, channelSafeAgent } from './lib/evolution.mjs';
+import { evolutionSecrets, connectInstance, instanceState, disconnectInstance, sendText as sendEvolutionText, parseEvolutionAny, parseEvolutionGroup, groupName, contactMode, isAllowed, makeRateLimiter, channelSafeAgent } from './lib/evolution.mjs';
 import { history as waHistory, recordMessage as recordWaMessage, listChats as waListChats, readChat as waReadChat, findContacts as waFindContacts, styleProfile as waStyleProfile, styleHint, stats as waStats, wipeHistory as waWipeHistory } from './lib/whatsapp-store.mjs';
 import { timingSafeEqual } from 'node:crypto';
 import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStreaming, activeChatStreamCount } from './lib/chat-stream.mjs';
@@ -1000,7 +1000,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
       chats: a => {
         recordCorporateAudit(db.settings, { category: 'whatsapp', action: 'whatsapp.list_chats', agentId: agent.id, chatId: chat.id, at: Date.now() });
         const rows = waListChats(a.limit);
-        return rows.length ? rows.map(r => `+${r.phone}${r.name ? ` (${r.name})` : ''} · ${new Date(r.lastAt).toLocaleString('pt-BR')}${r.unread ? ` · ${r.unread} não lida(s)` : ''} · "${String(r.last || '').slice(0, 80)}"`).join(String.fromCharCode(10)) : 'Nenhuma conversa guardada ainda (só a partir de quando a leitura foi ligada).';
+        return rows.length ? rows.map(r => `${r.phone.startsWith('g') ? 'Grupo' : '+' + r.phone}${r.name ? ` (${r.name})` : ''} · ${new Date(r.lastAt).toLocaleString('pt-BR')}${r.unread ? ` · ${r.unread} não lida(s)` : ''} · "${String(r.last || '').slice(0, 80)}"`).join(String.fromCharCode(10)) : 'Nenhuma conversa guardada ainda (só a partir de quando a leitura foi ligada).';
       },
       read: a => {
         const typed = String(a.contact || '').replace(/\D/g, '');
@@ -1012,7 +1012,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
       },
       contacts: a => {
         const rows = waFindContacts(a.query, a.limit);
-        return rows.length ? rows.map(r => `+${r.phone}${r.name ? ` — ${r.name}` : ''}`).join(String.fromCharCode(10)) : 'Nenhum contato encontrado.';
+        return rows.length ? rows.map(r => `${r.phone.startsWith('g') ? 'Grupo' : '+' + r.phone}${r.name ? ` — ${r.name}` : ''}`).join(String.fromCharCode(10)) : 'Nenhum contato encontrado.';
       },
       send: async a => {
         const to = String(a.to || '').replace(/\D/g, ''), msgText = String(a.text || '').trim();
@@ -1867,7 +1867,7 @@ const routes = [
   ['GET', /^\/api\/whatsapp-web\/contacts$/, (req, _, url) => {
     requireEnterpriseAdmin();
     const w = db.settings.whatsappWeb || {};
-    return { contacts: waFindContacts(url.searchParams.get('q') || '', 100).map(c => ({ ...c, mode: contactMode(c.phone, w) })) };
+    return { contacts: waFindContacts(url.searchParams.get('q') || '', 100).map(c => ({ ...c, mode: c.phone.startsWith('g') ? 'group' : contactMode(c.phone, w) })) };
   }],
   ['DELETE', /^\/api\/whatsapp-web\/history$/, () => {
     requireEnterpriseAdmin();
@@ -2541,6 +2541,15 @@ const server = createServer(async (req, res) => {
       let ev; try { ev = JSON.parse((await body.raw(req)).toString('utf8')); } catch { throw new HttpError(400, 'JSON inválido.'); }
       if (ev?.event === 'connection.update' && ev.data?.state) {
         recordCorporateAudit(db.settings, { category: 'whatsapp', action: `whatsapp_web.${ev.data.state}`, at: Date.now() });
+      }
+      // grupo: só guardar para leitura (opt-in "Ler grupos"); nunca entra no fluxo de resposta
+      const grp = parseEvolutionGroup(ev);
+      if (grp) {
+        const w = db.settings.whatsappWeb || {};
+        if (w.readAll && w.readGroups && isEnterpriseMode(db.settings)) {
+          groupName(grp.groupJid).then(name => recordWaMessage({ id: grp.id, phone: grp.key, fromMe: false, text: grp.text, name: name || 'Grupo', at: grp.at })).catch(() => {});
+        }
+        return json(res, { ok: true }, 200, {}, req);
       }
       const msg = parseEvolutionAny(ev);
       if (msg) handleWhatsappWebMessage(msg).catch(e => console.error('whatsapp-web', ...redactForLog(db.settings, e.message)));

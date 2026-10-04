@@ -167,3 +167,46 @@ test('com leitura ligada: rascunho só sai com aprovação; "só lê" e mensagem
     child.kill(); evo.close();
   }
 });
+
+test('grupo: parser lê quem falou; só guarda com "Ler grupos" e nunca responde', async () => {
+  const { parseEvolutionGroup } = await import('../lib/evolution.mjs');
+  const gEv = (id, text, extra = {}) => ({ event: 'messages.upsert', data: { key: { id, remoteJid: '120363111@g.us', participant: '5511988887777@s.whatsapp.net', ...extra }, pushName: 'Tia Ana', message: { conversation: text } } });
+  assert.deepEqual(parseEvolutionGroup(gEv('g1', 'bom dia família')), { id: 'g1', groupJid: '120363111@g.us', key: 'g120363111', text: 'Tia Ana: bom dia família', fromMe: false, at: parseEvolutionGroup(gEv('g1', 'bom dia família')).at });
+  assert.equal(parseEvolutionGroup(msg({ remoteJid: '5511988887777@s.whatsapp.net' })), null); // individual não é grupo
+  assert.equal(parseEvolutionMessage(gEv('g1', 'oi')), null);                                    // grupo nunca entra no fluxo de resposta
+
+  const sent = [];
+  const evo = http.createServer((req, res) => { let b = ''; req.on('data', c => (b += c)); req.on('end', () => { sent.push(req.url); res.setHeader('content-type', 'application/json'); res.end(req.url.startsWith('/group/') ? '{"subject":"Familia mil grau"}' : '{}'); }); });
+  await new Promise(r => evo.listen(0, '127.0.0.1', r));
+  const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r)); const port = probe.address().port; await new Promise(r => probe.close(r));
+  const dataDir = mkdtempSync(join(tmpdir(), 'ripper-wagrp-'));
+  const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
+    env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'stream', HOME: dataDir, USERPROFILE: dataDir, JULIA_AUTOSTART: '0', EVOLUTION_URL: `http://127.0.0.1:${evo.address().port}` },
+    stdio: 'ignore'
+  });
+  const base = `http://127.0.0.1:${port}`;
+  try {
+    for (let i = 0; i < 60; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 250)); }
+    const st = await (await fetch(base + '/api/state')).json();
+    const put = b => fetch(base + '/api/settings', { method: 'PUT', headers: { 'content-type': 'application/json', origin: base }, body: JSON.stringify(b) });
+    await put({ ui: { mode: 'enterprise' } });
+    await put({ whatsappWeb: { enabled: true, readAll: true, readGroups: false, agentId: st.agents[0].id, allowlist: ['5511988887777'] } });
+    await fetch(base + '/api/channels/whatsapp-web/' + 'f'.repeat(48), { method: 'POST', body: '{}' });
+    const { hookToken } = JSON.parse(readFileSync(join(dataDir, 'evolution.json'), 'utf8'));
+    const send = ev => fetch(base + '/api/channels/whatsapp-web/' + hookToken, { method: 'POST', body: JSON.stringify(ev), headers: { 'content-type': 'application/json', 'x-ripper-token': hookToken } });
+    const hist = async () => (await (await fetch(base + '/api/whatsapp-web/status')).json()).history;
+
+    await send(gEv('off', 'não deve guardar'));                       // "Ler grupos" desligado
+    await new Promise(r => setTimeout(r, 400));
+    assert.equal((await hist()).messages, 0);
+
+    await put({ whatsappWeb: { readGroups: true } });
+    await send(gEv('on', 'churrasco domingo?'));
+    for (let i = 0; i < 20 && (await hist()).messages === 0; i++) await new Promise(r => setTimeout(r, 200));
+    const contacts = (await (await fetch(base + '/api/whatsapp-web/contacts?q=familia')).json()).contacts;
+    assert.equal(contacts[0]?.name, 'Familia mil grau');
+    assert.equal(contacts[0]?.mode, 'group');
+    await new Promise(r => setTimeout(r, 600));
+    assert.equal(sent.filter(u => u.startsWith('/message/sendText')).length, 0); // nunca responde em grupo
+  } finally { child.kill(); evo.close(); }
+});

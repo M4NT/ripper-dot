@@ -89,6 +89,11 @@ export function WhatsappWebPanel({ w, setW, Row }) {
         setW('readAll', v);
       }} label="Ler todas as conversas" />
     </Row>
+    {w.readAll && (
+      <Row title="Ler grupos" desc="O agente lê os grupos para resumir e responder perguntas suas (ex.: “resuma o grupo da família de hoje”). Ele nunca responde nem age em grupo. Vale a partir de agora: mensagens antigas não ficam disponíveis.">
+        <Switch checked={!!w.readGroups} onChange={v => setW('readGroups', v)} label="Ler grupos do WhatsApp" />
+      </Row>
+    )}
     {w.readAll && st?.history && (
       <div className="wa-history">
         <span><b>{st.history.contacts}</b> contatos · <b>{st.history.messages}</b> mensagens guardadas{st.styleFrom ? <> · estilo aprendido com <b>{st.styleFrom}</b> mensagens suas</> : ' · o estilo aparece depois de 5 mensagens suas'}</span>
@@ -130,8 +135,10 @@ function ContactModes({ w, setW, Row }) {
       {rows === null ? <p className="muted small">Carregando…</p> : rows.length === 0 ? <p className="muted small">Nenhum contato ainda: aparecem conforme as mensagens chegam.</p> :
         <ul className="wa-contacts">{rows.map(c => (
           <li key={c.phone}>
-            <span className="grow"><b>{c.name || 'Sem nome'}</b><small className="muted">+{c.phone}</small></span>
-            <Select label={`Modo de ${c.name || c.phone}`} size="sm" value={(w.contactModes || {})[c.phone] || c.mode || 'draft'} onChange={v => setMode(c.phone, v)} options={MODES} />
+            <span className="grow"><b>{c.name || 'Sem nome'}</b><small className="muted">{c.mode === 'group' ? 'Grupo' : '+' + c.phone}</small></span>
+            {c.mode === 'group'
+              ? <span className="tag">Grupo · só leitura</span>
+              : <Select label={`Modo de ${c.name || c.phone}`} size="sm" value={(w.contactModes || {})[c.phone] || c.mode || 'draft'} onChange={v => setMode(c.phone, v)} options={MODES} />}
           </li>
         ))}</ul>}
     </Row>
