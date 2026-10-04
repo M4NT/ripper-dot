@@ -27,7 +27,8 @@ try {
 
   // 1) Prompt com ferramentas pela UI (linha de ações + ThinkingOrb + streaming)
   where = 'chat com ferramentas';
-  await page.goto(base + '/#/');
+  // domcontentloaded: o app renderiza após o DOM; o evento 'load' às vezes não dispara com a máquina sob carga
+  await page.goto(base + '/#/', { waitUntil: 'domcontentloaded', timeout: 60_000 });
   const box = page.locator('textarea').first();
   await box.waitFor({ timeout: 15_000 });
   await box.fill('[[ripper:test:tools]] resposta-do-smoke');
@@ -47,7 +48,7 @@ try {
     await fetch(base + '/api/settings', { method: 'PUT', headers: { 'content-type': 'application/json', origin: base }, body: JSON.stringify({ ui: { mode } }) });
     for (const r of routes) {
       where = `${mode} ${r}`;
-      await page.goto(base + '/#' + r);
+      await page.goto(base + '/#' + r, { waitUntil: 'domcontentloaded', timeout: 60_000 });
       await page.waitForTimeout(500);
       await broken();
     }
