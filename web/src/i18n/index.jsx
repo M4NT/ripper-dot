@@ -38,6 +38,7 @@ export function settingsTabs(t) {
     ['profile', t('settings.tab.profile'), 'agents', t('settings.tab.profileHint')],
     ['models', t('settings.tab.models'), 'bolt', t('settings.tab.modelsHint')],
     ['computer', t('settings.tab.computer'), 'terminal', t('settings.tab.computerHint')],
+    ['channels', t('settings.tab.channels'), 'chat', t('settings.tab.channelsHint')],
     ['plugins', t('settings.tab.plugins'), 'plug', t('settings.tab.pluginsHint')],
     ['security', t('settings.tab.security'), 'key', t('settings.tab.securityHint')],
     ['backup', t('settings.tab.backup'), 'data', t('settings.tab.backupHint')],

@@ -106,7 +106,7 @@ export function Tools({ v, set }) {
   const toggle = t => set({ tools: v.tools.includes(t) ? v.tools.filter(x => x !== t) : [...v.tools, t] });
   const notes = {
     computer: S.settings.computer.mode === 'off' ? 'O computador está desligado em Configurações → Computador.' : S.settings.computer.mode === 'boat' && !S.settings.computer.boatApiKey ? 'Falta a chave do boat.dev em Configurações → Computador.' : null,
-    plugins: S.settings.plugins.length ? `${S.settings.plugins.length} app(s) conectado(s) no Ripper, mais os da sua conta claude.ai.` : 'Usa os apps conectados no Ripper e na sua conta claude.ai.'
+    plugins: ' '
   };
   return (
     <ul className="toggle-list">

@@ -6,27 +6,46 @@ import { Basics, Behavior, Tools, Appearance, ModelPick, VoiceStyle, agentStyleD
 import { AutonomySemaphore } from '../autonomy.jsx';
 import { uploadFile } from '../composer.jsx';
 import { isEnterpriseMode } from '../uiMode.js';
+import { useOv } from '../overlay.jsx';
 
 // 4 abas pelo jeito que o dono pensa: quem ele é, o que sabe fazer, quanto decide sozinho, quando age sozinho.
 const TABS = [['identity', 'Identidade'], ['skills', 'Habilidades'], ['autonomy', 'Autonomia'], ['routines', 'Rotinas']];
 // links antigos (?tab=model etc.) continuam abrindo a aba certa
 const OLD_TAB = { general: 'identity', look: 'identity', voice: 'identity', advanced: 'identity', tools: 'skills', knowledge: 'skills', model: 'autonomy', behavior: 'autonomy' };
 
-/** Onde o agente atende além do chat do Ripper (canais configurados para ele). */
+/** Onde o agente atende. O WhatsApp é um número só; aqui você escolhe se É ESTE agente que atende. */
 function Channels({ agent }) {
-  const { S } = useApp();
-  const qr = S.settings.whatsappWeb?.agentId === agent.id, meta = S.settings.whatsapp?.agentId === agent.id;
-  const on = (qr && S.settings.whatsappWeb.enabled) || (meta && S.settings.whatsapp.enabled);
+  const { S, refresh, toast } = useApp();
+  const ov = useOv();
+  const w = S.settings.whatsappWeb || {};
+  const enterprise = isEnterpriseMode(S.settings);
+  const mine = w.agentId === agent.id && w.enabled;
+  const other = w.enabled && w.agentId && w.agentId !== agent.id ? S.agents.find(a => a.id === w.agentId) : null;
+  async function toggle(on) {
+    if (on && other && !(await ov.confirm({ title: `Passar o WhatsApp para ${agent.name}?`, body: `Hoje quem atende é ${other.name}. Só um agente atende o número por vez.`, action: 'Passar' }))) return;
+    try {
+      await api('/api/settings', { method: 'PUT', body: { whatsappWeb: on ? { agentId: agent.id, enabled: true } : { enabled: false } } });
+      await refresh();
+      toast(on ? `${agent.name} agora atende o WhatsApp` : 'WhatsApp desligado');
+    } catch (e) { toast(e.message, 'error'); }
+  }
   return <>
     <h3 className="sub">Onde atende</h3>
     <ul className="toggle-list">
-      <li><label><span className="toggle-ico"><Icon name="chat" /></span><span className="toggle-text"><b>Chat do Ripper</b><small>Você e seus times conversam com {agent.name} aqui.</small></span><span className="tag">sempre</span></label></li>
-      <li><label><span className="toggle-ico"><Icon name="inbox" /></span><span className="toggle-text"><b>WhatsApp</b>
-        <small>{qr || meta ? `${agent.name} responde ${qr ? 'pelo WhatsApp conectado por QR' : 'pela API oficial'}${on ? '' : ' (pausado: "Responder mensagens" está desligado)'}. Recados chegam na Caixa.` : `${agent.name} não atende no WhatsApp.`}</small></span>
-        <a className="btn btn-sm" href="#/settings/plugins">{qr || meta ? 'Configurar' : 'Conectar'}</a></label></li>
+      <li><label><span className="toggle-ico"><Icon name="chat" /></span><span className="toggle-text"><b>Chat do Ripper</b><small>Você conversa com {agent.name} aqui.</small></span><span className="tag">sempre</span></label></li>
+      <li><label><span className="toggle-ico"><Icon name="inbox" /></span>
+        <span className="toggle-text"><b>WhatsApp</b>
+          <small>{!enterprise ? 'Disponível no modo Enterprise (Configurações → Aparência).'
+            : mine ? `${agent.name} responde os contatos liberados e deixa recados na Caixa.`
+            : other ? `Hoje quem atende é ${other.name}.`
+            : 'Ninguém atende o WhatsApp agora.'}{enterprise && <> <a className="inline-link" href="#/settings/channels">Contatos, conexão e segurança</a></>}</small>
+        </span>
+        {enterprise && <Switch checked={!!mine} onChange={toggle} label={`${agent.name} atende o WhatsApp`} />}
+      </label></li>
     </ul>
   </>;
 }
+
 const pick = a => ({
   name: a.name, description: a.description, category: a.category, status: a.status,
   instructions: a.instructions, tone: a.tone, style: agentStyleDraft(a),

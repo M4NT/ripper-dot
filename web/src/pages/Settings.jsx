@@ -250,7 +250,8 @@ function Plugins({ s, set }) {
 export default function Settings({ theme, toggleTheme, tab: initial }) {
   const { S, refresh, toast } = useApp();
   const ov = useOv();
-  const [waMode, setWaMode] = useState('api');
+  // abre no tipo de conexão que você usa (QR configurado → QR)
+  const [waMode, setWaMode] = useState(() => (S.settings.whatsappWeb?.agentId || !S.settings.whatsapp?.agentId ? 'qr' : 'api'));
   const tr = useT();
   const SETTINGS_TABS = settingsTabs(tr);
   const d = useSettingsDraft();
@@ -416,12 +417,12 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
         </>}
 
         {tab === 'plugins' && <Plugins s={s} set={set} />}
-        {tab === 'plugins' && enterprise && (() => {
+        {tab === 'channels' && (() => {
           const w = s.whatsapp || {};
           const setW = (k, v) => set('whatsapp', { ...w, [k]: v });
           const hook = `${location.origin}/api/channels/whatsapp/webhook`;
           return (
-            <Card title="Canal WhatsApp" desc="Um agente responde quem escreve no seu WhatsApp. Cada contato vira uma conversa aqui, que você acompanha e pode assumir.">
+            <Card title="Canal WhatsApp" desc="Um agente responde quem escreve no seu WhatsApp. A conversa fica no WhatsApp; o que precisar de você chega na Caixa.">
               <Segmented label="Tipo de conexão" value={waMode} onChange={setWaMode} size="sm" className="wa-mode"
                 items={[['api', 'API oficial (Meta)'], ['qr', 'WhatsApp Web (QR)']]} />
               {waMode === 'qr' ? <WhatsappWebPanel w={s.whatsappWeb || {}} setW={(k, v) => set('whatsappWeb', { ...(s.whatsappWeb || {}), [k]: v })} Row={Row} /> : <>

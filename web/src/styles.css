@@ -1579,3 +1579,4 @@ code, .mono, pre { overflow-wrap: anywhere; }
 .panel-project { display: flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--ink-2); }
 .member-list li > .icon-btn { flex: none; }
 .note-info { color: var(--muted); } .note-info a { text-decoration: underline; text-underline-offset: 2px; color: var(--ink-2); }
+.inline-link { color: var(--ink-2); text-decoration: underline; text-underline-offset: 2px; }
