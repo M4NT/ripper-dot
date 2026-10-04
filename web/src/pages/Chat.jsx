@@ -20,6 +20,33 @@ import { FirstRunChecklist } from '../firstRunChecklist.jsx';
 // Cor do agente como TEXTO: misturada com a tinta para passar contraste nos dois temas (a pura dava 3,3:1).
 const agentColor = a => `color-mix(in srgb, ${nameColor(a, botAvatarPalette)} 58%, var(--ink))`;
 // Qual "verbo" o orb mostra para cada fase da resposta.
+// Erro do provedor em linguagem de gente: o que houve e o que fazer. O texto técnico fica em "Detalhes".
+const ERRORS = [
+  [/model.{0,40}(not.?found|não.?encontrad|unavailable|indispon)|invalid.?model|not_found_error/i, 'Este modelo não está disponível na sua conta.', 'Troque o modelo no seletor abaixo ou desligue-o em Configurações → Modelos.'],
+  [/429|rate.?limit|usage.?limit|quota|limite de uso|overloaded/i, 'O limite de uso foi atingido.', 'Espere a janela de uso renovar ou escolha outro modelo no seletor.'],
+  [/401|unauthori|login|credential|oauth|api.?key|autentic/i, 'O Ripper perdeu o acesso ao modelo.', 'Rode “claude login” nesta máquina ou confira a chave em Configurações → Modelos.'],
+  [/timeout|timed out|tempo esgotado|ETIMEDOUT/i, 'O modelo demorou demais para responder.', 'Tente de novo; pedidos menores respondem mais rápido.'],
+  [/ENOTFOUND|ECONN|fetch failed|network|sem conex/i, 'Sem conexão com o provedor do modelo.', 'Confira a internet desta máquina e tente de novo.'],
+  [/codex/i, 'O Codex não respondeu.', 'Confira se o Codex está instalado e logado (codex login).'],
+  [/success: erro|error_during_execution|error_max_turns|max.?turns/i, 'O modelo encerrou sem dar uma resposta.', 'Costuma ser passageiro: tente de novo. Se repetir, troque o modelo.']
+];
+function humanError(raw) {
+  const hit = ERRORS.find(([re]) => re.test(String(raw || '')));
+  return hit ? { title: hit[1], hint: hit[2] } : { title: 'Algo deu errado ao responder.', hint: 'Tente de novo. Se continuar, veja os detalhes abaixo.' };
+}
+function MsgError({ raw, onRetry }) {
+  const { title, hint } = humanError(raw);
+  return (
+    <div className="msg-error" role="alert">
+      <b>{title}</b><span>{hint}</span>
+      <div className="msg-error-actions">
+        {onRetry && <button type="button" className="btn btn-sm" onClick={onRetry}><Icon name="retry" size={14} />Tentar de novo</button>}
+        <details><summary>Detalhes</summary><code>{String(raw)}</code></details>
+      </div>
+    </div>
+  );
+}
+
 // Por que a resposta parou (gravado pelo servidor em message.stopReason).
 const STOP_REASON = {
   user: 'Você interrompeu a resposta.',
@@ -80,7 +107,7 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, mo
           <ActionLine steps={m.steps} live={live} />
           {m.content ? (live ? <LiveText text={m.content} /> : <Markdown text={m.content} />)
             : live ? <div className="thinking"><ThinkingOrb state={ORB[phase] || 'breathing'} size={20} /><span>{phase === 'route' ? 'Escolhendo o melhor modelo…' : phase === 'think' ? 'Pensando com calma…' : phase === 'approval' ? 'Aguardando sua aprovação…' : 'Pensando…'}</span></div>
-            : m.error ? <p className="msg-error">Não consegui responder. {m.error}</p>
+            : m.error ? <MsgError raw={m.error} onRetry={onRetry} />
             : m.stopped ? <p className="muted">{STOP_REASON[m.stopReason] || 'Resposta interrompida.'}</p> : null}
         </div>
         <div className="msg-meta">

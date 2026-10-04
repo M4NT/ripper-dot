@@ -1534,3 +1534,32 @@ code, .mono, pre { overflow-wrap: anywhere; }
 .approval-result.approved { color: var(--ink-2); }
 .approval-result.approved .icon { color: var(--ok); }
 .seg-count { color: var(--ink-2); opacity: .8; }
+
+/* ============ fase 2 · Caixa ============ */
+.nav .count.attn { background: var(--ink); color: var(--bg); border-color: transparent; font-weight: 600; }
+.inbox-page { max-width: 860px; }
+.inbox-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.inbox-item { padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); display: flex; flex-direction: column; gap: 10px; }
+.inbox-item.urgent { border-color: color-mix(in srgb, var(--warn) 55%, var(--line)); }
+.inbox-who { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--ink-2); }
+.inbox-who > span:not(.av-box) { flex: 1; min-width: 0; }
+.inbox-who b { color: var(--ink); font-weight: 600; }
+.inbox-who time { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.inbox-summary { margin: 0; font-size: 15px; line-height: 1.55; color: var(--ink); max-width: 70ch; white-space: pre-wrap; }
+.inbox-summary.is-error { color: var(--err); }
+.inbox-action { margin: 0; display: flex; align-items: center; gap: 8px; font-weight: 500; color: var(--ink); }
+.inbox-action .icon { color: var(--muted); flex: none; }
+.inbox-urgent { margin-left: 8px; vertical-align: middle; }
+.inbox-actions { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 2px; }
+.inbox-item.approval .approval { margin: 0; }
+.inbox-thread { list-style: none; margin: 0; padding: 12px; display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; border-radius: var(--r); background: var(--surface-2); }
+.inbox-thread li { align-self: flex-start; max-width: 80%; display: flex; flex-direction: column; gap: 2px; padding: 7px 11px; border-radius: 12px 12px 12px 4px; background: var(--chip); border: 1px solid var(--line); font-size: 14px; }
+.inbox-thread li.me { align-self: flex-end; border-radius: 12px 12px 4px 12px; background: color-mix(in srgb, var(--ink) 8%, var(--surface)); }
+.inbox-thread time { font-size: 12px; color: var(--muted); }
+/* erro de resposta: o que houve (tinta), o que fazer (apoio), técnico recolhido */
+.msg-error { color: var(--ink); display: flex; flex-direction: column; gap: 4px; padding: 2px 0; }
+.msg-error b { font-weight: 600; color: var(--err); }
+.msg-error > span { color: var(--ink-2); }
+.msg-error-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 6px; }
+.msg-error details { font-size: 12.5px; color: var(--muted); }
+.msg-error details code { display: block; margin-top: 4px; white-space: pre-wrap; word-break: break-word; }

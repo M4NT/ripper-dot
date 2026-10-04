@@ -19,6 +19,7 @@ export default {
   'nav.main': 'Main',
   'nav.projects': 'Projects',
   'nav.agents': 'Agents',
+  'nav.inbox': 'Inbox',
   'nav.explore': 'Explore',
   'nav.library': 'Library',
   'nav.chats': 'Chats',

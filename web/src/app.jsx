@@ -21,6 +21,7 @@ const lazy = load => reactLazy(() => load().catch(err => {
   throw err;
 }));
 const Agents = lazy(() => import('./pages/Agents.jsx'));
+const Inbox = lazy(() => import('./pages/Inbox.jsx'));
 const Projects = lazy(() => import('./pages/Projects.jsx'));
 const Project = lazy(() => import('./pages/Project.jsx'));
 const Chats = lazy(() => import('./pages/Chats.jsx'));
@@ -74,13 +75,14 @@ function Boot({ error, retry }) {
 function navForMode(settings, t) {
   const NAV_ALL = [
     ['', t('nav.home'), 'home'],
+    ['inbox', t('nav.inbox'), 'inbox'],
     ['projects', t('nav.projects'), 'folder'],
     ['agents', t('nav.agents'), 'agents'],
     ['explore', t('nav.explore'), 'compass'],
     ['library', t('nav.library'), 'book']
   ];
   if (!isEnterpriseMode(settings)) {
-    return NAV_ALL.filter(([k]) => k === '' || k === 'agents');
+    return NAV_ALL.filter(([k]) => k === '' || k === 'inbox' || k === 'agents');
   }
   return NAV_ALL;
 }
@@ -93,7 +95,8 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
   const { parts } = useRoute();
   const chatMenu = useChatMenu();
   const section = parts[0] === 'c' ? 'chat' : parts[0] === 'new' ? 'agents' : parts[0] === 'p' ? 'projects' : parts[0] || '';
-  const recent = [...S.chats].sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt)).slice(0, 12);
+  // Avisos de agente de canal moram na Caixa, não na lista de conversas
+  const recent = [...S.chats].filter(c => !String(c.channelKey || '').startsWith('owner:')).sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt)).slice(0, 12);
   const brand = brandForChrome(S.settings);
   const logoSrc = brand ? brandLogoSrc(brand.logoUrl) : null;
   const brandName = brand ? brandTitle(S.settings) : t('shell.brand');
@@ -117,6 +120,7 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
           <a key={n[0]} href={'#/' + n[0]} className={section === n[0] ? 'on' : ''} aria-current={section === n[0] ? 'page' : undefined} onClick={onNavigate} title={collapsed ? n[1] : undefined} aria-label={n[1]}>
             <Icon name={n[2]} /><span className="nav-label">{n[1]}</span>
             {n[0] === 'projects' && S.projects.length > 0 && <span className="count">{S.projects.length}</span>}
+            {n[0] === 'inbox' && S.inboxCount > 0 && <span className="count attn" aria-label={`${S.inboxCount} pendentes`}>{S.inboxCount}</span>}
           </a>
         ) : <hr key={i} />)}
         {collapsed && <a href="#/chats" className={section === 'chats' ? 'on' : ''} onClick={onNavigate} title={t('nav.chats')} aria-label={t('nav.chats')}><Icon name="chat" /></a>}
@@ -281,6 +285,7 @@ function Shell() {
     p0 === 'chats' ? <Chats /> :
     p0 === 'agents' && p1 && p2 === 'settings' ? <AgentConfig id={p1} /> :
     p0 === 'agents' ? <Agents /> :
+    p0 === 'inbox' ? <Inbox /> :
     p0 === 'new' ? <NewAgent key={query.get('template') || 'blank'} /> :
     p0 === 'explore' ? <Explore /> :
     p0 === 'library' ? <Library /> :

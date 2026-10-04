@@ -74,6 +74,7 @@ import { buildMeteringReport, listMeteringEvents, usageEventsToCsv } from './lib
 import { buildTokenRoiContract, routingSummary } from './lib/token-roi.mjs';
 import { listScripts, deleteScript } from './lib/script-pool.mjs';
 import { listClaudeConnectors } from './lib/claude-connectors.mjs';
+import { buildInbox, resolveInboxItem } from './lib/inbox-feed.mjs';
 import { parseWhatsappMessages, whatsappPrompt, sendWhatsappText, whatsappReady } from './lib/whatsapp.mjs';
 import { evolutionSecrets, connectInstance, instanceState, disconnectInstance, sendText as sendEvolutionText, parseEvolutionAny, contactMode, isAllowed, makeRateLimiter, channelSafeAgent } from './lib/evolution.mjs';
 import { history as waHistory, recordMessage as recordWaMessage, listChats as waListChats, readChat as waReadChat, findContacts as waFindContacts, styleProfile as waStyleProfile, styleHint, stats as waStats, wipeHistory as waWipeHistory } from './lib/whatsapp-store.mjs';
@@ -967,7 +968,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
         inbox.messages.push({
           id: id(), role: 'assistant', agentId: agent.id, at: Date.now(),
           content: `**Recado do WhatsApp — ${contact}**\n\n${String(a.summary || '').trim()}${a.action ? `\n\n**Ação sugerida:** ${String(a.action).trim()}` : ''}\n\nResponda aqui (ex.: "pode marcar") que eu cuido e confirmo com o contato.`,
-          via: { type: 'owner-notify', fromChatId: chat.id, contact }
+          via: { type: 'owner-notify', fromChatId: chat.id, contact, phone, summary: String(a.summary || '').trim(), action: String(a.action || '').trim() }
         });
         inbox.updatedAt = Date.now(); inbox.unread = true; save();
         recordCorporateAudit(db.settings, { category: 'whatsapp', action: 'whatsapp.owner_notified', agentId: agent.id, chatId: chat.id, at: Date.now() });
@@ -1357,7 +1358,8 @@ const routes = [
         contextWindow: { ...b.contextWindow, emptyLabel: 'sem dados', available: false, hasData: false }
       };
     })(),
-    meta: { ...settingsMeta(), codexInstalled: codexOk }
+    meta: { ...settingsMeta(), codexInstalled: codexOk },
+    inboxCount: buildInbox(db).count
   })],
   ['GET', /^\/api\/usage$/, async (req, _, url) => {
     const chatId = url.searchParams.get('chatId') || undefined;
@@ -1878,6 +1880,22 @@ const routes = [
   ['GET', /^\/api\/claude\/connectors$/, async (req, _, url) => {
     if (db.settings.claude?.mode === 'api') return { connectors: [], note: 'Conectores do claude.ai só existem no modo assinatura.' };
     return { connectors: await listClaudeConnectors({ force: url.searchParams.get('refresh') === '1' }).catch(e => { throw new HttpError(502, `Não consegui ler os conectores do claude.ai: ${e.message}`); }) };
+  }],
+  // Caixa: aprovações + recados de canal + novidades de rotina
+  ['GET', /^\/api\/inbox$/, () => {
+    const box = buildInbox(db);
+    return { ...box, items: box.items.map(it => (it.kind === 'approval' ? { ...it, approval: approvalView(it.approval) } : it)) };
+  }],
+  ['POST', /^\/api\/inbox\/(notice|routine)\/([\w-]+)\/done$/, (req, [kind, iid]) => {
+    if (!resolveInboxItem(db, kind, iid)) throw new HttpError(404, 'Item não encontrado.');
+    save();
+    return { ok: true, count: buildInbox(db).count };
+  }],
+  // O que o agente conversou com um contato (para o dono conferir pela Caixa). Leitura auditada.
+  ['GET', /^\/api\/whatsapp-web\/history\/(\d{10,15})$/, (req, [phone]) => {
+    requireEnterpriseAdmin();
+    recordCorporateAudit(db.settings, { category: 'whatsapp', action: 'whatsapp.read_from_inbox', at: Date.now() });
+    return { messages: waHistory(phone, 30) };
   }],
   ['GET', /^\/api\/scripts$/, () => ({ scripts: listScripts() })],
   ['DELETE', /^\/api\/scripts\/(\d+)$/, (req, [sid]) => {

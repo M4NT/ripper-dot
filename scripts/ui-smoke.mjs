@@ -40,7 +40,7 @@ try {
   // 2) Todas as telas, nos dois modos de interface
   const st = await (await fetch(base + '/api/state')).json();
   const chat = st.chats[0], agent = st.agents[0];
-  const routes = ['/', '/agents', '/new', '/chats', '/marketplace', '/settings', '/settings/models', '/settings/computer', '/settings/security',
+  const routes = ['/', '/inbox', '/agents', '/new', '/chats', '/marketplace', '/settings', '/settings/models', '/settings/computer', '/settings/security',
     '/settings/backup', '/settings/memory', '/settings/appearance', '/settings/advanced', '/explore', '/library', '/projects', '/connectors',
     '/skills', '/admin', '/admin/uso', chat && `/c/${chat.id}`, agent && `/agents/${agent.id}/settings`].filter(Boolean);
   for (const mode of ['simple', 'enterprise']) {
