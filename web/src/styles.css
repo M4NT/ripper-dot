@@ -205,7 +205,7 @@ code { font: .88em var(--mono); }
 .toast-error { background: var(--err); color: #fff; }
 
 /* ============ páginas ============ */
-.page { padding: 44px 48px 72px; max-width: 1240px; margin: 0 auto; animation: fade .35s var(--out); }
+.page { padding: 44px 48px 72px; max-width: 1240px; margin: 0 auto; animation: rise .4s var(--out); }
 .page.narrow { max-width: 860px; }
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 26px; }
 .page-head-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-end; }
@@ -573,6 +573,19 @@ a.row-main:hover b { text-decoration: underline; text-underline-offset: 3px; }
 @keyframes fade { from { opacity: 0; } }
 @keyframes draw { to { stroke-dashoffset: 0; } }
 @keyframes blink { 50% { opacity: 0; } }
+/* ============ movimento: entrada em cascata, toque, transição entre telas ============ */
+:where(.agent-grid, .template-row, .project-grid, .inbox-list, .member-cards) > * { animation: rise .45s var(--out) both; }
+:where(.agent-grid, .template-row, .project-grid, .inbox-list, .member-cards) > :nth-child(2) { animation-delay: 40ms; }
+:where(.agent-grid, .template-row, .project-grid, .inbox-list, .member-cards) > :nth-child(3) { animation-delay: 80ms; }
+:where(.agent-grid, .template-row, .project-grid, .inbox-list, .member-cards) > :nth-child(4) { animation-delay: 120ms; }
+:where(.agent-grid, .template-row, .project-grid, .inbox-list, .member-cards) > :nth-child(5) { animation-delay: 160ms; }
+:where(.agent-grid, .template-row, .project-grid, .inbox-list, .member-cards) > :nth-child(n+6) { animation-delay: 200ms; }
+:where(.btn, .icon-btn, .pill, .chip, .send, .round-btn, .seg button):active:not(:disabled) { transform: scale(.96); }
+:where(.agent-card, .template-card, .project-card):active { transform: scale(.985); }
+:where(a, button, input, textarea, select, summary) { -webkit-tap-highlight-color: transparent; }
+html { scrollbar-gutter: stable; interpolate-size: allow-keywords; }
+details::details-content { block-size: 0; overflow: clip; transition: block-size .3s var(--out), content-visibility .3s allow-discrete; }
+details[open]::details-content { block-size: auto; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
   .hero-lines path { stroke-dashoffset: 0; }

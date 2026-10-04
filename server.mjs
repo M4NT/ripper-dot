@@ -297,7 +297,7 @@ class HttpError extends Error {
     if (details?.length) this.details = details;
   }
 }
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.woff2': 'font/woff2', '.json': 'application/json', '.pdf': 'application/pdf', '.ico': 'image/x-icon' };
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.woff2': 'font/woff2', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.pdf': 'application/pdf', '.ico': 'image/x-icon' };
 const CORS_ALLOWLIST = parseCorsAllowlist();
 const hdr = (req, extra = {}) => mergeResponseHeaders(req, CORS_ALLOWLIST, extra);
 
@@ -2080,12 +2080,12 @@ const routes = [
     } else if (!brief) {
       throw new HttpError(400, 'Envie goal, brief (texto) ou structure (JSON).');
     } else if (b.orchestrate) {
-      const orchAgent = newAgent({ name: 'Orquestrador de times', tools: [], instructions: '', model: 'claude-sonnet-5-5' });
+      const orchAgent = newAgent({ name: 'Orquestrador de times', tools: [], instructions: '', model: channelModel(db.settings) });
       const runModel = process.env.RIPPER_TEST_PROVIDER
         ? prompt => runTestProvider({ prompt })
         : prompt => runClaude({
           agent: orchAgent,
-          model: 'claude-sonnet-5-5',
+          model: orchAgent.model,
           effort: 'low',
           prompt: brief,
           history: [],

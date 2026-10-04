@@ -1,0 +1,15 @@
+{
+  "name": "Ripper",
+  "short_name": "Ripper",
+  "description": "Agentes de IA que pensam, agem e trabalham por você.",
+  "start_url": "/#/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f3f1ec",
+  "theme_color": "#151412",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }],
+  "shortcuts": [
+    { "name": "Caixa", "url": "/#/inbox" },
+    { "name": "Agentes", "url": "/#/agents" }
+  ]
+}
