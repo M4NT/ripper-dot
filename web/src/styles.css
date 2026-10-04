@@ -155,7 +155,7 @@ code { font: .88em var(--mono); }
 .chaos-banner strong { color: var(--warn); }
 
 /* abas com indicador líquido */
-.seg { position: relative; display: inline-flex; gap: 2px; padding: 4px; border-radius: 12px; background: color-mix(in srgb, var(--line) 55%, transparent); isolation: isolate; max-width: 100%; }
+.seg { position: relative; display: inline-flex; gap: 2px; padding: 4px; border-radius: 12px; background: color-mix(in srgb, var(--line) 55%, transparent); isolation: isolate; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
 .seg-liquid { position: absolute !important; inset: 0; pointer-events: none; z-index: 0; }
 .seg-thumb { position: absolute; top: 0; left: 0; border-radius: 9px; }
 .seg button { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border-radius: 9px; font-size: 13.5px; color: var(--muted); white-space: nowrap; transition: color .2s; }
@@ -340,6 +340,7 @@ a.row-main:hover b { text-decoration: underline; text-underline-offset: 3px; }
 .msg-time, .msg-meta time { font-size: 12px; color: var(--faint); }
 .msg-time { margin-top: 6px; }
 .msg-meta { display: flex; align-items: center; gap: 8px; margin-top: 8px; min-height: 26px; }
+.msg-took { font-size: 12px; color: var(--faint); font-variant-numeric: tabular-nums; }
 .meta-btn { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 7px; color: var(--muted); font-size: 12px; opacity: 0; transition: opacity .15s, background .15s; }
 .msg:hover .meta-btn, .meta-btn:focus-visible { opacity: 1; }
 .meta-btn:hover { background: var(--surface); color: var(--ink); }
@@ -1122,6 +1123,8 @@ html.lightbox-open { overflow: hidden; }
 .set-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 340px); gap: 24px; align-items: center; padding: 16px 0; border-top: 1px solid var(--line); }
 .set-card > .set-row:first-child, .set-card > header + .set-row, .set-card > .set-card-desc + .set-row, form > .set-row:first-child { border-top: 0; }
 .set-row.stack { grid-template-columns: 1fr; gap: 10px; }
+.set-card { container-type: inline-size; }
+@container (max-width: 560px) { .set-row { grid-template-columns: 1fr; gap: 10px; } .set-control { justify-content: flex-start; } }
 .set-label { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .set-label b { font-weight: 500; font-size: 14.5px; }
 .help-tip { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; margin-left: 6px; border-radius: 50%; font-size: 11px; font-weight: 600; color: var(--muted); border: 1px solid var(--line-2); cursor: help; vertical-align: middle; }
@@ -1169,14 +1172,14 @@ html.lightbox-open { overflow: hidden; }
 .rows.flat { border: 0; background: none; margin-bottom: 8px; }
 .set-card .keys { padding: 16px 0; }
 .settings-main .save-bar { position: sticky; bottom: 16px; }
-@media (max-width: 900px) {
+/* o menu do app ocupa ~250px: a quebra considera a área útil, não a janela */
+@media (max-width: 1100px) {
   .settings-page { grid-template-columns: 1fr; gap: 16px; padding: 20px 16px 80px; }
-  .settings-nav { position: static; flex-direction: row; overflow-x: auto; gap: 4px; }
+  .settings-nav { position: static; flex-direction: row; align-items: center; overflow-x: auto; gap: 4px; scrollbar-width: none; }
+  .settings-nav .settings-simple-hint { display: none; }
   .settings-nav h1 { display: none; }
   .settings-nav a { flex: none; padding: 8px 12px; }
   .settings-nav a small, .settings-nav a .icon { display: none; }
-  .set-row { grid-template-columns: 1fr; gap: 10px; }
-  .set-control { justify-content: flex-start; }
   .mode-grid, .mode-grid.three { grid-template-columns: 1fr; }
 }
 

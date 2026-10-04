@@ -17,7 +17,10 @@ Legenda: **P0** bloqueia uso/confiança · **P1** diferencial forte · **P2** po
 - ✅ Regra "web antes da VM" no prompt; orquestrador de times no modelo econômico.
 
 ## 1. Velocidade e economia (P0)
-- [ ] Medir e cortar os ~7s fixos por turno: processo do SDK reaproveitado (sessão quente por agente) em vez de spawn a cada mensagem.
+- ✅ Tempos por etapa gravados em cada resposta (preparo, roteamento, 1ª palavra, total) e mostrados na mensagem.
+- ✅ Sem telemetria/checagem de atualização do CLI por turno (1ª palavra ~5s → ~1–2s no teste puro).
+- ✅ Conectores do claude.ai sob demanda (custavam 3–5s por mensagem): memória 5.4→2.9s, delegação 13.8→5.9s.
+- [ ] Processo do SDK pré-aquecido (`prewarm`) por agente — exige prompt de sistema estável (memórias via contexto, não no system).
 - [ ] Prompt de sistema enxuto: blocos só quando a ferramenta é usada; cache de prompt (prefixo estável primeiro).
 - [ ] Roteador Julia com rota Haiku para conversa curta; Opus só sob esforço alto.
 - [ ] Multitarefa real: subtarefas em paralelo (pesquisa + planilha) com barra de progresso por subtarefa.
@@ -50,7 +53,7 @@ Legenda: **P0** bloqueia uso/confiança · **P1** diferencial forte · **P2** po
 | Tela | Pendências |
 |---|---|
 | Início | Mostrar "o que seus agentes fizeram hoje" no lugar do herói quando já há agentes. |
-| Caixa | Ações em lote; atalhos de teclado (A aprovar, R recusar); notificação push. |
+| Caixa | ✅ Filtros não estouram no celular. Ações em lote; atalhos de teclado (A aprovar, R recusar); notificação push. |
 | Agentes | Busca/filtro; status ao vivo no card (trabalhando/ocioso); duplicar agente. |
 | Novo agente | Criação em 1 frase ("um agente que responde clientes no WhatsApp") → configura tudo (fase 6). |
 | Config. do agente | Testar ferramenta ali mesmo; histórico de mudanças. |
@@ -59,7 +62,7 @@ Legenda: **P0** bloqueia uso/confiança · **P1** diferencial forte · **P2** po
 | Projetos | Quadro de tarefas (kanban) atribuídas a agentes. |
 | Biblioteca | Busca em texto completo de artefatos e arquivos. |
 | Conectores / Integrações / Marketplace | Unificar em um catálogo só (fase 5). |
-| Configurações | Busca de configuração; dizer o efeito de cada chave; "restaurar padrão" por seção. |
+| Configurações | ✅ Linhas não espremem com o menu aberto; abas no celular corrigidas. Busca de configuração; dizer o efeito de cada chave; "restaurar padrão" por seção. |
 | Admin | Gráficos de uso por período; exportar CSV. |
 
 ## 6. Qualquer aparelho (P1)
