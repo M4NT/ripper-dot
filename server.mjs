@@ -761,6 +761,7 @@ async function syncLocalFiles(agent, chat) {
 }
 
 async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0, mcpSession, credentialRefs }, emit) {
+  const t0 = Date.now(), timing = {}; // tempos do turno: preparo, roteamento, 1ª palavra, total
   let s = settingsForMcp(db.settings, mcpSession);
   const vault = vaultContextFromSession(mcpSession, db);
   if (vault.dek) {
@@ -1086,12 +1087,14 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
   const model = chosen === 'auto' || enabledModels(s).includes(chosen) ? chosen : 'auto';
   const requestedEffort = (chat.effort && chat.effort !== 'auto' ? chat.effort : null) || agent.effort || 'auto';
   const corrections = (db.juliaCorrections || []).filter(x => x.agentId === agent.id).slice(-20);
+  timing.prepMs = Date.now() - t0;
   const pick = model === 'auto' ? await route(text, history, s, { effort: requestedEffort, corrections }) : { model, by: 'manual' };
   // A Julia pode ter escolhido o esforço; em todo caso, nunca passa do teto do modelo.
   const effort = clampEffort(s, pick.model, pick.effort || requestedEffort);
   const routedBy = pick.by;
   // Sem o CLI do Codex instalado, o Auto nunca o escolhe (evita uma falha e um desvio a cada pedido de código).
   if (pick.model === 'codex' && !(await codexInstalled)) pick.model = enabledModels(s).find(m => MODELS[m].provider === 'claude') || 'claude-sonnet-5-5';
+  timing.routeMs = Date.now() - t0 - timing.prepMs;
   emit({ route: { ...pick, effort } });
 
   const testProvider = process.env.RIPPER_TEST_PROVIDER;
@@ -1149,6 +1152,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
         return;
       }
     }
+    if (ev.text && timing.firstMs == null) timing.firstMs = Date.now() - t0;
     emit(ev);
   };
   const turnPlugins = await pluginsForTurn(s, agent); // cofre + token renovado, uma vez por turno
@@ -1169,7 +1173,9 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
         : runClaude({ ...args, model: m, ctx });
     },
     onSuccess: ({ model: m, out, steps }) => {
-      push(out, steps, { model: m, effort, routedBy, ...(delivered.length ? { files: [...delivered] } : {}) });
+      timing.totalMs = Date.now() - t0;
+      logger.info('turn.timing', { agent: agent.name, model: m, ...timing });
+      push(out, steps, { model: m, effort, routedBy, timing, ...(delivered.length ? { files: [...delivered] } : {}) });
       recordUsage(db, m, {
         charsIn: (text?.length || 0) + (prompt?.length || 0),
         charsOut: out.length,
