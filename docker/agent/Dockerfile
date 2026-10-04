@@ -5,7 +5,8 @@ FROM node:22-bookworm
 ENV DEBIAN_FRONTEND=noninteractive \
     DISPLAY=:99 \
     SCREEN_SIZE=1280x800x24 \
-    LANG=pt_BR.UTF-8
+    LANG=pt_BR.UTF-8 \
+    PIP_BREAK_SYSTEM_PACKAGES=1
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       chromium fonts-liberation fonts-noto-core fonts-noto-color-emoji \
@@ -13,6 +14,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       procps curl ca-certificates git python3-pip jq locales \
   && sed -i 's/# pt_BR.UTF-8/pt_BR.UTF-8/' /etc/locale.gen && locale-gen \
   && rm -rf /var/lib/apt/lists/*
+
+# Documentos e dados prontos: o agente não gasta tempo nem tokens instalando a cada pedido.
+# (PIP_BREAK_SYSTEM_PACKAGES acima: sem isso o pip recusava instalar e o erro vazava na resposta.)
+RUN pip install --no-cache-dir python-docx openpyxl pandas reportlab xlsxwriter
 
 # Controle do navegador pelo agente (a mesma janela que você vê e controla pela tela).
 RUN mkdir -p /opt/ripper-browser && cd /opt/ripper-browser \

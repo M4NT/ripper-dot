@@ -1580,3 +1580,12 @@ code, .mono, pre { overflow-wrap: anywhere; }
 .member-list li > .icon-btn { flex: none; }
 .note-info { color: var(--muted); } .note-info a { text-decoration: underline; text-underline-offset: 2px; color: var(--ink-2); }
 .inline-link { color: var(--ink-2); text-decoration: underline; text-underline-offset: 2px; }
+/* arquivo entregue pelo agente */
+.delivered { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.delivered-file { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface-2); }
+.delivered-ico { flex: none; width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--chip); border: 1px solid var(--line); color: var(--ink-2); }
+.delivered-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.delivered-text b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.delivered-text small { color: var(--muted); font-size: 12.5px; }
+.delivered-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+@media (max-width: 640px) { .delivered-file { flex-wrap: wrap; } .delivered-actions { width: 100%; justify-content: flex-start; } }

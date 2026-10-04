@@ -88,8 +88,18 @@ export const STEP_LABEL = {
   remember: 'Guardando na memória', schedule_routine: 'Criando rotina',
   browser_open: 'Abrindo página', browser_click: 'Clicando', browser_type: 'Digitando', browser_scroll: 'Rolando a página', browser_read: 'Lendo a página',
   send_message: 'Mandando mensagem', call_agent: 'Chamando colega', save_artifact: 'Salvando artefato', read_artifact: 'Lendo artefato', use_skill: 'Usando skill', save_skill: 'Guardando skill',
-  post_social: 'Publicando', send_webhook: 'Enviando webhook', list_social_webhooks: 'Listando webhooks'
+  post_social: 'Publicando', send_webhook: 'Enviando webhook', list_social_webhooks: 'Listando webhooks',
+  deliver_file: 'Entregando arquivo', find_script: 'Procurando script pronto', save_script: 'Guardando script', handoff: 'Passando a tarefa',
+  notify_owner: 'Avisando você', whatsapp_send: 'Enviando WhatsApp', whatsapp_chats: 'Vendo conversas do WhatsApp', whatsapp_read: 'Lendo conversa do WhatsApp', whatsapp_contacts: 'Buscando contato',
+  list_skills: 'Listando skills', x9_context: 'Coletando dados', x9_checklist: 'Rodando checklist'
 };
+/** Rótulo humano de uma ferramenta; conectores (mcp__claude_ai_Google_Calendar__list_events) viram "Google Calendar: list events". */
+export function stepLabel(tool) {
+  if (STEP_LABEL[tool]) return STEP_LABEL[tool];
+  const m = /^mcp__(?:claude_ai_)?(.+?)__(.+)$/.exec(String(tool || ''));
+  if (m) return `${m[1].replace(/_/g, ' ')}: ${m[2].replace(/_/g, ' ')}`;
+  return `Usando ${tool}`;
+}
 export const TONES = [['direto', 'Direto'], ['amigavel', 'Amigável'], ['formal', 'Formal'], ['tecnico', 'Técnico']];
 export const FORMALITIES = [['informal', 'Informal'], ['neutro', 'Neutro'], ['formal', 'Formal']];
 

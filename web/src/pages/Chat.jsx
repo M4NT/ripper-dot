@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
-import { api, go, fmtTime, fmtSize, STEP_LABEL, useMediaQuery, local, nameColor } from '../lib.js';
+import { api, go, fmtTime, fmtSize, stepLabel, useMediaQuery, local, nameColor } from '../lib.js';
 import { markdown, closeOpen } from '../markdown.js';
 import { AgentAvatar, Icon, Menu, MenuItem, StatusDot, useConfirm, EmptyState } from '../ui.jsx';
 import { useApp } from '../app.jsx';
@@ -8,7 +8,7 @@ import Composer, { uploadFile } from '../composer.jsx';
 import { sessionPayload } from '../marketplace/sessionMcp.js';
 import { createInputQueue, normalizeInputQueue } from '../../../lib/input-queue.mjs';
 import { effortLabel } from '../modelPicker.jsx';
-import MessageAttachments from '../MessageAttachments.jsx';
+import MessageAttachments, { DeliveredFiles } from '../MessageAttachments.jsx';
 import ChatPanel from '../chatPanel.jsx';
 import { ResizeHandle } from '../resize.jsx';
 import ActionLine from '../actionLine.jsx';
@@ -98,7 +98,9 @@ function LiveText({ text }) {
   return shown ? <Markdown text={closeOpen(shown)} live /> : null;
 }
 
-const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, models, group, showModel }) {
+const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, models, group, showModel, allFiles, onFileError }) {
+  // ids (resposta salva) ou objetos (chegando ao vivo)
+  const delivered = (m.files || []).map(x => (typeof x === 'string' ? allFiles?.find(f => f.id === x) : x)).filter(Boolean);
   return (
     <div className="msg bot">
       <div className="msg-av"><AgentAvatar agent={agent} size={36} state={live ? 'working' : undefined} paused={!live} /></div>
@@ -106,6 +108,7 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, mo
         {group && <span className="speaker" style={{ color: agentColor(agent) }}>{agent.name}</span>}
         <div className="bubble bot-bubble">
           <ActionLine steps={m.steps} live={live} />
+          {delivered.length > 0 && <DeliveredFiles items={delivered} onError={onFileError} />}
           {m.content ? (live ? <LiveText text={m.content} /> : <Markdown text={m.content} />)
             : live ? <div className="thinking"><ThinkingOrb state={ORB[phase] || 'breathing'} size={20} /><span>{phase === 'route' ? 'Escolhendo o melhor modelo…' : phase === 'think' ? 'Pensando com calma…' : phase === 'approval' ? 'Aguardando sua aprovação…' : 'Pensando…'}</span></div>
             : m.error ? <MsgError raw={m.error} onRetry={onRetry} />
@@ -124,7 +127,7 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, mo
       </div>
     </div>
   );
-}, (a, b) => a.m === b.m && a.agent === b.agent && a.live === b.live && a.phase === b.phase && a.group === b.group && a.showModel === b.showModel && a.models === b.models && !!a.onRetry === !!b.onRetry);
+}, (a, b) => a.m === b.m && a.agent === b.agent && a.live === b.live && a.phase === b.phase && a.group === b.group && a.showModel === b.showModel && a.allFiles === b.allFiles && a.models === b.models && !!a.onRetry === !!b.onRetry);
 
 function InboxMessage({ m, from }) {
   return (
@@ -325,7 +328,8 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
           if (e.route) { building.model = e.route.model; building.effort = e.route.effort; building.routed = e.route.by !== 'manual'; }
           // Primeiro uso do computador/navegador nesta resposta: o painel abre a tela ao vivo.
           if (e.tool && /^(computer_|browser_)/.test(e.tool) && !building.steps.some(s => /^(computer_|browser_)/.test(s.tool || ''))) dispatchEvent(new CustomEvent('ripper:computer'));
-          if (e.tool) { building.steps.push({ kind: 'tool', tool: e.tool, label: STEP_LABEL[e.tool] || `Usando ${e.tool}`, detail: e.detail }); setPhase(e.tool); }
+          if (e.file) building.files = [...(building.files || []), e.file]; // arquivo entregue aparece na hora
+          if (e.tool) { building.steps.push({ kind: 'tool', tool: e.tool, label: stepLabel(e.tool), detail: e.detail }); setPhase(e.tool); }
           if (e.handoff) {
             const lbl = S.models[e.handoff]?.label || e.handoff;
             const fromLbl = e.from && (getAgent(e.from)?.name || S.models[e.from]?.label);
@@ -429,7 +433,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
             )}
             {messages.map((m, i) => m.inbox ? <InboxMessage key={m.id || i} m={m} from={getAgent(m.inbox.from)} /> : m.role === 'user'
               ? <UserMessage key={m.id || i} m={m} name={S.settings.name} files={S.files} />
-              : <BotMessage key={m.id || i} m={m} agent={getAgent(m.agentId) || agent} group={isGroup || (!!m.agentId && m.agentId !== agent.id)} models={S.models} showModel={isEnterpriseMode(S.settings)} onRetry={m === messages.at(-1) && lastUser ? () => send({ text: lastUser.content }) : null} />)}
+              : <BotMessage key={m.id || i} m={m} agent={getAgent(m.agentId) || agent} group={isGroup || (!!m.agentId && m.agentId !== agent.id)} models={S.models} showModel={isEnterpriseMode(S.settings)} allFiles={S.files} onFileError={msg => toast(msg, 'error')} onRetry={m === messages.at(-1) && lastUser ? () => send({ text: lastUser.content }) : null} />)}
             {live && <BotMessage m={live} agent={getAgent(live.agentId) || agent} group={isGroup} live phase={phase} models={S.models} />}
           </div>
         </div>

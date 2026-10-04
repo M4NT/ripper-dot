@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
-import { STEP_LABEL, TOOL_INFO } from './lib.js';
+import { stepLabel, TOOL_INFO } from './lib.js';
 import { Icon } from './ui.jsx';
 import { ApprovalCard } from './approvals.jsx';
 
@@ -8,7 +8,7 @@ const ORB = { route: 'connecting', WebSearch: 'searching', WebFetch: 'searching'
 
 function normStep(raw) {
   if (raw.kind === 'approval') return raw;
-  return raw.kind ? raw : { ...raw, kind: 'tool', label: STEP_LABEL[raw.tool] || `Usando ${raw.tool}` };
+  return raw.kind ? raw : { ...raw, kind: 'tool', label: stepLabel(raw.tool) };
 }
 
 function toolFamily(tool) {

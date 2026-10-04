@@ -1,6 +1,6 @@
-# Capacidades dos agentes — auditoria de 04/10/2026, 12:17:01
+# Capacidades dos agentes — auditoria de 04/10/2026, 13:27:04
 
-Modelo usado: `claude-haiku-4-5` (esforço baixo). **13/13 áreas funcionando.** Tokens são aproximados (resposta ÷ 4).
+Modelo usado: `claude-haiku-4-5` (esforço baixo). **14/14 áreas funcionando.** Tokens são aproximados (resposta ÷ 4).
 
 | Área | Resultado | Ferramentas usadas | Tempo | Tokens (resp.) | Economia |
 |---|---|---|---|---|---|
@@ -9,6 +9,7 @@ Modelo usado: `claude-haiku-4-5` (esforço baixo). **13/13 áreas funcionando.**
 | Pesquisa na web | funciona | WebSearch | 24.4s | 93 | — |
 | Ler arquivo anexado | funciona | — | 9.5s | 2 | — |
 | Gerar planilha Excel | funciona | computer_exec | 32.2s | 65 | — |
+| Entregar arquivo (Word) com botões | funciona | computer_exec, deliver_file | 78.0s | 17 | caminho barato |
 | Memória entre conversas | funciona | remember | 6.9s | 3 | — |
 | Documento (artefato) | funciona | save_artifact | 11.7s | 33 | — |
 | Rotina agendada | funciona | schedule_routine | 11.3s | 34 | — |

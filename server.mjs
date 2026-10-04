@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import { readFile, stat, writeFile, unlink, copyFile } from 'node:fs/promises';
 import { mkdirSync, existsSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
-import { extname, basename } from 'node:path';
+import { extname, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { authed as checkAuth } from './lib/auth.mjs';
 import { load, save, flush, id, newAgent, patchAgent, dataUrl, safeCheckStoreReady } from './lib/store.mjs';
@@ -75,6 +75,7 @@ import { buildTokenRoiContract, routingSummary } from './lib/token-roi.mjs';
 import { listScripts, deleteScript } from './lib/script-pool.mjs';
 import { listClaudeConnectors } from './lib/claude-connectors.mjs';
 import { buildInbox, resolveInboxItem } from './lib/inbox-feed.mjs';
+import { vmPathToData, mimeOf, inlineType } from './lib/deliver-file.mjs';
 import { parseWhatsappMessages, whatsappPrompt, sendWhatsappText, whatsappReady } from './lib/whatsapp.mjs';
 import { evolutionSecrets, connectInstance, instanceState, disconnectInstance, sendText as sendEvolutionText, parseEvolutionAny, contactMode, isAllowed, makeRateLimiter, channelSafeAgent } from './lib/evolution.mjs';
 import { history as waHistory, recordMessage as recordWaMessage, listChats as waListChats, readChat as waReadChat, findContacts as waFindContacts, styleProfile as waStyleProfile, styleHint, stats as waStats, wipeHistory as waWipeHistory } from './lib/whatsapp-store.mjs';
@@ -814,9 +815,24 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
     }
   }
   const x9Sources = () => collectX9Sources({ db, settings: s });
+  const delivered = []; // arquivos entregues neste turno: viram botões na resposta
   const ctx = {
     db,
     settings: s,
+    // Entrega um arquivo do computador do agente na conversa (Abrir / Baixar / Mostrar na pasta).
+    deliverFile: async a => {
+      const rel = vmPathToData(a.path, agent.id);
+      if (!rel) return 'Caminho inválido: use um arquivo dentro de /work ou /shared.';
+      const st = await stat(dataUrl(rel)).catch(() => null);
+      if (!st?.isFile()) return `Arquivo não encontrado: ${a.path}. Confira o caminho com ls.`;
+      const name = basename(rel);
+      const rec = { id: id(), agentId: agent.id, projectId: chat.projectId || null, chatId: chat.id, name, type: mimeOf(name), size: st.size, path: rel, delivered: true, createdAt: Date.now() };
+      db.files.push(rec); save();
+      delivered.push(rec.id);
+      const { path, ...pub } = rec;
+      emit({ file: pub });
+      return `"${name}" entregue: o usuário vê botões para abrir, baixar e mostrar na pasta. Não cite caminho, porta nem link.`;
+    },
     x9: isEnterpriseMode(s) ? {
       context: () => JSON.stringify(x9Sources(), null, 2),
       checklist: () => JSON.stringify(runX9Scan({ db, settings: s, sources: x9Sources() }), null, 2)
@@ -1153,7 +1169,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
         : runClaude({ ...args, model: m, ctx });
     },
     onSuccess: ({ model: m, out, steps }) => {
-      push(out, steps, { model: m, effort, routedBy });
+      push(out, steps, { model: m, effort, routedBy, ...(delivered.length ? { files: [...delivered] } : {}) });
       recordUsage(db, m, {
         charsIn: (text?.length || 0) + (prompt?.length || 0),
         charsOut: out.length,
@@ -2370,9 +2386,25 @@ const routes = [
     let buf;
     try { buf = await readFile(dataUrl(f.path)); }
     catch { throw new HttpError(404, 'Arquivo ausente no disco (registro removido na próxima limpeza).'); }
-    const inline = /^image\/(png|jpe?g|webp|gif)$/.test(f.type);
-    res.writeHead(200, hdr(req, { 'content-type': inline ? f.type : 'application/octet-stream', 'content-disposition': `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(f.name)}`, 'cache-control': 'private, max-age=3600' }));
+    // ?view=1: abre na aba quando é seguro (PDF, imagem, texto — HTML/SVG viram texto); senão, baixa.
+    const view = url.searchParams.get('view') === '1' ? inlineType(f.type) : null;
+    const inline = view || (/^image\/(png|jpe?g|webp|gif)$/.test(f.type) ? f.type : null);
+    res.writeHead(200, hdr(req, { 'content-type': inline || 'application/octet-stream', 'content-disposition': `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(f.name)}`, 'cache-control': 'private, max-age=3600' }));
     res.end(buf);
+  }],
+  // Abre no programa padrão desta máquina (Word, Excel…) ou mostra na pasta. Só pedido vindo desta
+  // própria máquina e só arquivo registrado no Ripper (o caminho nunca vem do navegador).
+  ['POST', /^\/api\/files\/([\w-]+)\/(open|reveal)$/, (req, [fid, mode]) => {
+    const local = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+    if (!local) throw new HttpError(403, 'Só dá para abrir arquivos na própria máquina do Ripper.');
+    const f = db.files.find(x => x.id === fid); if (!f) throw new HttpError(404, 'Arquivo não encontrado.');
+    const full = fileURLToPath(dataUrl(f.path));
+    const [cmd, args] = process.platform === 'win32'
+      ? ['explorer.exe', mode === 'reveal' ? [`/select,${full}`] : [full]]
+      : process.platform === 'darwin' ? ['open', mode === 'reveal' ? ['-R', full] : [full]]
+      : ['xdg-open', [mode === 'reveal' ? dirname(full) : full]];
+    spawn(cmd, args, { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
+    return { ok: true };
   }],
   ['DELETE', /^\/api\/files\/([\w-]+)$/, async (req, [fid]) => {
     const f = db.files.find(x => x.id === fid); if (!f) return {};
