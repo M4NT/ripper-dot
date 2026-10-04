@@ -1,0 +1,199 @@
+{
+  "at": 1791127021297,
+  "model": "claude-haiku-4-5",
+  "results": [
+    {
+      "id": "conversa",
+      "area": "Conversa",
+      "pass": true,
+      "economy": null,
+      "best": null,
+      "tools": [],
+      "ms": 7349,
+      "tokens": 2,
+      "approvals": 0,
+      "error": null,
+      "answer": "Paris."
+    },
+    {
+      "id": "web",
+      "area": "Ler página (sem VM)",
+      "pass": true,
+      "economy": true,
+      "best": "leitura web, sem navegador/computador",
+      "tools": [
+        "WebFetch"
+      ],
+      "ms": 10352,
+      "tokens": 5,
+      "approvals": 0,
+      "error": null,
+      "answer": "**Example Domain**"
+    },
+    {
+      "id": "pesquisa",
+      "area": "Pesquisa na web",
+      "pass": true,
+      "economy": null,
+      "best": null,
+      "tools": [
+        "WebSearch"
+      ],
+      "ms": 24370,
+      "tokens": 93,
+      "approvals": 0,
+      "error": null,
+      "answer": "**24**\n\nSources:\n- [Node.js LTS vs Current: Which Version Should You Use? (2026)](https://techearl.com/nodejs-lts-vs-current)\n- [Node 22 vs Node 24 in 2026: LTS Support, Breaking Changes, and Upgrade Path](https://www.pkgpulse.com/guides/nodejs-22-vs-nodejs-24-2026)\n- [Node.js End of Life (EOL) Date"
+    },
+    {
+      "id": "arquivo",
+      "area": "Ler arquivo anexado",
+      "pass": true,
+      "economy": null,
+      "best": null,
+      "tools": [],
+      "ms": 9484,
+      "tokens": 2,
+      "approvals": 0,
+      "error": null,
+      "answer": "Teclado."
+    },
+    {
+      "id": "excel",
+      "area": "Gerar planilha Excel",
+      "pass": true,
+      "economy": null,
+      "best": "um script no computador",
+      "tools": [
+        "computer_exec"
+      ],
+      "ms": 32206,
+      "tokens": 65,
+      "approvals": 0,
+      "error": null,
+      "answer": "**`C:\\Users\\yan05\\Desktop\\muuudot\\vendas.xlsx`**\n\nPlanilha criada com coluna \"total\" calculada:\n| produto | quantidade | valor | total |\n|---------|-----------|-------|-------|\n| Mouse | 10 | 50 | 500 |\n| Teclado | 4 | 320 | 1280 |\n| Cabo HDMI | 25 | 30 | 750 |"
+    },
+    {
+      "id": "memoria",
+      "area": "Memória entre conversas",
+      "pass": true,
+      "economy": null,
+      "best": null,
+      "tools": [
+        "remember"
+      ],
+      "ms": 6874,
+      "tokens": 3,
+      "approvals": 0,
+      "error": null,
+      "answer": "Sem açúcar."
+    },
+    {
+      "id": "artefato",
+      "area": "Documento (artefato)",
+      "pass": true,
+      "economy": null,
+      "best": null,
+      "tools": [
+        "save_artifact"
+      ],
+      "ms": 11672,
+      "tokens": 33,
+      "approvals": 0,
+      "error": null,
+      "answer": "Pronto. Parágrafo sobre economia de tokens salvo em \"Auditoria Ripper\" — focado em deletar excesso, não em economizar cada caractere."
+    },
+    {
+      "id": "rotina",
+      "area": "Rotina agendada",
+      "pass": true,
+      "economy": null,
+      "best": null,
+      "tools": [
+        "schedule_routine"
+      ],
+      "ms": 11308,
+      "tokens": 34,
+      "approvals": 0,
+      "error": null,
+      "answer": "✅ Rotina criada. \"Auditoria Ripper\" roda 07:00 diariamente e resume tech news (IA, cloud, dev, segurança, mercado). Ela vai rodar amanhã."
+    },
+    {
+      "id": "delegacao",
+      "area": "Delegar para outro agente",
+      "pass": true,
+      "economy": null,
+      "best": null,
+      "tools": [
+        "send_message"
+      ],
+      "ms": 9855,
+      "tokens": 21,
+      "approvals": 0,
+      "error": null,
+      "answer": "Pronto. Mensagem enviada ao Auditor Colega. Resposta chega aqui quando ele responder."
+    },
+    {
+      "id": "scripts",
+      "area": "Aprender e reaproveitar script",
+      "pass": true,
+      "economy": null,
+      "best": "procurar no pool antes de escrever",
+      "tools": [
+        "computer_exec",
+        "save_script"
+      ],
+      "ms": 17122,
+      "tokens": 28,
+      "approvals": 2,
+      "error": null,
+      "answer": "✓ Executado e guardado. \n\nCódigo: `print(2 + 2)` → saída `4` → script no pool com tarefa \"somar dois números\"."
+    },
+    {
+      "id": "navegador",
+      "area": "Navegador da VM (quando precisa interagir)",
+      "pass": true,
+      "economy": null,
+      "best": null,
+      "tools": [
+        "browser_open"
+      ],
+      "ms": 16555,
+      "tokens": 7,
+      "approvals": 0,
+      "error": null,
+      "answer": "Título: **Example Domain**"
+    },
+    {
+      "id": "agenda",
+      "area": "Conector (Google Agenda, só leitura)",
+      "pass": true,
+      "economy": null,
+      "best": null,
+      "tools": [
+        "mcp__claude_ai_Google_Calendar__list_events"
+      ],
+      "ms": 13540,
+      "tokens": 29,
+      "approvals": 0,
+      "error": null,
+      "answer": "1. **Reunião - Sistema da Paula (Yan, Saúde Cred)** — 6 out, 09:30–10:30\n2. **🛜Pagar Internet** — 9 out, 12:00–13:00"
+    },
+    {
+      "id": "multitarefa",
+      "area": "Multitarefa (web + computador)",
+      "pass": true,
+      "economy": null,
+      "best": "as duas ferramentas no mesmo pedido",
+      "tools": [
+        "WebFetch",
+        "computer_exec"
+      ],
+      "ms": 22098,
+      "tokens": 12,
+      "approvals": 2,
+      "error": null,
+      "answer": "✓ **Título**: Example Domain\n✓ **17 × 23 = 391**"
+    }
+  ]
+}
