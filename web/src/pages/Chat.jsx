@@ -17,7 +17,8 @@ import { useOv } from '../overlay.jsx';
 import { botAvatarPalette } from 'bot-avatars';
 import { FirstRunChecklist } from '../firstRunChecklist.jsx';
 
-const agentColor = a => nameColor(a, botAvatarPalette);
+// Cor do agente como TEXTO: misturada com a tinta para passar contraste nos dois temas (a pura dava 3,3:1).
+const agentColor = a => `color-mix(in srgb, ${nameColor(a, botAvatarPalette)} 58%, var(--ink))`;
 // Qual "verbo" o orb mostra para cada fase da resposta.
 // Por que a resposta parou (gravado pelo servidor em message.stopReason).
 const STOP_REASON = {

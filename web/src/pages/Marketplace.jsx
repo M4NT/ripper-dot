@@ -175,7 +175,7 @@ function Discover({ settings, refresh, onOpenDetail }) {
           <div className="mp-section-head"><h2>Conectores em alta <span className="tag">{trending.length}</span></h2></div>
           <div className="mp-discover-grid">{trending.map(c => (
             <article key={`t-${c.id}`} className="mp-discover-card">
-              <button type="button" className="mp-plus" onClick={() => onOpenDetail(c.id)}><Icon name="plus" size={16} /></button>
+              <button type="button" className="mp-plus" aria-label={`Ver ${c.name}`} onClick={() => onOpenDetail(c.id)}><Icon name="plus" size={16} /></button>
               <MpIcon id={c.icon} size={36} />
               <h3>{c.name}</h3>
               <p>{c.desc}</p>
