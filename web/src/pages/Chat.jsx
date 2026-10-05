@@ -191,7 +191,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   const [live, setLive] = useState(null); // mensagem em construção
   const [phase, setPhase] = useState(null);
   const [panel, setPanel] = useState(() => local.get('panel', true));
-  const wide = useMediaQuery('(min-width: 1180px)');
+  const wide = useMediaQuery('(min-width: 1200px)');
   const ctrl = useRef(null), scroller = useRef(null), stick = useRef(true);
   const queueRef = useRef(null);
   const sendTurnRef = useRef(null);
