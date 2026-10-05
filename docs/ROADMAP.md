@@ -12,9 +12,9 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 ---
 
 ## Próximos passos (em ordem)
-1. Fluxos com ramificação (§3).
-2. Pulse também no WhatsApp do dono e na tela Início (§3).
-3. Linha do tempo do agente com custo por ação (§4).
+1. Ver a tela da VM ao vivo dentro do chat (§4).
+2. Grupos com linhas de delegação visíveis (§4).
+3. Notificações push no celular (§6).
 
 ---
 
@@ -60,7 +60,7 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 
 ## 3. Automação (P1 — onde viramos nº 1)
 - ✅ **Resumo diário ("Pulse")**: todo dia (8h, ajustável em Configurações → Perfil) na Caixa — o que cada agente fez, arquivos, rotinas (e quais falharam), ações em seu nome, gasto e o que espera você. Montado sem chamar modelo (zero tokens); `GET /api/pulse` mostra na hora.
-- [ ] Pulse também no WhatsApp do dono e na tela Início.
+- ✅ Pulse também no seu WhatsApp (opt-in em Configurações → Perfil → Resumo do dia, só para o seu número) e na Início ("O que seus agentes fizeram hoje" no lugar do herói quando há atividade).
 - ✅ Gatilho por webhook (GitHub, formulários, qualquer sistema).
 - ✅ Gatilho "mensagem no WhatsApp": palavras-chave (palavra inteira, sem acento/maiúscula; vazio = toda mensagem), de contatos, grupos ou ambos; áudios transcritos também disparam; mensagens suas não; no máximo 1 disparo por minuto por rotina. Grupos exigem "Ler grupos" e o agente nunca responde no grupo.
 - ✅ Gatilho "chegou e-mail": palavras-chave no remetente/assunto; checa a cada 2 min só quando alguma rotina usa.
@@ -70,7 +70,8 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 - [ ] Guardião: aprovar/mesclar PR com aprovação do dono.
 - ✅ **Fluxos** (menu Fluxos, também no modo Simples): editor visual com os passos como cartões ligados por setas (reordenar, até 10 passos); cada passo = agente + instrução + "pedir minha aprovação antes de seguir". Rodar abre uma conversa onde cada agente fala na sua vez vendo o que os anteriores fizeram, com barra de progresso; nos passos com aprovação o fluxo pausa e pede o OK na Caixa (recusar para). No celular os passos ficam empilhados.
 - ✅ Fluxos automatizados: botão "Automatizar" em cada fluxo, com os mesmos gatilhos das rotinas (horário, a cada N min, webhook, e-mail, WhatsApp); o evento vira o pedido do fluxo e o resultado chega na Caixa. Rodadas não se sobrepõem; apagar o fluxo apaga as automações. Formulário de rotina agora é um componente só (`web/src/routines.jsx`).
-- [ ] Fluxos com ramificação (se/senão) e passo de ação direta (enviar e-mail/WhatsApp sem agente).
+- ✅ Fluxos com ramificação: cada passo (do 2º em diante) pode rodar só se o resultado anterior contiver (ou não) certas palavras — dá "se/senão" sem gastar modelo; passos pulados ficam registrados.
+- [ ] Passo de ação direta (enviar e-mail/WhatsApp sem agente).
 - ✅ **E-mail como canal** (botões por provedor; Gmail com 1 clique pelo conector da conta Claude; senha de app com link direto; "Outro (IMAP)" para e-mail de empresa; aba Canais também no modo Simples): agentes listam, buscam, leem e respondem — leitura ao vivo, sem cópia local; todo envio com aprovação e no registro de ações externas; senha cifrada no disco. Configurações → Canais → E-mail.
 - ✅ E-mail com anexos: `email_attachment` baixa o anexo (aparece na conversa com Abrir/Baixar e fica em /work/anexos); texto/CSV/HTML vêm lidos, PDF/Word/Excel/PowerPoint com o comando pronto para ler no computador (pypdf na imagem `ripper-agent:3`). `email_send` anexa arquivos do computador do agente (até 20 MB), listados na aprovação.
 - [ ] E-mail: resposta automática por remetente (como a autonomia por contato do WhatsApp).
@@ -80,7 +81,8 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 ## 4. Visibilidade do trabalho (P1)
 - ✅ Registro de ações externas (Caixa → Ações externas) — ver §7.
 - ✅ Subtarefas em paralelo com barra de progresso no chat.
-- [ ] Linha do tempo do agente: cada ação com tela/print, tempo, custo — reproduzível.
+- ✅ Linha do tempo do agente: aba "Atividade" (últimos 7 dias, por dia: conversa, ações, duração, arquivos, custo, falhas).
+- [ ] Linha do tempo com print da tela em cada ação do navegador; incluir as ações externas.
 - [ ] Ver a tela da VM ao vivo dentro do chat (miniatura que expande) enquanto ele age.
 - [ ] Grupos: linhas de delegação visíveis ("Ana pediu a Bruno…"), quem está falando, fila.
 - [ ] Painel lateral unificado: Detalhes / Arquivos / Tarefas / Tela.
