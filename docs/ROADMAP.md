@@ -13,7 +13,8 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 
 ## Próximos passos (em ordem)
 1. **E-mail como canal** (§3) — ler, rascunhar e responder com aprovação; destrava o gatilho "e-mail chegou".
-5. Provedores diretos: OpenAI, Gemini, Ollama (§1b).
+2. **Agente Guardião do GitHub** (§3) — usa o gatilho por webhook que já existe.
+3. Provedores diretos: OpenAI, Gemini, Ollama (§1b).
 
 ---
 
