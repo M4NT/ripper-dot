@@ -236,3 +236,44 @@ export default function ChatPanel({ members, project, chatId, messages, files, o
     </aside>
   );
 }
+
+/**
+ * Miniatura da tela do agente dentro da conversa (canto, por cima): aparece sozinha quando ele
+ * abre o navegador. Só assiste; "Ampliar" abre em tela cheia com a opção de assumir o controle.
+ */
+export function MiniScreen({ agent, working, onClose }) {
+  const [url, setUrl] = useState(null);
+  const [err, setErr] = useState(null);
+  const [big, setBig] = useState(false);
+  const [control, setControl] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    api(`/api/agents/${agent.id}/vnc`).then(r => alive && setUrl(r.url), e => alive && setErr(e.message));
+    return () => { alive = false; };
+  }, [agent.id]);
+  const src = url && `${url}&view_only=${big && control ? 0 : 1}`;
+  return <>
+    <aside className={`mini-screen ${working ? 'live' : ''}`} aria-label={`Tela de ${agent.name} ao vivo`}>
+      <div className="mini-screen-bar">
+        {working && <span className="live-dot" aria-hidden="true" />}
+        <span className="grow">{agent.name} · {working ? 'usando o navegador' : 'tela'}</span>
+        <button type="button" className="icon-btn sm" onClick={() => setBig(true)} aria-label="Ampliar a tela"><Icon name="share" size={13} /></button>
+        <button type="button" className="icon-btn sm" onClick={onClose} aria-label="Fechar a miniatura"><Icon name="x" size={13} /></button>
+      </div>
+      {src && !big ? <iframe src={src} title={`Tela de ${agent.name}`} tabIndex={-1} />
+        : <p className="mini-screen-msg">{err || (big ? 'Aberta em tela cheia.' : 'Ligando a tela…')}</p>}
+    </aside>
+    {big && src && (
+      <div className="vnc-full" role="dialog" aria-label={`Tela de ${agent.name}`}>
+        <div className="vnc-full-bar">
+          <b>Tela de {agent.name}</b>{working && <span className="live-dot">trabalhando</span>}
+          <div className="grow" />
+          <button className={`btn btn-sm ${control ? 'btn-primary' : ''}`} onClick={() => setControl(c => !c)}>{control ? 'Soltar controle' : 'Assumir controle'}</button>
+          <button className="btn btn-sm" onClick={() => { setBig(false); setControl(false); }}><Icon name="x" size={14} />Fechar</button>
+        </div>
+        <iframe key={src} src={src} title={`Tela de ${agent.name}`} allow="clipboard-read; clipboard-write" />
+        <p className="vnc-hint">{control ? 'Você está no controle: mouse e teclado vão para a VM.' : 'Só assistindo. Clique em “Assumir controle” para usar mouse e teclado.'}</p>
+      </div>
+    )}
+  </>;
+}

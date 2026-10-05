@@ -9,7 +9,7 @@ import { sessionPayload } from '../marketplace/sessionMcp.js';
 import { createInputQueue, normalizeInputQueue } from '../../../lib/input-queue.mjs';
 import { effortLabel } from '../modelPicker.jsx';
 import MessageAttachments, { DeliveredFiles } from '../MessageAttachments.jsx';
-import ChatPanel from '../chatPanel.jsx';
+import ChatPanel, { MiniScreen } from '../chatPanel.jsx';
 import { ResizeHandle } from '../resize.jsx';
 import ActionLine from '../actionLine.jsx';
 import { useChatMenu } from '../actions.jsx';
@@ -162,6 +162,7 @@ const UserMessage = memo(function UserMessage({ m, name, files }) {
 
 export default function Chat({ chatId: initialId, agentId: initialAgent, projectId: initialProject, agentIds: initialMembers }) {
   const { S, agent: getAgent, refresh, toast, setBusy, busy, setBusyChats } = useApp();
+  const [pip, setPip] = useState(null); // agente cuja tela aparece em miniatura na conversa (painel fechado)
   const chatMenu = useChatMenu();
   const ov = useOv();
   const [chat, setChat] = useState(null);
@@ -331,6 +332,8 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
           if (e.route) { building.model = e.route.model; building.effort = e.route.effort; building.routed = e.route.by !== 'manual'; }
           // Primeiro uso do computador/navegador nesta resposta: o painel abre a tela ao vivo.
           if (e.tool && /^(computer_|browser_)/.test(e.tool) && !building.steps.some(s => /^(computer_|browser_)/.test(s.tool || ''))) dispatchEvent(new CustomEvent('ripper:computer'));
+          // Navegador em uso: a tela aparece em miniatura (só com computador Docker, que tem a tela ao vivo)
+          if ((e.screen || /^browser_/.test(e.tool || '')) && S.settings.computer?.mode === 'docker') setPip(p => p || building.agentId);
           if (e.file) building.files = [...(building.files || []), e.file]; // arquivo entregue aparece na hora
           if (e.tool) { building.steps.push({ kind: 'tool', tool: e.tool, label: stepLabel(e.tool), detail: e.detail }); setPhase(e.tool); }
           if (e.handoff) {
@@ -459,6 +462,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
         </div>
       </div>
       {!showPanel && wide && <div className="panel-collapsed-edge"><ResizeHandle side="right" cssVar="panel-w" min={280} max={620} collapsed label="Abrir painel" onExpand={togglePanel} /><button className="panel-reopen" onClick={togglePanel} aria-label="Mostrar painel" title="Mostrar painel (Ctrl .)"><Icon name="sidebar" size={16} style={{ transform: 'scaleX(-1)' }} /></button></div>}
+      {pip && !showPanel && getAgent(pip) && <MiniScreen agent={getAgent(pip)} working={!!busy[pip]} onClose={() => setPip(null)} />}
       {showPanel && <ChatPanel members={members} project={project} chatId={chatId} messages={messages} files={files} onCollapse={() => { setPanel(false); local.set('panel', false); }} />}
       {confirmNode}
     </div>
