@@ -45,7 +45,7 @@ function WorkspacePicker({ open, current, onClose, onPick }) {
   const [readOnly, setReadOnly] = useState(false);
   const [repo, setRepo] = useState('');
   const [error, setError] = useState('');
-  const go = path => api(`/api/fs/dirs${path ? `?path=${encodeURIComponent(path)}` : ''}`).then(d => { setDir(d); setError(''); }).catch(e => setError(e.message));
+  const go = path => api(`/api/fs/dirs${path ? `?path=${encodeURIComponent(path)}` : ''}`).then(d => { setDir(d); setError(''); }).catch(e => setError(/Rota não encontrada/.test(e.message) ? 'O servidor do Ripper ainda está na versão anterior. Reinicie o Ripper para usar a pasta de trabalho.' : e.message));
 
   useEffect(() => {
     if (!open) return;

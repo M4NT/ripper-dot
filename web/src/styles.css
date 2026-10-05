@@ -425,7 +425,7 @@ button.ws-chip { cursor: pointer; } button.ws-chip:hover:not(:disabled) { border
 button.ws-chip:disabled { opacity: .55; cursor: not-allowed; }
 .ws-chip.is-set { color: var(--ink); }
 .ws-chip .icon { flex: none; color: var(--muted); }
-.ws-picker { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; }
+.ws-picker { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 24px; }
 .ws-ro { display: flex; align-items: center; gap: 10px; font-size: 13px; }
 .ws-picker h2 { margin: 0 0 12px; font-size: 18px; }
 .ws-tabs { margin-bottom: 12px; }
