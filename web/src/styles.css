@@ -350,6 +350,17 @@ a.row-main:hover b { text-decoration: underline; text-underline-offset: 3px; }
 .meta-btn { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 7px; color: var(--muted); font-size: 12px; opacity: 0; transition: opacity .15s, background .15s; }
 .msg:hover .meta-btn, .meta-btn:focus-visible { opacity: 1; }
 .meta-btn:hover { background: var(--surface); color: var(--ink); }
+.msg.user .msg-meta { margin-top: 4px; }
+.user-edit { display: flex; flex-direction: column; gap: 6px; width: min(560px, 100%); }
+.user-edit textarea { width: 100%; resize: vertical; font: inherit; }
+.user-edit-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.chat-search-btn { margin-left: auto; }
+.chat-search { display: flex; align-items: center; gap: 6px; padding: 6px 12px 6px 24px; border-bottom: 1px solid var(--line); color: var(--muted); }
+.chat-search-input { flex: 1; min-width: 0; height: 32px; border: 0; background: transparent; color: var(--ink); font: inherit; outline: none; }
+.chat-search-count { font-size: 12px; white-space: nowrap; }
+.search-hit > .msg { border-radius: 12px; box-shadow: 0 0 0 1px var(--line-2); }
+.search-hit.current > .msg { box-shadow: 0 0 0 2px var(--ink); }
+@media (max-width: 480px) { .chat-search { padding-left: 16px; } }
 .msg-files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; justify-content: flex-end; }
 .msg-error { color: var(--err); }
 .thinking { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; }

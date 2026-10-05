@@ -91,7 +91,8 @@ import { evolutionSecrets, connectInstance, instanceState, disconnectInstance, s
 import { history as waHistory, recordMessage as recordWaMessage, listChats as waListChats, readChat as waReadChat, findContacts as waFindContacts, styleProfile as waStyleProfile, styleHint, stats as waStats, wipeHistory as waWipeHistory } from './lib/whatsapp-store.mjs';
 import { timingSafeEqual } from 'node:crypto';
 import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStreaming, activeChatStreamCount } from './lib/chat-stream.mjs';
-import { beginChatRun, bumpChatRunSeq, finishChatRun, chatRunPublic, canResumeChatRun, trimPartialRepliesAfterLastUser } from './lib/chat-run.mjs';
+import { truncateChatFrom } from './lib/chat-edit.mjs';
+import { beginChatRun,bumpChatRunSeq, finishChatRun, chatRunPublic, canResumeChatRun, trimPartialRepliesAfterLastUser } from './lib/chat-run.mjs';
 import { exportChatPayload, importChatPayload } from './lib/chat-transfer.mjs';
 import { listAgentTemplates, createSavedTemplate, patchSavedTemplate, agentFromSavedTemplate } from './lib/agent-templates.mjs';
 import { architectSuggest } from './lib/architect-suggest.mjs';
@@ -2778,6 +2779,16 @@ const routes = [
     db.chats.find(c => c.id === cid) || (() => { throw new HttpError(404, 'Conversa não encontrada.'); })();
     if (!cancelChatStream(cid)) throw new HttpError(404, 'Nenhuma resposta em andamento.');
     return { ok: true };
+  }],
+  ['POST', /^\/api\/chats\/([\w-]+)\/truncate$/, async (req, [cid]) => {
+    // Editar e reenviar: apaga a mensagem escolhida e tudo depois; o cliente reenvia via POST /api/chat.
+    const c = db.chats.find(x => x.id === cid);
+    if (!c) throw new HttpError(404, 'Conversa não encontrada.');
+    if (isChatStreaming(cid)) throw new HttpError(409, 'Aguarde a resposta terminar.');
+    const r = truncateChatFrom(c, (await body(req)).fromMessageId);
+    if (!r.ok) throw new HttpError(400, r.reason);
+    c.updatedAt = Date.now(); save();
+    return r;
   }],
   ['DELETE', /^\/api\/chats\/([\w-]+)$/, (req, [cid]) => { if (isChatStreaming(cid)) throw new HttpError(409, 'Aguarde a resposta terminar.'); db.chats = db.chats.filter(c => c.id !== cid); save(); return {}; }],
   // Ditado em qualquer navegador (Firefox, Safari, celular): o áudio gravado vira texto no Whisper local.
