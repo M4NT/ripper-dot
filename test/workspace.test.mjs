@@ -30,3 +30,18 @@ test('lista subpastas, marca repositórios git e lê o branch', () => {
   assert.equal(workspaceFor({ kind: 'repo', repo: 'dono/site' }, 'docker').cwd, '/work/repos/site');
   assert.ok(listDirs('').dirs.length > 0, 'atalhos iniciais');
 });
+
+test('pasta que contém os dados do Ripper é permitida, com a pasta de dados escondida; a própria pasta de dados não', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'ripper-self-'));
+  mkdirSync(join(root, 'data'));
+  const prev = process.env.RIPPER_DATA;
+  process.env.RIPPER_DATA = join(root, 'data');
+  (await import('../lib/store.mjs'))._resetStoreForTests();
+  const { hiddenDataPath } = await import('../lib/workspace.mjs');
+  try {
+    assert.equal(normalizeWorkspace({ kind: 'folder', path: root }).path, root);
+    assert.equal(hiddenDataPath(root), 'data');
+    assert.match(workspaceFor({ kind: 'folder', path: root }, 'docker').hint, /data são os dados do próprio Ripper/);
+    assert.throws(() => normalizeWorkspace({ kind: 'folder', path: join(root, 'data') }), /pasta de dados do Ripper/);
+  } finally { process.env.RIPPER_DATA = prev; }
+});
