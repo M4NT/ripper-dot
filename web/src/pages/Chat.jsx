@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
-import { api, go, fmtTime, fmtSize, stepLabel, useMediaQuery, local, nameColor } from '../lib.js';
+import { api, go, fmtTime, fmtSize, stepLabel, useMediaQuery, local, nameColor, speak, canSpeak } from '../lib.js';
 import { markdown, closeOpen } from '../markdown.js';
 import { AgentAvatar, Icon, Menu, MenuItem, StatusDot, useConfirm, EmptyState } from '../ui.jsx';
 import { useApp } from '../app.jsx';
@@ -122,6 +122,7 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, mo
           {m.model && showModel && <span className="badge">{m.routed ? 'Auto → ' : ''}{models[m.model]?.label || m.model}{m.effort && m.effort !== 'auto' ? ` · ${effortLabel(m.effort)}` : ''}</span>}
           {!live && m.content && <>
             <button className="meta-btn" onClick={() => navigator.clipboard.writeText(m.content)}><Icon name="copy" size={14} />Copiar</button>
+            {canSpeak && <button className="meta-btn" onClick={() => speak(m.content)}><Icon name="volume" size={14} />Ouvir</button>}
             {onRetry && <button className="meta-btn" onClick={onRetry}><Icon name="retry" size={14} />Refazer</button>}
           </>}
         </div>
@@ -370,6 +371,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
       setBusy(b => { const n = { ...b }; memberIds.forEach(id => delete n[id]); return n; });
       if (cid) setBusyChats(b => { const n = { ...b }; delete n[cid]; return n; });
       setLive(null); setPhase(null);
+      if (sawDone && building.content && !building.error && local.get('handsFree', false)) speak(building.content);
       if (cid) {
         try {
           const c = await api(`/api/chats/${cid}`);

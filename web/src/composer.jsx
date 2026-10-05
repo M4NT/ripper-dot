@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { VoiceBeam, useMicrophone } from 'voice-glow';
-import { api, fmtSize, go, local, useDark } from './lib.js';
+import { api, fmtSize, go, local, useDark, canSpeak } from './lib.js';
 import { AgentAvatar, Icon, useToast } from './ui.jsx';
 import { useApp } from './app.jsx';
 import { isEnterpriseMode } from './uiMode.js';
@@ -28,6 +28,7 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
   const [credOpen, setCredOpen] = useState(false);
   const [listening, setListening] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
+  const [handsFree, setHandsFree] = useState(() => local.get('handsFree', false));
   const ta = useRef(null), fileInput = useRef(null), folderInput = useRef(null), plusBtn = useRef(null), rec = useRef(null), base = useRef(''), spoke = useRef(false); // spoke: a mensagem teve trecho ditado
   const mic = useMicrophone();
   const resolvedTheme = useDark() ? 'dark' : 'light';
@@ -228,6 +229,10 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
                 {setChoice && <ModelPicker value={choice} onChange={setChoice} group={group} chatId={chatId} />}
               </div>
               <div className="grow" />
+              {canSpeak && (
+                <button type="button" className={`icon-btn ${handsFree ? 'live' : ''}`} aria-pressed={handsFree} title={handsFree ? 'Mãos livres: as respostas são lidas em voz alta' : 'Ler as respostas em voz alta'}
+                  aria-label="Ler respostas em voz alta" onClick={() => { const v = !handsFree; setHandsFree(v); local.set('handsFree', v); if (!v) speechSynthesis.cancel(); }}><Icon name="volume" /></button>
+              )}
               {(SpeechRec || typeof MediaRecorder !== 'undefined') && (
                 <button type="button" className={`icon-btn mic ${listening ? 'live' : ''}`} aria-pressed={listening} aria-busy={transcribing} disabled={transcribing} aria-label={listening ? 'Parar ditado' : 'Ditar mensagem'} onClick={toggleVoice}><Icon name="mic" /></button>
               )}

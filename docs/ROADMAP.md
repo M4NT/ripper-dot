@@ -28,7 +28,7 @@ Legenda: **P0** bloqueia uso/confiança · **P1** diferencial forte · **P2** po
 
 ## 2. Entrada e saída multimodal (P0/P1)
 - ✅ Ditado por voz em todos os navegadores (gravação + transcrição no servidor); texto ditado em *itálico* na bolha.
-- [ ] Resposta falada (TTS) opcional, modo "mãos livres" no celular.
+- ✅ Resposta falada: botão "Ouvir" em cada resposta e modo "mãos livres" (lê toda resposta) no composer — voz do navegador.
 - ✅ WhatsApp: analisar imagem e áudio recebidos (transcrever áudio, descrever imagem) e responder com base nisso.
 - [ ] Prévia inline de arquivos entregues (PDF, imagem, planilha em tabela).
 - [ ] Geração de imagem e de slides como artefato.

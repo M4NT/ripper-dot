@@ -48,6 +48,17 @@ export const local = {
   set(k, v) { try { localStorage.setItem('ripper.' + k, JSON.stringify(v)); } catch {} }
 };
 
+/* ---------- voz (resposta falada, sintetizador do próprio navegador) ---------- */
+export const canSpeak = typeof speechSynthesis !== 'undefined';
+const plainText = md => md.replace(/```[\s\S]*?```/g, ' (trecho de código) ').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/[*_#>`~|]/g, '');
+export function speak(md) {
+  if (!canSpeak) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(plainText(md));
+  u.lang = 'pt-BR';
+  speechSynthesis.speak(u);
+}
+
 /* ---------- tema ---------- */
 export function useTheme() {
   const media = typeof matchMedia === 'function' ? matchMedia('(prefers-color-scheme: dark)') : null;
