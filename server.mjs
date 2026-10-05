@@ -511,8 +511,11 @@ const inboxLimits = () => ({ maxPerHour: 20, maxHops: 3, ...(db.settings?.inbox 
 async function runInboxDelivery(m, { signal } = {}) {
   const to = db.agents.find(a => a.id === m.to), from = db.agents.find(a => a.id === m.from);
   if (!to || !from) return { ok: false, error: 'Agente não existe mais.', threadChatId: null };
+  // Os dois no mesmo grupo de onde a mensagem saiu: a conversa acontece no grupo (sem abrir "A ↔ B" à parte).
+  const origin = db.chats.find(x => x.id === m.originChatId);
+  const inGroup = origin && (origin.agentIds || []).length > 1 && origin.agentIds.includes(from.id) && origin.agentIds.includes(to.id);
   const key = threadKey(from.id, to.id);
-  let c = db.chats.find(x => x.inboxKey === key);
+  let c = inGroup ? origin : db.chats.find(x => x.inboxKey === key);
   if (!c) {
     c = { id: id(), agentId: to.id, agentIds: [from.id, to.id], inboxKey: key, title: `${from.name} ↔ ${to.name}`, messages: [], createdAt: Date.now(), updatedAt: Date.now() };
     db.chats.unshift(c);
@@ -528,7 +531,7 @@ async function runInboxDelivery(m, { signal } = {}) {
     at: Date.now()
   });
   const lenBeforeTurn = c.messages.length;
-  await turn({ agent: to, chat: c, text: m.body, prompt, images: [], group: null, hops: m.hops, signal }, () => {});
+  await turn({ agent: to, chat: c, text: m.body, prompt, images: [], group: inGroup ? groupMembers(origin, db.agents) : null, hops: m.hops, signal }, () => {});
   const parsed = interpretInboxReply(c.messages, lenBeforeTurn);
   c.updatedAt = Date.now(); c.unread = true;
   m.threadChatId = c.id;
@@ -744,7 +747,8 @@ async function deliver(m) {
       });
     }
     const origin = db.chats.find(x => x.id === m.originChatId);
-    if (origin && result.reply?.content) {
+    // resposta já ficou no grupo (conversa aconteceu lá): não duplica
+    if (origin && result.reply?.content && result.threadChatId !== origin.id) {
       origin.messages.push({
         id: id(), role: 'assistant', agentId: to.id, content: result.reply.content, model: result.reply.model,
         via: { type: 'inbox', from: from.id, messageId: m.id, threadChatId: result.threadChatId }, at: Date.now()
@@ -1514,7 +1518,8 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
       '3. Se você depende do trabalho de um colega que ainda não chegou, só delegue com @Nome e pare. Não responda antes da hora.',
       '4. Se não tem nada útil a acrescentar, responda exatamente: PASSO',
       '5. Para devolver a palavra a alguém, use @Nome. Sem @, ninguém é chamado.',
-      '6. Não comece com o seu nome (a interface já mostra) e não repita o que já foi dito.'
+      '6. Não comece com o seu nome (a interface já mostra) e não repita o que já foi dito.',
+      '7. Com colegas deste grupo, fale AQUI usando @Nome. Não use send_message, call_agent nem handoff com eles: o que é do grupo fica no grupo.'
     ].join('\n')
   ].filter(Boolean).join('\n\n');
 
