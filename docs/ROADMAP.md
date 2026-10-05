@@ -13,8 +13,8 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 
 ## Próximos passos (em ordem)
 1. Acesso remoto seguro com HTTPS (destrava notificações no celular; precisa do login — decisão do dono) (§6/§7).
-2. Conversas: pastas/etiquetas e arquivar em lote (§5).
-3. Projetos: quadro de tarefas (kanban) atribuídas a agentes (§5).
+2. Biblioteca: busca em texto completo de artefatos e arquivos (§5).
+3. Admin: gráficos de uso por período e exportar CSV (§5).
 
 ---
 
@@ -98,8 +98,8 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 | Novo agente | ✅ Criar em 1 frase: o modelo econômico monta nome, instruções, tom e habilidades; sugere atender o WhatsApp e rotina (dia/semana) para confirmar; correções determinísticas (sem "social" sem pedir, planilha liga computador, rotina liga "Rotinas"). |
 | Config. do agente | Testar ferramenta ali mesmo; histórico de mudanças; limite de gasto próprio do agente. |
 | Chat | ✅ Ouvir resposta; ✅ prévia de arquivos; ✅ custo por resposta paga. ✅ Editar e reenviar (qualquer mensagem sua). ✅ Buscar na conversa (Ctrl+F, sem acento). Ramificar; fixar. |
-| Conversas | Pastas/etiquetas; arquivar em lote. |
-| Projetos | Quadro de tarefas (kanban) atribuídas a agentes. |
+| Conversas | ✅ Etiquetas (filtro e busca), arquivar (some da lista e do menu; aba Arquivadas), seleção em lote: etiquetar, arquivar, desarquivar, apagar. |
+| Projetos | ✅ Aba Quadro: A fazer / Fazendo / Feito, cartões com agente, arrastar ou "Mover" (teclado/toque), "Pedir ao agente" roda a tarefa no projeto e move para Feito com link da conversa. Card fica "rodando" se o servidor reiniciar no meio (mover à mão limpa). |
 | Biblioteca | Busca em texto completo de artefatos e arquivos. |
 | Conectores / Integrações / Marketplace | Unificar em um catálogo só (mesmo padrão da grade de Provedores). |
 | Configurações | ✅ Provedores de IA em grade. ✅ Backup visível no modo Simples. ✅ Não espreme mais em ~800px nem no celular; busca de configuração; "restaurar padrão" por seção. |
