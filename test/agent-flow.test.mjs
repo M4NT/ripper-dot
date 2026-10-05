@@ -92,6 +92,14 @@ test('rotina não dispara duas vezes no mesmo minuto', () => {
   assert.equal(routineDue({ everyMinutes: 5, lastRun: now.getTime() - 4 * 60_000 }, now), false);
 });
 
+test('rotina só em dias úteis: roda de segunda a sexta, pula fim de semana', () => {
+  const r = { dailyAt: '07:00', weekdays: true, lastRun: 0 };
+  assert.equal(routineDue(r, new Date('2026-10-05T07:00:10')), true);  // segunda
+  assert.equal(routineDue(r, new Date('2026-10-09T07:00:10')), true);  // sexta
+  assert.equal(routineDue(r, new Date('2026-10-10T07:00:10')), false); // sábado
+  assert.equal(routineDue(r, new Date('2026-10-11T07:00:10')), false); // domingo
+});
+
 test('falha depois do início da resposta preserva o texto sem chamar outro modelo', () => {
   assert.equal(mayFallback('', false), true);
   assert.equal(mayFallback('resposta parcial', false), false);

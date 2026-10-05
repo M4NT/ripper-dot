@@ -2793,8 +2793,14 @@ const routes = [
       ...(b.trigger === 'webhook' ? { trigger: 'webhook', hookToken: newHookToken(), hookSecret: String(b.hookSecret || '').slice(0, 200) || undefined }
         : b.trigger === 'email' ? { trigger: 'email', keywords: parseKeywords(b.keywords) }
         : b.trigger === 'whatsapp' ? { trigger: 'whatsapp', keywords: parseKeywords(b.keywords), scope: ['contacts', 'groups', 'any'].includes(b.scope) ? b.scope : 'contacts' }
-        : b.everyMinutes ? { everyMinutes: Math.max(5, +b.everyMinutes) } : { dailyAt: /^\d\d:\d\d$/.test(b.dailyAt) ? b.dailyAt : '08:00', weekday: b.weekday ?? undefined }) };
+        : b.everyMinutes ? { everyMinutes: Math.max(5, +b.everyMinutes) } : { dailyAt: /^\d\d:\d\d$/.test(b.dailyAt) ? b.dailyAt : '08:00', weekday: b.weekday ?? undefined, ...(b.weekdays === true && b.weekday == null ? { weekdays: true } : {}) }),
+      ...(b.deliver?.whatsapp || b.deliver?.email ? { deliver: { whatsapp: !!b.deliver.whatsapp, email: !!b.deliver.email } } : {}) };
     db.routines.push(r); save(); return redactRoutine(r);
+  }],
+  ['POST', /^\/api\/routines\/([\w-]+)\/run$/, (req, [rid]) => {
+    const r = db.routines.find(x => x.id === rid); if (!r) throw new HttpError(404, 'Rotina não encontrada.');
+    if (!runRoutine(r)) throw new HttpError(409, 'A rotina já está rodando ou o agente está pausado.');
+    return { started: true };
   }],
   ['DELETE', /^\/api\/routines\/([\w-]+)$/, (req, [rid]) => { db.routines = db.routines.filter(x => x.id !== rid); save(); return {}; }],
   ['GET', /^\/api\/chats$/, (req, _, url) => {
@@ -3494,6 +3500,7 @@ function runRoutine(r, event) {
     }
     r.lastChatId = r.lastStatus === 'quiet' ? r.lastChatId : c.id;
     save();
+    if (r.lastStatus === 'succeeded' && r.deliver) await deliverRoutineReport(r, replies.at(-1)?.content);
   }).catch(e => { r.lastStatus = 'failed'; r.lastError = e.message; save(); console.error('rotina', r.name, ...redactForLog(db.settings, e.message)); })
     .finally(() => releaseRoutineClaim(r.id));
   return true;
@@ -3578,6 +3585,23 @@ setInterval(() => {
   raiseSystemAlert({ key: 'pulse', title: p.title, body: p.body, href: '/agents', hrefLabel: 'Ver agentes', quiet: true });
   sendPulseWhatsapp(p).catch(e => console.error('pulse.whatsapp', ...redactForLog(db.settings, e.message)));
 }, 60_000).unref?.();
+
+// Relatório da rotina (ex.: Radar) só para o próprio dono: número do Pulso e e-mail da conta; nunca terceiros.
+async function deliverRoutineReport(r, reply) {
+  const body = String(reply || '').trim(); if (!body) return;
+  const head = `Radar — ${new Date().toLocaleDateString('pt-BR')}`;
+  const text = body.length > 3500 ? body.slice(0, 3500) + ' […]' : body;
+  const s = db.settings, to = pulseWhatsappTo(s);
+  const meta = { agentId: r.agentId, chatId: r.lastChatId };
+  if (r.deliver.whatsapp && to) {
+    const viaQr = !!s.whatsappWeb?.enabled;
+    if ((viaQr && waWebRate(to)) || (!viaQr && whatsappReady(s.whatsapp)))
+      await deliverOut(viaQr ? 'wa-qr' : 'wa-meta', { to, text: `*${head}*
+${text}` }, { ...meta, target: `+${to}`, ext: { kind: 'whatsapp.sent', approved: 'rule' } }).catch(e => console.error('radar.whatsapp', ...redactForLog(s, e.message)));
+  }
+  if (r.deliver.email && s.email?.enabled && s.email.user)
+    await deliverOut('email', { to: s.email.user, subject: `${head} · ${r.name}`, text }, { ...meta, target: s.email.user, ext: { kind: 'email.sent', approved: 'rule' } }).catch(e => console.error('radar.email', ...redactForLog(s, e.message)));
+}
 
 // Só para o número do próprio dono, que optou nas Configurações; nunca para terceiros.
 async function sendPulseWhatsapp(p) {

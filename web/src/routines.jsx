@@ -17,7 +17,7 @@ export function describeTrigger(r) {
   if (r.trigger === 'github') return 'Eventos do GitHub';
   if (r.trigger === 'webhook') return `Quando chegar um evento${r.hasSecret ? ' · assinatura verificada' : ''}`;
   if (r.everyMinutes) return `A cada ${r.everyMinutes} min`;
-  return `${r.weekday != null ? DAYS[r.weekday] + ', ' : 'Todo dia, '}${r.dailyAt}`;
+  return `${r.weekday != null ? DAYS[r.weekday] + ', ' : r.weekdays ? 'Dias úteis, ' : 'Todo dia, '}${r.dailyAt}${r.deliver?.whatsapp || r.deliver?.email ? ` · relatório no ${[r.deliver.whatsapp && 'WhatsApp', r.deliver.email && 'e-mail'].filter(Boolean).join(' e ')}` : ''}`;
 }
 const triggerIcon = r => ({ webhook: 'plug', whatsapp: 'chat', email: 'inbox', github: 'plug' })[r.trigger] || 'clock';
 
