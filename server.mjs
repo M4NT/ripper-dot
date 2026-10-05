@@ -1683,8 +1683,12 @@ async function chat({ chat, text, fileIds, signal, mcpSession, skipUserPush = fa
   const floor = new Floor(first, members, group ? 5 : 1);
   if (group) emit({ turnPlan: turnPlanIds(first, floor) });
   for (let agent = floor.next(); agent; agent = floor.next()) {
+  // Ninguém fica sem resposta: se quem abriu passar a vez (PASSO) e ninguém mais falou, chama o próximo membro.
+  let answered = false;
+  const tried = new Set();
     if (signal?.aborted) break;
     const runBudget = checkRunBudget(db, db.settings, { agentId: agent.id });
+    tried.add(agent.id);
     if (runBudget.blocked) {
       const alert = tokenBudgetAlertFromCheck(runBudget) || { kind: runBudget.kind, message: runBudget.userMessage };
       emit({ tokenBudget: alert, stopped: true });
@@ -1702,9 +1706,14 @@ async function chat({ chat, text, fileIds, signal, mcpSession, skipUserPush = fa
       images: extra.images, signal, group, mcpSession, credentialRefs: refs
     }, emit);
     const reply = chat.messages.length > before ? chat.messages.at(-1) : null;
-    if (group && reply && isPass(reply.content)) { chat.messages.pop(); emit({ passed: agent.id }); }
+    if (group && reply && isPass(reply.content)) {
+      chat.messages.pop(); emit({ passed: agent.id });
+      const nextUp = !answered && !floor.queue.length && members.find(m => !tried.has(m.id));
+      if (nextUp) floor.queue.push(nextUp);
+    }
     else if (group && reply) {
       const deniedPeers = [];
+      answered = true;
       const next = floor.afterReply(agent, reply.content, {
         allowPeer: peer => {
           const gate = canDelegate(

@@ -126,3 +126,16 @@ test('@Apelido chama o agente (ex.: @Ripper → Engenheiro de Software)', async 
   assert.deepEqual(mentionOrder('@Donald e @Ripper, vejam isso', ms).map(a => a.id), [2, 1]);
   assert.deepEqual(mentionOrder('@Ripperzao', ms), [], 'apelido precisa ser a palavra inteira');
 });
+
+test('chamado pelo nome sem @ (vocativo): começo, fim ou entre vírgulas; no meio da frase não', async () => {
+  const { addressedByName, selectSpeakers } = await import('../lib/agent-flow.mjs');
+  const ms = [{ id: 1, name: 'Engenheiro de Software', nickname: 'Ripper' }, { id: 2, name: 'Donald' }, { id: 3, name: 'Quinn' }];
+  const ids = t => addressedByName(t, ms).map(a => a.id);
+  assert.deepEqual(ids('consegue resolver isso ripper?'), [1]);
+  assert.deepEqual(ids('Ripper consegue bolar algum jeito?'), [1]);
+  assert.deepEqual(ids('o Ripper precisa de testes, Quinn, pode ver?'), [3]);
+  assert.deepEqual(ids('vamos melhorar a plataforma Ripper hoje'), []);
+  const chat = { agentIds: [1, 2, 3] };
+  const first = await selectSpeakers(chat, 'consegue resolver isso ripper?', ms, async () => ms[1]);
+  assert.deepEqual(first.map(a => a.id), [1], 'nome vence o classificador');
+});
