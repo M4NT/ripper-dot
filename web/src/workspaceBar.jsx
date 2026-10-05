@@ -18,6 +18,7 @@ export default function WorkspaceBar({ chat, chatId, agents, pending, setPending
   const withComputer = (agents || []).filter(a => a?.tools?.includes('computer'));
   const hasComputer = withComputer.length > 0 && S.settings.computer?.mode !== 'off';
   const group = (agents || []).length > 1;
+  const writers = withComputer.filter(a => !(ws?.readOnlyAgents || []).includes(a.id)).length;
 
   async function apply(next) {
     setOpen(false);
@@ -37,15 +38,23 @@ export default function WorkspaceBar({ chat, chatId, agents, pending, setPending
       </button>
       {ws?.kind === 'folder' && chat?.workspaceBranch && <span className="ws-chip is-static"><Icon name="branch" size={13} />{chat.workspaceBranch}</span>}
       {ws?.readOnly && <span className="tag">somente leitura</span>}
-      <WorkspacePicker open={open} current={ws} onClose={() => setOpen(false)} onPick={apply} />
+      {!ws?.readOnly && (ws?.readOnlyAgents || []).length > 0 && <span className="tag" title={withComputer.filter(a => ws.readOnlyAgents.includes(a.id)).map(a => a.name).join(', ')}>{ws.readOnlyAgents.length} só lê</span>}
+      {ws && !ws.readOnly && writers >= 2 && (
+        <span className="ws-warn" role="note" title="Se dois agentes salvarem o mesmo arquivo ao mesmo tempo, vale a última versão salva. Combine quem mexe em quê ou deixe quem só revisa em modo leitura.">
+          <Icon name="alert" size={13} />{writers} podem editar os mesmos arquivos
+        </span>
+      )}
+      <WorkspacePicker open={open} current={ws} members={group ? withComputer : []} onClose={() => setOpen(false)} onPick={apply} />
     </div>
   );
 }
 
-function WorkspacePicker({ open, current, onClose, onPick }) {
+function WorkspacePicker({ open, current, members = [], onClose, onPick }) {
   const [tab, setTab] = useState('folder');
   const [dir, setDir] = useState(null); // { path, parent, dirs, branch, blocked, recent }
   const [readOnly, setReadOnly] = useState(false);
+  const [roAgents, setRoAgents] = useState([]);
+  const toggleAgent = (id, on) => setRoAgents(l => on ? [...new Set([...l, id])] : l.filter(x => x !== id));
   const [repo, setRepo] = useState('');
   const [error, setError] = useState('');
   const go = path => api(`/api/fs/dirs${path ? `?path=${encodeURIComponent(path)}` : ''}`).then(d => { setDir(d); setError(''); }).catch(e => setError(/Rota não encontrada/.test(e.message) ? 'O servidor do Ripper ainda está na versão anterior. Reinicie o Ripper para usar a pasta de trabalho.' : e.message));
@@ -54,6 +63,7 @@ function WorkspacePicker({ open, current, onClose, onPick }) {
     if (!open) return;
     setTab(current?.kind === 'repo' ? 'repo' : 'folder');
     setReadOnly(!!current?.readOnly);
+    setRoAgents(current?.readOnlyAgents || []);
     setRepo(current?.repo || '');
     go(current?.kind === 'folder' ? current.path : '');
   }, [open]);
@@ -92,7 +102,16 @@ function WorkspacePicker({ open, current, onClose, onPick }) {
             ))}
             {dir && !dir.dirs.length && <li className="muted small">Sem subpastas.</li>}
           </ul>
-          <div className="ws-ro"><Switch checked={readOnly} onChange={setReadOnly} label="Somente leitura" /><span>Somente leitura <small className="muted">— o agente lê, mas não altera nada</small></span></div>
+          <div className="ws-ro"><Switch checked={readOnly} onChange={setReadOnly} label="Somente leitura" /><span>Somente leitura {members.length > 1 ? 'para todos' : ''} <small className="muted">— {members.length > 1 ? 'ninguém' : 'o agente'} altera nada, só lê</small></span></div>
+          {members.length > 1 && !readOnly && (
+            <fieldset className="ws-members">
+              <legend>Quem só lê <small className="muted">— ideal para quem revisa ou testa</small></legend>
+              {members.map(a => (
+                <div key={a.id} className="ws-ro"><Switch checked={roAgents.includes(a.id)} onChange={v => toggleAgent(a.id, v)} label={`${a.name}: somente leitura`} /><span>{a.name}</span></div>
+              ))}
+              {members.length - roAgents.length >= 2 && <p className="ws-warn small"><Icon name="alert" size={13} />{members.length - roAgents.length} membros vão poder editar. Se dois salvarem o mesmo arquivo, vale a última versão: combinem quem mexe em quê.</p>}
+            </fieldset>
+          )}
           {dir?.blocked && <p className="form-error">Por segurança, o agente não pode trabalhar em {dir.blocked}.</p>}
         </>
       ) : (
@@ -106,7 +125,7 @@ function WorkspacePicker({ open, current, onClose, onPick }) {
         {current && <button type="button" className="btn" onClick={() => onPick(null)}>Tirar pasta</button>}
         <button type="button" className="btn" onClick={onClose}>Cancelar</button>
         {tab === 'folder'
-          ? <button type="button" className="btn btn-primary" disabled={!dir?.path || !!dir?.blocked} onClick={() => onPick({ kind: 'folder', path: dir.path, readOnly })}>Usar esta pasta</button>
+          ? <button type="button" className="btn btn-primary" disabled={!dir?.path || !!dir?.blocked} onClick={() => onPick({ kind: 'folder', path: dir.path, readOnly, ...(members.length > 1 && !readOnly && roAgents.length ? { readOnlyAgents: roAgents } : {}) })}>Usar esta pasta</button>
           : <button type="button" className="btn btn-primary" disabled={!/^\S+\/\S+$/.test(repo.trim())} onClick={() => onPick({ kind: 'repo', repo: repo.trim() })}>Usar repositório</button>}
       </div>
       {tab === 'folder' && <p className="muted small">O agente vê só esta pasta. São seus arquivos reais: ações arriscadas continuam pedindo aprovação.</p>}

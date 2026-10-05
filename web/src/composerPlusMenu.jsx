@@ -69,7 +69,7 @@ export default function ComposerPlusMenu({ open, onClose, anchorRef, onFiles, on
   async function toggleRow(row, enabled) {
     if (row.kind === 'plugin' && enabled) {
       const plugins = S.settings.plugins.map(p => p.name === row.id ? { ...p, enabled: true } : p);
-      await api('/api/settings', { method: 'PUT', body: { ...S.settings, plugins } });
+      await api('/api/settings', { method: 'PUT', body: { plugins } });
       await refresh();
     }
     setSessionEnabled(row.id, enabled);

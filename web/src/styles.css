@@ -439,6 +439,10 @@ button.ws-chip:disabled { opacity: .55; cursor: not-allowed; }
 .ws-chip .icon { flex: none; color: var(--muted); }
 .ws-picker { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 24px; }
 .ws-ro { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.ws-warn { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px; font-size: 12px; color: var(--warn, #b45309); background: color-mix(in srgb, var(--warn, #b45309) 12%, transparent); cursor: help; }
+p.ws-warn { border-radius: 8px; padding: 6px 10px; margin: 6px 0 0; cursor: default; }
+.ws-members { border: 1px solid var(--line, #0002); border-radius: 10px; padding: 8px 12px; margin: 8px 0 0; display: grid; gap: 6px; }
+.ws-members legend { font-size: 13px; padding: 0 4px; }
 .ws-picker h2 { margin: 0 0 12px; font-size: 18px; }
 .ws-tabs { margin-bottom: 12px; }
 .ws-recent { display: flex; flex-direction: column; gap: 2px; margin-bottom: 12px; }

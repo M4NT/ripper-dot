@@ -46,7 +46,7 @@ import { browserFor, browserRisk } from './lib/browser.mjs';
 import { runClaude, runCodex, systemPrompt, describeImage, CLAUDE_FAST_ENV } from './lib/providers.mjs';
 import { runOpenRouter, syncOpenRouterModels, checkCompatKey, compatCatalog, COMPAT } from './lib/openrouter.mjs';
 import { allAccounts, isLoggedIn, exhaustedUntil, loginCommand, openLoginTerminal, testAccount, configDirOf } from './lib/claude-accounts.mjs';
-import { normalizeWorkspace, listDirs, gitBranch, workspaceFor } from './lib/workspace.mjs';
+import { normalizeWorkspace, listDirs, gitBranch, workspaceFor, workspaceForAgent } from './lib/workspace.mjs';
 import { recordExternal, listExternal, externalCsv, EXTERNAL_KINDS } from './lib/external-actions.mjs';
 import { buildPulse, pulseDue, pulseWhatsappTo } from './lib/pulse.mjs';
 import { normalizeFlow, stepPrompt, stepRuns } from './lib/flows.mjs';
@@ -1018,7 +1018,8 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
   let computer = null;
   // Sem chave/computador desligado: a ferramenta só não é oferecida (o painel do agente avisa).
   // Pasta de trabalho da conversa (pasta desta máquina ou repositório); repositório privado usa o token do Guardião.
-  const chatWs = chat.workspace?.kind === 'repo' && s.github?.token ? { ...chat.workspace, auth: gitAuthArg(s.github.token) } : chat.workspace || null;
+  const agentWs = workspaceForAgent(chat.workspace, agent.id);
+  const chatWs = agentWs?.kind === 'repo' && s.github?.token ? { ...agentWs, auth: gitAuthArg(s.github.token) } : agentWs || null;
   if (agent.tools.includes('computer')) { try { computer = computerFor(agent, s, save, chatWs); } catch {} }
   let browser = null;
   if (computer?.kind === 'docker' && agent.tools.includes('browser')) {
@@ -1501,7 +1502,7 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
   const system = [
     systemStable,
     memoryContext(memories, s.memoryLogInContext ?? 10),
-    chat.workspace && (computer ? workspaceFor(chat.workspace, computer.kind).hint : `O usuário escolheu a pasta de trabalho ${chat.workspace.path || chat.workspace.repo}, mas você não tem computador ligado: diga isso se ele pedir para mexer nos arquivos.`),
+    chat.workspace && (computer ? workspaceFor(workspaceForAgent(chat.workspace, agent.id), computer.kind).hint : `O usuário escolheu a pasta de trabalho ${chat.workspace.path || chat.workspace.repo}, mas você não tem computador ligado: diga isso se ele pedir para mexer nos arquivos.`),
     await projectContext(project),
     visibleArtifacts(chat).length && `Artefatos do time (leia com read_artifact; salve entregas com save_artifact): ${visibleArtifacts(chat).slice(-20).map(x => `"${x.title}" (${x.kind}, v${x.version})`).join('; ')}`,
     (() => {
@@ -1687,13 +1688,13 @@ async function chat({ chat, text, fileIds, signal, mcpSession, skipUserPush = fa
   const first = await selectSpeakers(chat, text, db.agents, (t, ms) => classifySpeaker(t, ms, db.settings, heuristicSpeaker));
   const floor = new Floor(first, members, group ? 5 : 1);
   if (group) emit({ turnPlan: turnPlanIds(first, floor) });
-  for (let agent = floor.next(); agent; agent = floor.next()) {
   // Ninguém fica sem resposta: se quem abriu passar a vez (PASSO) e ninguém mais falou, chama o próximo membro.
   let answered = false;
   const tried = new Set();
+  for (let agent = floor.next(); agent; agent = floor.next()) {
     if (signal?.aborted) break;
-    const runBudget = checkRunBudget(db, db.settings, { agentId: agent.id });
     tried.add(agent.id);
+    const runBudget = checkRunBudget(db, db.settings, { agentId: agent.id });
     if (runBudget.blocked) {
       const alert = tokenBudgetAlertFromCheck(runBudget) || { kind: runBudget.kind, message: runBudget.userMessage };
       emit({ tokenBudget: alert, stopped: true });
@@ -1717,8 +1718,8 @@ async function chat({ chat, text, fileIds, signal, mcpSession, skipUserPush = fa
       if (nextUp) floor.queue.push(nextUp);
     }
     else if (group && reply) {
-      const deniedPeers = [];
       answered = true;
+      const deniedPeers = [];
       const next = floor.afterReply(agent, reply.content, {
         allowPeer: peer => {
           const gate = canDelegate(

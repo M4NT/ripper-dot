@@ -58,7 +58,7 @@ export function useUiMode() {
     try {
       const ui = { ...(S.settings.ui || {}), mode: next };
       const enterprise = { ...(S.settings.enterprise || {}), enabled: next === 'enterprise' };
-      await api('/api/settings', { method: 'PUT', body: { ...S.settings, ui, enterprise } });
+      await api('/api/settings', { method: 'PUT', body: { ui, enterprise } });
       await refresh();
       toast(next === 'enterprise' ? 'Modo enterprise ativado' : 'Modo simples ativado');
     } catch (e) {

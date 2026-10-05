@@ -243,7 +243,7 @@ function Palette({ open, onClose, toggleTheme }) {
 }
 
 function Shell() {
-  const { S } = useApp();
+  const { S, toast } = useApp();
   const { parts, query } = useRoute();
   const t = useT();
   const [theme, toggleTheme] = useTheme();
@@ -276,6 +276,7 @@ function Shell() {
     if (!isRouteAllowed(parts, S.settings)) {
       if (parts[0] === 'settings') go('/settings');
       else go('/');
+      toast?.('Essa tela fica no modo Enterprise. Ative em Configurações › Aparência para ver Projetos e grupos.');
     }
   }, [parts.join('/'), S?.settings?.ui?.mode, S?.settings?.enterprise?.enabled]);
 

@@ -47,7 +47,7 @@ export default function Chats() {
   return (
     <div className="page narrow">
       <header className="page-head">
-        <div><h1>Conversas</h1><p className="lede">{S.chats.length - archivedCount} ativas{archivedCount ? ` · ${archivedCount} arquivadas` : ''}, com {S.agents.length} agentes.</p></div>
+        <div><h1>Conversas</h1><p className="lede">{(() => { const n = S.chats.length - archivedCount; return n ? `${n} ${n === 1 ? 'conversa ativa' : 'conversas ativas'}${archivedCount ? ` · ${archivedCount} arquivada${archivedCount === 1 ? '' : 's'}` : ''}` : `Nenhuma conversa ainda. ${S.agents.length} ${S.agents.length === 1 ? 'agente disponível' : 'agentes disponíveis'}.`; })()}</p></div>
         {visible.length > 0 && <button type="button" className="btn" onClick={() => (selecting ? stopSelecting() : setSelecting(true))}>{selecting ? 'Cancelar' : 'Selecionar'}</button>}
       </header>
       <div className="toolbar">
