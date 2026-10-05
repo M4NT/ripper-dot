@@ -42,7 +42,7 @@ import { listChatsPage } from './lib/history.mjs';
 import { tryClaimRoutine, releaseRoutineClaim } from './lib/persist-coord.mjs';
 import { browserFor, browserRisk } from './lib/browser.mjs';
 import { runClaude, runCodex, systemPrompt, describeImage } from './lib/providers.mjs';
-import { runOpenRouter, syncOpenRouterModels, checkOpenRouterKey, openRouterCatalog } from './lib/openrouter.mjs';
+import { runOpenRouter, syncOpenRouterModels, checkCompatKey, compatCatalog, COMPAT } from './lib/openrouter.mjs';
 import { recordExternal, listExternal, externalCsv, EXTERNAL_KINDS } from './lib/external-actions.mjs';
 import { buildPulse, pulseDue } from './lib/pulse.mjs';
 import { emailReady, listEmails, readEmail, sendEmail, newEmailsSince, testEmail } from './lib/email.mjs';
@@ -1386,7 +1386,7 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
       const providerSystem = MODELS[m].provider === 'codex' && s.computer.mode !== 'local'
         ? `${system}\n\nNesta execução do Codex, o computador está em modo somente leitura; não prometa executar comandos nem acessar a VM Boat.` : system;
       const args = { agent, effort: clampEffort(s, m, effort), prompt, images, history, system: providerSystem, systemStable, settings: { ...s, plugins: turnPlugins }, signal };
-      if (MODELS[m].provider === 'openrouter') return runOpenRouter({ ...args, model: m, ctx });
+      if (MODELS[m].provider in COMPAT) return runOpenRouter({ ...args, model: m, ctx }); // OpenRouter, OpenAI, Gemini, Ollama
       return MODELS[m].provider === 'codex'
         ? runCodex({ ...args, cwd: sandboxDir(agent), ctx })
         : runClaude({ ...args, model: m, ctx });
@@ -1989,14 +1989,16 @@ const routes = [
   ['GET', /^\/api\/settings$/, () => ({ settings: redact(db.settings), meta: settingsMeta() })],
   ['GET', /^\/api\/flags$/, () => ({ flags: effectiveFeatureFlags(db.settings) })],
   // Provedores de IA → OpenRouter: testar a chave e listar o catálogo (para escolher modelos).
-  ['POST', /^\/api\/openrouter\/test$/, async req => {
+  // Provedores compatíveis com OpenAI: testar conexão e listar modelos (o caminho antigo /api/openrouter/* continua)
+  ['POST', /^\/api\/(?:providers\/)?(openrouter|openai|gemini|ollama)\/test$/, async (req, [prov]) => {
     const b = await body(req);
-    const key = !b.apiKey || b.apiKey === '••••' ? db.settings.openrouter?.apiKey : String(b.apiKey).trim();
-    if (!key) throw new HttpError(400, 'Informe a chave do OpenRouter.');
-    try { return await checkOpenRouterKey(key); } catch (e) { return { ok: false, error: `Sem resposta do OpenRouter: ${e.message}` }; }
+    const key = !b.apiKey || b.apiKey === '••••' ? db.settings[prov]?.apiKey : String(b.apiKey).trim();
+    const settings = b.url ? { ...db.settings, ollama: { ...db.settings.ollama, url: b.url } } : db.settings;
+    if (!key && !COMPAT[prov].noKey) return { ok: false, error: 'Informe a chave.' };
+    try { return await checkCompatKey(prov, settings, key); } catch (e) { return { ok: false, error: `Sem resposta do ${COMPAT[prov].label}: ${e.message}` }; }
   }],
-  ['GET', /^\/api\/openrouter\/models$/, async () => {
-    try { return await openRouterCatalog(); } catch (e) { throw new HttpError(502, e.message); }
+  ['GET', /^\/api\/(?:providers\/)?(openrouter|openai|gemini|ollama)\/models$/, async (req, [prov]) => {
+    try { return await compatCatalog(prov, db.settings); } catch (e) { throw new HttpError(502, e.message); }
   }],
   ['PUT', /^\/api\/settings$/, async req => {
     const b = await body(req), s = db.settings;

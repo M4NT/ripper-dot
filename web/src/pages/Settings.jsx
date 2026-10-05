@@ -146,7 +146,7 @@ function Row({ title, desc, children, stack, tip }) {
     </div>
   );
 }
-const PAID_BODY = 'O Ripper funciona pela sua assinatura (Claude, ChatGPT) sem custo extra. Com o uso pago ativado, cada resposta de um modelo pago (OpenRouter ou Claude por chave de API) é cobrada em dólar na conta do provedor, inclusive o que os agentes fizerem sozinhos (rotinas, WhatsApp). Os limites diários abaixo pausam o gasto quando atingidos.';
+const PAID_BODY = 'O Ripper funciona pela sua assinatura (Claude, ChatGPT) sem custo extra. Com o uso pago ativado, cada resposta de um modelo pago (OpenRouter, OpenAI, Gemini ou Claude por chave de API) é cobrada em dólar na conta do provedor, inclusive o que os agentes fizerem sozinhos (rotinas, WhatsApp). Os limites diários abaixo pausam o gasto quando atingidos.';
 
 /** Uso pago: consentimento explícito, limites diários e o gasto de hoje. Sem consentimento, modelo pago não roda. */
 function PaidUsageCard({ s, set, S }) {
@@ -182,20 +182,33 @@ function PaidUsageCard({ s, set, S }) {
   );
 }
 
-/** OpenRouter: uma chave dá acesso a GPT, Gemini, DeepSeek, Llama… com as ferramentas do Ripper. */
-function OpenRouterCard({ s, set }) {
-  const or = s.openrouter || { apiKey: '', models: [] };
+/** Provedores compatíveis com OpenAI: OpenRouter, OpenAI, Gemini (chave) e Ollama (local, endereço). */
+const COMPAT_UI = {
+  openrouter: { title: 'OpenRouter', keyUrl: 'https://openrouter.ai/keys', keyHost: 'openrouter.ai/keys', ph: 'sk-or-…', search: 'gpt, gemini, deepseek, llama…',
+    desc: 'Uma chave só para usar GPT, Gemini, DeepSeek, Llama e centenas de outros modelos, com as ferramentas do Ripper (computador, navegador, memória). Pago por uso na sua conta do OpenRouter.' },
+  openai: { title: 'OpenAI API', keyUrl: 'https://platform.openai.com/api-keys', keyHost: 'platform.openai.com/api-keys', ph: 'sk-…', search: 'gpt-5, gpt-4.1, o4…',
+    desc: 'GPT direto pela chave da OpenAI, com as ferramentas do Ripper. Pago por uso na sua conta da OpenAI (o custo aqui é estimado pelos tokens).' },
+  gemini: { title: 'Gemini', keyUrl: 'https://aistudio.google.com/apikey', keyHost: 'aistudio.google.com/apikey', ph: 'AIza…', search: 'flash, pro…',
+    desc: 'Modelos Gemini pela chave do Google AI Studio (os mesmos do Antigravity), com as ferramentas do Ripper. O AI Studio tem cota grátis; acima dela, pago por uso (custo estimado pelos tokens).' },
+  ollama: { title: 'Ollama', local: true, search: 'llama, qwen, deepseek…',
+    desc: 'Modelos rodando nesta máquina: grátis, offline e nada sai do computador. Instale em ollama.com, baixe um modelo (ex.: ollama pull qwen3) e adicione aqui. Prefira modelos que aceitam ferramentas (qwen3, llama3.1+, mistral).' }
+};
+
+function OpenRouterCard({ s, set, prov = 'openrouter' }) {
+  const ui = COMPAT_UI[prov];
+  const or = s[prov] || { apiKey: '', models: [], url: '' };
   const [check, setCheck] = useState(null); // null | 'testing' | { ok, error, usage }
   const [catalog, setCatalog] = useState(null);
   const [q, setQ] = useState('');
-  const setOr = patch => set('openrouter', { ...or, ...patch });
+  const setOr = patch => set(prov, { ...or, ...patch });
+  const connected = ui.local || !!or.apiKey;
   async function test() {
     setCheck('testing');
-    try { setCheck(await api('/api/openrouter/test', { method: 'POST', body: { apiKey: or.apiKey } })); }
+    try { setCheck(await api(`/api/providers/${prov}/test`, { method: 'POST', body: { apiKey: or.apiKey, url: or.url } })); }
     catch (e) { setCheck({ ok: false, error: e.message }); }
   }
   async function openCatalog() {
-    try { setCatalog(await api('/api/openrouter/models')); } catch (e) { setCheck({ ok: false, error: e.message }); }
+    try { setCatalog(await api(`/api/providers/${prov}/models`)); } catch (e) { setCheck({ ok: false, error: e.message }); }
   }
   const chosen = new Set(or.models.map(m => m.id));
   const words = q.toLowerCase().split(/\s+/).filter(Boolean);
@@ -204,16 +217,25 @@ function OpenRouterCard({ s, set }) {
   const status = check === 'testing' ? <span className="tag" role="status">Testando…</span>
     : check?.ok ? <span className="tag tag-ok">conectado</span>
     : check ? <span className="tag tag-warn">{check.error}</span>
-    : or.apiKey ? <span className="tag">chave salva</span> : <span className="tag">não conectado</span>;
+    : ui.local ? <span className="tag">local</span> : or.apiKey ? <span className="tag">chave salva</span> : <span className="tag">não conectado</span>;
   return (
-    <Card title="OpenRouter" badge={status} desc="Uma chave só para usar GPT, Gemini, DeepSeek, Llama e centenas de outros modelos, com as ferramentas do Ripper (computador, navegador, memória). Pago por uso na sua conta do OpenRouter.">
-      {!s.billing?.paidConsentAt && <p className="paid-inline"><Icon name="bolt" size={14} />Os modelos do OpenRouter só respondem com o uso pago ativado (acima).</p>}
-      <Row title="Chave da API" desc={<>Crie em <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a>.</>}>
-        <div className="row">
-          <input className="input" type="password" autoComplete="off" value={or.apiKey} onChange={e => { setOr({ apiKey: e.target.value }); setCheck(null); }} placeholder="sk-or-…" aria-label="Chave do OpenRouter" />
-          <button type="button" className="btn" disabled={!or.apiKey || check === 'testing'} onClick={test}>Testar</button>
-        </div>
-      </Row>
+    <Card title={ui.title} badge={status} desc={ui.desc}>
+      {!ui.local && !s.billing?.paidConsentAt && <p className="paid-inline"><Icon name="bolt" size={14} />Os modelos do {ui.title} só respondem com o uso pago ativado (acima).</p>}
+      {ui.local ? (
+        <Row title="Endereço do Ollama" desc="Padrão desta máquina. Mude só se o Ollama roda em outro computador da rede.">
+          <div className="row">
+            <input className="input" value={or.url || 'http://127.0.0.1:11434'} onChange={e => { setOr({ url: e.target.value }); setCheck(null); }} aria-label="Endereço do Ollama" />
+            <button type="button" className="btn" disabled={check === 'testing'} onClick={test}>Testar</button>
+          </div>
+        </Row>
+      ) : (
+        <Row title="Chave da API" desc={<>Crie em <a href={ui.keyUrl} target="_blank" rel="noopener">{ui.keyHost}</a>.</>}>
+          <div className="row">
+            <input className="input" type="password" autoComplete="off" value={or.apiKey} onChange={e => { setOr({ apiKey: e.target.value }); setCheck(null); }} placeholder={ui.ph} aria-label={`Chave do ${ui.title}`} />
+            <button type="button" className="btn" disabled={!or.apiKey || check === 'testing'} onClick={test}>Testar</button>
+          </div>
+        </Row>
+      )}
       <Row title="Modelos em uso" desc="Aparecem no seletor de modelo das conversas e dos agentes depois de salvar." stack>
         {or.models.length ? (
           <ul className="rows flat">{or.models.map(m => (
@@ -225,16 +247,16 @@ function OpenRouterCard({ s, set }) {
         ) : <p className="muted small">Nenhum ainda.</p>}
         {catalog ? (
           <div className="or-catalog">
-            <input className="input" value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar: gpt, gemini, deepseek, llama…" aria-label="Buscar modelo no OpenRouter" autoFocus />
+            <input className="input" value={q} onChange={e => setQ(e.target.value)} placeholder={`Buscar: ${ui.search}`} aria-label={`Buscar modelo no ${ui.title}`} autoFocus />
             <ul className="rows flat">{found.map(m => (
               <li key={m.id} className="row-item">
-                <div className="row-main"><b>{m.label}</b><small className="mono">{m.id} · US$ {price(m.priceIn)} / {price(m.priceOut)} por milhão de tokens</small></div>
+                <div className="row-main"><b>{m.label}</b><small className="mono">{m.id}{m.priceIn > 0 ? ` · US$ ${price(m.priceIn)} / ${price(m.priceOut)} por milhão de tokens` : ui.local ? ' · grátis' : ''}</small></div>
                 <button type="button" className="btn btn-sm btn-primary" onClick={() => setOr({ models: [...or.models, { id: m.id, label: m.label }] })}>Adicionar</button>
               </li>
             ))}</ul>
-            {!found.length && <p className="muted small">Nada encontrado. Só aparecem modelos que aceitam ferramentas.</p>}
+            {!found.length && <p className="muted small">{ui.local && !(catalog || []).length ? 'Nenhum modelo baixado. Rode, por exemplo: ollama pull qwen3' : 'Nada encontrado.'}</p>}
           </div>
-        ) : <button type="button" className="btn" disabled={!or.apiKey} onClick={openCatalog}><Icon name="plus" size={16} />Adicionar modelos</button>}
+        ) : <button type="button" className="btn" disabled={!connected} onClick={openCatalog}><Icon name="plus" size={16} />Adicionar modelos</button>}
       </Row>
     </Card>
   );
@@ -369,7 +391,10 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
     julia: julia === null ? { tone: 'off', label: 'verificando…' } : julia ? { tone: 'ok', label: 'no ar' } : { tone: 'warn', label: 'fora do ar' },
     claude: s.claude.mode === 'api' && !s.claude.apiKey ? { tone: 'warn', label: 'falta a chave' } : { tone: 'ok', label: s.claude.mode === 'api' ? 'API key' : 'assinatura' },
     codex: S.meta?.codexInstalled ? { tone: 'ok', label: 'conectado' } : { tone: 'warn', label: 'não instalado' },
-    openrouter: s.openrouter?.apiKey ? { tone: 'ok', label: 'chave salva' } : { tone: 'off', label: 'não conectado' }
+    openrouter: s.openrouter?.apiKey ? { tone: 'ok', label: 'chave salva' } : { tone: 'off', label: 'não conectado' },
+    openai: s.openai?.apiKey ? { tone: 'ok', label: 'chave salva' } : { tone: 'off', label: 'não conectado' },
+    gemini: s.gemini?.apiKey ? { tone: 'ok', label: 'chave salva' } : { tone: 'off', label: 'não conectado' },
+    ollama: s.ollama?.models?.length ? { tone: 'ok', label: `${s.ollama.models.length} modelo(s)` } : { tone: 'off', label: 'sem modelos' }
   };
   const [sandboxSt, setSandboxSt] = useState(null);
   useEffect(() => {
@@ -465,7 +490,8 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
             <Row title="Apps conectados do ChatGPT" desc="Quando houver suporte."><Switch checked={s.chatgpt.useConnectedApps} onChange={v => set('chatgpt.useConnectedApps', v)} label="Apps do ChatGPT" /></Row>
           </Card>
           </>}
-          {P.id === 'openrouter' && <><PaidUsageCard s={s} set={set} S={S} /><OpenRouterCard s={s} set={set} /></>}
+          {['openrouter', 'openai', 'gemini'].includes(P.id) && <><PaidUsageCard s={s} set={set} S={S} /><OpenRouterCard s={s} set={set} prov={P.id} /></>}
+          {P.id === 'ollama' && <OpenRouterCard s={s} set={set} prov="ollama" />}
           {P.id === 'julia' && <>
           <Card title="Como a Julia trabalha" badge={<><MetalBadge theme={dark ? 'dark' : 'light'}>Julia 1</MetalBadge>{julia === null ? <span className="tag" role="status">Verificando…</span> : <span className={`tag ${julia ? 'tag-ok' : 'tag-warn'}`}>{julia ? 'no ar' : 'fora do ar'}</span>}</>} desc="A Julia 1 escolhe modelo e prioridades antes do modelo grande. Fora do ar, as regras de reserva decidem.">
             <AdvancedBlock settings={s} hint="Limites de API, Julia e detalhes do Codex" className="in-card">
