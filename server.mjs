@@ -45,7 +45,7 @@ import { runClaude, runCodex, systemPrompt, describeImage } from './lib/provider
 import { runOpenRouter, syncOpenRouterModels, checkCompatKey, compatCatalog, COMPAT } from './lib/openrouter.mjs';
 import { recordExternal, listExternal, externalCsv, EXTERNAL_KINDS } from './lib/external-actions.mjs';
 import { buildPulse, pulseDue } from './lib/pulse.mjs';
-import { emailReady, listEmails, readEmail, sendEmail, newEmailsSince, testEmail } from './lib/email.mjs';
+import { emailReady, listEmails, readEmail, sendEmail, newEmailsSince, testEmail, getAttachment, safeName, attachmentText, readHint } from './lib/email.mjs';
 import { gh, githubReady, normalizeRepo, repoChanges, describeChange, prBranch, gitAuthArg, hideToken } from './lib/github.mjs';
 import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './lib/event-triggers.mjs';
 import { isPaidModel, paidBlockReason, addSpend, spendToday, spendLimits, normalizeBilling } from './lib/paid-usage.mjs';
@@ -515,6 +515,8 @@ async function runInboxDelivery(m, { signal } = {}) {
   m.deliveredAt = Date.now();
   return { ...parsed, threadChatId: c.id, reply: parsed.ok ? { content: parsed.content, model: parsed.model } : null };
 }
+
+const fmtBytes = n => n < 1024 ? `${n} B` : n < 1048576 ? `${Math.round(n / 1024)} KB` : `${(n / 1048576).toFixed(1).replace('.', ',')} MB`;
 
 /** Áudio → transcrição (Whisper local); imagem → descrição curta (Haiku). Volta como texto da mensagem. */
 async function mediaToText(ev, media) {
@@ -1130,11 +1132,26 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
           const m = await readEmail(s.email, a.uid);
           return m ? `De: ${m.from}
 Assunto: ${m.subject}
-Data: ${new Date(m.at).toLocaleString('pt-BR')}${m.attachments.length ? `
-Anexos: ${m.attachments.join(', ')}` : ''}
+Data: ${new Date(m.at).toLocaleString('pt-BR')}${m.attachments.length ? `\nAnexos (baixe com email_attachment): ${m.attachments.map(x => `${x.name} (${fmtBytes(x.size)})`).join(', ')}` : ''}
 
 ${m.text}` : 'E-mail não encontrado.';
         } catch (e) { return `Não consegui ler o e-mail: ${e.message}`; }
+      },
+      attachment: async a => {
+        recordCorporateAudit(db.settings, { category: 'email', action: 'email.attachment', agentId: agent.id, chatId: chat.id, at: Date.now() });
+        let att;
+        try { att = await getAttachment(s.email, a.uid, a.name); } catch (e) { return `Não consegui baixar o anexo: ${e.message}`; }
+        if (!att) return `Anexo "${a.name}" não encontrado nesse e-mail. Confira os nomes com email_read.`;
+        const name = safeName(att.name), rel = `sandbox/${agent.id}/anexos/${name}`;
+        mkdirSync(dataUrl(`sandbox/${agent.id}/anexos/`), { recursive: true });
+        await writeFile(dataUrl(rel), att.content);
+        // aparece na conversa com Abrir / Baixar / Mostrar na pasta
+        const rec = { id: id(), agentId: agent.id, projectId: chat.projectId || null, chatId: chat.id, name, type: att.type || mimeOf(name), size: att.content.length, path: rel, delivered: true, createdAt: Date.now() };
+        db.files.push(rec); save();
+        delivered.push(rec.id); { const { path, ...pub } = rec; emit({ file: pub }); }
+        const vm = `/work/anexos/${name}`, txt = attachmentText(name, att.content), hint = readHint(vm);
+        return [`Anexo salvo: ${vm} (${fmtBytes(att.content.length)}). O usuário já vê o arquivo na conversa.`,
+          txt != null ? `Conteúdo:\n${txt}` : hint ? (rawComputer ? `Para ler, rode no computador:\n${hint}` : 'Para ler o conteúdo, este agente precisa de computador (Habilidades → Computador).') : ''].filter(Boolean).join('\n\n');
       },
       send: async a => {
         let to = String(a.to || '').trim(), subject = String(a.subject || '').trim(), inReplyTo;
@@ -1143,12 +1160,20 @@ ${m.text}` : 'E-mail não encontrado.';
           if (orig) { to ||= orig.replyTo; inReplyTo = orig.messageId; if (!subject) subject = /^re:/i.test(orig.subject) ? orig.subject : `Re: ${orig.subject}`; }
         }
         if (!/@/.test(to) || !a.text?.trim()) return 'Informe o destinatário (e-mail) e o texto.';
+        const attachments = [];
+        for (const f of a.files || []) {
+          const rel = vmPathToData(f, agent.id);
+          const st = rel && await stat(dataUrl(rel)).catch(() => null);
+          if (!st?.isFile()) return `Arquivo não encontrado: ${f}. Use um caminho em /work ou /shared (confira com ls).`;
+          attachments.push({ filename: basename(rel), path: fileURLToPath(dataUrl(rel)), size: st.size });
+        }
+        if (attachments.reduce((n, x) => n + x.size, 0) > 20 * 1024 * 1024) return 'Os anexos passam de 20 MB: a maioria dos provedores recusa. Mande um link ou divida.';
         const ok = await askApproval({ agent, chat, emit, signal }, 'email', `Para ${to}
-Assunto: ${subject}
+Assunto: ${subject}${attachments.length ? `\nAnexos: ${attachments.map(x => `${x.filename} (${fmtBytes(x.size)})`).join(', ')}` : ''}
 
 ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
         if (!ok) return 'O usuário NÃO aprovou o envio. Nada foi enviado.';
-        try { await sendEmail(s.email, { to, subject, text: a.text, inReplyTo }); }
+        try { await sendEmail(s.email, { to, subject, text: a.text, inReplyTo, attachments: attachments.map(({ filename, path }) => ({ filename, path })) }); }
         catch (e) {
           recordExternal({ kind: 'email.sent', agentId: agent.id, chatId: chat.id, target: to, text: a.text, approved: 'user', ok: false, error: e.message });
           return `Falha ao enviar o e-mail: ${e.message}`;

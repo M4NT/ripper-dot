@@ -12,9 +12,9 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 ---
 
 ## Próximos passos (em ordem)
-1. E-mail com anexos (§3).
-2. Fluxos visuais encadeando agentes (§3).
-3. Plugins MCP nos provedores compatíveis com OpenAI (§1b).
+1. Fluxos visuais encadeando agentes (§3).
+2. Plugins MCP nos provedores compatíveis com OpenAI (§1b).
+3. Aviso na Caixa quando a imagem dos agentes está desatualizada (Pontes P1).
 
 ---
 
@@ -56,7 +56,7 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 - [ ] Prévia de .xlsx em tabela.
 - ✅ Slides: python-pptx no computador do agente (entrega .pptx).
 - [ ] Geração de imagem — falta escolher provedor (OpenAI/Gemini pela API, ou modelo local).
-- ⚠️ Ditado, WhatsApp-áudio e slides exigem **reconstruir a imagem dos agentes** (`ripper-agent:2`) em Configurações → Computador.
+- ⚠️ Ditado, WhatsApp-áudio e slides exigem **reconstruir a imagem dos agentes** (`ripper-agent:3`) em Configurações → Computador.
 
 ## 3. Automação (P1 — onde viramos nº 1)
 - ✅ **Resumo diário ("Pulse")**: todo dia (8h, ajustável em Configurações → Perfil) na Caixa — o que cada agente fez, arquivos, rotinas (e quais falharam), ações em seu nome, gasto e o que espera você. Montado sem chamar modelo (zero tokens); `GET /api/pulse` mostra na hora.
@@ -70,7 +70,7 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 - [ ] Guardião: aprovar/mesclar PR com aprovação do dono.
 - [ ] Fluxos visuais: encadear agentes num canvas (A pesquisa → B escreve → C publica), com aprovação em qualquer passo.
 - ✅ **E-mail como canal** (botões por provedor; Gmail com 1 clique pelo conector da conta Claude; senha de app com link direto; "Outro (IMAP)" para e-mail de empresa; aba Canais também no modo Simples): agentes listam, buscam, leem e respondem — leitura ao vivo, sem cópia local; todo envio com aprovação e no registro de ações externas; senha cifrada no disco. Configurações → Canais → E-mail.
-- [ ] E-mail: anexos (ler PDF/planilha anexados; enviar arquivo entregue pelo agente).
+- ✅ E-mail com anexos: `email_attachment` baixa o anexo (aparece na conversa com Abrir/Baixar e fica em /work/anexos); texto/CSV/HTML vêm lidos, PDF/Word/Excel/PowerPoint com o comando pronto para ler no computador (pypdf na imagem `ripper-agent:3`). `email_send` anexa arquivos do computador do agente (até 20 MB), listados na aprovação.
 - [ ] E-mail: resposta automática por remetente (como a autonomia por contato do WhatsApp).
 - [ ] Telegram, Instagram DM, Slack, Discord como canais.
 - [ ] Marketplace de agentes e skills prontos com instalação de 1 clique (base existe em Marketplace/SkillsHub).
@@ -140,7 +140,7 @@ Coisas encontradas durante o desenvolvimento: ligações que faltam entre partes
 - **Pré-aquecimento.** 1ª mensagem por agente ainda é fria; no máximo 3 processos parados. Aquecer ao abrir a conversa do agente (não só depois do 1º turno).
 - **Aba aberta durante uma atualização.** Abas abertas antes de um `npm run build` continuam com o JavaScript antigo, e telas carregadas sob demanda dão 404. Mostrar "Nova versão disponível — recarregar".
 - **Uso pago só configurável no modo Enterprise.** A tela Provedores de IA não aparece no modo Simples; quem é Simples não consegue nem ver o consentimento. Ok enquanto OpenRouter for recurso avançado; revisar se virar padrão.
-- **Imagem dos agentes desatualizada.** Quem não reconstruiu a `ripper-agent:2` só descobre quando uma transcrição falha. Avisar na Caixa (aviso do sistema) quando a imagem instalada for mais antiga que a esperada.
+- **Imagem dos agentes desatualizada.** Quem não reconstruiu a `ripper-agent:3` só descobre quando uma transcrição falha. Avisar na Caixa (aviso do sistema) quando a imagem instalada for mais antiga que a esperada.
 
 ### P2 — qualidade e higiene
 - **Testes instáveis em máquina carregada.** Testes que sobem o servidor (vault, idempotência, openapi, cabeçalhos) estouram ~15s quando há outros servidores rodando; passam sozinhos. Aumentar o tempo de espera de subida ou rodar esses arquivos em série.
