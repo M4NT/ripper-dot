@@ -51,6 +51,7 @@ import { normalizeFlow, stepPrompt, stepRuns } from './lib/flows.mjs';
 import { DRAFT_SYSTEM, sanitizeDraft, heuristicDraft } from './lib/agent-draft.mjs';
 import { applyBulk } from './lib/chat-bulk.mjs';
 import { searchLibrary } from './lib/library-search.mjs';
+import * as outbox from './lib/outbox.mjs';
 import { emailReady, listEmails, readEmail, sendEmail, newEmailsSince, testEmail, getAttachment, safeName, attachmentText, readHint } from './lib/email.mjs';
 import { gh, githubReady, normalizeRepo, repoChanges, describeChange, prBranch, gitAuthArg, hideToken } from './lib/github.mjs';
 import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './lib/event-triggers.mjs';
@@ -629,10 +630,7 @@ async function handleWhatsappMessage(msg) {
   recordWaMessage({ id: msg.id, phone: msg.from, fromMe: false, text: msg.text, name: msg.name });
   const { reply } = await channelReply('whatsapp', msg, agent, whatsappPrompt(msg));
   if (!reply) return;
-  try { await sendWhatsappText(w, msg.from, reply.content); }
-  catch (e) { recordExternal({ kind: 'whatsapp.auto_reply', agentId: agent.id, target: `+${msg.from}`, text: reply.content, approved: 'auto', ok: false, error: e.message }); throw e; }
-  recordExternal({ kind: 'whatsapp.auto_reply', agentId: agent.id, target: `+${msg.from}`, text: reply.content, approved: 'auto' });
-  recordWaMessage({ id: `out-${reply.id}`, phone: msg.from, fromMe: true, text: reply.content });
+  await deliverOut('wa-meta', { to: msg.from, text: reply.content }, { target: `+${msg.from}`, agentId: agent.id, ext: { kind: 'whatsapp.auto_reply', approved: 'auto' }, waPhone: msg.from });
 }
 
 /**
@@ -669,10 +667,7 @@ async function handleWhatsappWebMessage(msg) {
     if (!ok) return;
   }
   const approved = mode === 'draft' ? 'user' : 'auto';
-  try { await sendEvolutionText(msg.from, reply.content); }
-  catch (e) { recordExternal({ kind: 'whatsapp.auto_reply', agentId: agent.id, target: `${msg.name || ''} +${msg.from}`.trim(), text: reply.content, approved, ok: false, error: e.message }); throw e; }
-  recordExternal({ kind: 'whatsapp.auto_reply', agentId: agent.id, target: `${msg.name || ''} +${msg.from}`.trim(), text: reply.content, approved });
-  recordWaMessage({ id: `out-${reply.id}`, phone: msg.from, fromMe: true, text: reply.content });
+  await deliverOut('wa-qr', { to: msg.from, text: reply.content }, { target: `${msg.name || ''} +${msg.from}`.trim(), agentId: agent.id, ext: { kind: 'whatsapp.auto_reply', approved }, waPhone: msg.from });
 }
 
 /**
@@ -780,6 +775,60 @@ async function askApproval({ agent, chat, emit, signal }, kind, command, reason,
   if (remember && done.status === 'approved' && done.remember) rememberAllowedCommand(chat, command);
   return done.status === 'approved';
 }
+
+// ---------- Envios para fora com fila (dead-letter) ----------
+// Cada tipo sabe enviar a partir do payload; as configurações são lidas na hora (reconectou → o próximo envio usa a nova).
+const SENDERS = {
+  'wa-qr': p => sendEvolutionText(p.to, p.text),
+  'wa-meta': p => sendWhatsappText(db.settings.whatsapp, p.to, p.text),
+  email: p => sendEmail(db.settings.email, p),
+  webhook: async p => {
+    const hook = resolveSocialWebhook(db.settings, p.hookId);
+    const r = await postToSocialWebhook(hook, p.text);
+    if (!r.ok) throw Object.assign(new Error(`Webhook respondeu ${r.status}: ${r.body || '(sem corpo)'}`), { status: r.status });
+  }
+};
+/**
+ * Envia agora; se falhar por problema temporário, vai para a fila e sai sozinho depois.
+ * meta: { target, agentId, chatId, ext: { kind, approved }, waPhone } — o registro de ações externas
+ * e o histórico do WhatsApp são gravados quando o envio de fato sai.
+ * Devolve { sent } ou { queued }; erro permanente é lançado (quem chamou explica).
+ */
+async function deliverOut(kind, payload, meta) {
+  const { _meta, ...clean } = payload;
+  try { await SENDERS[kind](clean); }
+  catch (e) {
+    if (!outbox.isTransient(e)) { recordExternal({ kind: meta.ext.kind, agentId: meta.agentId, chatId: meta.chatId, target: meta.target, text: payload.text, approved: meta.ext.approved, ok: false, error: e.message }); throw e; }
+    outbox.enqueue({ kind, payload: { ...clean, _meta: meta }, target: meta.target, label: String(payload.subject || payload.text || '').slice(0, 120), agentId: meta.agentId, chatId: meta.chatId, error: e.message });
+    return { queued: true };
+  }
+  deliveredOut(payload.text, meta);
+  return { sent: true };
+}
+function deliveredOut(text, meta) {
+  recordExternal({ kind: meta.ext.kind, agentId: meta.agentId, chatId: meta.chatId, target: meta.target, text, approved: meta.ext.approved });
+  if (meta.waPhone) recordWaMessage({ id: `out-${id()}`, phone: meta.waPhone, fromMe: true, text });
+}
+// A cada 30s tenta de novo o que está na hora. Morreu (esgotou ou erro permanente) → aviso na Caixa.
+let outboxBusy = false;
+setInterval(async () => {
+  if (outboxBusy) return;
+  outboxBusy = true;
+  try {
+    for (const it of outbox.due()) {
+      const { _meta: meta = { ext: { kind: 'external', approved: 'rule' } }, ...clean } = it.payload;
+      try { await SENDERS[it.kind](clean); outbox.markSent(it.id); deliveredOut(clean.text, meta); }
+      catch (e) {
+        if (outbox.markFailed(it.id, e) === 'dead') {
+          recordExternal({ kind: meta.ext.kind, agentId: meta.agentId, chatId: meta.chatId, target: meta.target, text: clean.text, approved: meta.ext.approved, ok: false, error: e.message });
+          const n = outbox.counts().dead || 0;
+          raiseSystemAlert({ key: 'outbox-dead', title: n === 1 ? 'Um envio não saiu' : `${n} envios não saíram`, body: `Tentei de novo várias vezes e não consegui (ex.: ${meta.target || it.kind}: ${String(e.message).slice(0, 120)}). Reenvie ou descarte.`, href: '/outbox', hrefLabel: 'Ver envios' });
+        }
+      }
+    }
+  } catch (e) { console.error('outbox', ...redactForLog(db.settings, e.message)); }
+  finally { outboxBusy = false; }
+}, +process.env.RIPPER_OUTBOX_TICK_MS || 30_000).unref?.(); // testes encurtam o intervalo
 
 /**
  * "Preciso de você": o agente pausa e faz uma pergunta aberta na Caixa (com opções rápidas, se fizer sentido).
@@ -1243,13 +1292,10 @@ Assunto: ${subject}${attachments.length ? `\nAnexos: ${attachments.map(x => `${x
 
 ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
         if (!ok) return 'O usuário NÃO aprovou o envio. Nada foi enviado.';
-        try { await sendEmail(s.email, { to, subject, text: a.text, inReplyTo, attachments: attachments.map(({ filename, path }) => ({ filename, path })) }); }
-        catch (e) {
-          recordExternal({ kind: 'email.sent', agentId: agent.id, chatId: chat.id, target: to, text: a.text, approved: 'user', ok: false, error: e.message });
-          return `Falha ao enviar o e-mail: ${e.message}`;
-        }
-        recordExternal({ kind: 'email.sent', agentId: agent.id, chatId: chat.id, target: to, text: a.text, approved: 'user' });
-        return `E-mail enviado para ${to}.`;
+        let r;
+        try { r = await deliverOut('email', { to, subject, text: a.text, inReplyTo, attachments: attachments.map(({ filename, path }) => ({ filename, path })) }, { target: to, agentId: agent.id, chatId: chat.id, ext: { kind: 'email.sent', approved: 'user' } }); }
+        catch (e) { return `Falha ao enviar o e-mail: ${e.message}`; }
+        return r.queued ? `Sem conexão com o servidor de e-mail agora: o e-mail para ${to} ficou na fila e sai sozinho quando voltar.` : `E-mail enviado para ${to}.`;
       }
     } : null,
     // Enviar WhatsApp pela API conectada (QR/Evolution ou Meta) — nunca pelo navegador.
@@ -1282,14 +1328,11 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
         if (viaQr && !contactMode(to, s.whatsappWeb)) return `+${to} não está na lista de números permitidos do WhatsApp (Configurações → Plugins → Canal WhatsApp). Nada foi enviado.`;
         const ok = await askApproval({ agent, chat, emit, signal }, 'whatsapp', `Para +${to}:\n${msgText}`, 'A mensagem sai no WhatsApp em seu nome.', false);
         if (!ok) return 'O usuário NÃO aprovou o envio. Nada foi enviado.';
-        try { viaQr ? await sendEvolutionText(to, msgText) : await sendWhatsappText(s.whatsapp, to, msgText); }
-        catch (e) {
-          recordExternal({ kind: 'whatsapp.sent', agentId: agent.id, chatId: chat.id, target: `+${to}`, text: msgText, approved: 'user', ok: false, error: e.message });
-          return `Falha ao enviar pelo WhatsApp: ${e.message}${viaQr ? '' : ' (na API oficial, fora da janela de 24 h só vale mensagem de template)'}`; }
-        // Vai para o histórico do WhatsApp (o agente vê a continuação); não vira conversa no Ripper.
-        recordWaMessage({ id: `out-${id()}`, phone: to, fromMe: true, text: msgText });
-        recordExternal({ kind: 'whatsapp.sent', agentId: agent.id, chatId: chat.id, target: `+${to}`, text: msgText, approved: 'user' });
-        return `Mensagem enviada para +${to}.`;
+        // Vai para o histórico do WhatsApp quando sair (o agente vê a continuação); não vira conversa no Ripper.
+        let r;
+        try { r = await deliverOut(viaQr ? 'wa-qr' : 'wa-meta', { to, text: msgText }, { target: `+${to}`, agentId: agent.id, chatId: chat.id, ext: { kind: 'whatsapp.sent', approved: 'user' }, waPhone: to }); }
+        catch (e) { return `Falha ao enviar pelo WhatsApp: ${e.message}${viaQr ? '' : ' (na API oficial, fora da janela de 24 h só vale mensagem de template)'}`; }
+        return r.queued ? `WhatsApp fora do ar agora: a mensagem para +${to} ficou na fila e sai sozinha quando voltar.` : `Mensagem enviada para +${to}.`;
       }
     } : null,
     social: agent.tools.includes('social') && isFlagEnabled(s, 'socialWebhooks') ? {
@@ -1314,10 +1357,10 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
         if (reason && !(await askApproval({ agent, chat, emit, signal }, 'social', cmd, reason))) {
           return 'O usuário NÃO aprovou publicar neste webhook. Não tente contornar; ofereça editar o rascunho ou publicar depois.';
         }
-        const result = await postToSocialWebhook(hook, body);
-        recordExternal({ kind: 'social.posted', agentId: agent.id, chatId: chat.id, target: hook.name, text: body, approved: reason ? 'user' : 'rule', ok: !!result.ok, error: result.ok ? undefined : `HTTP ${result.status}` });
-        if (!result.ok) return `Webhook respondeu ${result.status}: ${result.body || '(sem corpo)'}`;
-        return `Publicado em "${hook.name}" (HTTP ${result.status}).`;
+        let r;
+        try { r = await deliverOut('webhook', { hookId: hook.id, text: body }, { target: hook.name, agentId: agent.id, chatId: chat.id, ext: { kind: 'social.posted', approved: reason ? 'user' : 'rule' } }); }
+        catch (e) { return e.message; }
+        return r.queued ? `"${hook.name}" fora do ar agora: a publicação ficou na fila e sai sozinha quando voltar.` : `Publicado em "${hook.name}".`;
       }
     } : null
   };
@@ -2833,6 +2876,13 @@ const routes = [
     save();
     return { chat: summary(chat), warnings };
   }],
+  // Fila de envios: o que está esperando nova tentativa e o que morreu
+  ['GET', /^\/api\/outbox$/, (req, _, url) => ({ items: outbox.list({ status: url.searchParams.get('status') || undefined }).map(({ payload, ...it }) => ({ ...it, text: String(payload.text || '').slice(0, 300), subject: payload.subject })), counts: outbox.counts() })],
+  ['POST', /^\/api\/outbox\/([\w-]+)\/(retry|discard)$/, (req, [oid, act]) => {
+    if (!(act === 'retry' ? outbox.retryNow(oid) : outbox.discard(oid))) throw new HttpError(404, 'Envio não encontrado ou já resolvido.');
+    if (!outbox.counts().dead) resolveSystemAlert('outbox-dead');
+    save(); return { ok: true };
+  }],
   // Biblioteca: busca dentro do conteúdo (artefatos, arquivos de texto, memórias, skills)
   // ponytail: lê os arquivos a cada busca (até 1 MB cada); índice se a biblioteca crescer muito
   ['GET', /^\/api\/library\/search$/, async (req, _, url) => {
@@ -3515,9 +3565,7 @@ async function sendPulseWhatsapp(p) {
   if (!viaQr && !whatsappReady(s.whatsapp)) return;
   if (viaQr && !waWebRate(to)) return;
   const text = `*${p.title}*\n${p.body}`;
-  try { viaQr ? await sendEvolutionText(to, text) : await sendWhatsappText(s.whatsapp, to, text); }
-  catch (e) { recordExternal({ kind: 'whatsapp.sent', target: `+${to}`, text, approved: 'rule', ok: false, error: e.message }); throw e; }
-  recordExternal({ kind: 'whatsapp.sent', target: `+${to}`, text, approved: 'rule' });
+  await deliverOut(viaQr ? 'wa-qr' : 'wa-meta', { to, text }, { target: `+${to}`, ext: { kind: 'whatsapp.sent', approved: 'rule' } });
 }
 
 process.on('unhandledRejection', e => console.error('unhandledRejection', ...redactForLog(db?.settings, e?.message || String(e))));

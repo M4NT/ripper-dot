@@ -38,6 +38,7 @@ const AdminUso = lazy(() => import('./pages/AdminUso.jsx'));
 const NewAgent = lazy(() => import('./pages/NewAgent.jsx'));
 const AgentConfig = lazy(() => import('./pages/AgentConfig.jsx'));
 const Flows = lazy(() => import('./pages/Flows.jsx'));
+const Outbox = lazy(() => import('./pages/Outbox.jsx'));
 
 const Ctx = createContext(null);
 export const useApp = () => useContext(Ctx);
@@ -290,6 +291,7 @@ function Shell() {
     p0 === 'agents' ? <Agents /> :
     p0 === 'inbox' ? <Inbox /> :
     p0 === 'flows' ? <Flows /> :
+    p0 === 'outbox' ? <Outbox /> :
     p0 === 'log' ? <ExternalLog /> :
     p0 === 'new' ? <NewAgent key={query.get('template') || 'blank'} /> :
     p0 === 'explore' ? <Explore /> :

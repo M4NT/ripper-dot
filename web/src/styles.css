@@ -1839,3 +1839,5 @@ code, .mono, pre { overflow-wrap: anywhere; }
 .question-answer { display: flex; gap: 8px; align-items: flex-end; margin-top: 6px; }
 .question-answer textarea { flex: 1; min-width: 0; resize: vertical; font-size: 14px; }
 @media (max-width: 600px) { .question-answer { flex-direction: column; align-items: stretch; } }
+.outbox-row.dead .thumb { color: var(--err); }
+.outbox-err { color: var(--err); overflow-wrap: anywhere; }
