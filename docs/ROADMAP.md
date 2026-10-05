@@ -5,6 +5,19 @@ Referências a superar: ChatGPT (Agent, Tasks, Pulse, Projects), Grok (Tasks, Co
 
 Legenda: **P0** bloqueia uso/confiança · **P1** diferencial forte · **P2** polimento · ✅ feito
 
+Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principal**. Qualquer coisa que gaste crédito (OpenRouter, Claude por API key) só roda com consentimento explícito e dentro de limite diário.
+
+Última atualização: 05/10/2026.
+
+---
+
+## Próximos passos (em ordem)
+1. **Login com senha quando o Ripper sai do localhost** (§7) — destrava acesso remoto, push e relógio (§6).
+2. **Resumo diário "Pulse"** (§3) — o recurso mais "funcionário de verdade"; usa os avisos do sistema da Caixa que já existem.
+3. **Gatilhos por evento** (§3) — e-mail chegou, palavra-chave no WhatsApp, webhook.
+4. Pontes P0 da seção "Pontes" (persistência do db.json, segredos em texto puro no backup).
+5. Provedores diretos: OpenAI, Gemini, Ollama (§1b).
+
 ---
 
 ## 0. Já entregue (base)
@@ -20,35 +33,44 @@ Legenda: **P0** bloqueia uso/confiança · **P1** diferencial forte · **P2** po
 - ✅ Tempos por etapa gravados em cada resposta (preparo, roteamento, 1ª palavra, total) e mostrados na mensagem.
 - ✅ Sem telemetria/checagem de atualização do CLI por turno (1ª palavra ~5s → ~1–2s no teste puro).
 - ✅ Conectores do claude.ai sob demanda (custavam 3–5s por mensagem): memória 5.4→2.9s, delegação 13.8→5.9s.
-- ✅ Processo do SDK pré-aquecido (`prewarm`) por agente; memórias e contexto do turno no fim (`appendSystemPrompt`). 1ª palavra 2.6s → 1.3–2.0s (`scripts/bench-prewarm.mjs`).
-- [ ] Prompt de sistema enxuto: blocos só quando a ferramenta é usada. ✅ Cache de prompt: prefixo fixo primeiro, memórias saíram do meio.
-- ✅ Roteador Julia com rota Haiku para conversa curta (Julia + heurística). Opus: a cascata de custo já escolhe; teto por modelo em Configurações.
+- ✅ Processo do SDK pré-aquecido (`prewarm`) por agente — 1ª palavra 2.6s → 1.3–2.0s (`scripts/bench-prewarm.mjs`). Até 3 processos parados (~250 MB cada); a 1ª mensagem de cada agente ainda é fria.
+- ✅ Cache de prompt: prefixo fixo primeiro; memórias e contexto do turno vão no fim.
+- [ ] Prompt de sistema enxuto: medir o tamanho real por agente e cortar blocos raramente usados (a maioria já é condicional à ferramenta).
+- ✅ Roteador: rota Haiku para conversa curta (Julia + heurística). Opus: a cascata de custo decide; teto por modelo em Configurações.
 - ✅ Multitarefa real: ferramenta `parallel_tasks` (2–5 subtarefas ao mesmo tempo, web + computador) com barra de progresso por subtarefa no chat.
-- ✅ Custo do dia no card do agente (respostas, tokens e US$ estimados, tempo médio). Falta: R$ (câmbio) e tokens reais do SDK.
+- ✅ Custo do dia no card do agente (respostas, tokens e US$ estimados, tempo médio). Respostas pagas mostram o custo real.
+- [ ] Custo em R$ (câmbio do dia).
 
 ## 1b. Provedores de IA (P0)
-- ✅ Tela "Provedores de IA": grade com todos os provedores (logo, status, quantos modelos) e detalhe de cada um (o que faz no Ripper, o que ainda não faz, conexão e modelos).
-- ✅ OpenRouter com as ferramentas do Ripper (computador, navegador, memória, delegação; web pelo plugin do OpenRouter); escolha de modelos pelo catálogo.
-- [ ] OpenAI direto (chave), Gemini (AI Studio — cobre os modelos do Antigravity), Cursor (`cursor-agent`), Ollama (local).
+- ✅ Tela "Provedores de IA": grade com todos os provedores (logo, status, nº de modelos, "assinatura" ou "pago por uso") e detalhe de cada um (o que faz no Ripper, o que ainda não faz, conexão e modelos).
+- ✅ OpenRouter com as ferramentas do Ripper (computador, navegador, memória, delegação; web pelo plugin do OpenRouter); escolha de modelos pelo catálogo; teste de chave. Falha → cai no Claude pela assinatura.
+- [ ] OpenAI direto (chave), Gemini (AI Studio — cobre os modelos do Antigravity), Ollama (local, grátis). Reaproveitam `lib/openrouter.mjs` (API compatível com OpenAI).
+- [ ] Cursor (`cursor-agent`, como o Codex).
 - [ ] Plugins MCP do usuário nos provedores novos (hoje só Claude/Codex).
+- [ ] Ripper Auto escolher modelos do OpenRouter (hoje só por escolha manual) — só com uso pago ativo.
 
 ## 2. Entrada e saída multimodal (P0/P1)
-- ✅ Ditado por voz em todos os navegadores (gravação + transcrição no servidor); texto ditado em *itálico* na bolha.
-- ✅ Resposta falada: botão "Ouvir" em cada resposta e modo "mãos livres" (lê toda resposta) no composer — voz do navegador.
-- ✅ WhatsApp: analisar imagem e áudio recebidos (transcrever áudio, descrever imagem) e responder com base nisso.
-- ✅ Prévia inline de arquivos entregues: imagem, PDF embutido, CSV em tabela. Falta: .xlsx em tabela.
-- ✅ Slides: python-pptx no computador do agente (entrega .pptx com deliver_file). [ ] Geração de imagem: falta escolher provedor.
+- ✅ Ditado por voz em todos os navegadores (Chrome/Edge nativo; demais gravam e transcrevem com Whisper local); texto ditado em *itálico*.
+- ✅ Resposta falada: botão "Ouvir" e modo "mãos livres" (voz do navegador).
+- ✅ WhatsApp: transcreve áudio (Whisper local) e descreve imagem (Haiku) antes de responder.
+- ✅ Prévia inline de arquivos entregues: imagem, PDF embutido, CSV em tabela.
+- [ ] Prévia de .xlsx em tabela.
+- ✅ Slides: python-pptx no computador do agente (entrega .pptx).
+- [ ] Geração de imagem — falta escolher provedor (OpenAI/Gemini pela API, ou modelo local).
+- ⚠️ Ditado, WhatsApp-áudio e slides exigem **reconstruir a imagem dos agentes** (`ripper-agent:2`) em Configurações → Computador.
 
 ## 3. Automação (P1 — onde viramos nº 1)
-- [ ] **Agente Guardião do GitHub**: observa repositórios, abre issues/PRs, delega correções a outros agentes, revisa antes de pedir merge.
+- [ ] **Resumo diário proativo ("Pulse")**: o que aconteceu, o que precisa de você, o que os agentes fizeram, quanto gastaram — na Caixa (aviso do sistema) e no WhatsApp.
 - [ ] Gatilhos por evento (e-mail chegou, planilha mudou, webhook, mensagem no WhatsApp com palavra-chave) além de horário.
+- [ ] **Agente Guardião do GitHub**: observa repositórios, abre issues/PRs, delega correções, revisa antes de pedir merge.
 - [ ] Fluxos visuais: encadear agentes num canvas (A pesquisa → B escreve → C publica), com aprovação em qualquer passo.
-- [ ] Resumo diário proativo ("Pulse"): o que aconteceu, o que precisa de você, o que os agentes fizeram — na Caixa e no WhatsApp.
 - [ ] E-mail como canal (ler, rascunhar, responder com aprovação), igual ao WhatsApp.
 - [ ] Telegram, Instagram DM, Slack, Discord como canais.
 - [ ] Marketplace de agentes e skills prontos com instalação de 1 clique (base existe em Marketplace/SkillsHub).
 
 ## 4. Visibilidade do trabalho (P1)
+- ✅ Registro de ações externas (Caixa → Ações externas) — ver §7.
+- ✅ Subtarefas em paralelo com barra de progresso no chat.
 - [ ] Linha do tempo do agente: cada ação com tela/print, tempo, custo — reproduzível.
 - [ ] Ver a tela da VM ao vivo dentro do chat (miniatura que expande) enquanto ele age.
 - [ ] Grupos: linhas de delegação visíveis ("Ana pediu a Bruno…"), quem está falando, fila.
@@ -58,35 +80,62 @@ Legenda: **P0** bloqueia uso/confiança · **P1** diferencial forte · **P2** po
 ## 5. Interface (P1/P2) — revisão tela a tela
 | Tela | Pendências |
 |---|---|
-| Início | Mostrar "o que seus agentes fizeram hoje" no lugar do herói quando já há agentes. |
-| Caixa | ✅ Filtros não estouram no celular. Ações em lote; atalhos de teclado (A aprovar, R recusar); notificação push. |
-| Agentes | Busca/filtro; status ao vivo no card (trabalhando/ocioso); duplicar agente. |
-| Novo agente | Criação em 1 frase ("um agente que responde clientes no WhatsApp") → configura tudo (fase 6). |
-| Config. do agente | Testar ferramenta ali mesmo; histórico de mudanças. |
-| Chat | Editar mensagem e reenviar; ramificar; fixar; buscar dentro da conversa. |
+| Início | Mostrar "o que seus agentes fizeram hoje" no lugar do herói quando já há agentes (base: Pulse). |
+| Caixa | ✅ Filtros não estouram no celular. ✅ Avisos de gasto e do sistema. ✅ Link para Ações externas. Ações em lote; atalhos (A aprovar, R recusar); filtros "Gasto"/"Sistema"; notificação push. |
+| Agentes | ✅ Custo e tempo do dia no card. Busca/filtro; status ao vivo no card; duplicar agente. |
+| Novo agente | Criação em 1 frase ("um agente que responde clientes no WhatsApp") → configura tudo. |
+| Config. do agente | Testar ferramenta ali mesmo; histórico de mudanças; limite de gasto próprio do agente. |
+| Chat | ✅ Ouvir resposta; ✅ prévia de arquivos; ✅ custo por resposta paga. Editar e reenviar; ramificar; fixar; buscar na conversa. |
 | Conversas | Pastas/etiquetas; arquivar em lote. |
 | Projetos | Quadro de tarefas (kanban) atribuídas a agentes. |
 | Biblioteca | Busca em texto completo de artefatos e arquivos. |
-| Conectores / Integrações / Marketplace | Unificar em um catálogo só (fase 5). |
-| Configurações | ✅ Linhas não espremem com o menu aberto; abas no celular corrigidas. Busca de configuração; dizer o efeito de cada chave; "restaurar padrão" por seção. |
+| Conectores / Integrações / Marketplace | Unificar em um catálogo só (mesmo padrão da grade de Provedores). |
+| Configurações | ✅ Provedores de IA em grade. ✅ Backup visível no modo Simples. Espremido em ~800px de largura; busca de configuração; "restaurar padrão" por seção. |
 | Admin | Gráficos de uso por período; exportar CSV. |
 
 ## 6. Qualquer aparelho (P1)
 - ✅ PWA instalável.
-- [ ] Notificações push (Web Push) para aprovações e avisos urgentes.
+- [ ] Notificações push (Web Push) para aprovações, gasto e avisos do sistema.
 - [ ] Layout de tablet (duas colunas: lista + conversa).
-- [ ] Cabeçalho móvel e alternância Simples/Enterprise acessíveis no celular (fase 5).
-- [ ] Acesso remoto seguro (túnel com login) para usar fora da rede de casa.
-- [ ] Relógio: via notificações push espelhadas (aprovar/recusar direto no relógio); app nativo só se houver demanda.
+- [ ] Cabeçalho móvel e alternância Simples/Enterprise acessíveis no celular.
+- [ ] Acesso remoto seguro (túnel com login) — depende do login (§7).
+- [ ] Relógio: via push espelhado (aprovar/recusar direto no relógio).
 - [ ] Atalhos de voz (Siri/Google Assistant) que abrem a conversa com o agente.
 
 ## 7. Confiança e segurança (P0)
-- [ ] Login com senha/passkey quando exposto fora do localhost.
-- ✅ Registro de ações externas (Caixa → Ações externas): WhatsApp enviado e respostas automáticas, posts/webhooks, ações arriscadas no navegador, links públicos, uso pago ligado/desligado. Sempre ligado, imutável, filtros e CSV.
-- ✅ Uso pago só com consentimento explícito (aviso + confirmação); limite diário por agente e total com pausa automática do gasto, aviso na Caixa e custo real por resposta. A assinatura nunca é bloqueada.
-- [ ] Backup automático agendado (hoje é manual).
+- [ ] **Login com senha/passkey quando exposto fora do localhost.** Hoje só existe `RIPPER_TOKEN` (variável de ambiente, sem tela de login).
+- ✅ Registro de ações externas: WhatsApp enviado e respostas automáticas, posts/webhooks, ações arriscadas no navegador, links públicos, uso pago ligado/desligado. Sempre ligado (não depende do Enterprise), imutável, filtros por tipo/agente/período e CSV. Guarda só 160 caracteres de cada conteúdo, mascarados.
+- ✅ Uso pago só com consentimento explícito (aviso + confirmação); limite diário por agente (US$ 2) e total (US$ 10) com pausa automática do gasto, aviso na Caixa e custo real por resposta. A assinatura nunca é bloqueada.
+- ✅ Backup automático: ligado por padrão (diário, 7 cópias), cópia extra opcional em outra pasta (OneDrive/Drive/disco externo), aviso na Caixa se falhar, e checkpoint do SQLite antes de empacotar (antes ficavam de fora as gravações mais recentes).
+- [ ] Backup criptografado (hoje o .tar.gz leva as chaves de API em texto — ver Pontes).
 
 ## 8. Qualidade
 - [ ] Smoke de UI estável em máquina carregada (CI já cobre).
-- [ ] Auditoria de capacidades rodando toda noite e alertando na Caixa se algo quebrar.
+- [ ] Auditoria de capacidades rodando toda noite e alertando na Caixa se algo quebrar (usar `raiseSystemAlert`).
 - [ ] Pesquisa de concorrentes atualizada a cada trimestre (este arquivo).
+
+---
+
+## Pontes a construir ou corrigir
+
+Coisas encontradas durante o desenvolvimento: ligações que faltam entre partes que já existem, ou defeitos que ainda não doem mas vão doer.
+
+### P0 — podem perder dados ou expor segredos
+- **db.json descarta chaves que não conhece.** `mergePersistedDb` só grava o que está em `DEFAULT` (lib/store.mjs). `db.juliaCorrections` (correções ao Ripper Auto) provavelmente some a cada gravação. Toda coleção nova precisa entrar em `DEFAULT` e, se tiver `id`, em `ID_COLLECTIONS` (lib/db-merge.mjs). *Tarefa separada já sugerida.* Ideal: um teste que falha se o código usar `db.<chave>` fora de `DEFAULT`.
+- **Segredos em texto puro no db.json e nos backups.** `settings.claude.apiKey` e `settings.openrouter.apiKey` ficam abertos; o snapshot .tar.gz (e a cópia extra no OneDrive) leva tudo. Já existe o cofre (`lib/credential-vault.mjs`, refs `vlt_*`): mover essas chaves para lá, como os plugins MCP já fazem.
+- **Registro imutável × LGPD.** O registro de ações externas é WORM e guarda trechos de mensagens (160 caracteres). Pedido de exclusão (`/api/lgpd/erasure`) não apaga esses trechos. Decidir: guardar só destino/tipo (sem trecho) ou gravar os trechos fora da trilha WORM.
+
+### P1 — funcionam, mas com teto conhecido
+- **Gasto entre processos.** `paidSpend` no merge do db.json é "quem gravou por último vence": com dois servidores no mesmo diretório o gasto do dia é subcontado. Mover para SQLite (como usage-events) se houver mais de um processo.
+- **Ferramentas Ripper fora do Claude.** OpenRouter não usa plugins MCP do usuário; subtarefas em paralelo sempre rodam no Claude (pela assinatura); Ripper Auto não escolhe modelos do OpenRouter.
+- **Backup trava o servidor alguns segundos por dia.** `tar` roda síncrono (`spawnSync`); trocar por spawn assíncrono quando a pasta de dados crescer (hoje ~13 MB).
+- **Pré-aquecimento.** 1ª mensagem por agente ainda é fria; no máximo 3 processos parados. Aquecer ao abrir a conversa do agente (não só depois do 1º turno).
+- **Aba aberta durante uma atualização.** Abas abertas antes de um `npm run build` continuam com o JavaScript antigo, e telas carregadas sob demanda dão 404. Mostrar "Nova versão disponível — recarregar".
+- **Uso pago só configurável no modo Enterprise.** A tela Provedores de IA não aparece no modo Simples; quem é Simples não consegue nem ver o consentimento. Ok enquanto OpenRouter for recurso avançado; revisar se virar padrão.
+- **Imagem dos agentes desatualizada.** Quem não reconstruiu a `ripper-agent:2` só descobre quando uma transcrição falha. Avisar na Caixa (aviso do sistema) quando a imagem instalada for mais antiga que a esperada.
+
+### P2 — qualidade e higiene
+- **Testes instáveis em máquina carregada.** Testes que sobem o servidor (vault, idempotência, openapi, cabeçalhos) estouram ~15s quando há outros servidores rodando; passam sozinhos. Aumentar o tempo de espera de subida ou rodar esses arquivos em série.
+- **Configurações espremidas em ~800px** (menu de abas + conteúdo).
+- **Caixa sem filtros "Gasto" e "Sistema"** (aparecem só em "Tudo").
+- **`listExternal` lê até 5.000 linhas e filtra em memória.** Filtrar por tipo/agente no SQL se o registro crescer muito.
