@@ -1,15 +1,16 @@
 import { BorderBeam } from 'border-beam';
-import { go, useDark } from './lib.js';
+import { go, useDark, stepLabel } from './lib.js';
 import { AgentAvatar, Icon, Menu, MenuItem, StatusDot, useConfirm } from './ui.jsx';
 import { AutonomySemaphore } from './autonomy.jsx';
 import { useApp } from './app.jsx';
 import { api } from './lib.js';
 
 /** Card de agente. Enquanto o agente responde, a borda ganha um feixe (border-beam). */
-export default function AgentCard({ agent }) {
+/** live: { chatId, chatTitle, since, tool } quando o agente está trabalhando em qualquer lugar (rotina, fluxo, WhatsApp…). */
+export default function AgentCard({ agent, live }) {
   const { busy, updateAgent, refresh, toast, S } = useApp();
   const [confirm, confirmNode] = useConfirm();
-  const working = !!busy[agent.id];
+  const working = !!busy[agent.id] || !!live;
   const dark = useDark();
   const paused = agent.status === 'paused';
   const day = S.agentStats?.[agent.id];
@@ -37,13 +38,16 @@ export default function AgentCard({ agent }) {
         <div className="agent-card-foot">
           <StatusDot status={agent.status} />
           <AutonomySemaphore level={agent.autonomyLevel} settings={S.settings} showLabel={false} size="sm" />
-          {working && <span className="working-label">respondendo</span>}
+          {working && (live?.chatId
+            ? <a className="working-label" href={`#/c/${live.chatId}`} title={live.chatTitle ? `Em: ${live.chatTitle}` : undefined}>{live.tool ? stepLabel(live.tool) : 'trabalhando'}</a>
+            : <span className="working-label">{live?.tool ? stepLabel(live.tool) : live?.chatTitle === 'WhatsApp' ? 'no WhatsApp' : 'respondendo'}</span>)}
         </div>
         <Menu align="right" className="agent-card-menu" trigger={({ toggle, open }) => (
           <button className="icon-btn sm" aria-label={`Opções de ${agent.name}`} aria-expanded={open} onClick={toggle}><Icon name="more" /></button>
         )}>
           <MenuItem icon="chat" onClick={() => go(`/a/${agent.id}`)}>Nova conversa</MenuItem>
           <MenuItem icon="gear" onClick={() => go(`/agents/${agent.id}/settings`)}>Configurar</MenuItem>
+          <MenuItem icon="copy" onClick={async () => { try { const c = await api(`/api/agents/${agent.id}/duplicate`, { method: 'POST' }); await refresh(); toast(`${c.name} criado`); go(`/agents/${c.id}/settings`); } catch (e) { toast(e.message, 'error'); } }}>Duplicar</MenuItem>
           <MenuItem icon={paused ? 'play' : 'pause'} onClick={() => updateAgent(agent.id, { status: paused ? 'online' : 'paused' }).then(() => toast(paused ? `${agent.name} voltou` : `${agent.name} pausado. Rotinas não rodam.`))}>{paused ? 'Retomar' : 'Pausar'}</MenuItem>
           {S.agents.length > 1 && <MenuItem icon="trash" danger onClick={remove}>Excluir</MenuItem>}
         </Menu>

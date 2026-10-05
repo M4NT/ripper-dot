@@ -852,7 +852,17 @@ async function syncLocalFiles(agent, chat) {
   }
 }
 
-async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0, mcpSession, credentialRefs }, emit) {
+// O que cada agente está fazendo agora (em qualquer conversa, rotina, fluxo ou canal): status ao vivo nos cards.
+const working = new Map(); // agentId → { chatId, chatTitle, since, tool }
+async function turn(args, emit) {
+  const { agent, chat } = args;
+  working.set(agent.id, { chatId: chat.channel ? null : chat.id, chatTitle: chat.channel ? 'WhatsApp' : chat.title, since: Date.now(), tool: null });
+  try {
+    return await turnInner(args, ev => { if (ev?.tool && working.has(agent.id)) working.get(agent.id).tool = ev.tool; emit(ev); });
+  } finally { working.delete(agent.id); }
+}
+
+async function turnInner({ agent, chat, text, prompt, images, signal, group, hops = 0, mcpSession, credentialRefs }, emit) {
   const t0 = Date.now(), timing = {}; // tempos do turno: preparo, roteamento, 1ª palavra, total
   let s = settingsForMcp(db.settings, mcpSession);
   const vault = vaultContextFromSession(mcpSession, db);
@@ -2259,6 +2269,16 @@ const routes = [
     } catch (e) { console.error('agent.draft', ...redactForLog(db.settings, e.message)); }
     return { ...heuristicDraft(sentence), by: 'heuristic' };
   }],
+  // Duplicar: mesma configuração, sem memórias, rotinas, conversas nem computador (a cópia começa limpa).
+  ['POST', /^\/api\/agents\/([\w-]+)\/duplicate$/, (req, [aid]) => {
+    const src = agentOr404(aid);
+    const { id: _id, vmId: _vm, createdAt: _c, updatedAt: _u, status: _s, ...cfg } = structuredClone(src);
+    const a = { ...newAgent({}), ...cfg, id: id(), name: `${src.name} (cópia)`.slice(0, 60), status: 'online', vmId: null, createdAt: Date.now() };
+    db.agents.push(a);
+    recordCorporateAudit(db.settings, auditAgentLifecycle('create', a));
+    save(); return a;
+  }],
+  ['GET', /^\/api\/agents\/working$/, () => ({ working: Object.fromEntries(working) })],
   // Fluxos: agentes em sequência, com aprovação nos passos marcados
   ['GET', /^\/api\/flows$/, () => ({ flows: db.flows || [] })],
   ['POST', /^\/api\/flows$/, async req => {
