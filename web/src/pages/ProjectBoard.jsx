@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../app.jsx';
 import { api, fmtAgo } from '../lib.js';
 import { AgentAvatar, Icon } from '../ui.jsx';
+import ErrorNote from '../errorNote.jsx';
 
 const COLUMNS = [['todo', 'A fazer'], ['doing', 'Fazendo'], ['done', 'Feito']];
 
@@ -42,7 +43,7 @@ export default function ProjectBoard({ project, members }) {
                   <li key={t.id} className={'board-card' + (t.error ? ' err' : '')} draggable onDragStart={e => e.dataTransfer.setData('text/plain', t.id)}>
                     <b>{t.title}</b>
                     {t.note && <p>{t.note}</p>}
-                    {t.error && <p className="board-error" role="alert">{t.error}</p>}
+                    {t.error && <ErrorNote raw={t.error} compact />}
                     <div className="board-meta">
                       {a && <AgentAvatar agent={a} size={22} paused={!t.running} state={t.running ? 'working' : undefined} />}
                       <small>{t.running ? 'Trabalhando…' : fmtAgo(t.createdAt)}</small>

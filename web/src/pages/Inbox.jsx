@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, go, fmtAgo } from '../lib.js';
 import { useApp } from '../app.jsx';
 import { AgentAvatar, Icon, Segmented, EmptyState } from '../ui.jsx';
+import ErrorNote from '../errorNote.jsx';
 import { ApprovalCard } from '../approvals.jsx';
 
 const FILTERS = [['all', 'Tudo'], ['approval', 'Aprovações'], ['notice', 'Recados'], ['routine', 'Rotinas'], ['spend', 'Gasto'], ['system', 'Sistema']];
@@ -102,6 +103,7 @@ function SystemItem({ it, onDone }) {
   return <>
     <div className="inbox-who"><Icon name={it.quiet ? 'inbox' : 'bolt'} size={18} /><span><b>{it.title}</b><span className={`tag ${it.quiet ? '' : 'warn '}inbox-urgent`}>{it.quiet ? 'resumo' : 'sistema'}</span></span><time>{fmtAgo(it.at)}</time></div>
     <p className="inbox-summary">{it.body}</p>
+    {it.error && <ErrorNote raw={it.error} compact />}
     <div className="inbox-actions">
       {it.href && <button type="button" className="btn btn-sm" onClick={() => go(it.href)}>{it.hrefLabel || 'Abrir'}</button>}
       <button type="button" className="btn btn-sm btn-primary" onClick={ok}>Entendi</button>
