@@ -37,7 +37,7 @@ export default function ExternalLog() {
                 <span className="extlog-av">{a ? <AgentAvatar agent={a} size={28} /> : null}</span>
                 <div className="extlog-main">
                   <p><b>{data.kinds[e.action] || e.action}</b>{e.target && <> · <span className="mono">{e.target}</span></>}{e.ok === false && <span className="tag tag-warn">falhou</span>}</p>
-                  {e.preview && <p className="extlog-preview">{e.preview}</p>}
+                  {e.preview && <p className="extlog-preview">{e.preview}</p>}{e.chars > 0 && <p className="extlog-preview muted">{e.chars} caracteres · o texto fica só na conversa</p>}
                   <small>{a?.name || (e.agentId ? 'Agente removido' : 'Você')}{APPROVED[e.approved] ? ` · ${APPROVED[e.approved]}` : ''}{e.error ? ` · ${e.error}` : ''}</small>
                 </div>
                 <time dateTime={new Date(e.at).toISOString()} title={new Date(e.at).toLocaleString('pt-BR')}>{fmtAgo(e.at)}</time>

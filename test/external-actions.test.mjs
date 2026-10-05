@@ -18,9 +18,11 @@ test('ações externas: grava sempre, filtra por tipo/agente e exporta CSV', asy
     assert.equal(all.length, 2);
     assert.equal(listExternal({ kind: 'whatsapp.sent' })[0].target, '+5516999990000');
     assert.equal(listExternal({ agentId: 'b' })[0].ok, false);
-    assert.ok(listExternal({ agentId: 'b' })[0].preview.length <= 161, 'guarda só um trecho');
+    assert.equal(listExternal({ agentId: 'b' })[0].preview, undefined, 'trilha imutável não guarda conteúdo (LGPD)');
+    assert.equal(listExternal({ agentId: 'b' })[0].chars, 500);
     const csv = externalCsv(all, id => ({ a: 'Ana', b: 'Bia' })[id]);
-    assert.match(csv, /WhatsApp enviado;Ana;\+5516999990000;"Oi; tudo ""certo""\?\nAté";você;ok/);
+    assert.match(csv, /WhatsApp enviado;Ana;\+5516999990000;21;você;ok/);
+    assert.ok(!csv.includes('certo'), 'CSV sem o texto da mensagem');
     assert.match(csv, /falhou: HTTP 500/);
   } finally {
     _resetAuditTrailForTests(); _resetStoreForTests();

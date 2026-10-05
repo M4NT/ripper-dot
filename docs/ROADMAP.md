@@ -15,7 +15,6 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 1. **Login com senha quando o Ripper sai do localhost** (§7) — destrava acesso remoto, push e relógio (§6).
 2. **Resumo diário "Pulse"** (§3) — o recurso mais "funcionário de verdade"; usa os avisos do sistema da Caixa que já existem.
 3. **Gatilhos por evento** (§3) — e-mail chegou, palavra-chave no WhatsApp, webhook.
-4. Ponte P0 restante: registro imutável × LGPD (decisão pendente).
 5. Provedores diretos: OpenAI, Gemini, Ollama (§1b).
 
 ---
@@ -104,7 +103,7 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 
 ## 7. Confiança e segurança (P0)
 - [ ] **Login com senha/passkey quando exposto fora do localhost.** Hoje só existe `RIPPER_TOKEN` (variável de ambiente, sem tela de login).
-- ✅ Registro de ações externas: WhatsApp enviado e respostas automáticas, posts/webhooks, ações arriscadas no navegador, links públicos, uso pago ligado/desligado. Sempre ligado (não depende do Enterprise), imutável, filtros por tipo/agente/período e CSV. Guarda só 160 caracteres de cada conteúdo, mascarados.
+- ✅ Registro de ações externas: WhatsApp enviado e respostas automáticas, posts/webhooks, ações arriscadas no navegador, links públicos, uso pago ligado/desligado. Sempre ligado (não depende do Enterprise), imutável, filtros por tipo/agente/período e CSV. Não guarda o conteúdo (só destino, tipo e tamanho).
 - ✅ Uso pago só com consentimento explícito (aviso + confirmação); limite diário por agente (US$ 2) e total (US$ 10) com pausa automática do gasto, aviso na Caixa e custo real por resposta. A assinatura nunca é bloqueada.
 - ✅ Backup automático: ligado por padrão (diário, 7 cópias), cópia extra opcional em outra pasta (OneDrive/Drive/disco externo), aviso na Caixa se falhar, e checkpoint do SQLite antes de empacotar (antes ficavam de fora as gravações mais recentes).
 - ✅ Chaves de API e tokens cifrados no db.json (AES-256-GCM, chave em `~/.ripper/secret.key`, fora da pasta de dados): backups, cópia extra e exportação JSON levam só texto cifrado. Restaurar em outra máquina sem a chave = redigitar as chaves.
@@ -124,7 +123,7 @@ Coisas encontradas durante o desenvolvimento: ligações que faltam entre partes
 ### P0 — podem perder dados ou expor segredos
 - ✅ ~~db.json descartava chaves que não conhece~~: além de `juliaCorrections` (correções ao Ripper Auto), o `auditLog` também voltava ao vazio a cada gravação. Agora toda chave sem regra própria é preservada (teste `db-merge-unknown-keys`).
 - ✅ ~~Segredos em texto puro no db.json e nos backups~~: cifrados (ver §7). O cofre de credenciais não servia aqui: a chave dele vem do navegador, e rotinas/WhatsApp rodam sem aba aberta.
-- **Registro imutável × LGPD.** O registro de ações externas é WORM e guarda trechos de mensagens (160 caracteres). Pedido de exclusão (`/api/lgpd/erasure`) não apaga esses trechos. Decidir: guardar só destino/tipo (sem trecho) ou gravar os trechos fora da trilha WORM.
+- ✅ ~~Registro imutável × LGPD~~: o registro de ações externas guarda só destino, tipo e tamanho — nunca o texto. O conteúdo fica na conversa, onde a exclusão funciona. (Registros anteriores a 05/10/2026 ainda têm o trecho: a trilha é imutável.)
 
 ### P1 — funcionam, mas com teto conhecido
 - **Gasto entre processos.** `paidSpend` no merge do db.json é "quem gravou por último vence": com dois servidores no mesmo diretório o gasto do dia é subcontado. Mover para SQLite (como usage-events) se houver mais de um processo.
