@@ -77,6 +77,9 @@ function contractFromState(S) {
   };
 }
 
+// subscriptionType vem cru do Claude Code ('pro', 'team', 'max'…) ou já legível ('Claude Pro')
+const planLabel = p => ({ pro: 'Pro', team: 'Teams', max: 'Max', enterprise: 'Enterprise', free: 'Free' })[String(p).toLowerCase()] || String(p).replace(/^Claude /, '');
+
 /** Popover enxuto no chat: contexto + resumo + link para Admin → Uso. */
 export default function ModelUsage({ chatId }) {
   const { S, refresh } = useApp();
@@ -123,6 +126,7 @@ export default function ModelUsage({ chatId }) {
   const tokenBudget = bundle?.tokenBudget;
   const claudeSub = provider?.claudeSubscription;
   const claudeWin = claudeSub?.available ? claudeSub.windows : null;
+  const claudeAccounts = claudeSub?.accounts || [];
   const ctxAvailable = ctx?.available === true;
   const ctxPct = ctxAvailable ? ctx.pct : null;
   const r5 = account?.ripperQuota?.rolling5h;
@@ -164,12 +168,22 @@ export default function ModelUsage({ chatId }) {
         <p className="pop-label">Resumo</p>
         <p className="small">{localLine}</p>
 
-        {claudeWin?.fiveHour?.pct != null && (
-          <UsageBar label="Claude 5 h" pct={claudeWin.fiveHour.pct} resetLabel={claudeWin.fiveHour.resetLabel} />
-        )}
-        {claudeWin?.sevenDay?.pct != null && (
-          <UsageBar label="Claude 7 d" pct={claudeWin.sevenDay.pct} resetLabel={claudeWin.sevenDay.resetLabel} />
-        )}
+        {claudeAccounts.length > 0 ? claudeAccounts.map(a => (
+          <div key={a.id} className={`usage-acc ${a.active ? 'is-active' : ''}`}>
+            <p className="usage-acc-head"><b>Claude · {a.label}</b>{a.plan && <span className="tag">{planLabel(a.plan)}</span>}{a.active && <span className="tag tag-ok">em uso</span>}</p>
+            {a.email && <small className="muted">{a.email}</small>}
+            {a.windows?.fiveHour?.pct != null && <UsageBar label="5 h" pct={a.windows.fiveHour.pct} resetLabel={a.windows.fiveHour.resetLabel} />}
+            {a.windows?.sevenDay?.pct != null && <UsageBar label="7 dias" pct={a.windows.sevenDay.pct} resetLabel={a.windows.sevenDay.resetLabel} />}
+            {!a.windows && <small className="muted">{a.error === 'not_logged_in' ? 'falta o login' : 'sem leitura ainda'}</small>}
+          </div>
+        )) : <>
+          {claudeWin?.fiveHour?.pct != null && (
+            <UsageBar label="Claude 5 h" pct={claudeWin.fiveHour.pct} resetLabel={claudeWin.fiveHour.resetLabel} />
+          )}
+          {claudeWin?.sevenDay?.pct != null && (
+            <UsageBar label="Claude 7 d" pct={claudeWin.sevenDay.pct} resetLabel={claudeWin.sevenDay.resetLabel} />
+          )}
+        </>}
         {r5?.configured && r5.pct != null && (
           <UsageBar label="Cota Ripper 5 h" pct={r5.pct} tone={r5.pct >= 100 ? 'red' : 'blue'} resetLabel={r5.resetLabel} />
         )}

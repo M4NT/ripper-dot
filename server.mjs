@@ -116,7 +116,7 @@ import {
   ORCHESTRATOR_SYSTEM
 } from './lib/team-orchestrator.mjs';
 import { ripperBuiltinSchemaChars, listRipperBuiltinToolNames } from './lib/ripper-builtin-tools.mjs';
-import { refreshClaudeSubscriptionUsage } from './lib/claude-subscription-usage.mjs';
+import { refreshAllClaudeAccounts } from './lib/claude-subscription-usage.mjs';
 import {
   lookupSemanticCache,
   resolveSemanticCacheConfig,
@@ -282,6 +282,8 @@ const APP_PKG = JSON.parse(await readFile(new URL('./package.json', import.meta.
 const SERVER_STARTED_AT = Date.now();
 const db = load();
 syncOpenRouterModels(db.settings); // modelos do OpenRouter escolhidos em Configurações
+// e-mail e plano de cada conta do Claude (pessoal, Teams…) para o painel de uso; ~1 s cada, sem gastar mensagem
+if (!process.env.RIPPER_TEST_PROVIDER) setTimeout(() => allAccounts(db.settings).filter(a => isLoggedIn(a.id)).forEach(a => testAccount(a.id, CLAUDE_FAST_ENV).catch(() => {})), 3000);
 // Quem já usava Claude por API key escolheu pagar antes do consentimento existir: não quebra o turno dele.
 if (db.settings.claude?.mode === 'api' && db.settings.claude.apiKey && !db.settings.billing) { db.settings.billing = normalizeBilling({ paidConsent: true }); save(); }
 if (db.chats.some(c => c.channel)) { db.chats = db.chats.filter(c => !c.channel); save(); } // conversa de WhatsApp fica no WhatsApp (versões antigas criavam aqui)
@@ -1632,7 +1634,7 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
         });
       }
       if (MODELS[m].provider === 'claude') {
-        refreshClaudeSubscriptionUsage(db, s).then(() => save()).catch(() => {});
+        refreshAllClaudeAccounts(db, s).then(() => save()).catch(() => {});
       }
     },
     onAttemptFailed: async ({ model: m, error: e, aborted, canFallback, out, steps }) => {
@@ -1828,12 +1830,12 @@ const routes = [
   })],
   ['GET', /^\/api\/usage$/, async (req, _, url) => {
     const chatId = url.searchParams.get('chatId') || undefined;
-    await refreshClaudeSubscriptionUsage(db, db.settings).catch(() => {});
+    await refreshAllClaudeAccounts(db, db.settings).catch(() => {});
     save();
     return buildUsageContract(db, db.settings, { chatId, measures: usageContextMeasures(chatId) });
   }],
   ['GET', /^\/api\/usage\/limits$/, async () => {
-    await refreshClaudeSubscriptionUsage(db, db.settings).catch(() => {});
+    await refreshAllClaudeAccounts(db, db.settings).catch(() => {});
     save();
     const bundle = buildUsageContract(db, db.settings);
     return {
@@ -1865,7 +1867,7 @@ const routes = [
     const now = Date.now();
     const since = parseMeteringMsParam(url.searchParams.get('since'), now - 30 * 86400_000);
     const until = parseMeteringMsParam(url.searchParams.get('until'), now);
-    await refreshClaudeSubscriptionUsage(db, db.settings).catch(() => {});
+    await refreshAllClaudeAccounts(db, db.settings).catch(() => {});
     save();
     return buildMeteringReport(db, db.settings, { since, until });
   }],

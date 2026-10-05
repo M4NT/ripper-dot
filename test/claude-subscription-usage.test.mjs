@@ -101,3 +101,18 @@ test('recordClaudeSubscriptionSnapshot persiste em providers.claude', () => {
   assert.equal(view.available, true);
   assert.equal(view.windows.fiveHour.pct, 5);
 });
+
+test('uso por conta: cada conta guarda as próprias janelas e a vista marca a que está em uso', async () => {
+  const { recordClaudeSubscriptionSnapshot: rec, claudeSubscriptionView: view } = await import('../lib/claude-subscription-usage.mjs');
+  const db = {};
+  rec(db, { source: 'oauth_endpoint', windows: { fiveHour: { pct: 100 } }, subscriptionType: 'pro' });
+  rec(db, { source: 'oauth_endpoint', windows: { fiveHour: { pct: 12 } }, subscriptionType: 'team', account: 'teams' });
+  const settings = { claude: { mode: 'subscription', defaultAccount: 'teams', accounts: [{ id: 'teams', label: 'Teams' }] } };
+  const v = view(db, settings, {});
+  assert.equal(v.activeAccount.id, 'teams');
+  assert.equal(v.windows.fiveHour.pct, 12, 'barra principal = conta em uso');
+  const byId = Object.fromEntries(v.accounts.map(a => [a.id, a]));
+  assert.equal(byId.principal.windows.fiveHour.pct, 100);
+  assert.equal(byId.teams.active, true);
+  assert.equal(db.usage.providers.claude.windows.fiveHour.pct, 100, 'providers.claude continua sendo a principal (compat)');
+});
