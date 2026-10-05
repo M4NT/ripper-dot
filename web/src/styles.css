@@ -388,6 +388,10 @@ img.delivered-preview { max-height: 360px; object-fit: contain; }
 .prov-caps li .icon { color: var(--ok); flex: none; }
 .prov-caps .is-not li .icon { color: var(--faint); }
 @media (prefers-reduced-motion: reduce) { .prov-card { transition: none; } .prov-card:active { transform: none; } }
+.paid-box { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; margin-bottom: 12px; border-radius: var(--r); border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--line)); background: color-mix(in srgb, var(--warn) 8%, var(--surface)); font-size: 13px; color: var(--ink-2); }
+.paid-box .icon { color: var(--warn); flex: none; margin-top: 2px; }
+.paid-box b { color: var(--ink); }
+.paid-inline { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--warn); margin: 0 0 8px; }
 .or-catalog { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .or-catalog .rows { max-height: 320px; overflow: auto; }
 .subtasks { list-style: none; margin: 0; padding: 0; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 8px; }

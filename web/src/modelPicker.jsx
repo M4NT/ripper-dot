@@ -70,7 +70,7 @@ export default function ModelPicker({ value, onChange, group, chatId }) {
           {models.map(([k, v]) => (
             <button key={k} type="button" role="radio" aria-checked={k === value.model} className={`menu-item model-item ${k === value.model ? 'on' : ''}`}
               onClick={() => onChange(v => ({ ...v, model: k }))}>
-              <span><b>{v.label}</b><small>{MODEL_DESC[k]}</small></span>{k === value.model && <Icon name="check" size={16} />}
+              <span><b>{v.label}</b><small>{(v.provider === 'openrouter' || (v.provider === 'claude' && S.settings.claude?.mode === 'api')) ? `Pago por uso: gasta créditos${MODEL_DESC[k] ? ` · ${MODEL_DESC[k]}` : ''}` : MODEL_DESC[k]}</small></span>{k === value.model && <Icon name="check" size={16} />}
             </button>
           ))}
         </div>

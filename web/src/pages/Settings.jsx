@@ -4,7 +4,7 @@ import { useApp } from '../app.jsx';
 import { useOv } from '../overlay.jsx';
 import { WhatsappWebPanel } from '../whatsappWeb.jsx';
 import { api, apiUpload, go, useDark, brandLogoSrc, TONES, FORMALITIES } from '../lib.js';
-import { Icon, Switch, Select, EmptyState, Segmented } from '../ui.jsx';
+import { Icon, Switch, Select, EmptyState, Segmented, useConfirm } from '../ui.jsx';
 import { AdvancedBlock, HelpTip } from '../disclosure.jsx';
 import { ApprovalHistory } from '../approvals.jsx';
 import { MODEL_DESC, EffortScale, EFFORTS } from '../modelPicker.jsx';
@@ -142,6 +142,42 @@ function Row({ title, desc, children, stack, tip }) {
     </div>
   );
 }
+const PAID_BODY = 'O Ripper funciona pela sua assinatura (Claude, ChatGPT) sem custo extra. Com o uso pago ativado, cada resposta de um modelo pago (OpenRouter ou Claude por chave de API) é cobrada em dólar na conta do provedor, inclusive o que os agentes fizerem sozinhos (rotinas, WhatsApp). Os limites diários abaixo pausam o gasto quando atingidos.';
+
+/** Uso pago: consentimento explícito, limites diários e o gasto de hoje. Sem consentimento, modelo pago não roda. */
+function PaidUsageCard({ s, set, S }) {
+  const [confirm, confirmNode] = useConfirm();
+  const b = s.billing || {};
+  const on = !!S.settings.billing?.paidConsentAt;
+  const pending = b.paidConsent === true && !on;
+  const spent = S.paidSpend?.total || 0;
+  const usd = n => `US$ ${(+n || 0).toFixed(2).replace('.', ',')}`;
+  async function enable() {
+    if (await confirm({ title: 'Ativar uso pago?', body: `${PAID_BODY} Você pode desativar quando quiser.`, action: 'Entendo, ativar uso pago', danger: true })) set('billing', { ...b, paidConsent: true });
+  }
+  return (
+    <Card title="Uso pago" badge={on ? <span className="tag tag-warn">ativo · gasta créditos</span> : pending ? <span className="tag tag-warn">salve para ativar</span> : <span className="tag tag-ok">desligado · só assinatura</span>}>
+      <div className={`paid-box ${on ? 'is-on' : ''}`} role="note">
+        <Icon name="bolt" size={18} />
+        <p><b>{on ? 'Os agentes podem gastar dinheiro.' : 'Isto gasta dinheiro.'}</b> {PAID_BODY}</p>
+      </div>
+      {on && <Row title="Gasto pago de hoje" desc={`Desde ${new Date(S.settings.billing.paidConsentAt).toLocaleDateString('pt-BR')} com uso pago ativo. Zera à meia-noite.`}><b className="mono">{usd(spent)} de {usd(b.totalDailyUsd ?? 10)}</b></Row>}
+      <Row title="Limite por agente, por dia" desc="Ao atingir, o agente para de usar modelos pagos até amanhã e você recebe um aviso na Caixa.">
+        <div className="input-unit"><span>US$</span><input className="input" type="number" min={0} step={0.5} value={b.perAgentDailyUsd ?? 2} onChange={e => set('billing', { ...b, perAgentDailyUsd: e.target.value })} aria-label="Limite diário por agente em dólares" /></div>
+      </Row>
+      <Row title="Limite de todos os agentes, por dia">
+        <div className="input-unit"><span>US$</span><input className="input" type="number" min={0} step={1} value={b.totalDailyUsd ?? 10} onChange={e => set('billing', { ...b, totalDailyUsd: e.target.value })} aria-label="Limite diário total em dólares" /></div>
+      </Row>
+      <div className="row">
+        {on || pending
+          ? <button type="button" className="btn" onClick={() => set('billing', { ...b, paidConsent: false })}>Desativar uso pago</button>
+          : <button type="button" className="btn btn-danger" onClick={enable}>Ativar uso pago…</button>}
+      </div>
+      {confirmNode}
+    </Card>
+  );
+}
+
 /** OpenRouter: uma chave dá acesso a GPT, Gemini, DeepSeek, Llama… com as ferramentas do Ripper. */
 function OpenRouterCard({ s, set }) {
   const or = s.openrouter || { apiKey: '', models: [] };
@@ -167,6 +203,7 @@ function OpenRouterCard({ s, set }) {
     : or.apiKey ? <span className="tag">chave salva</span> : <span className="tag">não conectado</span>;
   return (
     <Card title="OpenRouter" badge={status} desc="Uma chave só para usar GPT, Gemini, DeepSeek, Llama e centenas de outros modelos, com as ferramentas do Ripper (computador, navegador, memória). Pago por uso na sua conta do OpenRouter.">
+      {!s.billing?.paidConsentAt && <p className="paid-inline"><Icon name="bolt" size={14} />Os modelos do OpenRouter só respondem com o uso pago ativado (acima).</p>}
       <Row title="Chave da API" desc={<>Crie em <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a>.</>}>
         <div className="row">
           <input className="input" type="password" autoComplete="off" value={or.apiKey} onChange={e => { setOr({ apiKey: e.target.value }); setCheck(null); }} placeholder="sk-or-…" aria-label="Chave do OpenRouter" />
@@ -399,22 +436,24 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
           <Card title="Conexão" badge={<span className="tag">Opus 5.5 · Sonnet 5.5 · Fable 5.1</span>}>
             <Row title="Como conectar">
               <div className="seg-choice">
-                {[['subscription', 'Assinatura', 'claude login desta máquina'], ['api', 'API key', 'paga por token']].map(([k, l, h]) => (
+                {[['subscription', 'Assinatura', 'claude login desta máquina'], ['api', 'API key', 'pago por uso: gasta créditos']].map(([k, l, h]) => (
                   <button key={k} type="button" className={s.claude.mode === k ? 'on' : ''} onClick={() => set('claude.mode', k)}><b>{l}</b><small>{h}</small></button>
                 ))}
               </div>
             </Row>
+            {s.claude.mode === 'api' && <p className="paid-inline"><Icon name="bolt" size={14} />Com chave de API, cada resposta do Claude é cobrada na sua conta da Anthropic. Precisa do uso pago ativado (abaixo).</p>}
             {s.claude.mode === 'api' && <Row title="Anthropic API key"><input className="input" type="password" autoComplete="off" value={s.claude.apiKey} onChange={e => set('claude.apiKey', e.target.value)} placeholder="sk-ant-…" /></Row>}
             <Row title="Conectores do claude.ai" desc="Gmail, Drive e outros. Carregar custa tokens: só vale para agentes com Plugins MCP."><Switch checked={s.claude.useConnectors} onChange={v => set('claude.useConnectors', v)} label="Conectores do claude.ai" /></Row>
           </Card>
           </>}
+          {P.id === 'claude' && s.claude.mode === 'api' && <PaidUsageCard s={s} set={set} S={S} />}
           {P.id === 'codex' && <>
           <Card title="Conexão" badge={<span className="tag">Codex</span>}>
             <Row title="Login" desc="Rode codex login uma vez nesta máquina. Sem o Codex instalado, o Ripper Auto usa só o Claude."><code className="inline-code">npm i -g @openai/codex</code></Row>
             <Row title="Apps conectados do ChatGPT" desc="Quando houver suporte."><Switch checked={s.chatgpt.useConnectedApps} onChange={v => set('chatgpt.useConnectedApps', v)} label="Apps do ChatGPT" /></Row>
           </Card>
           </>}
-          {P.id === 'openrouter' && <OpenRouterCard s={s} set={set} />}
+          {P.id === 'openrouter' && <><PaidUsageCard s={s} set={set} S={S} /><OpenRouterCard s={s} set={set} /></>}
           {P.id === 'julia' && <>
           <Card title="Como a Julia trabalha" badge={<><MetalBadge theme={dark ? 'dark' : 'light'}>Julia 1</MetalBadge>{julia === null ? <span className="tag" role="status">Verificando…</span> : <span className={`tag ${julia ? 'tag-ok' : 'tag-warn'}`}>{julia ? 'no ar' : 'fora do ar'}</span>}</>} desc="A Julia 1 escolhe modelo e prioridades antes do modelo grande. Fora do ar, as regras de reserva decidem.">
             <AdvancedBlock settings={s} hint="Limites de API, Julia e detalhes do Codex" className="in-card">

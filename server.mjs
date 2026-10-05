@@ -43,6 +43,7 @@ import { tryClaimRoutine, releaseRoutineClaim } from './lib/persist-coord.mjs';
 import { browserFor, browserRisk } from './lib/browser.mjs';
 import { runClaude, runCodex, systemPrompt, describeImage } from './lib/providers.mjs';
 import { runOpenRouter, syncOpenRouterModels, checkOpenRouterKey, openRouterCatalog } from './lib/openrouter.mjs';
+import { isPaidModel, paidBlockReason, addSpend, spendToday, spendLimits, normalizeBilling } from './lib/paid-usage.mjs';
 import { runTestProvider } from './lib/test-provider.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
 import { memoryContext, isDuplicateMemory, canUseFile, selectSpeakers, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent, turnPlanIds } from './lib/agent-flow.mjs';
@@ -260,6 +261,8 @@ const APP_PKG = JSON.parse(await readFile(new URL('./package.json', import.meta.
 const SERVER_STARTED_AT = Date.now();
 const db = load();
 syncOpenRouterModels(db.settings); // modelos do OpenRouter escolhidos em Configurações
+// Quem já usava Claude por API key escolheu pagar antes do consentimento existir: não quebra o turno dele.
+if (db.settings.claude?.mode === 'api' && db.settings.claude.apiKey && !db.settings.billing) { db.settings.billing = normalizeBilling({ paidConsent: true }); save(); }
 if (db.chats.some(c => c.channel)) { db.chats = db.chats.filter(c => !c.channel); save(); } // conversa de WhatsApp fica no WhatsApp (versões antigas criavam aqui)
 configureLogger({ settings: db.settings });
 
@@ -529,6 +532,16 @@ ${media.caption}` : ''}`;
  * A cada mensagem montamos uma conversa temporária com o histórico do contato (whatsapp.sqlite),
  * rodamos o turno e descartamos. Modelo: o mais econômico liberado, esforço baixo — são só mensagens.
  */
+/** Limite de uso pago atingido: um aviso na Caixa (uma vez por agente/limite por dia). */
+function alertSpendLimit(agent, which) {
+  const day = spendToday(db).day, lim = spendLimits(db.settings);
+  db.spendAlerts ||= [];
+  if (db.spendAlerts.some(a => a.day === day && a.which === which && (which === 'total' || a.agentId === agent.id))) return;
+  db.spendAlerts.push({ id: id(), day, which, agentId: agent.id, at: Date.now(), limitUsd: which === 'agent' ? lim.perAgentDailyUsd : lim.totalDailyUsd });
+  if (db.spendAlerts.length > 100) db.spendAlerts.splice(0, db.spendAlerts.length - 100);
+  recordCorporateAudit(db.settings, { category: 'billing', action: `billing.limit_${which}`, agentId: agent.id, at: Date.now() });
+}
+
 function channelModel(s) {
   return ['claude-haiku-4-5', 'claude-sonnet-5-5'].find(m => enabledModels(s).includes(m)) || enabledModels(s)[0];
 }
@@ -1078,12 +1091,22 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
       }
     } : null
   };
+  // Uso pago (OpenRouter, Claude por API key): soma o custo real e avisa na Caixa ao bater o limite.
+  let turnCost = 0;
+  const chargePaid = usd => {
+    turnCost += usd;
+    const hit = addSpend(db, s, agent.id, usd);
+    if (hit) alertSpendLimit(agent, hit);
+    save();
+  };
   // Subtarefas em paralelo: cada uma é um turno curto do mesmo agente (web + computador, sem delegar nem histórico).
   const subtaskSteps = []; // estado final de cada subtarefa: fica salvo na resposta
   ctx.parallel = {
     run: async tasks => {
       const subModel = enabledModels(s).includes('claude-sonnet-5-5') ? 'claude-sonnet-5-5' : enabledModels(s).find(m => MODELS[m].provider === 'claude');
       if (!subModel) return 'Nenhum modelo Claude liberado para subtarefas.';
+      const paidWhy = isPaidModel(subModel, s) && paidBlockReason(db, s, agent.id);
+      if (paidWhy) return paidWhy;
       const batch = id();
       const subCtx = { db, settings: s, computer, deliverFile: ctx.deliverFile };
       const subAgent = { ...agent, tools: agent.tools.filter(t => ['web', 'computer'].includes(t)) };
@@ -1094,6 +1117,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
         let out = '';
         try {
           for await (const ev of runClaude({ agent: subAgent, model: subModel, effort: 'medium', prompt: t.prompt, history: [], system, settings: s, ctx: subCtx, signal })) {
+            if (ev.cost) chargePaid(ev.cost);
             if (ev.text) { out += ev.text; if (out.length % 400 < ev.text.length) emit({ subtask: { key, title: t.title, status: 'running', chars: out.length } }); }
           }
           recordUsage(db, subModel, { charsIn: t.prompt.length, charsOut: out.length, routedBy: 'parallel', agentId: agent.id });
@@ -1154,6 +1178,9 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
   const order = testProvider
     ? [pick.model]
     : providerAttemptOrder(pick.model, await codexInstalled).filter((m, i) => i === 0 || enabledModels(s).includes(m));
+  // Reserva fora do Claude (Codex, OpenRouter) com o Sonnet desligado: cai no primeiro Claude liberado.
+  const claudeBackup = enabledModels(s).find(m => MODELS[m].provider === 'claude' && m !== pick.model);
+  if (!testProvider && order.length === 1 && MODELS[pick.model]?.provider !== 'claude' && claudeBackup) order.push(claudeBackup);
   const push = (out, steps, extra) => chat.messages.push({
     id: id(), role: 'assistant', agentId: agent.id, content: out, at: Date.now(),
     ...(steps.length || subtaskSteps.length ? { steps: [...subtaskSteps, ...steps] } : {}), ...extra
@@ -1205,6 +1232,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
         return;
       }
     }
+    if (ev.cost) { chargePaid(ev.cost); return; }
     if (ev.text && timing.firstMs == null) timing.firstMs = Date.now() - t0;
     emit(ev);
   };
@@ -1218,6 +1246,8 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
       const chaosErr = maybeChaosProviderFailure(resolveEffectiveChaos(db.settings));
       if (chaosErr) throw chaosErr;
       if (testProvider) return runTestProvider({ prompt, signal });
+      const paidWhy = isPaidModel(m, s) && paidBlockReason(db, s, agent.id);
+      if (paidWhy) throw new Error(paidWhy); // a fila de tentativas cai para o próximo modelo (ex.: assinatura)
       const providerSystem = MODELS[m].provider === 'codex' && s.computer.mode !== 'local'
         ? `${system}\n\nNesta execução do Codex, o computador está em modo somente leitura; não prometa executar comandos nem acessar a VM Boat.` : system;
       const args = { agent, effort: clampEffort(s, m, effort), prompt, images, history, system: providerSystem, systemStable, settings: { ...s, plugins: turnPlugins }, signal };
@@ -1229,7 +1259,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
     onSuccess: ({ model: m, out, steps }) => {
       timing.totalMs = Date.now() - t0;
       logger.info('turn.timing', { agent: agent.name, model: m, ...timing });
-      push(out, steps, { model: m, effort, routedBy, timing, ...(delivered.length ? { files: [...delivered] } : {}) });
+      push(out, steps, { model: m, effort, routedBy, timing, ...(turnCost ? { costUsd: turnCost } : {}), ...(delivered.length ? { files: [...delivered] } : {}) });
       recordUsage(db, m, {
         charsIn: (text?.length || 0) + (prompt?.length || 0),
         charsOut: out.length,
@@ -1424,6 +1454,7 @@ const routes = [
     chats: db.chats.map(summary), routines: db.routines.map(redactRoutine),
     files: db.files.map(({ path, ...f }) => f), memoriesCount: db.memories.length, pendingInbox: db.messages.filter(m => m.status === 'queued' || m.status === 'delivering').reduce((o, m) => (o[m.originChatId] = (o[m.originChatId] || 0) + 1, o), {}), approvals: db.approvals.filter(a => a.status === 'pending').map(approvalView), artifacts: db.artifacts.map(({ content, size, blob, ...a }) => ({ ...a, size: size ?? content?.length ?? 0, stored: blob ? 'disk' : 'inline' })),     skills: db.skills, memoriesByAgent: db.memories.reduce((o, x) => (o[x.agentId] = (o[x.agentId] || 0) + 1, o), {}), projects: db.projects,
     usage: usageSummary(db),
+    paidSpend: spendToday(db),
     agentStats: (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return agentDayStats(listUsageEventsSince(d.getTime()), db.chats, d.getTime()); })(),
     limits: accountLimits(db, db.settings),
     usageContract: (() => {
@@ -1974,7 +2005,7 @@ const routes = [
     const box = buildInbox(db);
     return { ...box, items: box.items.map(it => (it.kind === 'approval' ? { ...it, approval: approvalView(it.approval) } : it)) };
   }],
-  ['POST', /^\/api\/inbox\/(notice|routine)\/([\w-]+)\/done$/, (req, [kind, iid]) => {
+  ['POST', /^\/api\/inbox\/(notice|routine|spend)\/([\w-]+)\/done$/, (req, [kind, iid]) => {
     if (!resolveInboxItem(db, kind, iid)) throw new HttpError(404, 'Item não encontrado.');
     save();
     return { ok: true, count: buildInbox(db).count };

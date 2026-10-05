@@ -19,25 +19,25 @@ export const PROVIDERS = [
     cannot: ['Não responde sozinha: só faz a triagem']
   },
   {
-    id: 'claude', name: 'Claude', kind: 'Anthropic', logo: claudeSvg, provider: 'claude',
+    id: 'claude', name: 'Claude', kind: 'Anthropic · assinatura ou API', logo: claudeSvg, provider: 'claude',
     tagline: 'O motor principal dos agentes: conversa, raciocínio, computador e navegador.',
     can: ['Todas as ferramentas do Ripper', 'Computador e navegador do agente', 'Pesquisa na web', 'Lê imagens', 'Conectores do claude.ai (Gmail, Drive, Agenda…)', 'Plugins MCP', 'Esforço de raciocínio ajustável', 'Processo pré-aquecido (responde mais rápido)'],
     cannot: []
   },
   {
-    id: 'codex', name: 'ChatGPT', kind: 'OpenAI · Codex', logo: openaiSvg, provider: 'codex',
+    id: 'codex', name: 'ChatGPT', kind: 'OpenAI · Codex · assinatura', logo: openaiSvg, provider: 'codex',
     tagline: 'Codex com o login do ChatGPT: forte em escrever e rodar código.',
     can: ['Escrever, rodar e depurar código', 'Ferramentas do Ripper (memória, artefatos, mensagens)', 'Plugins MCP', 'Lê imagens'],
     cannot: ['Pesquisa web do Claude', 'Conectores do claude.ai']
   },
   {
-    id: 'openrouter', name: 'OpenRouter', kind: 'Centenas de modelos', logo: openrouterSvg, provider: 'openrouter',
+    id: 'openrouter', name: 'OpenRouter', kind: 'Centenas de modelos · pago por uso', logo: openrouterSvg, provider: 'openrouter',
     tagline: 'Uma chave só para GPT, Gemini, DeepSeek, Llama, Grok, Mistral e outros.',
     can: ['Ferramentas do Ripper', 'Computador e navegador do agente', 'Pesquisa na web (do OpenRouter)', 'Lê imagens (modelos com visão)', 'Pago por uso, sem assinatura'],
     cannot: ['Plugins MCP (em breve)', 'Escolha automática pelo Ripper Auto']
   },
-  { id: 'openai', name: 'OpenAI API', kind: 'Chave da API', logo: openaiSvg, soon: true, tagline: 'GPT direto pela chave da OpenAI, sem passar pelo OpenRouter.', can: ['Ferramentas do Ripper', 'Lê imagens'], cannot: [] },
-  { id: 'gemini', name: 'Gemini', kind: 'Google AI Studio', logo: geminiSvg, soon: true, tagline: 'Modelos Gemini pela chave do AI Studio. Hoje: pelo OpenRouter.', can: ['Ferramentas do Ripper', 'Contexto muito longo', 'Lê imagens e vídeo'], cannot: [] },
+  { id: 'openai', name: 'OpenAI API', kind: 'Chave da API · pago por uso', logo: openaiSvg, soon: true, tagline: 'GPT direto pela chave da OpenAI, sem passar pelo OpenRouter.', can: ['Ferramentas do Ripper', 'Lê imagens'], cannot: [] },
+  { id: 'gemini', name: 'Gemini', kind: 'Google AI Studio · pago por uso', logo: geminiSvg, soon: true, tagline: 'Modelos Gemini pela chave do AI Studio. Hoje: pelo OpenRouter.', can: ['Ferramentas do Ripper', 'Contexto muito longo', 'Lê imagens e vídeo'], cannot: [] },
   { id: 'antigravity', name: 'Antigravity', kind: 'Google', logo: antigravitySvg, soon: true, tagline: 'É um editor, sem API pública. Os mesmos modelos chegam pelo Gemini.', can: ['Modelos Gemini (via Gemini ou OpenRouter)'], cannot: ['Conexão direta: não existe API'] },
   { id: 'cursor', name: 'Cursor', kind: 'cursor-agent', logo: cursorSvg, soon: true, tagline: 'Agente de código do Cursor pela linha de comando, como o Codex.', can: ['Escrever e rodar código'], cannot: [] },
   { id: 'ollama', name: 'Ollama', kind: 'Modelos locais', logo: ollamaSvg, soon: true, tagline: 'Llama, Qwen, DeepSeek e outros rodando nesta máquina, de graça e offline.', can: ['Sem custo por uso', 'Nada sai da máquina'], cannot: [] }

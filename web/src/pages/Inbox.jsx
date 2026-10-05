@@ -41,6 +41,7 @@ export default function Inbox() {
               {it.kind === 'approval' && <ApprovalItem it={it} onDone={settle} />}
               {it.kind === 'notice' && <NoticeItem it={it} onDone={settle} />}
               {it.kind === 'routine' && <RoutineItem it={it} onDone={settle} />}
+              {it.kind === 'spend' && <SpendItem it={it} onDone={settle} />}
             </li>
           ))}</ul>}
     </div>
@@ -90,6 +91,21 @@ function NoticeItem({ it, onDone }) {
       <button type="button" className="btn btn-sm btn-primary" onClick={() => go(`/c/${it.chatId}`)}><Icon name="chat" size={14} />Responder ao {it.agentName}</button>
       {it.phone && <button type="button" className="btn btn-sm" onClick={toggleHistory} aria-expanded={!!history}>{history ? 'Esconder conversa' : 'Ver conversa no WhatsApp'}</button>}
       <button type="button" className="btn btn-sm" onClick={done}><Icon name="check" size={14} />Resolvido</button>
+    </div>
+  </>;
+}
+
+function SpendItem({ it, onDone }) {
+  const ok = async () => { await api(`/api/inbox/spend/${it.id}/done`, { method: 'POST' }); onDone(); };
+  const usd = `US$ ${it.limitUsd.toFixed(2).replace('.', ',')}`;
+  return <>
+    <Who it={it} label={<>bateu o limite de uso pago<span className="tag warn inbox-urgent">gasto</span></>} />
+    <p className="inbox-summary">{it.which === 'total'
+      ? `Os agentes juntos gastaram ${usd} hoje em modelos pagos. Até amanhã, nenhum agente usa modelo pago: as respostas seguem pela assinatura.`
+      : `${it.agentName} gastou ${usd} hoje em modelos pagos. Até amanhã ele não usa modelo pago: as respostas seguem pela assinatura.`}</p>
+    <div className="inbox-actions">
+      <button type="button" className="btn btn-sm" onClick={() => go('/settings/models')}>Ajustar limite</button>
+      <button type="button" className="btn btn-sm btn-primary" onClick={ok}>Entendi</button>
     </div>
   </>;
 }

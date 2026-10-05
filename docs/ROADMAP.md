@@ -83,7 +83,7 @@ Legenda: **P0** bloqueia uso/confiança · **P1** diferencial forte · **P2** po
 ## 7. Confiança e segurança (P0)
 - [ ] Login com senha/passkey quando exposto fora do localhost.
 - [ ] Registro de auditoria de toda ação externa (mensagem enviada, compra, post).
-- [ ] Limite de gasto por agente com pausa automática.
+- ✅ Uso pago só com consentimento explícito (aviso + confirmação); limite diário por agente e total com pausa automática do gasto, aviso na Caixa e custo real por resposta. A assinatura nunca é bloqueada.
 - [ ] Backup automático agendado (hoje é manual).
 
 ## 8. Qualidade
