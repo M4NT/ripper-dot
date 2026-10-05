@@ -13,8 +13,8 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 
 ## Próximos passos (em ordem)
 1. Acesso remoto seguro com HTTPS (destrava notificações no celular; precisa do login — decisão do dono) (§6/§7).
-2. Seção 9: X9 Guard em tempo real (bloquear segredos/dados de faturamento antes de sair).
-3. Seção 9: Radar pronto (rotina diária configurada) e contrato entre modelos validado por esquema.
+2. Seção 9: sessões de portais com auto-cura (depende da integração com o Omie — decidir escopo).
+3. Seção 9: "zero tela parada" em rotinas de segundo plano e canais.
 
 ---
 
@@ -142,9 +142,9 @@ Registradas como vieram, com o estado real do código e a prioridade.
 
 ### P1 — negócio e governança
 - ✅ **Custo por cliente (FinOps)**: Admin → Uso → Clientes (nome, CNPJ/CPF, etiqueta de conversa e projetos, valor cobrado/mês, margem estimada com câmbio editável) e relatório "por cliente" + CSV. Atribuição pela etiqueta da conversa ou pelo projeto; custo real quando pago, senão estimado. Uso anterior a 06/10/2026 fica "Sem cliente"; histórico guarda os últimos 800 eventos.
-- [ ] **X9 Guard em tempo real.** Além da varredura (`lib/x9-scan.mjs`, `x9Auditor.jsx`): filtro na saída de WhatsApp, e-mail e logs que bloqueia/mascara senhas, tokens e dados de faturamento antes de enviar, com aviso na Caixa.
-- [ ] **Agente Radar (estilo Ro-DOU).** Modelo pronto: varredura diária em fontes (DOU, sites, e-mails) por palavras-chave, relatório consolidado na Caixa/WhatsApp do responsável, sem comando manual. *Já existe* o modelo de agente "Radar" (`lib/templates.mjs`); falta criá-lo já com a rotina diária e o destino do relatório configurados (hoje é manual).
-- [ ] **Contrato entre modelos validado por esquema.** Toda troca estruturada entre modelos (rascunho de agente, orquestrador de times, triagem, fluxos) validada por esquema (zod) com correção/repetição automática quando o modelo variar. *Hoje:* o áudio é transcrito pelo Whisper local (não pelo Gemini); validações existem caso a caso (ex.: `sanitizeDraft`).
+- ✅ **X9 Guard em tempo real** (`lib/x9-guard.mjs`): tudo que sai (WhatsApp, e-mail, publicações, Pulse, fila) passa por filtro que mascara os segredos salvos no Ripper (valor exato), chaves/tokens, "senha: …" e cartões (Luhn + bandeira), com aviso na Caixa sem mostrar o dado. Números de pedido, links e CNPJ não são tocados. Logs já eram mascarados (`lib/redact.mjs`).
+- ✅ **Radar pronto**: escolher o modelo Radar abre "Configure o Radar" (o que vigiar, fontes — DOU e notícias já sugeridos —, horário, só dias úteis, enviar para Caixa/WhatsApp/e-mail). Cria a rotina "Radar diário" silenciosa (só avisa com novidade) e entrega o relatório consolidado ao dono. Rotinas ganharam "dias úteis" e "Rodar agora".
+- ✅ **Contrato entre modelos validado por esquema** (`lib/model-contract.mjs`): rascunho de agente e orquestrador de times validam o JSON com zod, consertam variações simples e pedem de novo uma vez citando o erro antes da heurística. Testado com o modelo real (rascunho). Router/Julia não trocam JSON de modelo.
 
 ### P2 — UX
 - [ ] **Zero tela parada.** Progresso visível em tarefas longas em todo lugar ("O Porteiro está consultando a agenda…"). *Base:* status ao vivo nos cards, linha de ação no chat, miniatura da tela, barra de fluxo; falta em rotinas em segundo plano e canais.
