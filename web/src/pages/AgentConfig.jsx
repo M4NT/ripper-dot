@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../app.jsx';
-import { api, go, useRoute, fmtSize, fmtAgo } from '../lib.js';
+import { api, go, useRoute, fmtSize, fmtAgo, fmtTime, stepLabel } from '../lib.js';
 import { AgentAvatar, Icon, Segmented, StatusDot, EmptyState, useConfirm, Select, Switch } from '../ui.jsx';
 import { Basics, Behavior, Tools, Appearance, ModelPick, VoiceStyle, agentStyleDraft } from '../agentForm.jsx';
 import { AutonomySemaphore } from '../autonomy.jsx';
@@ -9,8 +9,8 @@ import { isEnterpriseMode } from '../uiMode.js';
 import { useOv } from '../overlay.jsx';
 import { RoutineList, RoutineForm } from '../routines.jsx';
 
-// 4 abas pelo jeito que o dono pensa: quem ele é, o que sabe fazer, quanto decide sozinho, quando age sozinho.
-const TABS = [['identity', 'Identidade'], ['skills', 'Habilidades'], ['autonomy', 'Autonomia'], ['routines', 'Rotinas']];
+// Abas pelo jeito que o dono pensa: quem ele é, o que sabe fazer, quanto decide sozinho, quando age sozinho, o que já fez.
+const TABS = [['identity', 'Identidade'], ['skills', 'Habilidades'], ['autonomy', 'Autonomia'], ['routines', 'Rotinas'], ['activity', 'Atividade']];
 // links antigos (?tab=model etc.) continuam abrindo a aba certa
 const OLD_TAB = { general: 'identity', look: 'identity', voice: 'identity', advanced: 'identity', tools: 'skills', knowledge: 'skills', model: 'autonomy', behavior: 'autonomy' };
 
@@ -76,6 +76,39 @@ function Knowledge({ agent }) {
         <li key={m.id} className="row-item"><div className="row-main"><b className="wrap">{m.text}</b><small>{fmtAgo(m.createdAt)}</small></div>
           <button type="button" className="icon-btn sm" aria-label="Esquecer" onClick={() => api(`/api/memories/${m.id}`, { method: 'DELETE' }).then(() => setMem(x => x.filter(y => y.id !== m.id)))}><Icon name="trash" size={16} /></button></li>
       ))}</ul>}
+  </>;
+}
+
+const fmtS = ms => `${(ms / 1000).toFixed(1).replace('.', ',')}s`;
+const fmtUsd = n => `US$ ${n.toFixed(n < 0.01 ? 4 : 2).replace('.', ',')}`;
+const KIND = { routine: 'rotina', flow: 'fluxo' };
+
+// Linha do tempo dos últimos 7 dias: o que o agente fez, quanto demorou e custou.
+function Activity({ agent }) {
+  const [t, setT] = useState(null);
+  useEffect(() => { api(`/api/agents/${agent.id}/timeline?days=7`).then(setT).catch(e => setT({ error: e.message })); }, [agent.id]);
+  if (!t) return <p className="muted">Carregando…</p>;
+  if (t.error) return <p className="form-error">{t.error}</p>;
+  if (!t.entries.length) return <EmptyState title="Nada nos últimos 7 dias" body={`Quando ${agent.name} responder ou agir sozinho, aparece aqui.`} />;
+  const s = t.summary, days = [];
+  for (const e of t.entries) {
+    const d = new Date(e.at).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' });
+    if (days.at(-1)?.d !== d) days.push({ d, list: [] });
+    days.at(-1).list.push(e);
+  }
+  return <>
+    <p className="tl-summary muted">Últimos 7 dias: {s.replies} {s.replies === 1 ? 'resposta' : 'respostas'} · {s.actions} {s.actions === 1 ? 'ação' : 'ações'} · <span className={s.errors ? 'msg-error' : ''}>{s.errors} {s.errors === 1 ? 'falha' : 'falhas'}</span>{s.costUsd > 0 && ` · ${fmtUsd(s.costUsd)}`}{s.avgMs != null && ` · ${fmtS(s.avgMs)} em média`}</p>
+    {days.map(({ d, list }) => <section key={d} className="tl-day">
+      <h4>{d}</h4>
+      <ol className="tl">
+        {list.map((e, i) => <li key={i} className={e.kind === 'error' ? 'tl-err' : ''}>
+          <div className="tl-head"><time>{fmtTime(e.at)}</time> <a className="link" href={`#/c/${e.chatId}`}>{e.chatTitle}</a>{KIND[e.kind] && <small className="muted"> · {KIND[e.kind]}</small>}</div>
+          {e.actions.length > 0 && <div className="tl-line muted">{[...new Set(e.actions.map(stepLabel))].join(' · ')}</div>}
+          {e.error && <div className="tl-line msg-error">{e.error}</div>}
+          <small className="muted">{[e.ms != null && fmtS(e.ms), e.files > 0 && `${e.files} ${e.files === 1 ? 'arquivo' : 'arquivos'}`, e.costUsd > 0 && fmtUsd(e.costUsd)].filter(Boolean).join(' · ')}</small>
+        </li>)}
+      </ol>
+    </section>)}
   </>;
 }
 
@@ -177,6 +210,7 @@ export default function AgentConfig({ id }) {
           </details>
         </>}
         {tab === 'routines' && <Routines agent={agent} />}
+        {tab === 'activity' && <Activity agent={agent} />}
       </div>
       {confirmNode}
     </div>
