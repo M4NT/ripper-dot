@@ -52,6 +52,8 @@ import { DRAFT_SYSTEM, sanitizeDraft, heuristicDraft } from './lib/agent-draft.m
 import { applyBulk } from './lib/chat-bulk.mjs';
 import { searchLibrary } from './lib/library-search.mjs';
 import * as outbox from './lib/outbox.mjs';
+import { guardOutbound } from './lib/x9-guard.mjs';
+import { SECRET_PATHS } from './lib/local-secret.mjs';
 import { emailReady, listEmails, readEmail, sendEmail, newEmailsSince, testEmail, getAttachment, safeName, attachmentText, readHint } from './lib/email.mjs';
 import { gh, githubReady, normalizeRepo, repoChanges, describeChange, prBranch, gitAuthArg, hideToken } from './lib/github.mjs';
 import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './lib/event-triggers.mjs';
@@ -795,16 +797,37 @@ const SENDERS = {
  * Devolve { sent } ou { queued }; erro permanente é lançado (quem chamou explica).
  */
 async function deliverOut(kind, payload, meta) {
-  const { _meta, ...clean } = payload;
+  const { _meta, ...clean } = x9Guard(payload, meta);
   try { await SENDERS[kind](clean); }
   catch (e) {
-    if (!outbox.isTransient(e)) { recordExternal({ kind: meta.ext.kind, agentId: meta.agentId, chatId: meta.chatId, target: meta.target, text: payload.text, approved: meta.ext.approved, ok: false, error: e.message }); throw e; }
-    outbox.enqueue({ kind, payload: { ...clean, _meta: meta }, target: meta.target, label: String(payload.subject || payload.text || '').slice(0, 120), agentId: meta.agentId, chatId: meta.chatId, error: e.message });
+    if (!outbox.isTransient(e)) { recordExternal({ kind: meta.ext.kind, agentId: meta.agentId, chatId: meta.chatId, target: meta.target, text: clean.text, approved: meta.ext.approved, ok: false, error: e.message }); throw e; }
+    outbox.enqueue({ kind, payload: { ...clean, _meta: meta }, target: meta.target, label: String(clean.subject || clean.text || '').slice(0, 120), agentId: meta.agentId, chatId: meta.chatId, error: e.message });
     return { queued: true };
   }
-  deliveredOut(payload.text, meta);
+  deliveredOut(clean.text, meta);
   return { sent: true };
 }
+/**
+ * X9 Guard: nada sai com segredo. Mascara os segredos salvos no Ripper (valor exato) e padrões sensíveis
+ * (chaves, tokens, "senha: …", cartão) no texto e no assunto; avisa na Caixa sem mostrar o dado.
+ */
+function x9Guard(payload, meta) {
+  const known = SECRET_PATHS.map(path => path.reduce((o, k) => o?.[k], db.settings)).filter(v => typeof v === 'string' && v.length >= 6);
+  for (const p of db.settings.plugins || []) for (const v of Object.values(p.headers || {})) if (typeof v === 'string' && v.length >= 12) known.push(v.replace(/^Bearer\s+/i, ''));
+  const out = { ...payload }, found = new Set();
+  for (const field of ['text', 'subject']) {
+    if (typeof out[field] !== 'string') continue;
+    const g = guardOutbound(out[field], known);
+    out[field] = g.text; g.findings.forEach(f => found.add(f));
+  }
+  if (found.size) {
+    const what = [...found].join(', ');
+    recordCorporateAudit(db.settings, { category: 'x9', action: 'x9.outbound_masked', agentId: meta.agentId, chatId: meta.chatId, at: Date.now(), detail: { what, target: meta.target } });
+    raiseSystemAlert({ key: 'x9-guard', title: 'O X9 protegeu um envio', body: `Um envio para ${meta.target || 'fora'} tinha ${what}. Mascarei antes de sair — confira a conversa e por que o agente incluiu isso.`, href: meta.chatId ? `/c/${meta.chatId}` : '/log', hrefLabel: meta.chatId ? 'Ver conversa' : 'Ver ações externas' });
+  }
+  return out;
+}
+
 function deliveredOut(text, meta) {
   recordExternal({ kind: meta.ext.kind, agentId: meta.agentId, chatId: meta.chatId, target: meta.target, text, approved: meta.ext.approved });
   if (meta.waPhone) recordWaMessage({ id: `out-${id()}`, phone: meta.waPhone, fromMe: true, text });
