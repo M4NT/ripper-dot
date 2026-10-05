@@ -73,7 +73,7 @@
       "tokens": 65,
       "approvals": 0,
       "error": null,
-      "answer": "**`C:\\Users\\yan05\\Desktop\\muuudot\\vendas.xlsx`**\n\nPlanilha criada com coluna \"total\" calculada:\n| produto | quantidade | valor | total |\n|---------|-----------|-------|-------|\n| Mouse | 10 | 50 | 500 |\n| Teclado | 4 | 320 | 1280 |\n| Cabo HDMI | 25 | 30 | 750 |"
+      "answer": "**`C:\\Users\\yan05\\Desktop\\ripper\\vendas.xlsx`**\n\nPlanilha criada com coluna \"total\" calculada:\n| produto | quantidade | valor | total |\n|---------|-----------|-------|-------|\n| Mouse | 10 | 50 | 500 |\n| Teclado | 4 | 320 | 1280 |\n| Cabo HDMI | 25 | 30 | 750 |"
     },
     {
       "id": "entrega",
