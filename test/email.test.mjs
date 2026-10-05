@@ -54,8 +54,7 @@ test('anexos: nome seguro, texto direto de CSV/HTML, dica de leitura para PDF/Wo
   assert.equal(attachmentText('a.pdf', Buffer.from('%PDF')), null);
   assert.match(readHint('/work/anexos/a.pdf'), /pypdf\.PdfReader\('\/work\/anexos\/a\.pdf'\)/);
   assert.match(readHint('/work/anexos/a.xlsx'), /read_excel/);
-  for (const f of ['pdf', 'docx', 'pptx', 'xlsx']) assert.ok(!readHint(`/work/anexos/a.${f}`).includes('
-'), `comando de ${f} numa linha só (quebra real derruba o python -c)`);
+  for (const f of ['pdf', 'docx', 'pptx', 'xlsx']) assert.ok(!readHint(`/work/anexos/a.${f}`).includes('\n'), `comando de ${f} numa linha só (quebra real derruba o python -c)`);
   assert.equal(readHint('/work/anexos/a.zip'), null);
 });
 
