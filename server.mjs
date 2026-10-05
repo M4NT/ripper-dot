@@ -45,6 +45,7 @@ import { tryClaimRoutine, releaseRoutineClaim } from './lib/persist-coord.mjs';
 import { browserFor, browserRisk } from './lib/browser.mjs';
 import { runClaude, runCodex, systemPrompt, describeImage } from './lib/providers.mjs';
 import { runOpenRouter, syncOpenRouterModels, checkCompatKey, compatCatalog, COMPAT } from './lib/openrouter.mjs';
+import { normalizeWorkspace, listDirs, gitBranch, workspaceFor } from './lib/workspace.mjs';
 import { recordExternal, listExternal, externalCsv, EXTERNAL_KINDS } from './lib/external-actions.mjs';
 import { buildPulse, pulseDue, pulseWhatsappTo } from './lib/pulse.mjs';
 import { normalizeFlow, stepPrompt, stepRuns } from './lib/flows.mjs';
@@ -366,7 +367,8 @@ function chatDetail(c, cid) {
     ...c,
     streaming: isChatStreaming(cid),
     run: chatRunPublic(c.run),
-    interrupted: c.run?.status === 'interrupted'
+    interrupted: c.run?.status === 'interrupted',
+    ...(c.workspace?.kind === 'folder' ? { workspaceBranch: gitBranch(c.workspace.path) } : {})
   };
 }
 
@@ -574,6 +576,21 @@ function notifyOwner(msg) {
 }
 function notifyApproval(agent, command) {
   notifyOwner({ title: `${agent.name || 'Agente'} precisa de você`, body: command, url: '#/inbox' });
+}
+
+const isLocalRequest = req => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+
+/** Troca a pasta de trabalho da conversa (null = área do próprio agente) e guarda nos recentes. */
+function setChatWorkspace(req, c, raw) {
+  let ws;
+  try { ws = normalizeWorkspace(raw); } catch (e) { throw new HttpError(400, e.message); }
+  if (ws?.kind === 'folder' && !isLocalRequest(req)) throw new HttpError(403, 'Pasta desta máquina só pode ser escolhida nela mesma.');
+  if (isChatStreaming(c.id)) throw new HttpError(409, 'Aguarde a resposta terminar para trocar a pasta.');
+  if (ws) c.workspace = ws; else delete c.workspace;
+  if (ws) {
+    const key = JSON.stringify(ws);
+    db.workspaceRecents = [ws, ...(db.workspaceRecents || []).filter(x => JSON.stringify(x) !== key)].slice(0, 8);
+  }
 }
 
 /** Aviso do sistema na Caixa (backup falhou etc.). Um por chave enquanto não for resolvido. */
@@ -986,7 +1003,9 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
   const memories = s.memory && agent.tools.includes('memory') ? db.memories.filter(m => m.agentId === agent.id) : [];
   let computer = null;
   // Sem chave/computador desligado: a ferramenta só não é oferecida (o painel do agente avisa).
-  if (agent.tools.includes('computer')) { try { computer = computerFor(agent, s, save); } catch {} }
+  // Pasta de trabalho da conversa (pasta desta máquina ou repositório); repositório privado usa o token do Guardião.
+  const chatWs = chat.workspace?.kind === 'repo' && s.github?.token ? { ...chat.workspace, auth: gitAuthArg(s.github.token) } : chat.workspace || null;
+  if (agent.tools.includes('computer')) { try { computer = computerFor(agent, s, save, chatWs); } catch {} }
   let browser = null;
   if (computer?.kind === 'docker' && agent.tools.includes('browser')) {
     const b = browsers.get(agent.id) || browserFor(computer, sandboxDir(agent));
@@ -1435,6 +1454,7 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
   const system = [
     systemStable,
     memoryContext(memories, s.memoryLogInContext ?? 10),
+    chat.workspace && (computer ? workspaceFor(chat.workspace, computer.kind).hint : `O usuário escolheu a pasta de trabalho ${chat.workspace.path || chat.workspace.repo}, mas você não tem computador ligado: diga isso se ele pedir para mexer nos arquivos.`),
     await projectContext(project),
     visibleArtifacts(chat).length && `Artefatos do time (leia com read_artifact; salve entregas com save_artifact): ${visibleArtifacts(chat).slice(-20).map(x => `"${x.title}" (${x.kind}, v${x.version})`).join('; ')}`,
     (() => {
@@ -2970,10 +2990,18 @@ const routes = [
     db.chats = r.chats; save();
     return { changed: r.changed, skipped: r.skipped };
   }],
+  // Seletor de pasta de trabalho: só quem está nesta máquina navega pelas pastas dela.
+  ['GET', /^\/api\/fs\/dirs$/, (req, _, url) => {
+    if (!isLocalRequest(req)) throw new HttpError(403, 'Só dá para escolher pastas na própria máquina do Ripper.');
+    try { return { ...listDirs(url.searchParams.get('path') || ''), recent: db.workspaceRecents || [] }; }
+    catch (e) { throw new HttpError(400, e.message); }
+  }],
   ['PUT', /^\/api\/chats\/([\w-]+)$/, async (req, [cid]) => {
     const c = db.chats.find(c => c.id === cid); if (!c) throw new HttpError(404, 'Conversa não encontrada.');
     const b = await body(req);
     if (typeof b.title === 'string' && b.title.trim()) c.title = b.title.trim().slice(0, 80);
+    if ('workspace' in b) setChatWorkspace(req, c, b.workspace);
+    if ('workspace' in b) { c.updatedAt = Date.now(); save(); return { ...summary(c), workspace: c.workspace || null, workspaceBranch: c.workspace?.kind === 'folder' ? gitBranch(c.workspace.path) : null }; }
     if (typeof b.archived === 'boolean') applyBulk([c], [c.id], b.archived ? 'archive' : 'unarchive');
     if (b.projectId === null) delete c.projectId;
     else if (typeof b.projectId === 'string' && b.projectId) {
@@ -3132,6 +3160,7 @@ const routes = [
         c = { id: id(), agentId: agent.id, title: 'Nova conversa', messages: [], createdAt: Date.now(), updatedAt: Date.now(),
           ...(project ? { projectId: project.id } : {}), ...(agentIds.length > 1 ? { agentIds } : {}) };
         db.chats.unshift(c);
+        if (b.workspace) setChatWorkspace(req, c, b.workspace);
       }
       if (isChatStreaming(c.id)) throw new HttpError(409, 'Esta conversa já está respondendo. Aguarde ou interrompa a resposta atual.');
       const quota = checkRunBudget(db, db.settings, { agentId: agent.id });

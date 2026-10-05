@@ -97,7 +97,7 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 | Agentes | ✅ Custo e tempo do dia no card. ✅ Busca/filtro. ✅ Status ao vivo no card (o que faz agora em qualquer lugar, link para a conversa) + filtro "Trabalhando agora". ✅ Duplicar agente. |
 | Novo agente | ✅ Criar em 1 frase: o modelo econômico monta nome, instruções, tom e habilidades; sugere atender o WhatsApp e rotina (dia/semana) para confirmar; correções determinísticas (sem "social" sem pedir, planilha liga computador, rotina liga "Rotinas"). |
 | Config. do agente | Testar ferramenta ali mesmo; histórico de mudanças; limite de gasto próprio do agente. |
-| Chat | ✅ Ouvir resposta; ✅ prévia de arquivos; ✅ custo por resposta paga. ✅ Editar e reenviar (qualquer mensagem sua). ✅ Buscar na conversa (Ctrl+F, sem acento). Ramificar; fixar. |
+| Chat | ✅ Ouvir resposta; ✅ prévia de arquivos; ✅ custo por resposta paga. ✅ Editar e reenviar (qualquer mensagem sua). ✅ Buscar na conversa (Ctrl+F, sem acento). ✅ Pasta de trabalho acima do composer (computador · pasta ou repositório · branch), por conversa, com somente leitura e recentes; no Docker a pasta vira /project. Ramificar; fixar. |
 | Conversas | ✅ Etiquetas (filtro e busca), arquivar (some da lista e do menu; aba Arquivadas), seleção em lote: etiquetar, arquivar, desarquivar, apagar. |
 | Projetos | ✅ Aba Quadro: A fazer / Fazendo / Feito, cartões com agente, arrastar ou "Mover" (teclado/toque), "Pedir ao agente" roda a tarefa no projeto e move para Feito com link da conversa. Card fica "rodando" se o servidor reiniciar no meio (mover à mão limpa). |
 | Biblioteca | ✅ Busca dentro do conteúdo de artefatos, arquivos de texto, memórias e skills (sem acento, trecho com a palavra). PDF/Word ainda não entram na busca. |

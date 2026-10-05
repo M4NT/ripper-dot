@@ -1,5 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
+import WorkspaceBar from '../workspaceBar.jsx';
 import { api, go, fmtTime, fmtSize, stepLabel, useMediaQuery, local, nameColor, speak, canSpeak } from '../lib.js';
 import { markdown, closeOpen } from '../markdown.js';
 import { AgentAvatar, Icon, Menu, MenuItem, StatusDot, useConfirm, EmptyState } from '../ui.jsx';
@@ -176,6 +177,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   const chatMenu = useChatMenu();
   const ov = useOv();
   const [chat, setChat] = useState(null);
+  const [pendingWs, setPendingWs] = useState(null); // pasta escolhida antes da 1ª mensagem
   const [chatId, setChatId] = useState(initialId || null);
   const [loading, setLoading] = useState(!!initialId);
   const [notFound, setNotFound] = useState(false);
@@ -320,7 +322,8 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
         ? { mcpSession: mcpSession || sessionPayload() }
         : {
           agentId: agent.id, agentIds: isGroup ? memberIds : undefined, projectId, chatId: cid, text, fileIds,
-          model: use.model, effort: use.effort, mcpSession: mcpSession || sessionPayload(), credentialRefs, voice
+          model: use.model, effort: use.effort, mcpSession: mcpSession || sessionPayload(), credentialRefs, voice,
+          ...(!cid && pendingWs ? { workspace: pendingWs } : {})
         };
       const res = await fetch(endpoint, { method: 'POST', signal: ac.signal, headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
       if (!res.ok) {
@@ -504,6 +507,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
               <button type="button" className="btn sm" onClick={() => send({ resume: true })}>Retomar resposta</button>
             </div>
           )}
+          {!isGroup && <WorkspaceBar chat={chat} chatId={chatId} agent={agent} pending={pendingWs} setPending={setPendingWs} onChanged={c => setChat(x => ({ ...x, ...c }))} />}
           <Composer agent={agent} chatId={chatId} projectId={projectId} streaming={!!live} onSend={queueSend} onStop={() => { queueRef.current?.cancel(); if (chatId) api(`/api/chats/${chatId}/cancel`, { method: 'POST' }).catch(() => {}); ctrl.current?.abort(); }}
             choice={choice} setChoice={setChoice} group={isGroup} mentions={isGroup ? members : null}
             placeholder={isGroup ? 'Mensagem para o grupo… use @Nome para chamar alguém' : `Mensagem para ${agent.name}…`} autoFocus draftKey={chatId || 'new-' + memberIds.join('-')} />
