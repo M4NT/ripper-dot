@@ -17,6 +17,7 @@ import { useOv } from '../overlay.jsx';
 import { botAvatarPalette } from 'bot-avatars';
 import { FirstRunChecklist } from '../firstRunChecklist.jsx';
 import { isEnterpriseMode } from '../uiMode.js';
+import { findChatMatches } from '../../../lib/chat-edit.mjs';
 
 // Cor do agente como TEXTO: misturada com a tinta para passar contraste nos dois temas (a pura dava 3,3:1).
 const agentColor = a => `color-mix(in srgb, ${nameColor(a, botAvatarPalette)} 58%, var(--ink))`;
@@ -163,16 +164,32 @@ function InboxMessage({ m, from }) {
   );
 }
 
-const UserMessage = memo(function UserMessage({ m, name, files }) {
+const UserMessage = memo(function UserMessage({ m, name, files, onEdit }) {
   // Prévias locais (recém-enviadas) ou os arquivos já salvos no servidor.
   const mine = m.previews || (m.files || []).map(id => files.find(f => f.id === id)).filter(Boolean).map(f => ({ ...f, url: `/api/files/${f.id}` }));
   const hasFiles = mine.length > 0;
+  const [draft, setDraft] = useState(null); // texto em edição (null = não editando)
+  const resend = () => { const t = draft.trim(); if (!t && !m.files?.length) return; setDraft(null); onEdit(t); };
   return (
     <div className="msg user">
       <div className="msg-col">
         {hasFiles && <MessageAttachments items={mine} />}
-        {m.content && <div className={`bubble user-bubble${m.voice ? ' voice' : ''}`} title={m.voice ? 'Mensagem ditada' : undefined}>{m.content}</div>}
-        {m.at && <time className="msg-time">{fmtTime(m.at)}</time>}
+        {draft !== null
+          ? <div className="user-edit">
+              <textarea className="input" aria-label="Editar mensagem" autoFocus rows={Math.min(8, draft.split('\n').length + 1)} value={draft} onChange={e => setDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Escape') setDraft(null); else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); resend(); } }} />
+              <div className="user-edit-actions">
+                <button type="button" className="btn btn-sm" onClick={() => setDraft(null)}>Cancelar</button>
+                <button type="button" className="btn btn-sm btn-primary" onClick={resend}>Reenviar</button>
+              </div>
+              <p className="fine">As respostas a partir daqui serão substituídas.</p>
+            </div>
+          : m.content && <div className={`bubble user-bubble${m.voice ? ' voice' : ''}`} title={m.voice ? 'Mensagem ditada' : undefined}>{m.content}</div>}
+        <div className="msg-meta">
+          {m.at && <time className="msg-time">{fmtTime(m.at)}</time>}
+          {m.content && draft === null && <button className="meta-btn" aria-label="Copiar mensagem" onClick={() => navigator.clipboard.writeText(m.content)}><Icon name="copy" size={14} />Copiar</button>}
+          {onEdit && draft === null && <button className="meta-btn" aria-label="Editar e reenviar mensagem" onClick={() => setDraft(m.content || '')}><Icon name="edit" size={14} />Editar</button>}
+        </div>
       </div>
       <span className="initial">{(name || 'V')[0].toUpperCase()}</span>
     </div>
@@ -196,6 +213,14 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   const queueRef = useRef(null);
   const sendTurnRef = useRef(null);
   const [confirm, confirmNode] = useConfirm();
+  const [search, setSearch] = useState(null); // { q, at } — busca na conversa aberta
+  const searchRef = useRef(null);
+  useEffect(() => { // rola até o resultado atual
+    if (!search?.q) return;
+    const el = scroller.current?.querySelector('.search-hit.current');
+    if (el) { stick.current = false; el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+  }, [search]);
+  useEffect(() => setSearch(null), [initialId]);
 
   const memberIds = chat ? (chat.agentIds || [chat.agentId]) : initialMembers?.length ? initialMembers : [initialAgent];
   const members = memberIds.map(getAgent).filter(Boolean);
@@ -422,6 +447,19 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   const files = S.files.filter(f => f.chatId && f.chatId === chatId);
   const title = chat?.title || 'Nova conversa';
   const lastUser = [...messages].reverse().find(m => m.role === 'user');
+  const canEdit = !!chatId && !chat?.flowRun && !live; // fluxos rodam no servidor: editar quebraria os passos
+  const matches = search ? findChatMatches(messages, search.q) : [];
+  const hit = matches.length ? Math.min(search.at, matches.length - 1) : -1;
+  const goHit = d => setSearch(s => ({ ...s, at: (hit + d + matches.length) % matches.length }));
+  async function editFrom(m, text) {
+    try { await api(`/api/chats/${chatId}/truncate`, { method: 'POST', body: { fromMessageId: m.id } }); }
+    catch (e) { toast(e.message, 'error'); return; }
+    setChat(c => ({ ...c, messages: c.messages.slice(0, Math.max(0, c.messages.findIndex(x => x.id === m.id))) }));
+    send({ text, fileIds: m.files || [] });
+  }
+  function onChatKey(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') { e.preventDefault(); setSearch(s => s || { q: '', at: 0 }); setTimeout(() => searchRef.current?.focus()); }
+  }
 
   const showPanel = panel && wide;
   const togglePanel = () => { setPanel(!panel); local.set('panel', !panel); };
@@ -437,7 +475,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   }
 
   return (
-    <div className={`chat ${showPanel ? 'with-panel' : ''}`}>
+    <div className={`chat ${showPanel ? 'with-panel' : ''}`} onKeyDown={onChatKey}>
       <div className="chat-main">
         <header className="chat-head" onContextMenu={openMenu}>
           <div className="chat-who">
@@ -449,7 +487,21 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
                 </span>
               : <span className="who-one"><AgentAvatar agent={agent} size={24} state={live ? 'working' : undefined} paused={!live} /><b>{agent.name}</b><StatusDot status={agent.status} /></span>}
           </div>
+          {messages.length > 0 && <button type="button" className="icon-btn chat-search-btn" aria-label="Buscar na conversa" title="Buscar na conversa (Ctrl F)" aria-expanded={!!search}
+            onClick={() => { setSearch(s => s ? null : { q: '', at: 0 }); setTimeout(() => searchRef.current?.focus()); }}><Icon name="search" size={16} /></button>}
         </header>
+        {search && (
+          <div className="chat-search" role="search">
+            <Icon name="search" size={14} />
+            <input ref={searchRef} className="chat-search-input" aria-label="Buscar na conversa" placeholder="Buscar na conversa…" value={search.q}
+              onChange={e => setSearch({ q: e.target.value, at: 0 })}
+              onKeyDown={e => { if (e.key === 'Escape') setSearch(null); else if (e.key === 'Enter' && matches.length) { e.preventDefault(); goHit(e.shiftKey ? -1 : 1); } }} />
+            <span className="chat-search-count" aria-live="polite">{search.q.trim() ? (matches.length ? `${hit + 1} de ${matches.length}` : 'Nada encontrado') : ''}</span>
+            <button type="button" className="icon-btn sm" aria-label="Resultado anterior" disabled={!matches.length} onClick={() => goHit(-1)}><Icon name="arrowUp" size={14} /></button>
+            <button type="button" className="icon-btn sm" aria-label="Próximo resultado" disabled={!matches.length} onClick={() => goHit(1)}><Icon name="down" size={14} /></button>
+            <button type="button" className="icon-btn sm" aria-label="Fechar busca" onClick={() => setSearch(null)}><Icon name="x" size={14} /></button>
+          </div>
+        )}
 
         <div className="thread" ref={scroller} onScroll={onScroll} onContextMenu={openMenu}>
           <div className="thread-inner">
@@ -464,9 +516,9 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
                 {!isGroup && <FirstRunChecklist settings={S.settings} agentCount={S.agents.length} />}
               </div>
             )}
-            {messages.map((m, i) => m.inbox ? <InboxMessage key={m.id || i} m={m} from={getAgent(m.inbox.from)} /> : m.role === 'user'
-              ? <UserMessage key={m.id || i} m={m} name={S.settings.name} files={S.files} />
-              : <BotMessage key={m.id || i} m={m} agent={getAgent(m.agentId) || agent} group={isGroup || (!!m.agentId && m.agentId !== agent.id)} models={S.models} showModel={isEnterpriseMode(S.settings)} allFiles={S.files} onFileError={msg => toast(msg, 'error')} onRetry={m === messages.at(-1) && lastUser ? () => send({ text: lastUser.content }) : null} />)}
+            {messages.map((m, i) => <div key={m.id || i} data-mi={i} className={matches.includes(i) ? `search-hit${matches[hit] === i ? ' current' : ''}` : undefined}>{m.inbox ? <InboxMessage m={m} from={getAgent(m.inbox.from)} /> : m.role === 'user'
+              ? <UserMessage m={m} name={S.settings.name} files={S.files} onEdit={canEdit && m.id && !/^u\d+$/.test(m.id) ? text => editFrom(m, text) : null} />
+              : <BotMessage m={m} agent={getAgent(m.agentId) || agent} group={isGroup || (!!m.agentId && m.agentId !== agent.id)} models={S.models} showModel={isEnterpriseMode(S.settings)} allFiles={S.files} onFileError={msg => toast(msg, 'error')} onRetry={m === messages.at(-1) && lastUser ? () => send({ text: lastUser.content }) : null} />}</div>)}
             {live && <BotMessage m={live} agent={getAgent(live.agentId) || agent} group={isGroup} live phase={phase} models={S.models} />}
           </div>
         </div>
