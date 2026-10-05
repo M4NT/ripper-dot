@@ -28,6 +28,7 @@ import {
   MESSAGE_KIND
 } from './lib/manager-worker-protocol.mjs';
 import { trackInboxDelegation, taskItemsSummary } from './lib/task-items.mjs';
+import { patchTask, taskPrompt } from './lib/project-tasks.mjs';
 import { closeTaskFromInboxReply } from './lib/task-closure.mjs';
 import { createGoogleTasksSync } from './lib/google-tasks-sync.mjs';
 import { rememberAllowedCommand, execNeedsApproval } from './lib/permissions.mjs';
@@ -413,6 +414,7 @@ async function streamChatResponse(req, c, { text, fileIds, mcpSession, resume = 
   return undefined;
 }
 const projectOr404 = pid => db.projects.find(p => p.id === pid) || (() => { throw new HttpError(404, 'Projeto não encontrado.'); })();
+const projectTaskOr404 = (pid, tid) => (projectOr404(pid), (db.projectTasks || []).find(t => t.id === tid && t.projectId === pid)) || (() => { throw new HttpError(404, 'Tarefa não encontrada.'); })();
 const agentOr404 = aid => db.agents.find(a => a.id === aid) || (() => { throw new HttpError(404, 'Agente não encontrado.'); })();
 const syncedBoatFiles = new Set();
 
@@ -2464,6 +2466,40 @@ const routes = [
     db.projects = db.projects.filter(p => p.id !== pid);
     removeProjectSandboxDir(pid);
     save(); return {};
+  }],
+  ['GET', /^\/api\/projects\/([\w-]+)\/tasks$/, (req, [pid]) => { projectOr404(pid); return (db.projectTasks || []).filter(t => t.projectId === pid); }],
+  ['POST', /^\/api\/projects\/([\w-]+)\/tasks$/, async (req, [pid]) => {
+    projectOr404(pid);
+    const t = { id: id(), projectId: pid, title: '', note: '', status: 'todo', assigneeId: null, createdAt: Date.now() };
+    try { patchTask(t, { title: '', ...(await body(req)) }, db.agents); } catch (e) { throw new HttpError(400, e.message); }
+    (db.projectTasks ||= []).push(t); save(); return t;
+  }],
+  ['PUT', /^\/api\/projects\/([\w-]+)\/tasks\/([\w-]+)$/, async (req, [pid, tid]) => {
+    const t = projectTaskOr404(pid, tid);
+    try { patchTask(t, await body(req), db.agents); } catch (e) { throw new HttpError(400, e.message); }
+    save(); return t;
+  }],
+  ['DELETE', /^\/api\/projects\/([\w-]+)\/tasks\/([\w-]+)$/, (req, [pid, tid]) => {
+    const t = projectTaskOr404(pid, tid);
+    db.projectTasks = db.projectTasks.filter(x => x !== t); save(); return {};
+  }],
+  ['POST', /^\/api\/projects\/([\w-]+)\/tasks\/([\w-]+)\/run$/, (req, [pid, tid]) => {
+    const t = projectTaskOr404(pid, tid);
+    const agent = db.agents.find(a => a.id === t.assigneeId);
+    if (!agent) throw new HttpError(400, 'Atribua a tarefa a um agente antes de pedir.');
+    if (agent.status === 'paused') throw new HttpError(409, 'Este agente está pausado.');
+    if (t.status === 'doing' && t.running) throw new HttpError(409, 'O agente já está trabalhando nesta tarefa.');
+    const c = { id: id(), agentId: agent.id, projectId: pid, title: t.title.slice(0, 80), messages: [], createdAt: Date.now(), updatedAt: Date.now() };
+    db.chats.unshift(c);
+    Object.assign(t, { status: 'doing', running: true, error: null, chatId: c.id, updatedAt: Date.now() }); save();
+    chat({ chat: c, text: taskPrompt(t) }, () => {}).then(() => {
+      const failed = c.messages.find(m => m.role === 'assistant' && m.error)?.error;
+      const replied = c.messages.some(m => m.role === 'assistant' && !m.error);
+      if (failed || !replied) t.error = failed || 'O agente não respondeu.';
+      else t.status = 'done';
+    }).catch(e => { t.error = e.message || 'Falha ao rodar.'; })
+      .finally(() => { t.running = false; t.updatedAt = Date.now(); c.unread = true; save(); });
+    return { ok: true, chatId: c.id };
   }],
   ['GET', /^\/api\/agent-templates$/, () => listAgentTemplates(db)],
   ['POST', /^\/api\/agent-templates$/, async req => {
