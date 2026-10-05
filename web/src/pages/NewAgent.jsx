@@ -8,6 +8,15 @@ import { uploadFile } from '../composer.jsx';
 
 const TYPES = ['clover', 'flower', 'triangle', 'square', 'blob', 'ghost', 'circle', 'drop', 'star', 'droid', 'mech', 'alien', 'hexagon', 'cat', 'cloud', 'pill', 'pebble', 'puddle'];
 const COLORS = [null, '#1a1917', '#e8537a', '#f08a3c', '#f2c94c', '#3fae78', '#3aa7c9', '#5b6cf0', '#9b6cf0'];
+const RADAR_SOURCES = 'https://www.in.gov.br/consulta (Diário Oficial da União)\nhttps://news.google.com';
+function radarPrompt({ topics, sources, whatsapp, email }) {
+  const to = [whatsapp && 'WhatsApp', email && 'e-mail'].filter(Boolean).join(' e ');
+  const src = sources.split('\n').map(x => x.trim()).filter(Boolean).join('; ') || 'busca na web e notícias';
+  return `Faça a varredura do dia sobre: ${topics.trim()}.
+Fontes: ${src}. Considere só o que foi publicado desde a última varredura.
+Se não houver nada novo e relevante, responda apenas NADA_NOVO.
+Se houver, entregue um relatório consolidado: um item por achado, com título, fonte (link), data e por que importa, do mais relevante ao menos relevante. Sem introdução.${to ? ` O relatório será enviado ao dono por ${to}: escreva texto simples, sem tabelas.` : ''}`;
+}
 const BLANK = { name: '', description: '', category: 'Outro', instructions: '', tone: 'direto', tools: ['web', 'memory', 'files', 'plugins'], templateId: null, savedTemplateId: null };
 
 function Section({ n, title, hint, children, optional }) {
@@ -36,6 +45,7 @@ export default function NewAgent() {
   const [sentence, setSentence] = useState('');
   const [drafting, setDrafting] = useState(false);
   const [extras, setExtras] = useState(null); // { whatsapp, routine, useWhatsapp, useRoutine } sugeridos pela frase
+  const [radar, setRadar] = useState({ topics: '', sources: RADAR_SOURCES, dailyAt: '07:00', weekdays: true, whatsapp: false, email: false });
   const input = useRef(null), nameRef = useRef(null);
   const set = p => setV(x => ({ ...x, ...p }));
 
@@ -61,6 +71,7 @@ export default function NewAgent() {
   async function create(e) {
     e?.preventDefault();
     if (!v.name.trim()) { nameRef.current?.focus(); return toast('Dê um nome ao agente.', 'error'); }
+    if (isRadar && !radar.topics.trim()) return toast('Diga o que o Radar deve vigiar.', 'error');
     setSaving(true);
     try {
       const body = { ...v, name: v.name.trim() };
@@ -70,6 +81,10 @@ export default function NewAgent() {
       // extras sugeridos pela frase e confirmados aqui
       if (extras?.useWhatsapp && waReady) await api('/api/settings', { method: 'PUT', body: { whatsappWeb: { agentId: a.id, enabled: true } } }).catch(err => toast(err.message, 'error'));
       if (extras?.useRoutine && extras.routine) await api('/api/routines', { method: 'POST', body: { agentId: a.id, name: extras.routine.weekday != null ? 'Rotina semanal' : 'Rotina diária', prompt: extras.routine.prompt, dailyAt: extras.routine.dailyAt, weekday: extras.routine.weekday, quiet: true } }).catch(err => toast(err.message, 'error'));
+      if (isRadar) {
+        const deliver = { whatsapp: radar.whatsapp && canRadarWa, email: radar.email && canRadarEmail };
+        await api('/api/routines', { method: 'POST', body: { agentId: a.id, name: 'Radar diário', prompt: radarPrompt({ ...radar, ...deliver }), dailyAt: radar.dailyAt, weekdays: radar.weekdays, quiet: true, deliver } }).catch(err => toast(err.message, 'error'));
+      }
       await refresh();
       toast(`${a.name} está pronto`);
       go(`/a/${a.id}`);
@@ -77,6 +92,9 @@ export default function NewAgent() {
   }
 
   const waReady = !!S.settings.whatsappWeb?.agentId || !!S.settings.whatsappWeb?.enabled;
+  const isRadar = v.templateId === 'radar' && !v.savedTemplateId;
+  const canRadarWa = !!S.settings.pulse?.whatsappTo;
+  const canRadarEmail = !!S.settings.email?.enabled && !!S.settings.email?.user;
   const computerNote = S.settings.computer.mode === 'off' ? 'Computador desligado em Integrações.' : S.settings.computer.mode === 'boat' && !S.settings.computer.boatApiKey ? 'Falta a chave do boat.dev em Integrações.' : null;
 
   return (
@@ -143,6 +161,22 @@ export default function NewAgent() {
               ))}
             </div>
           </Section>
+
+          {isRadar && (
+            <Section n="1b" title="Configure o Radar" hint="Ele roda sozinho no horário e só avisa quando houver novidade. O relatório sempre chega na Caixa.">
+              <label className="field"><span>O que vigiar</span>
+                <textarea className="input" rows={2} value={radar.topics} onChange={e => setRadar({ ...radar, topics: e.target.value })} placeholder="Ex.: licitações de software, portarias do Ministério da Saúde, meu CNPJ" /></label>
+              <label className="field"><span>Fontes <small className="muted">opcional, uma por linha</small></span>
+                <textarea className="input" rows={3} value={radar.sources} onChange={e => setRadar({ ...radar, sources: e.target.value })} /></label>
+              <div className="na-inline">
+                <span className="na-label">Horário</span>
+                <input className="input" type="time" value={radar.dailyAt} onChange={e => setRadar({ ...radar, dailyAt: e.target.value || '07:00' })} aria-label="Horário" style={{ width: 'auto' }} />
+              </div>
+              <label className="switch-row compact"><span>Só em dias úteis</span><Switch checked={radar.weekdays} onChange={weekdays => setRadar({ ...radar, weekdays })} label="Só em dias úteis" /></label>
+              {canRadarWa && <label className="switch-row compact"><span>Enviar também para o meu WhatsApp</span><Switch checked={radar.whatsapp} onChange={whatsapp => setRadar({ ...radar, whatsapp })} label="Enviar para o meu WhatsApp" /></label>}
+              {canRadarEmail && <label className="switch-row compact"><span>Enviar também para o meu e-mail ({S.settings.email.user})</span><Switch checked={radar.email} onChange={email => setRadar({ ...radar, email })} label="Enviar para o meu e-mail" /></label>}
+            </Section>
+          )}
 
           <Section n="2" title="Quem é" hint="Nome e o que ele faz, numa frase.">
             <div className="na-identity">
