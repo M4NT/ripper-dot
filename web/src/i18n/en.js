@@ -21,7 +21,7 @@ export default {
   'nav.agents': 'Agents',
   'nav.inbox': 'Inbox',
   'settings.tab.channels': 'Channels',
-  'settings.tab.channelsHint': 'WhatsApp and where agents answer',
+  'settings.tab.channelsHint': 'Email, WhatsApp and where agents answer',
   'nav.explore': 'Explore',
   'nav.library': 'Library',
   'nav.chats': 'Chats',

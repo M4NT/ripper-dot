@@ -25,7 +25,7 @@ export function brandForChrome(settings) {
 }
 
 /** Abas de configurações visíveis no modo simples. */
-export const SIMPLE_SETTINGS_TABS = new Set(['profile', 'appearance', 'memory', 'security', 'backup']);
+export const SIMPLE_SETTINGS_TABS = new Set(['profile', 'channels', 'appearance', 'memory', 'security', 'backup']);
 
 export function isSettingsTabAllowed(tab, settings) {
   if (isEnterpriseMode(settings)) return true;

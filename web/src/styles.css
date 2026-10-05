@@ -146,6 +146,7 @@ code { font: .88em var(--mono); }
 .pills { display: flex; flex-wrap: wrap; gap: 8px; }
 .pill { height: 32px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: 13.5px; color: var(--ink-2); transition: .15s; }
 .pill:hover { border-color: var(--line-2); }
+.mail-providers { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0 14px; }
 .pill.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .search-field { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--muted); min-width: 220px; }
 .search-field input { flex: 1; border: 0; outline: 0; background: none; min-width: 0; color: var(--ink); }

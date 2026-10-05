@@ -548,7 +548,9 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
         </>}
 
         {tab === 'plugins' && <Plugins s={s} set={set} />}
-        {tab === 'channels' && (() => {
+        {tab === 'channels' && <EmailCard s={s} set={set} toast={toast} />}
+        {tab === 'channels' && !enterprise && <p className="muted small">WhatsApp fica no <a href="#/settings/appearance">modo Enterprise</a>.</p>}
+        {tab === 'channels' && enterprise && (() => {
           const w = s.whatsapp || {};
           const setW = (k, v) => set('whatsapp', { ...w, [k]: v });
           const hook = `${location.origin}/api/channels/whatsapp/webhook`;
@@ -574,7 +576,6 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
             </Card>
           );
         })()}
-        {tab === 'channels' && <EmailCard s={s} set={set} toast={toast} />}
 
         {tab === 'security' && <>
           <Card
@@ -760,32 +761,68 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
   );
 }
 
-// E-mail como canal: IMAP/SMTP de qualquer provedor. Gmail/Outlook/Yahoo/iCloud preenchem os servidores sozinhos.
+// E-mail como canal. Gmail: o caminho de 1 clique é o conector Gmail da conta Claude (login Google de verdade).
+// Senha de app (IMAP/SMTP) serve para qualquer provedor; "Outro" mostra os servidores.
+const MAIL_PROVIDERS = [
+  { id: 'gmail', label: 'Gmail', domain: 'gmail.com', appPass: 'https://myaccount.google.com/apppasswords' },
+  { id: 'outlook', label: 'Outlook / Hotmail', domain: 'outlook.com', appPass: 'https://account.live.com/proofs/AppPassword' },
+  { id: 'icloud', label: 'iCloud', domain: 'icloud.com', appPass: 'https://account.apple.com/account/manage' },
+  { id: 'yahoo', label: 'Yahoo', domain: 'yahoo.com', appPass: 'https://login.yahoo.com/myaccount/security/app-password' },
+  { id: 'other', label: 'Outro (IMAP)', domain: '' }
+];
+const providerOf = user => {
+  const d = String(user || '').split('@')[1] || '';
+  return /gmail|googlemail/.test(d) ? 'gmail' : /outlook|hotmail|live/.test(d) ? 'outlook' : /icloud|me\.com/.test(d) ? 'icloud' : /yahoo/.test(d) ? 'yahoo' : d ? 'other' : null;
+};
+
 function EmailCard({ s, set, toast }) {
   const e = s.email || {};
-  const setE = (k, v) => set('email', { ...e, [k]: v });
+  const setE = patch => set('email', { ...e, ...patch });
+  const [pick, setPick] = useState(() => providerOf(e.user));
   const [testing, setTesting] = useState(false);
-  const domain = (e.user || '').split('@')[1] || '';
-  const appPass = /gmail|googlemail/.test(domain) ? 'Gmail: use uma “senha de app” (Conta Google → Segurança → Senhas de app), não a senha normal.'
-    : /outlook|hotmail|live/.test(domain) ? 'Outlook/Hotmail: use uma “senha de app” (Conta Microsoft → Segurança).' : 'Use a senha do e-mail (ou senha de app, se o provedor exigir).';
+  const [gmailClaude, setGmailClaude] = useState(null); // conector Gmail do claude.ai: conectado?
+  const prov = MAIL_PROVIDERS.find(p => p.id === pick);
+  useEffect(() => {
+    if (pick !== 'gmail') return;
+    api('/api/claude/connectors').then(r => setGmailClaude((r.connectors || []).some(c => /gmail/i.test(c.name) && c.status === 'connected'))).catch(() => setGmailClaude(false));
+  }, [pick]);
   async function test() {
     setTesting(true);
-    try { const r = await api('/api/email/test', { method: 'POST', body: e }); toast(`Conectou (${r.imapHost} / ${r.smtpHost})`); }
+    try { const r = await api('/api/email/test', { method: 'POST', body: e }); toast(`Conectado (${r.imapHost})`); setE({ enabled: true }); }
     catch (err) { toast(err.message, 'error'); }
     finally { setTesting(false); }
   }
   return (
     <Card title="E-mail" desc="Os agentes leem, resumem e respondem seus e-mails. Nada é copiado: eles consultam a caixa na hora. Todo envio espera a sua aprovação na Caixa.">
-      <Row title="Usar e-mail"><Switch checked={!!e.enabled} onChange={v => setE('enabled', v)} label="Usar e-mail" /></Row>
-      {e.enabled && <>
-        <Row title="Endereço"><input className="input" type="email" autoComplete="off" value={e.user || ''} onChange={ev => setE('user', ev.target.value)} placeholder="voce@empresa.com.br" /></Row>
-        <Row title="Senha" desc={appPass}><input className="input" type="password" autoComplete="new-password" value={e.pass || ''} onChange={ev => setE('pass', ev.target.value)} placeholder="Senha de app" /></Row>
-        <AdvancedBlock settings={s} summary="Servidores (só se não conectar sozinho)">
-          <Row title="IMAP (ler)"><input className="input" value={e.imapHost || ''} onChange={ev => setE('imapHost', ev.target.value)} placeholder={domain ? `imap.${domain}` : 'imap.seudominio.com'} /></Row>
-          <Row title="SMTP (enviar)"><input className="input" value={e.smtpHost || ''} onChange={ev => setE('smtpHost', ev.target.value)} placeholder={domain ? `smtp.${domain}` : 'smtp.seudominio.com'} /></Row>
-        </AdvancedBlock>
-        <Row title="Conexão" desc="Confere se dá para ler e enviar com esses dados.">
-          <button type="button" className="btn btn-sm" disabled={!e.user || !e.pass || testing} onClick={test}><Icon name="plug" size={14} />{testing ? 'Testando…' : 'Testar conexão'}</button>
+      <div className="mail-providers" role="radiogroup" aria-label="Seu e-mail">
+        {MAIL_PROVIDERS.map(p => (
+          <button key={p.id} type="button" role="radio" aria-checked={pick === p.id} className={`pill ${pick === p.id ? 'on' : ''}`} onClick={() => setPick(p.id)}>{p.label}</button>
+        ))}
+      </div>
+      {pick === 'gmail' && (
+        <Row title="Entrar com Google" desc={gmailClaude ? 'O Gmail já está conectado na sua conta Claude: os agentes já podem usar. Nada mais a fazer.' : 'Sem senha: conecte o Gmail na sua conta Claude (login Google) e os agentes passam a usar.'}>
+          {gmailClaude ? <span className="tag ok">Conectado</span>
+            : <a className="btn btn-sm btn-primary" href="https://claude.ai/settings/connectors" target="_blank" rel="noreferrer"><Icon name="plug" size={14} />Conectar Gmail</a>}
+        </Row>
+      )}
+      {prov && <>
+        {pick === 'gmail' && <p className="muted small">Ou, se preferir, com senha de app:</p>}
+        <Row title="Seu e-mail"><input className="input" type="email" autoComplete="off" value={e.user || ''} onChange={ev => setE({ user: ev.target.value })} placeholder={prov.domain ? `voce@${prov.domain}` : 'voce@empresa.com.br'} /></Row>
+        <Row title={prov.appPass ? 'Senha de app' : 'Senha'} desc={prov.appPass ? `É uma senha só para o Ripper, gerada no ${prov.label}. A sua senha normal não funciona aqui.` : 'A senha do e-mail (ou senha de app, se o provedor exigir).'}>
+          <div className="row">
+            <input className="input grow" type="password" autoComplete="new-password" value={e.pass || ''} onChange={ev => setE({ pass: ev.target.value })} placeholder="••••••••" />
+            {prov.appPass && <a className="btn btn-sm" href={prov.appPass} target="_blank" rel="noreferrer">Gerar senha</a>}
+          </div>
+        </Row>
+        {pick === 'other' && <>
+          <Row title="Servidor IMAP (ler)"><input className="input" value={e.imapHost || ''} onChange={ev => setE({ imapHost: ev.target.value })} placeholder={(e.user || '').includes('@') ? `imap.${e.user.split('@')[1]}` : 'imap.seudominio.com'} /></Row>
+          <Row title="Servidor SMTP (enviar)"><input className="input" value={e.smtpHost || ''} onChange={ev => setE({ smtpHost: ev.target.value })} placeholder={(e.user || '').includes('@') ? `smtp.${e.user.split('@')[1]}` : 'smtp.seudominio.com'} /></Row>
+        </>}
+        <Row title={e.enabled ? 'Conectado' : 'Conectar'} desc={e.enabled ? 'Os agentes já usam este e-mail.' : 'Confere o acesso e liga o e-mail. Depois é só salvar.'}>
+          <div className="row">
+            <button type="button" className="btn btn-sm btn-primary" disabled={!e.user || !e.pass || testing} onClick={test}><Icon name="plug" size={14} />{testing ? 'Conectando…' : e.enabled ? 'Testar de novo' : 'Conectar'}</button>
+            {e.enabled && <button type="button" className="btn btn-sm" onClick={() => setE({ enabled: false })}>Desligar</button>}
+          </div>
         </Row>
       </>}
     </Card>
