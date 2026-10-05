@@ -1745,7 +1745,7 @@ const routes = [
     try { q = parseUsageQuery(Object.fromEntries(url.searchParams)); } catch (e) { throw new HttpError(400, e.message); }
     let catalog = null; try { catalog = loadBenchmarkCatalog(); } catch {}
     const report = aggregateUsage(listUsageEventsSince(q.since), q, catalog);
-    const label = k => q.group === 'agent' ? db.agents.find(a => a.id === k)?.name || k : k;
+    const label = k => q.group === 'agent' ? db.agents.find(a => a.id === k)?.name || (/^[0-9a-f-]{36}$/.test(k) ? `Agente excluído · ${k.slice(0, 6)}` : k) : k;
     if (!m[0]) return { ...q, rows: report.rows.map(r => ({ ...r, label: label(r.key) })), totals: report.totals };
     const name = `ripper-uso-${url.searchParams.get('from')}-${url.searchParams.get('to')}-${q.group}.csv`;
     res.writeHead(200, hdr(req, {
