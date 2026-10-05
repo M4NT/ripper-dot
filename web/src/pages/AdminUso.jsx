@@ -2,6 +2,7 @@ import { useApp } from '../app.jsx';
 import { go } from '../lib.js';
 import { isEnterpriseMode } from '../uiMode.js';
 import { Icon, EmptyState } from '../ui.jsx';
+import UsageReportPanel from '../admin/UsageReportPanel.jsx';
 import MeteringPanel from '../admin/MeteringPanel.jsx';
 import JuliaEconomiaPanel from '../admin/JuliaEconomiaPanel.jsx';
 import TokenBudgetPanel from '../admin/TokenBudgetPanel.jsx';
@@ -49,6 +50,14 @@ export default function AdminUso() {
         </div>
         <button type="button" className="btn btn-sm" onClick={() => go('/admin')}><Icon name="arrowL" size={16} />Voltar ao admin</button>
       </header>
+
+      <Section
+        id="periodo"
+        title="Uso por período"
+        desc="Respostas, tokens e custo estimados por dia, agente ou modelo."
+      >
+        <UsageReportPanel />
+      </Section>
 
       <Section
         id="medicao"
