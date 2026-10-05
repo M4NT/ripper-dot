@@ -199,6 +199,8 @@ import { attachRequestId } from './lib/request-id.mjs';
 import { isShuttingDown, registerGracefulShutdown, SHUTDOWN_MESSAGE } from './lib/shutdown.mjs';
 import { closeUsageEventsStore, listUsageEventsSince } from './lib/usage-events.mjs';
 import { agentDayStats } from './lib/agent-day-stats.mjs';
+import { parseUsageQuery, aggregateUsage, usageCsv } from './lib/usage-report.mjs';
+import { loadBenchmarkCatalog } from './lib/julia-cascade.mjs';
 import { agentTimeline } from './lib/agent-timeline.mjs';
 import { closeJuliaEventsStore } from './lib/julia-events.mjs';
 import { closePersistCoordStore } from './lib/persist-coord.mjs';
@@ -1736,6 +1738,22 @@ const routes = [
       'cache-control': 'private, max-age=60'
     }));
     res.end(csv);
+  }],
+  ['GET', /^\/api\/admin\/usage(\.csv)?$/, async (req, m, url, res) => {
+    requireEnterpriseAdmin();
+    let q;
+    try { q = parseUsageQuery(Object.fromEntries(url.searchParams)); } catch (e) { throw new HttpError(400, e.message); }
+    let catalog = null; try { catalog = loadBenchmarkCatalog(); } catch {}
+    const report = aggregateUsage(listUsageEventsSince(q.since), q, catalog);
+    const label = k => q.group === 'agent' ? db.agents.find(a => a.id === k)?.name || k : k;
+    if (!m[0]) return { ...q, rows: report.rows.map(r => ({ ...r, label: label(r.key) })), totals: report.totals };
+    const name = `ripper-uso-${url.searchParams.get('from')}-${url.searchParams.get('to')}-${q.group}.csv`;
+    res.writeHead(200, hdr(req, {
+      'content-type': 'text/csv; charset=utf-8',
+      'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(name)}`,
+      'cache-control': 'private, no-store'
+    }));
+    res.end(usageCsv(report, q.group, label));
   }],
   ['POST', /^\/api\/mcp\/verify$/, async req => {
     const b = await body(req);
