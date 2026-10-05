@@ -210,15 +210,16 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   }, [initialId, initialAgent, initialProject, (initialMembers || []).join(',')]);
   useEffect(() => () => ctrl.current?.abort(), []);
   const waiting = chatId && S.pendingInbox?.[chatId];
+  const flowLive = ['running', 'waiting'].includes(chat?.flowRun?.status); // fluxo roda no servidor: a conversa se atualiza sozinha
   useEffect(() => {
-    if (!waiting) return;
+    if (!waiting && !flowLive) return;
     const t = setInterval(async () => {
       if (ctrl.current) return;
       try { const c = await api(`/api/chats/${chatId}`); setChat(c); } catch {}
       refresh();
     }, 4000);
     return () => clearInterval(t);
-  }, [waiting, chatId]);
+  }, [waiting, flowLive, chatId]);
   useEffect(() => {
     if (!chatId) return;
     const refetch = async () => {
@@ -425,6 +426,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
 
         <div className="thread" ref={scroller} onScroll={onScroll} onContextMenu={openMenu}>
           <div className="thread-inner">
+            {chat?.flowRun && <FlowProgress run={chat.flowRun} />}
             {messages.length === 0 && !live && (
               <div className="chat-empty">
                 {isGroup ? <div className="avatar-stack xl">{members.slice(0, 5).map(a => <AgentAvatar key={a.id} agent={a} size={72} interactive />)}</div> : <AgentAvatar agent={agent} size={96} interactive />}
@@ -459,6 +461,20 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
       {!showPanel && wide && <div className="panel-collapsed-edge"><ResizeHandle side="right" cssVar="panel-w" min={280} max={620} collapsed label="Abrir painel" onExpand={togglePanel} /><button className="panel-reopen" onClick={togglePanel} aria-label="Mostrar painel" title="Mostrar painel (Ctrl .)"><Icon name="sidebar" size={16} style={{ transform: 'scaleX(-1)' }} /></button></div>}
       {showPanel && <ChatPanel members={members} project={project} chatId={chatId} messages={messages} files={files} onCollapse={() => { setPanel(false); local.set('panel', false); }} />}
       {confirmNode}
+    </div>
+  );
+}
+
+/** Barra do fluxo no topo da conversa: em que passo está e se espera você. */
+function FlowProgress({ run }) {
+  const label = { running: `Passo ${run.step + 1} de ${run.total}`, waiting: `Passo ${run.step + 1} de ${run.total} pronto · esperando a sua aprovação na Caixa`, done: `Fluxo concluído · ${run.total} ${run.total === 1 ? 'passo' : 'passos'}`, stopped: 'Fluxo parado: você não aprovou o próximo passo', failed: `Fluxo parou no passo ${run.step + 1}${run.error ? `: ${run.error}` : ''}` }[run.status];
+  const pct = run.status === 'done' ? 100 : Math.round(((run.step + (run.status === 'waiting' ? 1 : 0.5)) / run.total) * 100);
+  return (
+    <div className={`flow-progress ${run.status}`} role="status">
+      <Icon name="flow" size={16} />
+      <span>{label}</span>
+      <span className="flow-progress-bar" aria-hidden="true"><span style={{ width: `${pct}%` }} /></span>
+      {run.status === 'waiting' && <a className="btn btn-sm" href="#/inbox">Abrir a Caixa</a>}
     </div>
   );
 }

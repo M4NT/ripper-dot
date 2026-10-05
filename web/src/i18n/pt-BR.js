@@ -19,6 +19,7 @@ export default {
   'nav.main': 'Principal',
   'nav.projects': 'Projetos',
   'nav.agents': 'Agentes',
+  'nav.flows': 'Fluxos',
   'nav.inbox': 'Caixa',
   'nav.explore': 'Explorar',
   'nav.library': 'Biblioteca',

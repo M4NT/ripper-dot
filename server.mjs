@@ -45,6 +45,7 @@ import { runClaude, runCodex, systemPrompt, describeImage } from './lib/provider
 import { runOpenRouter, syncOpenRouterModels, checkCompatKey, compatCatalog, COMPAT } from './lib/openrouter.mjs';
 import { recordExternal, listExternal, externalCsv, EXTERNAL_KINDS } from './lib/external-actions.mjs';
 import { buildPulse, pulseDue } from './lib/pulse.mjs';
+import { normalizeFlow, stepPrompt } from './lib/flows.mjs';
 import { emailReady, listEmails, readEmail, sendEmail, newEmailsSince, testEmail, getAttachment, safeName, attachmentText, readHint } from './lib/email.mjs';
 import { gh, githubReady, normalizeRepo, repoChanges, describeChange, prBranch, gitAuthArg, hideToken } from './lib/github.mjs';
 import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './lib/event-triggers.mjs';
@@ -2211,6 +2212,29 @@ const routes = [
     const e = { ...db.settings.email, ...b, pass: b.pass && b.pass !== '••••' ? b.pass : db.settings.email?.pass };
     try { return await testEmail(e); } catch (err) { throw new HttpError(400, `Não conectou: ${err.message}`); }
   }],
+  // Fluxos: agentes em sequência, com aprovação nos passos marcados
+  ['GET', /^\/api\/flows$/, () => ({ flows: db.flows || [] })],
+  ['POST', /^\/api\/flows$/, async req => {
+    let f;
+    try { f = normalizeFlow(await body(req), db.agents); } catch (e) { throw new HttpError(400, e.message); }
+    const flow = { id: id(), ...f, createdAt: Date.now(), updatedAt: Date.now() };
+    (db.flows ||= []).push(flow); save(); return flow;
+  }],
+  ['PUT', /^\/api\/flows\/([\w-]+)$/, async (req, [fid]) => {
+    const cur = (db.flows || []).find(f => f.id === fid);
+    if (!cur) throw new HttpError(404, 'Fluxo não encontrado.');
+    try { Object.assign(cur, normalizeFlow(await body(req), db.agents, cur), { updatedAt: Date.now() }); } catch (e) { throw new HttpError(400, e.message); }
+    save(); return cur;
+  }],
+  ['DELETE', /^\/api\/flows\/([\w-]+)$/, (req, [fid]) => { db.flows = (db.flows || []).filter(f => f.id !== fid); save(); return {}; }],
+  ['POST', /^\/api\/flows\/([\w-]+)\/run$/, async (req, [fid]) => {
+    const flow = (db.flows || []).find(f => f.id === fid);
+    if (!flow) throw new HttpError(404, 'Fluxo não encontrado.');
+    const missing = flow.steps.find(st => !db.agents.some(a => a.id === st.agentId && a.status !== 'paused'));
+    if (missing) throw new HttpError(400, 'Um agente deste fluxo foi apagado ou está pausado. Edite o fluxo.');
+    const { input = '' } = await body(req);
+    return { chatId: runFlow(flow, String(input).slice(0, 8000)) };
+  }],
   // Resumo do dia na hora (o mesmo que chega na Caixa às 8h)
   ['GET', /^\/api\/pulse$/, () => currentPulse()],
   // Caixa: aprovações + recados de canal + novidades de rotina
@@ -3091,6 +3115,41 @@ registerGracefulShutdown(server, {
 });
 
 // Rotinas: o agente dono acorda (por horário ou evento), executa e só deixa conversa se houver novidade.
+/**
+ * Roda um fluxo numa conversa: um agente por vez, cada um vendo o que os anteriores responderam.
+ * Passo com "approve": pausa e pede o seu OK na Caixa antes do próximo. Devolve o id da conversa.
+ */
+function runFlow(flow, input) {
+  const c = {
+    id: id(), agentId: flow.steps[0].agentId, title: `${flow.name}${input ? ` · ${input.slice(0, 40)}` : ''}`, flowId: flow.id,
+    flowRun: { step: 0, total: flow.steps.length, status: 'running' }, messages: [{ id: id(), role: 'user', content: input ? `▶ ${flow.name}: ${input}` : `▶ ${flow.name}`, at: Date.now() }],
+    createdAt: Date.now(), updatedAt: Date.now()
+  };
+  db.chats.unshift(c); save();
+  (async () => {
+    for (let i = 0; i < flow.steps.length; i++) {
+      const st = flow.steps[i], agent = db.agents.find(a => a.id === st.agentId);
+      if (!agent) { c.flowRun = { ...c.flowRun, status: 'failed', error: `Passo ${i + 1}: agente apagado.` }; break; }
+      c.agentId = agent.id; c.flowRun = { ...c.flowRun, step: i }; save();
+      await chat({ chat: c, text: stepPrompt(flow, i, input, null), skipUserPush: true }, () => {});
+      const out = [...c.messages].reverse().find(m => m.role === 'assistant' && m.agentId === agent.id);
+      if (!out || out.error || !out.content) { c.flowRun = { ...c.flowRun, status: 'failed', error: out?.error || `Passo ${i + 1} não respondeu.` }; break; }
+      if (st.approve && i < flow.steps.length - 1) {
+        c.flowRun = { ...c.flowRun, status: 'waiting' }; save();
+        const next = db.agents.find(a => a.id === flow.steps[i + 1].agentId);
+        const ok = await askApproval({ agent, chat: c, emit: () => {} }, 'flow',
+          `Fluxo "${flow.name}" — passo ${i + 1} de ${flow.steps.length} (${agent.name}) terminou.\nSeguir para ${next?.name || 'o próximo passo'}?\n\n${out.content.slice(0, 1500)}`,
+          'O próximo agente trabalha em cima deste resultado.', false);
+        if (!ok) { c.flowRun = { ...c.flowRun, status: 'stopped' }; break; }
+        c.flowRun = { ...c.flowRun, status: 'running' };
+      }
+    }
+    if (c.flowRun.status === 'running') c.flowRun = { ...c.flowRun, step: flow.steps.length, status: 'done' };
+    c.unread = true; c.updatedAt = Date.now(); save();
+  })().catch(e => { c.flowRun = { ...c.flowRun, status: 'failed', error: e.message }; save(); });
+  return c.id;
+}
+
 /** Rotinas com gatilho "mensagem no WhatsApp" que casam com esta mensagem. */
 function fireWhatsappTriggers({ text, isGroup, fromMe, where }) {
   for (const r of db.routines) {

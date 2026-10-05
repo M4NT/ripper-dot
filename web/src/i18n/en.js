@@ -19,6 +19,7 @@ export default {
   'nav.main': 'Main',
   'nav.projects': 'Projects',
   'nav.agents': 'Agents',
+  'nav.flows': 'Flows',
   'nav.inbox': 'Inbox',
   'settings.tab.channels': 'Channels',
   'settings.tab.channelsHint': 'Email, WhatsApp and where agents answer',

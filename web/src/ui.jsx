@@ -18,6 +18,7 @@ const P = {
   inbox: 'M3 13h5l1.5 3h5L16 13h5M5.5 5h13L21 13v6H3v-6z',
   plus: 'M12 5v14M5 12h14',
   arrowR: 'M5 12h14M13 6l6 6-6 6',
+  flow: 'M4 5h5v5H4zM15 14h5v5h-5zM9 7.5h2.5a2 2 0 0 1 2 2v5a2 2 0 0 0 2 2',
   arrowL: 'M19 12H5M11 6l-6 6 6 6',
   arrowUp: 'M12 19V5M5 12l7-7 7 7',
   down: 'm6 9 6 6 6-6',

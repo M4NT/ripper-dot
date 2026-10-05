@@ -37,6 +37,7 @@ const AdminCenter = lazy(() => import('./pages/AdminCenter.jsx'));
 const AdminUso = lazy(() => import('./pages/AdminUso.jsx'));
 const NewAgent = lazy(() => import('./pages/NewAgent.jsx'));
 const AgentConfig = lazy(() => import('./pages/AgentConfig.jsx'));
+const Flows = lazy(() => import('./pages/Flows.jsx'));
 
 const Ctx = createContext(null);
 export const useApp = () => useContext(Ctx);
@@ -79,11 +80,12 @@ function navForMode(settings, t) {
     ['inbox', t('nav.inbox'), 'inbox'],
     ['projects', t('nav.projects'), 'folder'],
     ['agents', t('nav.agents'), 'agents'],
+    ['flows', t('nav.flows'), 'flow'],
     ['explore', t('nav.explore'), 'compass'],
     ['library', t('nav.library'), 'book']
   ];
   if (!isEnterpriseMode(settings)) {
-    return NAV_ALL.filter(([k]) => k === '' || k === 'inbox' || k === 'agents');
+    return NAV_ALL.filter(([k]) => k === '' || k === 'inbox' || k === 'agents' || k === 'flows');
   }
   return NAV_ALL;
 }
@@ -287,6 +289,7 @@ function Shell() {
     p0 === 'agents' && p1 && p2 === 'settings' ? <AgentConfig id={p1} /> :
     p0 === 'agents' ? <Agents /> :
     p0 === 'inbox' ? <Inbox /> :
+    p0 === 'flows' ? <Flows /> :
     p0 === 'log' ? <ExternalLog /> :
     p0 === 'new' ? <NewAgent key={query.get('template') || 'blank'} /> :
     p0 === 'explore' ? <Explore /> :
