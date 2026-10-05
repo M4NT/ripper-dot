@@ -12,9 +12,9 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 ---
 
 ## Próximos passos (em ordem)
-1. **E-mail como canal** (§3) — ler, rascunhar e responder com aprovação; destrava o gatilho "e-mail chegou".
-2. **Agente Guardião do GitHub** (§3) — usa o gatilho por webhook que já existe.
-3. Provedores diretos: OpenAI, Gemini, Ollama (§1b).
+1. **Agente Guardião do GitHub** (§3) — usa o gatilho por webhook que já existe.
+2. Provedores diretos: OpenAI, Gemini, Ollama (§1b).
+3. E-mail com anexos (§3).
 
 ---
 
@@ -62,10 +62,13 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 - [ ] Pulse também no WhatsApp do dono e na tela Início.
 - ✅ Gatilho por webhook (GitHub, formulários, qualquer sistema).
 - ✅ Gatilho "mensagem no WhatsApp": palavras-chave (palavra inteira, sem acento/maiúscula; vazio = toda mensagem), de contatos, grupos ou ambos; áudios transcritos também disparam; mensagens suas não; no máximo 1 disparo por minuto por rotina. Grupos exigem "Ler grupos" e o agente nunca responde no grupo.
-- [ ] Gatilho "e-mail chegou" (depende do e-mail como canal) e "planilha mudou" (Google Drive).
+- ✅ Gatilho "chegou e-mail": palavras-chave no remetente/assunto; checa a cada 2 min só quando alguma rotina usa.
+- [ ] Gatilho "planilha mudou" (Google Drive).
 - [ ] **Agente Guardião do GitHub**: observa repositórios, abre issues/PRs, delega correções, revisa antes de pedir merge.
 - [ ] Fluxos visuais: encadear agentes num canvas (A pesquisa → B escreve → C publica), com aprovação em qualquer passo.
-- [ ] E-mail como canal (ler, rascunhar, responder com aprovação), igual ao WhatsApp.
+- ✅ **E-mail como canal** (IMAP/SMTP, qualquer provedor; Gmail/Outlook/Yahoo/iCloud configuram sozinhos): agentes listam, buscam, leem e respondem — leitura ao vivo, sem cópia local; todo envio com aprovação e no registro de ações externas; senha cifrada no disco. Configurações → Canais → E-mail.
+- [ ] E-mail: anexos (ler PDF/planilha anexados; enviar arquivo entregue pelo agente).
+- [ ] E-mail: resposta automática por remetente (como a autonomia por contato do WhatsApp).
 - [ ] Telegram, Instagram DM, Slack, Discord como canais.
 - [ ] Marketplace de agentes e skills prontos com instalação de 1 clique (base existe em Marketplace/SkillsHub).
 

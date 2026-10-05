@@ -574,6 +574,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
             </Card>
           );
         })()}
+        {tab === 'channels' && <EmailCard s={s} set={set} toast={toast} />}
 
         {tab === 'security' && <>
           <Card
@@ -756,5 +757,37 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
         <SaveBar {...d} />
       </div>
     </div>
+  );
+}
+
+// E-mail como canal: IMAP/SMTP de qualquer provedor. Gmail/Outlook/Yahoo/iCloud preenchem os servidores sozinhos.
+function EmailCard({ s, set, toast }) {
+  const e = s.email || {};
+  const setE = (k, v) => set('email', { ...e, [k]: v });
+  const [testing, setTesting] = useState(false);
+  const domain = (e.user || '').split('@')[1] || '';
+  const appPass = /gmail|googlemail/.test(domain) ? 'Gmail: use uma “senha de app” (Conta Google → Segurança → Senhas de app), não a senha normal.'
+    : /outlook|hotmail|live/.test(domain) ? 'Outlook/Hotmail: use uma “senha de app” (Conta Microsoft → Segurança).' : 'Use a senha do e-mail (ou senha de app, se o provedor exigir).';
+  async function test() {
+    setTesting(true);
+    try { const r = await api('/api/email/test', { method: 'POST', body: e }); toast(`Conectou (${r.imapHost} / ${r.smtpHost})`); }
+    catch (err) { toast(err.message, 'error'); }
+    finally { setTesting(false); }
+  }
+  return (
+    <Card title="E-mail" desc="Os agentes leem, resumem e respondem seus e-mails. Nada é copiado: eles consultam a caixa na hora. Todo envio espera a sua aprovação na Caixa.">
+      <Row title="Usar e-mail"><Switch checked={!!e.enabled} onChange={v => setE('enabled', v)} label="Usar e-mail" /></Row>
+      {e.enabled && <>
+        <Row title="Endereço"><input className="input" type="email" autoComplete="off" value={e.user || ''} onChange={ev => setE('user', ev.target.value)} placeholder="voce@empresa.com.br" /></Row>
+        <Row title="Senha" desc={appPass}><input className="input" type="password" autoComplete="new-password" value={e.pass || ''} onChange={ev => setE('pass', ev.target.value)} placeholder="Senha de app" /></Row>
+        <AdvancedBlock settings={s} summary="Servidores (só se não conectar sozinho)">
+          <Row title="IMAP (ler)"><input className="input" value={e.imapHost || ''} onChange={ev => setE('imapHost', ev.target.value)} placeholder={domain ? `imap.${domain}` : 'imap.seudominio.com'} /></Row>
+          <Row title="SMTP (enviar)"><input className="input" value={e.smtpHost || ''} onChange={ev => setE('smtpHost', ev.target.value)} placeholder={domain ? `smtp.${domain}` : 'smtp.seudominio.com'} /></Row>
+        </AdvancedBlock>
+        <Row title="Conexão" desc="Confere se dá para ler e enviar com esses dados.">
+          <button type="button" className="btn btn-sm" disabled={!e.user || !e.pass || testing} onClick={test}><Icon name="plug" size={14} />{testing ? 'Testando…' : 'Testar conexão'}</button>
+        </Row>
+      </>}
+    </Card>
   );
 }

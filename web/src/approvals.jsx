@@ -4,7 +4,7 @@ import { AgentAvatar, Icon } from './ui.jsx';
 import { useApp } from './app.jsx';
 import { useT } from './i18n/index.jsx';
 
-const KIND = { exec: 'quer rodar um comando', share: 'quer publicar um link', social: 'quer publicar em webhook', whatsapp: 'quer enviar um WhatsApp' };
+const KIND = { exec: 'quer rodar um comando', share: 'quer publicar um link', social: 'quer publicar em webhook', whatsapp: 'quer enviar um WhatsApp', email: 'quer enviar um e-mail' };
 
 /** Cartão de aprovação: mostra exatamente o que vai acontecer e por que precisa do seu ok. */
 export function ApprovalCard({ rec, status, compact, onDone }) {
@@ -22,7 +22,7 @@ export function ApprovalCard({ rec, status, compact, onDone }) {
   return (
     <div className={`approval ${st} ${compact ? 'compact' : ''}`} role="group" aria-label="Pedido de aprovação">
       <div className="approval-head">
-        <span className="approval-ico"><Icon name={rec.kind === 'share' || rec.kind === 'social' ? 'share' : rec.kind === 'whatsapp' ? 'chat' : 'terminal'} size={15} /></span>
+        <span className="approval-ico"><Icon name={rec.kind === 'share' || rec.kind === 'social' ? 'share' : rec.kind === 'whatsapp' ? 'chat' : rec.kind === 'email' ? 'inbox' : 'terminal'} size={15} /></span>
         <span className="approval-title"><b>{a?.name || rec.agentName || 'Agente'}</b> {KIND[rec.kind] || 'pede aprovação'}</span>
         {compact && rec.chatTitle && <button className="link approval-chat" onClick={() => go(`/c/${rec.chatId}`)}>{rec.chatTitle}</button>}
       </div>

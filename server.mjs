@@ -45,7 +45,8 @@ import { runClaude, runCodex, systemPrompt, describeImage } from './lib/provider
 import { runOpenRouter, syncOpenRouterModels, checkOpenRouterKey, openRouterCatalog } from './lib/openrouter.mjs';
 import { recordExternal, listExternal, externalCsv, EXTERNAL_KINDS } from './lib/external-actions.mjs';
 import { buildPulse, pulseDue } from './lib/pulse.mjs';
-import { whatsappTriggerMatches, parseKeywords } from './lib/event-triggers.mjs';
+import { emailReady, listEmails, readEmail, sendEmail, newEmailsSince, testEmail } from './lib/email.mjs';
+import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './lib/event-triggers.mjs';
 import { isPaidModel, paidBlockReason, addSpend, spendToday, spendLimits, normalizeBilling } from './lib/paid-usage.mjs';
 import { runTestProvider } from './lib/test-provider.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
@@ -1053,6 +1054,48 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
         return 'Recado entregue ao responsável no Ripper. Diga ao contato que vai confirmar e retorna em breve; não confirme nada antes disso.';
       }
     } : null,
+    // E-mail (IMAP/SMTP): lê ao vivo, sem cópia local; enviar sempre com a sua aprovação. Só em conversa sua.
+    email: !chat.channel && emailReady(s.email) ? {
+      list: async a => {
+        recordCorporateAudit(db.settings, { category: 'email', action: 'email.list', agentId: agent.id, chatId: chat.id, at: Date.now() });
+        try {
+          const rows = await listEmails(s.email, { query: a.query, unread: a.unread, sinceDays: a.days, limit: a.limit });
+          return rows.length ? rows.map(r => `uid ${r.uid} · ${new Date(r.at).toLocaleString('pt-BR')} · ${r.from} · "${r.subject}"${r.unread ? ' · não lido' : ''}`).join(String.fromCharCode(10)) : 'Nenhum e-mail encontrado nesse período.';
+        } catch (e) { return `Não consegui abrir a caixa de e-mail: ${e.message}`; }
+      },
+      read: async a => {
+        recordCorporateAudit(db.settings, { category: 'email', action: 'email.read', agentId: agent.id, chatId: chat.id, at: Date.now() });
+        try {
+          const m = await readEmail(s.email, a.uid);
+          return m ? `De: ${m.from}
+Assunto: ${m.subject}
+Data: ${new Date(m.at).toLocaleString('pt-BR')}${m.attachments.length ? `
+Anexos: ${m.attachments.join(', ')}` : ''}
+
+${m.text}` : 'E-mail não encontrado.';
+        } catch (e) { return `Não consegui ler o e-mail: ${e.message}`; }
+      },
+      send: async a => {
+        let to = String(a.to || '').trim(), subject = String(a.subject || '').trim(), inReplyTo;
+        if (a.reply_to_uid) {
+          const orig = await readEmail(s.email, a.reply_to_uid).catch(() => null);
+          if (orig) { to ||= orig.replyTo; inReplyTo = orig.messageId; if (!subject) subject = /^re:/i.test(orig.subject) ? orig.subject : `Re: ${orig.subject}`; }
+        }
+        if (!/@/.test(to) || !a.text?.trim()) return 'Informe o destinatário (e-mail) e o texto.';
+        const ok = await askApproval({ agent, chat, emit, signal }, 'email', `Para ${to}
+Assunto: ${subject}
+
+${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
+        if (!ok) return 'O usuário NÃO aprovou o envio. Nada foi enviado.';
+        try { await sendEmail(s.email, { to, subject, text: a.text, inReplyTo }); }
+        catch (e) {
+          recordExternal({ kind: 'email.sent', agentId: agent.id, chatId: chat.id, target: to, text: a.text, approved: 'user', ok: false, error: e.message });
+          return `Falha ao enviar o e-mail: ${e.message}`;
+        }
+        recordExternal({ kind: 'email.sent', agentId: agent.id, chatId: chat.id, target: to, text: a.text, approved: 'user' });
+        return `E-mail enviado para ${to}.`;
+      }
+    } : null,
     // Enviar WhatsApp pela API conectada (QR/Evolution ou Meta) — nunca pelo navegador.
     // Só em conversa sua com o agente (não em conversa de canal externo) e sempre com a sua aprovação.
     // Enviar não depende de 'Responder mensagens' (resposta automática): basta o QR com lista de números, ou a API oficial pronta.
@@ -2040,6 +2083,12 @@ const routes = [
     if (db.settings.claude?.mode === 'api') return { connectors: [], note: 'Conectores do claude.ai só existem no modo assinatura.' };
     return { connectors: await listClaudeConnectors({ force: url.searchParams.get('refresh') === '1' }).catch(e => { throw new HttpError(502, `Não consegui ler os conectores do claude.ai: ${e.message}`); }) };
   }],
+  // Testa login IMAP + SMTP com o que está salvo (ou com o que veio no corpo, antes de salvar)
+  ['POST', /^\/api\/email\/test$/, async req => {
+    const b = await body(req);
+    const e = { ...db.settings.email, ...b, pass: b.pass && b.pass !== '••••' ? b.pass : db.settings.email?.pass };
+    try { return await testEmail(e); } catch (err) { throw new HttpError(400, `Não conectou: ${err.message}`); }
+  }],
   // Resumo do dia na hora (o mesmo que chega na Caixa às 8h)
   ['GET', /^\/api\/pulse$/, () => currentPulse()],
   // Caixa: aprovações + recados de canal + novidades de rotina
@@ -2353,6 +2402,7 @@ const routes = [
     const r = { id: id(), agentId: b.agentId, name: String(b.name || 'Rotina').slice(0, 80), prompt: String(b.prompt).slice(0, 4000), lastRun: 0, lastStatus: 'never', lastError: null,
       quiet: b.quiet !== false,
       ...(b.trigger === 'webhook' ? { trigger: 'webhook', hookToken: newHookToken(), hookSecret: String(b.hookSecret || '').slice(0, 200) || undefined }
+        : b.trigger === 'email' ? { trigger: 'email', keywords: parseKeywords(b.keywords) }
         : b.trigger === 'whatsapp' ? { trigger: 'whatsapp', keywords: parseKeywords(b.keywords), scope: ['contacts', 'groups', 'any'].includes(b.scope) ? b.scope : 'contacts' }
         : b.everyMinutes ? { everyMinutes: Math.max(5, +b.everyMinutes) } : { dailyAt: /^\d\d:\d\d$/.test(b.dailyAt) ? b.dailyAt : '08:00', weekday: b.weekday ?? undefined }) };
     db.routines.push(r); save(); return redactRoutine(r);
@@ -2977,6 +3027,24 @@ setInterval(() => {
   if (out?.error) raiseSystemAlert({ key: 'backup', title: 'O backup automático falhou', body: `${out.error} Seus dados de hoje ainda não têm cópia.`, href: '/settings/backup', hrefLabel: 'Ver backup' });
   else if (out?.created) { resolveSystemAlert('backup'); save(); }
 }, 60_000);
+
+// Gatilho "chegou e-mail": a cada 2 min olha só os e-mails novos — e só se alguma rotina usa esse gatilho.
+let emailPolling = false;
+setInterval(async () => {
+  const e = db.settings.email;
+  if (emailPolling || !emailReady(e) || !db.routines.some(r => r.trigger === 'email')) return;
+  emailPolling = true;
+  try {
+    const { lastUid, items } = await newEmailsSince(e, db.emailLastUid || 0);
+    db.emailLastUid = lastUid; save();
+    for (const m of items) for (const r of db.routines) {
+      if (emailTriggerMatches(r, m)) runRoutine(r, { source: 'E-mail', type: m.from, body: `De: ${m.from}
+Assunto: ${m.subject}
+uid ${m.uid} (leia com email_read se precisar do conteúdo)` });
+    }
+  } catch (err) { console.error('email.poll', ...redactForLog(db.settings, err.message)); }
+  finally { emailPolling = false; }
+}, 120_000).unref?.();
 
 // Resumo diário ("Pulse"): uma vez por dia, a partir da hora escolhida, na Caixa. Sem tokens.
 function currentPulse() {

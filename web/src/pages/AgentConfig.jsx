@@ -92,6 +92,7 @@ function Routines({ agent }) {
     if (!f.prompt.trim()) return toast('Diga o que a rotina deve fazer.', 'error');
     const when = f.kind === 'webhook' ? { trigger: 'webhook', hookSecret: f.secret || undefined }
       : f.kind === 'whatsapp' ? { trigger: 'whatsapp', keywords: f.keywords, scope: f.scope }
+      : f.kind === 'email' ? { trigger: 'email', keywords: f.keywords }
       : f.kind === 'every' ? { everyMinutes: +f.when || 60 } : { dailyAt: f.when, weekday: f.weekday === '' ? undefined : +f.weekday };
     await api('/api/routines', { method: 'POST', body: { agentId: agent.id, name: f.name || 'Rotina', prompt: f.prompt, quiet: f.quiet, ...when } });
     setF(blank); refresh(); toast(f.kind === 'webhook' ? 'Rotina criada. Copie o endereço do webhook na lista.' : 'Rotina criada');
@@ -100,10 +101,10 @@ function Routines({ agent }) {
     <p className="muted">Rotinas acordam {agent.name} num horário ou quando algo acontece (mensagem no WhatsApp, GitHub, formulário, qualquer sistema). Com “só avisar se houver novidade”, execuções sem resultado relevante não deixam conversa.{agent.status === 'paused' && ' Com o agente pausado, elas não rodam.'}</p>
     {list.length > 0 && <ul className="rows">{list.map(r => (
       <li key={r.id} className="row-item routine-row">
-        <span className="thumb file-ico"><Icon name={r.trigger === 'webhook' ? 'plug' : r.trigger === 'whatsapp' ? 'chat' : 'clock'} size={18} /></span>
+        <span className="thumb file-ico"><Icon name={r.trigger === 'webhook' ? 'plug' : r.trigger === 'whatsapp' ? 'chat' : r.trigger === 'email' ? 'inbox' : 'clock'} size={18} /></span>
         <div className="row-main">
           <b>{r.name}{r.quiet !== false && <span className="tag">só novidades</span>}</b>
-          <small>{r.trigger === 'whatsapp' ? `Mensagem no WhatsApp ${SCOPE[r.scope] || SCOPE.contacts}${r.keywords?.length ? ` com “${r.keywords.join('”, “')}”` : ''}` : r.trigger === 'webhook' ? `Quando chegar um evento${r.hasSecret ? ' · assinatura verificada' : ''}` : r.everyMinutes ? `A cada ${r.everyMinutes} min` : `${r.weekday != null ? days[r.weekday] + ', ' : 'Todo dia, '}${r.dailyAt}`} · {r.prompt}</small>
+          <small>{r.trigger === 'email' ? `Quando chegar e-mail${r.keywords?.length ? ` de/sobre “${r.keywords.join('”, “')}”` : ''}` : r.trigger === 'whatsapp' ? `Mensagem no WhatsApp ${SCOPE[r.scope] || SCOPE.contacts}${r.keywords?.length ? ` com “${r.keywords.join('”, “')}”` : ''}` : r.trigger === 'webhook' ? `Quando chegar um evento${r.hasSecret ? ' · assinatura verificada' : ''}` : r.everyMinutes ? `A cada ${r.everyMinutes} min` : `${r.weekday != null ? days[r.weekday] + ', ' : 'Todo dia, '}${r.dailyAt}`} · {r.prompt}</small>
           {r.trigger === 'webhook' && (
             <div className="hook-url"><code>{hookUrl(r)}</code><button type="button" className="btn btn-sm" onClick={() => { navigator.clipboard.writeText(hookUrl(r)); toast('Endereço copiado'); }}><Icon name="copy" size={13} />Copiar</button></div>
           )}
@@ -115,14 +116,15 @@ function Routines({ agent }) {
     <div className="card-form">
       <h3 className="sub">Nova rotina</h3>
       <label className="field">Nome<input value={f.name} onChange={e => setF({ ...f, name: e.target.value })} placeholder={f.kind === 'webhook' ? 'Revisar PRs' : 'Resumo de IA'} /></label>
-      <label className="field">O que fazer<textarea rows={3} value={f.prompt} onChange={e => setF({ ...f, prompt: e.target.value })} placeholder={f.kind === 'whatsapp' ? 'Me avise na Caixa com quem mandou e o que precisa.' : f.kind === 'webhook' ? 'Leia o evento. Se for um PR novo, resuma as mudanças e aponte riscos.' : 'Pesquise as notícias de IA de hoje e me mande um resumo.'} /></label>
+      <label className="field">O que fazer<textarea rows={3} value={f.prompt} onChange={e => setF({ ...f, prompt: e.target.value })} placeholder={f.kind === 'email' ? 'Resuma o e-mail e, se for de cliente, rascunhe uma resposta.' : f.kind === 'whatsapp' ? 'Me avise na Caixa com quem mandou e o que precisa.' : f.kind === 'webhook' ? 'Leia o evento. Se for um PR novo, resuma as mudanças e aponte riscos.' : 'Pesquise as notícias de IA de hoje e me mande um resumo.'} /></label>
       <div className="row wrap-row">
         <Select label="Quando" value={f.kind} onChange={kind => setF({ ...f, kind, when: kind === 'every' ? '60' : '08:00' })}
-          options={[{ value: 'daily', label: 'No horário', icon: <Icon name="clock" size={15} /> }, { value: 'every', label: 'A cada N minutos', icon: <Icon name="retry" size={15} /> }, { value: 'webhook', label: 'Quando chegar um evento', hint: 'Webhook: GitHub, formulários, qualquer sistema', icon: <Icon name="plug" size={15} /> }, ...(waOn ? [{ value: 'whatsapp', label: 'Quando chegar mensagem no WhatsApp', hint: 'Com palavras-chave, de contatos ou grupos', icon: <Icon name="chat" size={15} /> }] : [])]} />
+          options={[{ value: 'daily', label: 'No horário', icon: <Icon name="clock" size={15} /> }, { value: 'every', label: 'A cada N minutos', icon: <Icon name="retry" size={15} /> }, { value: 'webhook', label: 'Quando chegar um evento', hint: 'Webhook: GitHub, formulários, qualquer sistema', icon: <Icon name="plug" size={15} /> }, ...(S.settings.email?.enabled ? [{ value: 'email', label: 'Quando chegar e-mail', hint: 'Com palavras-chave no remetente ou assunto', icon: <Icon name="inbox" size={15} /> }] : []), ...(waOn ? [{ value: 'whatsapp', label: 'Quando chegar mensagem no WhatsApp', hint: 'Com palavras-chave, de contatos ou grupos', icon: <Icon name="chat" size={15} /> }] : [])]} />
         {f.kind === 'daily' && <Select label="Dia" value={f.weekday} onChange={weekday => setF({ ...f, weekday })}
           options={[{ value: '', label: 'Todo dia' }, ...days.map((d, i) => ({ value: String(i), label: d }))]} />}
         {(f.kind === 'daily' || f.kind === 'every') && <input className="input narrow-input" type={f.kind === 'daily' ? 'time' : 'number'} min={5} value={f.when} onChange={e => setF({ ...f, when: e.target.value })} aria-label={f.kind === 'daily' ? 'Horário' : 'Minutos'} />}
       </div>
+      {f.kind === 'email' && <label className="field">Palavras-chave<input value={f.keywords} onChange={e => setF({ ...f, keywords: e.target.value })} placeholder="fatura, cliente@empresa.com, proposta" /><small>Valem para o remetente e o assunto. Vazio = todo e-mail novo. O agente lê o conteúdo se precisar; responder sempre pede a sua aprovação.</small></label>}
       {f.kind === 'whatsapp' && <>
         <label className="field">Palavras-chave<input value={f.keywords} onChange={e => setF({ ...f, keywords: e.target.value })} placeholder="urgente, orçamento, nota fiscal" /><small>Separe por vírgula. Vale sem acento e sem diferença de maiúscula. Vazio = toda mensagem. Áudios transcritos também contam.</small></label>
         <Select label="De onde" value={f.scope} onChange={scope => setF({ ...f, scope })}

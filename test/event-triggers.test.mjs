@@ -20,3 +20,12 @@ test('escopo, mensagens suas e intervalo mínimo', () => {
   assert.equal(whatsappTriggerMatches({ ...r, keywords: [] }, { text: 'qualquer coisa' }), true);
   assert.equal(whatsappTriggerMatches({ ...r, trigger: 'webhook' }, { text: 'urgente' }), false);
 });
+
+test('e-mail: palavra-chave no remetente ou assunto', async () => {
+  const { emailTriggerMatches } = await import('../lib/event-triggers.mjs');
+  const r = { trigger: 'email', keywords: ['fatura', 'banco.com'], lastRun: 0 };
+  assert.equal(emailTriggerMatches(r, { from: 'Cobrança <x@banco.com>', subject: 'Aviso' }), true);
+  assert.equal(emailTriggerMatches(r, { from: 'a@b.com', subject: 'Sua FATURA chegou' }), true);
+  assert.equal(emailTriggerMatches(r, { from: 'a@b.com', subject: 'Newsletter' }), false);
+  assert.equal(emailTriggerMatches({ ...r, trigger: 'whatsapp' }, { from: 'x@banco.com', subject: 'fatura' }), false);
+});
