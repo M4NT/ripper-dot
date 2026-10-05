@@ -7,7 +7,7 @@ import { gzipSync } from 'node:zlib';
 import { extname, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { authed as checkAuth } from './lib/auth.mjs';
-import { load, save, flush, id, newAgent, patchAgent, dataUrl, safeCheckStoreReady } from './lib/store.mjs';
+import { load, save, flush, id, newAgent, patchAgent, dataUrl, safeCheckStoreReady, TOOLS } from './lib/store.mjs';
 import { route, classifySpeaker, MODELS, EFFORTS, enabledModels, clampEffort } from './lib/router.mjs';
 import { computerFor } from './lib/boat.mjs';
 import { dockerAvailable, imageStatus, ensureImage, outdatedImage, hostnameOf, transcribeAudio } from './lib/docker.mjs';
@@ -1415,6 +1415,39 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
     const hit = addSpend(db, s, agent.id, usd);
     if (hit) alertSpendLimit(agent, hit);
     save();
+  };
+  // Montar o time: criar agente (com aprovação; nunca com ferramenta que quem cria não tem) e grupo. Fora de canais externos.
+  if (!chat.channel) ctx.team = {
+    createAgent: async a => {
+      const name = String(a.name || '').trim().slice(0, 60);
+      if (!name) return 'Informe o nome do agente.';
+      if (findAgentByName(name, db.agents)) return `Já existe um agente chamado "${name}". Escolha outro nome ou peça ao usuário para editar o existente.`;
+      const BASIC = ['web', 'memory', 'routines', 'files'];
+      const asked = Array.isArray(a.tools) && a.tools.length ? a.tools : BASIC;
+      const tools = [...new Set(asked.filter(t => TOOLS.includes(t) && (BASIC.includes(t) || agent.tools.includes(t))))];
+      const dropped = asked.filter(t => !tools.includes(t));
+      const instructions = String(a.instructions || '').slice(0, 8000);
+      const summary = `Criar o agente "${name}"${a.description ? ` — ${a.description}` : ''}\nFerramentas: ${tools.join(', ') || 'nenhuma'}\n\nInstruções:\n${instructions.slice(0, 1500)}${instructions.length > 1500 ? '…' : ''}`;
+      if (!(await askApproval({ agent, chat, emit, signal }, 'agent', summary, 'Cria um agente novo que vai trabalhar em seu nome.', false))) return 'O usuário NÃO aprovou criar o agente. Não tente de novo sem ele pedir.';
+      const created = newAgent({ name, description: String(a.description || '').slice(0, 200), category: String(a.category || 'Outro').slice(0, 40), instructions, tools });
+      db.agents.push(created);
+      recordCorporateAudit(db.settings, auditAgentLifecycle('create', created));
+      save();
+      return `Agente "${name}" criado com as ferramentas: ${tools.join(', ') || 'nenhuma'}.${dropped.length ? ` Ficou sem ${dropped.join(', ')} porque você não tem essas ferramentas; o usuário pode liberar em Configurar o agente.` : ''} Ele já pode receber mensagens (send_message/call_agent) e entrar em grupos.`;
+    },
+    createGroup: a => {
+      const missing = [], found = [];
+      for (const n of a.members || []) { const x = findAgentByName(n, db.agents); x ? found.push(x) : missing.push(n); }
+      if (missing.length) return `Não encontrei: ${missing.join(', ')}. Agentes que existem: ${db.agents.map(x => x.name).join(', ')}.`;
+      const ids = [...new Set(found.map(x => x.id))];
+      if (ids.length < 2) return 'Um grupo precisa de pelo menos 2 agentes diferentes.';
+      const title = String(a.title || 'Grupo').trim().slice(0, 80);
+      const g = { id: id(), agentId: ids[0], agentIds: ids, title, messages: [], createdAt: Date.now(), updatedAt: Date.now(), unread: true, ...(chat.projectId ? { projectId: chat.projectId } : {}) };
+      if (a.message) g.messages.push({ id: id(), role: 'assistant', agentId: agent.id, content: String(a.message).slice(0, 4000), at: Date.now() });
+      db.chats.unshift(g);
+      save();
+      return `Grupo "${title}" criado com ${found.map(x => x.name).join(', ')}. Ele aparece na lista de conversas do usuário; para falar com o time, o usuário escreve lá.`;
+    }
   };
   // Subtarefas em paralelo: cada uma é um turno curto do mesmo agente (web + computador, sem delegar nem histórico).
   const subtaskSteps = []; // estado final de cada subtarefa: fica salvo na resposta

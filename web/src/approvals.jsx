@@ -4,7 +4,7 @@ import { AgentAvatar, Icon } from './ui.jsx';
 import { useApp } from './app.jsx';
 import { useT } from './i18n/index.jsx';
 
-const KIND = { exec: 'quer rodar um comando', share: 'quer publicar um link', social: 'quer publicar em webhook', whatsapp: 'quer enviar um WhatsApp', email: 'quer enviar um e-mail', github: 'quer publicar no GitHub', flow: 'terminou um passo do fluxo' };
+const KIND = { exec: 'quer rodar um comando', share: 'quer publicar um link', social: 'quer publicar em webhook', whatsapp: 'quer enviar um WhatsApp', email: 'quer enviar um e-mail', github: 'quer publicar no GitHub', agent: 'quer criar um agente', flow: 'terminou um passo do fluxo' };
 
 /** Cartão de aprovação: mostra exatamente o que vai acontecer e por que precisa do seu ok. */
 export function ApprovalCard(props) {
