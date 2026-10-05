@@ -2459,7 +2459,9 @@ const routes = [
     // ?view=1: abre na aba quando é seguro (PDF, imagem, texto — HTML/SVG viram texto); senão, baixa.
     const view = url.searchParams.get('view') === '1' ? inlineType(f.type) : null;
     const inline = view || (/^image\/(png|jpe?g|webp|gif)$/.test(f.type) ? f.type : null);
-    res.writeHead(200, hdr(req, { 'content-type': inline || 'application/octet-stream', 'content-disposition': `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(f.name)}`, 'cache-control': 'private, max-age=3600' }));
+    // PDF com ?view=1 pode aparecer embutido no próprio Ripper (prévia na conversa), nunca em outro site.
+    const embed = view === 'application/pdf' ? { 'x-frame-options': 'SAMEORIGIN', 'content-security-policy': "default-src 'none'; frame-ancestors 'self'; sandbox" } : {};
+    res.writeHead(200, hdr(req, { ...embed, 'content-type': inline || 'application/octet-stream', 'content-disposition': `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(f.name)}`, 'cache-control': 'private, max-age=3600' }));
     res.end(buf);
   }],
   // Abre no programa padrão desta máquina (Word, Excel…) ou mostra na pasta. Só pedido vindo desta

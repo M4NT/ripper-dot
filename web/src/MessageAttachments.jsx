@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Icon } from './ui.jsx';
 import { api } from './lib.js';
 import { downloadName, fileHref, isImage } from './media.js';
@@ -74,8 +74,43 @@ export function DeliveredFiles({ items, onError }) {
             <a className="btn btn-sm" href={`/api/files/${f.id}`} download={f.name}><Icon name="download" size={14} />Baixar</a>
             <button type="button" className="btn btn-sm" onClick={() => act(f, 'reveal')}>Mostrar na pasta</button>
           </span>
+          <FilePreview file={f} />
         </li>
       );
     })}</ul>
+  );
+}
+
+/** Prévia na conversa: imagem, PDF e CSV (tabela). Demais tipos só pelos botões. */
+function FilePreview({ file: f }) {
+  const src = `/api/files/${f.id}?view=1`;
+  if (/^image\/(png|jpe?g|webp|gif)$/.test(f.type || '')) return <img className="delivered-preview" src={src} alt={f.name} loading="lazy" decoding="async" />;
+  if (f.type === 'application/pdf') return <iframe className="delivered-preview delivered-pdf" src={src} title={`Prévia de ${f.name}`} loading="lazy" />;
+  if (f.type === 'text/csv' || /\.csv$/i.test(f.name)) return <CsvPreview src={src} />;
+  return null;
+}
+
+// ponytail: separador simples (vírgula ou ponto e vírgula, aspas sem quebra de linha); 20 linhas.
+function CsvPreview({ src }) {
+  const [rows, setRows] = useState(null);
+  useEffect(() => {
+    let on = true;
+    fetch(src).then(r => r.text()).then(t => {
+      const lines = t.split(/\r?\n/).filter(Boolean).slice(0, 21);
+      const sep = (lines[0]?.split(';').length || 0) > (lines[0]?.split(',').length || 0) ? ';' : ',';
+      const cell = c => c.trim().replace(/^"(.*)"$/, '$1').replace(/""/g, '"');
+      if (on) setRows(lines.map(l => l.split(new RegExp(`${sep}(?=(?:[^"]*"[^"]*")*[^"]*$)`)).map(cell)));
+    }).catch(() => {});
+    return () => { on = false; };
+  }, [src]);
+  if (!rows?.length) return null;
+  const [head, ...body] = rows;
+  return (
+    <div className="delivered-preview delivered-table">
+      <table>
+        <thead><tr>{head.map((c, i) => <th key={i}>{c}</th>)}</tr></thead>
+        <tbody>{body.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j}>{c}</td>)}</tr>)}</tbody>
+      </table>
+    </div>
   );
 }

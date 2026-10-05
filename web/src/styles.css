@@ -358,6 +358,13 @@ a.row-main:hover b { text-decoration: underline; text-underline-offset: 3px; }
 
 /* faixa central de atividades (chat) */
 .action-line-wrap { margin: 0 0 12px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.delivered-preview { flex-basis: 100%; width: 100%; margin-top: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+img.delivered-preview { max-height: 360px; object-fit: contain; }
+.delivered-pdf { height: 420px; }
+.delivered-table { overflow: auto; max-height: 320px; }
+.delivered-table table { border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+.delivered-table th, .delivered-table td { padding: 4px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+.delivered-table th { position: sticky; top: 0; background: var(--surface); }
 .subtasks { list-style: none; margin: 0; padding: 0; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 8px; }
 .subtask { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; font-size: 13px; color: var(--ink-2); }
 .subtask-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1609,7 +1616,7 @@ code, .mono, pre { overflow-wrap: anywhere; }
 .inline-link { color: var(--ink-2); text-decoration: underline; text-underline-offset: 2px; }
 /* arquivo entregue pelo agente */
 .delivered { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.delivered-file { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface-2); }
+.delivered-file { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface-2); }
 .delivered-ico { flex: none; width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--chip); border: 1px solid var(--line); color: var(--ink-2); }
 .delivered-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .delivered-text b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
