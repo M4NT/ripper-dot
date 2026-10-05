@@ -12,9 +12,9 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 ---
 
 ## Próximos passos (em ordem)
-1. Guardião abrindo PR com a correção (§3).
-2. Provedores diretos: OpenAI, Gemini, Ollama (§1b).
-3. E-mail com anexos (§3).
+1. Provedores diretos: OpenAI, Gemini, Ollama (§1b).
+2. E-mail com anexos (§3).
+3. Fluxos visuais encadeando agentes (§3).
 
 ---
 
@@ -65,7 +65,7 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 - ✅ Gatilho "chegou e-mail": palavras-chave no remetente/assunto; checa a cada 2 min só quando alguma rotina usa.
 - [ ] Gatilho "planilha mudou" (Google Drive).
 - ✅ **Guardião do GitHub** (Configurações → Canais → GitHub): token + repositórios → agente "Guardião" com rotina de eventos. Consulta o GitHub a cada 5 min (sem expor o Ripper): PR aberto/atualizado, issue nova/atualizada, CI que falhou no branch padrão; ignora o que você mesmo fez. Lê PR, diff, arquivos e issues (só dos repositórios configurados); comenta e abre issue com aprovação; delega correções aos colegas. Token cifrado.
-- [ ] Guardião: abrir PR com a correção (agente com computador clona, corrige, roda os testes e propõe o PR para aprovação).
+- ✅ Guardião abre PR com a correção: `github_clone` (no computador do agente, em /work/repos) → branch `ripper/…` → corrige, roda os testes, commit → `github_open_pr` mostra o diff e pede aprovação antes de enviar. O token nunca fica no computador do agente (vai só no comando, cifrado em base64 no cabeçalho, e é removido de qualquer saída). Correção grande: delega a um colega, que usa as mesmas ferramentas.
 - [ ] Guardião: aprovar/mesclar PR com aprovação do dono.
 - [ ] Fluxos visuais: encadear agentes num canvas (A pesquisa → B escreve → C publica), com aprovação em qualquer passo.
 - ✅ **E-mail como canal** (botões por provedor; Gmail com 1 clique pelo conector da conta Claude; senha de app com link direto; "Outro (IMAP)" para e-mail de empresa; aba Canais também no modo Simples): agentes listam, buscam, leem e respondem — leitura ao vivo, sem cópia local; todo envio com aprovação e no registro de ações externas; senha cifrada no disco. Configurações → Canais → E-mail.

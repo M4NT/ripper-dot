@@ -76,3 +76,16 @@ test('criar o Guardião: confere token e acesso, cria agente + rotina uma vez s�
     assert.ok(!readFileSync(join(dataDir, 'db.json'), 'utf8').includes('"token":"bom"'), 'token cifrado no disco');
   } finally { child.kill(); api.close(); }
 });
+
+test('PR: branch sempre ripper/…, token só no comando e nunca na saída', async () => {
+  const { prBranch, gitAuthArg, hideToken } = await import('../lib/github.mjs');
+  assert.equal(prBranch('main'), 'ripper/main');
+  assert.equal(prBranch('ripper/corrige teste!'), 'ripper/corrige-teste');
+  assert.equal(prBranch('../../etc'), 'ripper/etc');
+  assert.equal(prBranch(''), 'ripper/correcao');
+  const arg = gitAuthArg('ghp_segredo123');
+  assert.ok(!arg.includes('ghp_segredo123'), 'token vai em base64 no cabeçalho');
+  const leaked = `fatal: x ghp_segredo123 y ${arg}`;
+  const shown = hideToken(leaked, 'ghp_segredo123');
+  assert.ok(!shown.includes('ghp_segredo123') && !shown.includes(arg.split('basic ')[1].slice(0, 20)));
+});

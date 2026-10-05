@@ -46,7 +46,7 @@ import { runOpenRouter, syncOpenRouterModels, checkOpenRouterKey, openRouterCata
 import { recordExternal, listExternal, externalCsv, EXTERNAL_KINDS } from './lib/external-actions.mjs';
 import { buildPulse, pulseDue } from './lib/pulse.mjs';
 import { emailReady, listEmails, readEmail, sendEmail, newEmailsSince, testEmail } from './lib/email.mjs';
-import { gh, githubReady, normalizeRepo, repoChanges, describeChange } from './lib/github.mjs';
+import { gh, githubReady, normalizeRepo, repoChanges, describeChange, prBranch, gitAuthArg, hideToken } from './lib/github.mjs';
 import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './lib/event-triggers.mjs';
 import { isPaidModel, paidBlockReason, addSpend, spendToday, spendLimits, normalizeBilling } from './lib/paid-usage.mjs';
 import { runTestProvider } from './lib/test-provider.mjs';
@@ -867,6 +867,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
       scroll: dy => b.scroll(dy), read: () => b.read()
     };
   }
+  const rawComputer = computer; // o Ripper usa sem pedir aprovação (ex.: git com token do Guardião); o agente só vê o guardado
   if (computer) computer = guarded(computer, { agent, chat, emit, signal });
   if (computer?.kind === 'boat') {
     for (const f of db.files.filter(f => f.agentId === agent.id || (chat.projectId && f.projectId === chat.projectId))) {
@@ -1078,7 +1079,40 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
           } catch (e) { return e.message; }
         },
         comment: a => write('github.comment', a.repo, `Comentar em ${a.repo} #${a.number}:\n\n${a.text}`, () => gh(g, `/repos/${normalizeRepo(a.repo)}/issues/${a.number}/comments`, { method: 'POST', body: { body: a.text } })),
-        issue: a => write('github.issue', a.repo, `Abrir issue em ${a.repo}: ${a.title}\n\n${a.text}`, () => gh(g, `/repos/${normalizeRepo(a.repo)}/issues`, { method: 'POST', body: { title: a.title, body: a.text } }))
+        issue: a => write('github.issue', a.repo, `Abrir issue em ${a.repo}: ${a.title}\n\n${a.text}`, () => gh(g, `/repos/${normalizeRepo(a.repo)}/issues`, { method: 'POST', body: { title: a.title, body: a.text } })),
+        // Clonar e enviar branch: o token vai só no comando (cabeçalho HTTP), nunca fica salvo no repositório nem aparece na saída.
+        ...(rawComputer?.kind === 'docker' ? (() => {
+          const auth = gitAuthArg(g.token), hide = out => hideToken(out, g.token);
+          const dir = repo => `/work/repos/${normalizeRepo(repo).split('/')[1]}`;
+          const okExit = out => /\[exit 0\]\s*$/.test(out);
+          return {
+            clone: async a => {
+              const repo = normalizeRepo(a.repo);
+              if (!allowed(repo)) return `${a.repo} não está na lista do Guardião.`;
+              const d = dir(repo);
+              const out = await rawComputer.exec(`if [ -d ${d}/.git ]; then git -C ${d} ${auth} fetch -q --prune origin && git -C ${d} checkout -q $(git -C ${d} remote show origin | sed -n 's/.*HEAD branch: //p') && git -C ${d} reset -q --hard @{u}; else mkdir -p /work/repos && git ${auth} clone -q https://github.com/${repo}.git ${d}; fi && git -C ${d} config user.name "${agent.name} (Ripper)" && git -C ${d} config user.email "ripper@users.noreply.github.com" && git -C ${d} log --oneline -1`);
+              return okExit(out) ? `Pronto em ${d} (branch principal atualizado). Crie um branch ripper/<algo>, corrija, rode os testes e faça commit; depois github_open_pr.\n${hide(out)}` : `Falhou ao clonar:\n${hide(out)}`;
+            },
+            openPr: async a => {
+              const repo = normalizeRepo(a.repo);
+              if (!allowed(repo)) return `${a.repo} não está na lista do Guardião.`;
+              const branch = prBranch(a.branch);
+              const d = dir(repo);
+              const info = await gh(g, `/repos/${repo}`);
+              const stat = await rawComputer.exec(`git -C ${d} branch -f ${branch} HEAD && git -C ${d} diff --stat origin/${info.default_branch}...${branch} | tail -20 && git -C ${d} log --oneline origin/${info.default_branch}..${branch} | head -10`);
+              if (!okExit(stat) || !/\d+ files? changed/.test(stat)) return `Nada para enviar: faça commit das mudanças em ${d} primeiro.\n${hide(stat)}`;
+              const ok = await askApproval({ agent, chat, emit, signal }, 'github', `Abrir PR em ${repo}: ${a.title}\nBranch ${branch} → ${info.default_branch}\n\n${hide(stat).replace(/\[exit 0\]\s*$/, '')}\n${a.body}`, 'Envia o branch e abre o PR no GitHub em seu nome.', false);
+              if (!ok) return 'O usuário NÃO aprovou. Nada foi enviado.';
+              const push = await rawComputer.exec(`git -C ${d} ${auth} push -q -f origin ${branch}:refs/heads/${branch}`);
+              if (!okExit(push)) { recordExternal({ kind: 'github.pr', agentId: agent.id, chatId: chat.id, target: repo, approved: 'user', ok: false, error: hide(push).slice(0, 300) }); return `Falhou ao enviar o branch:\n${hide(push)}`; }
+              try {
+                const pr = await gh(g, `/repos/${repo}/pulls`, { method: 'POST', body: { title: a.title, body: `${a.body}\n\n---\nAberto por ${agent.name} (Ripper) com a aprovação do dono.`, head: branch, base: info.default_branch } });
+                recordExternal({ kind: 'github.pr', agentId: agent.id, chatId: chat.id, target: pr.html_url, approved: 'user' });
+                return `PR aberto: ${pr.html_url}`;
+              } catch (e) { recordExternal({ kind: 'github.pr', agentId: agent.id, chatId: chat.id, target: repo, approved: 'user', ok: false, error: e.message }); return `Branch enviado, mas o PR falhou: ${e.message}`; }
+            }
+          };
+        })() : {})
       };
     })() : null,
     // E-mail (IMAP/SMTP): lê ao vivo, sem cópia local; enviar sempre com a sua aprovação. Só em conversa sua.
@@ -2121,13 +2155,14 @@ const routes = [
     if (!a) {
       a = newAgent({
         name: 'Guardião', category: 'Engenharia', description: 'Vigia os repositórios do GitHub: revisa PRs, investiga CI quebrado e delega correções.',
-        tools: ['web', 'memory', 'routines', 'files'], model: 'auto',
+        tools: ['web', 'memory', 'routines', 'files', 'computer'], model: 'auto',
         instructions: [
           'Você é o Guardião do GitHub. Cada evento (PR, issue, CI que falhou) chega pela sua rotina.',
           'PR: leia o diff (github_read com diff=true) e os arquivos alterados. Aponte bugs, riscos de segurança e o que falta de teste. Seja específico (arquivo e linha). Publique a revisão com github_comment.',
           'CI que falhou: descubra a causa pelo log/commit e diga quem deve corrigir.',
           'Issue: classifique (bug, pedido, dúvida), estime o esforço e sugira o próximo passo.',
-          'Delegue o conserto a um colega com send_message, com o repositório, o arquivo e o que fazer. Não faça o trabalho dele.',
+          'Correção pequena e clara (teste quebrado, bug de poucas linhas): corrija você mesmo — github_clone, crie o branch ripper/<assunto>, edite, RODE OS TESTES do projeto, faça commit e chame github_open_pr com o que mudou e como testou. Nunca abra PR com teste falhando.',
+          'Correção grande ou fora da sua área: delegue a um colega com send_message (repositório, arquivo, o que fazer, e que ele use github_clone e github_open_pr).',
           'Nada relevante (PR trivial, issue já resolvida): responda NADA_NOVO.'
         ].join('\n')
       });
