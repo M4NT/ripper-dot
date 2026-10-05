@@ -31,7 +31,7 @@ Legenda: **P0** bloqueia uso/confiança · **P1** diferencial forte · **P2** po
 - ✅ Resposta falada: botão "Ouvir" em cada resposta e modo "mãos livres" (lê toda resposta) no composer — voz do navegador.
 - ✅ WhatsApp: analisar imagem e áudio recebidos (transcrever áudio, descrever imagem) e responder com base nisso.
 - ✅ Prévia inline de arquivos entregues: imagem, PDF embutido, CSV em tabela. Falta: .xlsx em tabela.
-- [ ] Geração de imagem e de slides como artefato.
+- ✅ Slides: python-pptx no computador do agente (entrega .pptx com deliver_file). [ ] Geração de imagem: falta escolher provedor.
 
 ## 3. Automação (P1 — onde viramos nº 1)
 - [ ] **Agente Guardião do GitHub**: observa repositórios, abre issues/PRs, delega correções a outros agentes, revisa antes de pedir merge.

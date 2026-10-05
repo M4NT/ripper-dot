@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Documentos e dados prontos: o agente não gasta tempo nem tokens instalando a cada pedido.
 # (PIP_BREAK_SYSTEM_PACKAGES acima: sem isso o pip recusava instalar e o erro vazava na resposta.)
-RUN pip install --no-cache-dir python-docx openpyxl pandas reportlab xlsxwriter
+RUN pip install --no-cache-dir python-docx openpyxl pandas reportlab xlsxwriter python-pptx
 
 # Transcrição local de áudio (ditado e áudios do WhatsApp): nada sai da máquina.
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/* \
