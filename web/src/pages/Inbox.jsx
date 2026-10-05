@@ -43,6 +43,7 @@ export default function Inbox() {
               {it.kind === 'notice' && <NoticeItem it={it} onDone={settle} />}
               {it.kind === 'routine' && <RoutineItem it={it} onDone={settle} />}
               {it.kind === 'spend' && <SpendItem it={it} onDone={settle} />}
+              {it.kind === 'system' && <SystemItem it={it} onDone={settle} />}
             </li>
           ))}</ul>}
     </div>
@@ -92,6 +93,18 @@ function NoticeItem({ it, onDone }) {
       <button type="button" className="btn btn-sm btn-primary" onClick={() => go(`/c/${it.chatId}`)}><Icon name="chat" size={14} />Responder ao {it.agentName}</button>
       {it.phone && <button type="button" className="btn btn-sm" onClick={toggleHistory} aria-expanded={!!history}>{history ? 'Esconder conversa' : 'Ver conversa no WhatsApp'}</button>}
       <button type="button" className="btn btn-sm" onClick={done}><Icon name="check" size={14} />Resolvido</button>
+    </div>
+  </>;
+}
+
+function SystemItem({ it, onDone }) {
+  const ok = async () => { await api(`/api/inbox/system/${it.id}/done`, { method: 'POST' }); onDone(); };
+  return <>
+    <div className="inbox-who"><Icon name="bolt" size={18} /><span><b>{it.title}</b><span className="tag warn inbox-urgent">sistema</span></span><time>{fmtAgo(it.at)}</time></div>
+    <p className="inbox-summary">{it.body}</p>
+    <div className="inbox-actions">
+      {it.href && <button type="button" className="btn btn-sm" onClick={() => go(it.href)}>{it.hrefLabel || 'Abrir'}</button>}
+      <button type="button" className="btn btn-sm btn-primary" onClick={ok}>Entendi</button>
     </div>
   </>;
 }

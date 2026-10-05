@@ -86,7 +86,7 @@ function DataBackup({ s, set }) {
     } catch (e) { toast(e.message, 'error'); }
     finally { setBusy(''); if (fileRef.current) fileRef.current.value = ''; }
   };
-  const backup = s.backup || { enabled: false, intervalHours: 24, keepCount: 5 };
+  const backup = s.backup || { enabled: true, intervalHours: 24, keepCount: 7 };
   return (
     <>
       <Card title="Snapshot completo (RIPPER_DATA)" desc="Arquivo .tar.gz em RIPPER_DATA/backups com db.json, usage/julia SQLite, sandbox e anexos. Restaurar substitui os dados vivos — pare outros processos Ripper no mesmo diretório.">
@@ -98,8 +98,12 @@ function DataBackup({ s, set }) {
         </Row>
         {backup.enabled && <>
           <Row title="Intervalo"><div className="input-unit"><input className="input" type="number" min={1} max={168} value={backup.intervalHours ?? 24} onChange={e => set('backup', { ...backup, intervalHours: +e.target.value })} /><span>horas</span></div></Row>
-          <Row title="Manter no disco"><div className="input-unit"><input className="input" type="number" min={1} max={50} value={backup.keepCount ?? 5} onChange={e => set('backup', { ...backup, keepCount: +e.target.value })} /><span>snapshots</span></div></Row>
+          <Row title="Manter no disco"><div className="input-unit"><input className="input" type="number" min={1} max={50} value={backup.keepCount ?? 7} onChange={e => set('backup', { ...backup, keepCount: +e.target.value })} /><span>snapshots</span></div></Row>
+          <Row title="Cópia extra em outra pasta" desc="Recomendado: uma pasta sincronizada (OneDrive, Google Drive, Dropbox) ou um disco externo. Assim, se este disco falhar, o backup não vai junto. Caminho completo; deixe vazio para não copiar." stack>
+            <input className="input" value={backup.copyTo || ''} onChange={e => set('backup', { ...backup, copyTo: e.target.value })} placeholder="Ex.: C:\Users\voce\OneDrive\Ripper-backups" aria-label="Pasta da cópia extra" />
+          </Row>
         </>}
+        <Row title="Último backup">{snapshots[0] ? <span>{new Date(snapshots[0].createdAt).toLocaleString('pt-BR')} · {(snapshots[0].bytes / 1048576).toFixed(1).replace('.', ',')} MB</span> : <span className="tag tag-warn">nenhum ainda</span>}</Row>
         {snapshots.length > 0 && (
           <Row title="Snapshots no servidor" stack>
             <ul className="rows flat">

@@ -533,6 +533,19 @@ ${media.caption}` : ''}`;
  * A cada mensagem montamos uma conversa temporária com o histórico do contato (whatsapp.sqlite),
  * rodamos o turno e descartamos. Modelo: o mais econômico liberado, esforço baixo — são só mensagens.
  */
+/** Aviso do sistema na Caixa (backup falhou etc.). Um por chave enquanto não for resolvido. */
+function raiseSystemAlert({ key, title, body, href, hrefLabel }) {
+  db.systemAlerts ||= [];
+  const open = db.systemAlerts.find(a => a.key === key && !a.done);
+  if (open) Object.assign(open, { body, at: Date.now() });
+  else db.systemAlerts.push({ id: id(), key, at: Date.now(), title, body, href, hrefLabel });
+  if (db.systemAlerts.length > 100) db.systemAlerts.splice(0, db.systemAlerts.length - 100);
+  save();
+}
+function resolveSystemAlert(key) {
+  for (const a of db.systemAlerts || []) if (a.key === key && !a.done) a.done = true;
+}
+
 /** Limite de uso pago atingido: um aviso na Caixa (uma vez por agente/limite por dia). */
 function alertSpendLimit(agent, which) {
   const day = spendToday(db).day, lim = spendLimits(db.settings);
@@ -2030,7 +2043,7 @@ const routes = [
     const box = buildInbox(db);
     return { ...box, items: box.items.map(it => (it.kind === 'approval' ? { ...it, approval: approvalView(it.approval) } : it)) };
   }],
-  ['POST', /^\/api\/inbox\/(notice|routine|spend)\/([\w-]+)\/done$/, (req, [kind, iid]) => {
+  ['POST', /^\/api\/inbox\/(notice|routine|spend|system)\/([\w-]+)\/done$/, (req, [kind, iid]) => {
     if (!resolveInboxItem(db, kind, iid)) throw new HttpError(404, 'Item não encontrado.');
     save();
     return { ok: true, count: buildInbox(db).count };
@@ -2945,7 +2958,8 @@ if (typeof routineTimer.unref === 'function') routineTimer.unref();
 
 setInterval(() => {
   const out = maybeRunScheduledBackup(db);
-  if (out?.created) save();
+  if (out?.error) raiseSystemAlert({ key: 'backup', title: 'O backup automático falhou', body: `${out.error} Seus dados de hoje ainda não têm cópia.`, href: '/settings/backup', hrefLabel: 'Ver backup' });
+  else if (out?.created) { resolveSystemAlert('backup'); save(); }
 }, 60_000);
 
 process.on('unhandledRejection', e => console.error('unhandledRejection', ...redactForLog(db?.settings, e?.message || String(e))));
