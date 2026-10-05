@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { readFile, stat, writeFile, unlink, copyFile } from 'node:fs/promises';
 import { mkdirSync, existsSync } from 'node:fs';
+import { generateVapidKeys, sendPushAll } from './lib/web-push.mjs';
 import { gzipSync } from 'node:zlib';
 import { extname, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -541,12 +542,37 @@ ${media.caption}` : ''}`;
  * A cada mensagem montamos uma conversa temporária com o histórico do contato (whatsapp.sqlite),
  * rodamos o turno e descartamos. Modelo: o mais econômico liberado, esforço baixo — são só mensagens.
  */
+/** Notificação no celular (Web Push). Fire-and-forget: nunca bloqueia nem lança. */
+function vapidKeys() {
+  db.settings.push ||= {};
+  if (!db.settings.push.vapidPrivateKey) {
+    const k = generateVapidKeys();
+    Object.assign(db.settings.push, { vapidPublicKey: k.publicKey, vapidPrivateKey: k.privateKey });
+    save();
+  }
+  return { publicKey: db.settings.push.vapidPublicKey, privateKey: db.settings.push.vapidPrivateKey };
+}
+function notifyOwner(msg) {
+  if (!db.pushSubs?.length) return Promise.resolve();
+  return sendPushAll(db.pushSubs, vapidKeys(), msg).then(dead => {
+    if (!dead.length) return;
+    db.pushSubs = db.pushSubs.filter(s => !dead.includes(s.id));
+    save();
+  }).catch(() => {});
+}
+function notifyApproval(agent, command) {
+  notifyOwner({ title: `${agent.name || 'Agente'} precisa de você`, body: command, url: '#/inbox' });
+}
+
 /** Aviso do sistema na Caixa (backup falhou etc.). Um por chave enquanto não for resolvido. */
 function raiseSystemAlert({ key, title, body, href, hrefLabel, quiet }) {
   db.systemAlerts ||= [];
   const open = db.systemAlerts.find(a => a.key === key && !a.done);
   if (open) Object.assign(open, { body, at: Date.now() });
-  else db.systemAlerts.push({ id: id(), key, at: Date.now(), title, body, href, hrefLabel, ...(quiet ? { quiet: true } : {}) });
+  else {
+    db.systemAlerts.push({ id: id(), key, at: Date.now(), title, body, href, hrefLabel, ...(quiet ? { quiet: true } : {}) });
+    if (!quiet) notifyOwner({ title, body, url: '#/inbox' });
+  }
   if (db.systemAlerts.length > 100) db.systemAlerts.splice(0, db.systemAlerts.length - 100);
   save();
 }
@@ -561,6 +587,7 @@ function alertSpendLimit(agent, which) {
   if (db.spendAlerts.some(a => a.day === day && a.which === which && (which === 'total' || a.agentId === agent.id))) return;
   db.spendAlerts.push({ id: id(), day, which, agentId: agent.id, at: Date.now(), limitUsd: which === 'agent' ? lim.perAgentDailyUsd : lim.totalDailyUsd });
   if (db.spendAlerts.length > 100) db.spendAlerts.splice(0, db.spendAlerts.length - 100);
+  notifyOwner({ title: 'Limite de uso atingido', body: which === 'total' ? 'O limite diário total foi atingido.' : `${agent.name || 'Um agente'} atingiu o limite diário.`, url: '#/inbox' });
   recordCorporateAudit(db.settings, { category: 'billing', action: `billing.limit_${which}`, agentId: agent.id, at: Date.now() });
 }
 
@@ -739,6 +766,7 @@ async function askApproval({ agent, chat, emit, signal }, kind, command, reason,
   db.approvals.push(rec);
   if (db.approvals.length > 300) db.approvals.splice(0, db.approvals.length - 300);
   emit({ approval: approvalView(rec) });
+  notifyApproval(agent, command);
   const done = await gate.request(rec, signal);
   emit({ approvalDone: { id: rec.id, status: done.status } });
   if (remember && done.status === 'approved' && done.remember) rememberAllowedCommand(chat, command);
@@ -751,6 +779,7 @@ function guarded(computer, { agent, chat, emit, signal }) {
     db.approvals.push(rec);
     if (db.approvals.length > 300) db.approvals.splice(0, db.approvals.length - 300);
     emit({ approval: approvalView(rec) });
+    notifyApproval(agent, command);
     const done = await gate.request(rec, signal);
     emit({ approvalDone: { id: rec.id, status: done.status } });
     if (done.status === 'approved' && done.remember) rememberAllowedCommand(chat, command);
@@ -2235,6 +2264,31 @@ const routes = [
     if (missing) throw new HttpError(400, 'Um agente deste fluxo foi apagado ou está pausado. Edite o fluxo.');
     const { input = '' } = await body(req);
     return { chatId: runFlow(flow, String(input).slice(0, 8000)) };
+  }],
+  // Notificações no celular (Web Push)
+  ['GET', /^\/api\/push\/key$/, () => ({ publicKey: vapidKeys().publicKey })],
+  ['POST', /^\/api\/push\/subscribe$/, async req => {
+    const { subscription: sub } = await body(req);
+    let ok = false;
+    try { ok = new URL(sub?.endpoint).protocol === 'https:'; } catch {}
+    if (!ok || typeof sub.keys?.p256dh !== 'string' || typeof sub.keys?.auth !== 'string') throw new HttpError(400, 'Inscrição inválida.');
+    db.pushSubs ||= [];
+    db.pushSubs = db.pushSubs.filter(s => s.endpoint !== sub.endpoint);
+    db.pushSubs.push({ id: id(), endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth }, ua: String(req.headers['user-agent'] || '').slice(0, 200), createdAt: Date.now() });
+    if (db.pushSubs.length > 20) db.pushSubs.splice(0, db.pushSubs.length - 20);
+    save();
+    return { ok: true, count: db.pushSubs.length };
+  }],
+  ['POST', /^\/api\/push\/unsubscribe$/, async req => {
+    const { endpoint } = await body(req);
+    db.pushSubs = (db.pushSubs || []).filter(s => s.endpoint !== endpoint);
+    save();
+    return { ok: true };
+  }],
+  ['POST', /^\/api\/push\/test$/, async () => {
+    if (!db.pushSubs?.length) throw new HttpError(400, 'Nenhum aparelho com notificações ativadas.');
+    await notifyOwner({ title: 'Ripper', body: 'Teste: as notificações estão funcionando.', url: '#/inbox' });
+    return { ok: true, count: db.pushSubs.length };
   }],
   // Resumo do dia na hora (o mesmo que chega na Caixa às 8h)
   ['GET', /^\/api\/pulse$/, () => currentPulse()],

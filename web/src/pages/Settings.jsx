@@ -137,6 +137,51 @@ function DataBackup({ s, set }) {
   );
 }
 
+/** Notificações no celular (Web Push) para aprovações e avisos da Caixa. */
+function PushCard() {
+  const supported = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  const usable = supported && window.isSecureContext;
+  const [status, setStatus] = useState(!supported ? 'Este navegador não suporta notificações.' : !usable ? 'Precisa de HTTPS para funcionar aqui.' : '');
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    if (!usable) return;
+    navigator.serviceWorker.ready.then(r => r.pushManager.getSubscription()).then(sub => {
+      const ok = !!sub && Notification.permission === 'granted';
+      setOn(ok);
+      setStatus(ok ? 'Ativadas neste aparelho.' : Notification.permission === 'denied' ? 'Bloqueadas no navegador. Libere nas permissões do site.' : 'Desativadas neste aparelho.');
+    }).catch(() => {});
+  }, []);
+  const enable = async () => {
+    try {
+      if (await Notification.requestPermission() !== 'granted') return setStatus('Permissão negada. Libere nas permissões do site.');
+      const reg = await navigator.serviceWorker.ready;
+      const { publicKey } = await api('/api/push/key');
+      const key = Uint8Array.from(atob(publicKey.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+      const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+      await api('/api/push/subscribe', { method: 'POST', body: { subscription: sub.toJSON() } });
+      setOn(true); setStatus('Ativadas neste aparelho.');
+    } catch (e) { setStatus(`Não deu para ativar: ${e.message}`); }
+  };
+  const disable = async () => {
+    try {
+      const sub = await (await navigator.serviceWorker.ready).pushManager.getSubscription();
+      if (sub) { await api('/api/push/unsubscribe', { method: 'POST', body: { endpoint: sub.endpoint } }); await sub.unsubscribe(); }
+      setOn(false); setStatus('Desativadas neste aparelho.');
+    } catch (e) { setStatus(e.message); }
+  };
+  const test = () => api('/api/push/test', { method: 'POST' }).then(() => setStatus('Teste enviado. Deve chegar em segundos.'), e => setStatus(e.message));
+  return (
+    <Card title="Notificações neste aparelho" desc="Avisa quando um agente precisa da sua aprovação, quando há alerta do sistema ou quando um limite de uso é atingido.">
+      <Row title="Notificações" desc={status}>
+        {usable && (on
+          ? <div style={{ display: 'flex', gap: 8 }}><button className="btn btn-sm" onClick={test}>Enviar teste</button><button className="btn btn-sm" onClick={disable}>Desativar</button></div>
+          : <button className="btn btn-sm btn-primary" onClick={enable}>Ativar</button>)}
+      </Row>
+      <small style={{ opacity: 0.7 }}>No celular, abra o Ripper por um endereço HTTPS (ou instale a partir dele): por http num IP da rede local não funciona. No computador, localhost funciona. No iPhone, adicione à tela inicial antes.</small>
+    </Card>
+  );
+}
+
 /** Linha de configuração: rótulo e explicação à esquerda, controle à direita. */
 function Row({ title, desc, children, stack, tip }) {
   return (
@@ -443,6 +488,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
               <textarea className="input" rows={2} maxLength={500} value={s.defaults?.agentStyle?.customHints || ''} onChange={e => set('defaults', { ...s.defaults, agentStyle: { ...(s.defaults?.agentStyle || {}), customHints: e.target.value } })} placeholder="Ex.: sempre em português do Brasil." />
             </Row>
           </Card>
+          <PushCard />
           <Card title="Resumo do dia" desc="Todo dia, na Caixa: o que cada agente fez, o que espera você e quanto gastou. Montado sem gastar tokens.">
             <Row title="Receber o resumo"><Switch checked={s.pulse?.enabled !== false} onChange={v => set('pulse', { ...(s.pulse || {}), enabled: v })} label="Resumo do dia" /></Row>
             {s.pulse?.enabled !== false && <Row title="Horário">
