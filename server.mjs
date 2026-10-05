@@ -48,7 +48,8 @@ import { runOpenRouter, syncOpenRouterModels, checkCompatKey, compatCatalog, COM
 import { recordExternal, listExternal, externalCsv, EXTERNAL_KINDS } from './lib/external-actions.mjs';
 import { buildPulse, pulseDue, pulseWhatsappTo } from './lib/pulse.mjs';
 import { normalizeFlow, stepPrompt, stepRuns } from './lib/flows.mjs';
-import { DRAFT_SYSTEM, sanitizeDraft, heuristicDraft } from './lib/agent-draft.mjs';
+import { DRAFT_SYSTEM, DRAFT_SCHEMA, sanitizeDraft, heuristicDraft } from './lib/agent-draft.mjs';
+import { askWithContract } from './lib/model-contract.mjs';
 import { applyBulk } from './lib/chat-bulk.mjs';
 import { searchLibrary } from './lib/library-search.mjs';
 import * as outbox from './lib/outbox.mjs';
@@ -2375,10 +2376,15 @@ const routes = [
     if (process.env.RIPPER_TEST_PROVIDER) return { ...heuristicDraft(sentence), by: 'heuristic' };
     try {
       const helper = newAgent({ name: 'Configurador', tools: [], instructions: '', model: channelModel(db.settings) });
-      let out = '';
-      for await (const ev of runClaude({ agent: helper, model: helper.model, effort: 'low', prompt: sentence, history: [], system: DRAFT_SYSTEM, settings: db.settings, ctx: { db } })) if (ev.text) out += ev.text;
-      const d = sanitizeDraft(out, sentence);
+      const run = async prompt => {
+        let out = '';
+        for await (const ev of runClaude({ agent: helper, model: helper.model, effort: 'low', prompt, history: [], system: DRAFT_SYSTEM, settings: db.settings, ctx: { db } })) if (ev.text) out += ev.text;
+        return out;
+      };
+      const r = await askWithContract({ run, prompt: sentence, schema: DRAFT_SCHEMA });
+      const d = r.ok && sanitizeDraft(r.data, sentence);
       if (d) return { ...d, by: 'model' };
+      console.error('agent.draft contrato', r.error);
     } catch (e) { console.error('agent.draft', ...redactForLog(db.settings, e.message)); }
     return { ...heuristicDraft(sentence), by: 'heuristic' };
   }],
@@ -2686,7 +2692,8 @@ const routes = [
           agent: orchAgent,
           model: orchAgent.model,
           effort: 'low',
-          prompt: brief,
+          // o system já vai à parte; aqui só o brief (+ o pedido de correção, numa nova tentativa)
+          prompt: prompt.replace(ORCHESTRATOR_SYSTEM, '').replace('[[ripper:test:team]]', '').trim(),
           history: [],
           system: ORCHESTRATOR_SYSTEM,
           settings: db.settings,
