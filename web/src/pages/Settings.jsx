@@ -191,6 +191,74 @@ function Row({ title, desc, children, stack, tip }) {
     </div>
   );
 }
+/** Contas do Claude por assinatura (ex.: Pro e Teams): login de cada uma, conta padrão e troca automática no limite. */
+function ClaudeAccountsCard({ s, set, S }) {
+  const { toast } = useApp();
+  const [rows, setRows] = useState(null);
+  const [tests, setTests] = useState({}); // id → 'testing' | { ok, email, plan, error }
+  const [label, setLabel] = useState('');
+  const load = () => api('/api/claude/accounts').then(setRows).catch(() => setRows([]));
+  useEffect(() => { load(); }, [S.settings.claude?.accounts?.length]);
+  const claude = s.claude;
+  const saved = id => id === 'principal' || (S.settings.claude?.accounts || []).some(a => a.id === id);
+  const accounts = [{ id: 'principal', label: 'Principal (login desta máquina)' }, ...(claude.accounts || [])];
+  const info = id => rows?.find(r => r.id === id);
+  async function test(id) {
+    setTests(t => ({ ...t, [id]: 'testing' }));
+    const r = await api(`/api/claude/accounts/${id}/test`, { method: 'POST' }).catch(e => ({ ok: false, error: e.message }));
+    setTests(t => ({ ...t, [id]: r })); load();
+  }
+  async function login(id) {
+    try {
+      const r = await api(`/api/claude/accounts/${id}/login`, { method: 'POST' });
+      toast(r.opened ? 'Abri um terminal: faça o login lá e depois clique em Testar.' : `Rode no terminal: ${r.command}`);
+    } catch (e) { toast(e.message, 'error'); }
+  }
+  const add = () => {
+    const l = label.trim(); if (!l) return;
+    set('claude', { ...claude, accounts: [...(claude.accounts || []), { label: l }] }); setLabel('');
+  };
+  return (
+    <Card title="Contas" desc="Use mais de uma assinatura do Claude (ex.: Pro pessoal e Teams da empresa). Cada conta faz login uma vez; você escolhe a padrão e, por agente, qual usar. Nenhuma gasta crédito extra.">
+      <ul className="rows flat">
+        {accounts.map(a => {
+          const r = info(a.id), t = tests[a.id];
+          const st = t === 'testing' ? <span className="tag" role="status">testando…</span>
+            : t?.ok ? <span className="tag tag-ok">{t.plan || 'conectada'}{t.email ? ` · ${t.email}` : ''}</span>
+            : t ? <span className="tag tag-warn">{t.error}</span>
+            : r?.limitedUntil ? <span className="tag tag-warn">no limite até {new Date(r.limitedUntil).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+            : !saved(a.id) ? <span className="tag">salve para conectar</span>
+            : r?.loggedIn ? <span className="tag tag-ok">conectada</span> : <span className="tag tag-warn">falta o login</span>;
+          return (
+            <li key={a.id || a.label} className="row-item claude-acc">
+              <div className="row-main">
+                <b>{a.label}{(claude.defaultAccount || 'principal') === a.id && <span className="tag">padrão</span>}</b>
+                <small>{st}{r?.agents?.length ? ` · usada por ${r.agents.join(', ')}` : ''}</small>
+              </div>
+              <div className="row">
+                <button type="button" className="btn btn-sm" disabled={!saved(a.id)} onClick={() => login(a.id)}>{r?.loggedIn ? 'Trocar login' : 'Conectar'}</button>
+                <button type="button" className="btn btn-sm" disabled={!saved(a.id) || t === 'testing'} onClick={() => test(a.id)}>Testar</button>
+                {(claude.defaultAccount || 'principal') !== a.id && a.id && <button type="button" className="btn btn-sm" onClick={() => set('claude', { ...claude, defaultAccount: a.id })}>Tornar padrão</button>}
+                {a.id !== 'principal' && <button type="button" className="btn btn-sm" onClick={() => set('claude', { ...claude, accounts: claude.accounts.filter(x => x !== a), defaultAccount: claude.defaultAccount === a.id ? 'principal' : claude.defaultAccount })}>Remover</button>}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+      <Row title="Adicionar conta" desc="Dê um nome (ex.: Teams da empresa), salve e clique em Conectar. Abre um terminal nesta máquina para o login.">
+        <div className="row">
+          <input className="input" value={label} maxLength={40} onChange={e => setLabel(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()} placeholder="Ex.: Teams da empresa" aria-label="Nome da nova conta" />
+          <button type="button" className="btn" disabled={!label.trim()} onClick={add}>Adicionar</button>
+        </div>
+      </Row>
+      <Row title="Trocar de conta no limite" desc="Quando a conta da vez bater o limite da assinatura, o Ripper continua pela próxima conta conectada e avisa no chat.">
+        <Switch checked={claude.autoSwitch !== false} onChange={v => set('claude', { ...claude, autoSwitch: v })} label="Trocar de conta no limite" />
+      </Row>
+      <p className="muted small">Conta Teams costuma ser da empresa: use para o trabalho dela. Conectores do claude.ai (Gmail, Drive…) são de cada conta.</p>
+    </Card>
+  );
+}
+
 const PAID_BODY = 'O Ripper funciona pela sua assinatura (Claude, ChatGPT) sem custo extra. Com o uso pago ativado, cada resposta de um modelo pago (OpenRouter, OpenAI, Gemini ou Claude por chave de API) é cobrada em dólar na conta do provedor, inclusive o que os agentes fizerem sozinhos (rotinas, WhatsApp). Os limites diários abaixo pausam o gasto quando atingidos.';
 
 /** Uso pago: consentimento explícito, limites diários e o gasto de hoje. Sem consentimento, modelo pago não roda. */
@@ -535,6 +603,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
             <Row title="Conectores do claude.ai" desc="Gmail, Drive e outros. Carregar custa tokens: só vale para agentes com Plugins MCP."><Switch checked={s.claude.useConnectors} onChange={v => set('claude.useConnectors', v)} label="Conectores do claude.ai" /></Row>
           </Card>
           </>}
+          {P.id === 'claude' && s.claude.mode !== 'api' && <ClaudeAccountsCard s={s} set={set} S={S} />}
           {P.id === 'claude' && s.claude.mode === 'api' && <PaidUsageCard s={s} set={set} S={S} />}
           {P.id === 'codex' && <>
           <Card title="Conexão" badge={<span className="tag">Codex</span>}>

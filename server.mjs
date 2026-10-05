@@ -43,8 +43,9 @@ import {
 import { listChatsPage } from './lib/history.mjs';
 import { tryClaimRoutine, releaseRoutineClaim } from './lib/persist-coord.mjs';
 import { browserFor, browserRisk } from './lib/browser.mjs';
-import { runClaude, runCodex, systemPrompt, describeImage } from './lib/providers.mjs';
+import { runClaude, runCodex, systemPrompt, describeImage, CLAUDE_FAST_ENV } from './lib/providers.mjs';
 import { runOpenRouter, syncOpenRouterModels, checkCompatKey, compatCatalog, COMPAT } from './lib/openrouter.mjs';
+import { allAccounts, isLoggedIn, exhaustedUntil, loginCommand, openLoginTerminal, testAccount, configDirOf } from './lib/claude-accounts.mjs';
 import { normalizeWorkspace, listDirs, gitBranch, workspaceFor } from './lib/workspace.mjs';
 import { recordExternal, listExternal, externalCsv, EXTERNAL_KINDS } from './lib/external-actions.mjs';
 import { buildPulse, pulseDue, pulseWhatsappTo } from './lib/pulse.mjs';
@@ -2989,6 +2990,21 @@ const routes = [
     try { r = applyBulk(db.chats, b.ids.map(String), b.action, b.tag, isChatStreaming); } catch (e) { throw new HttpError(400, e.message); }
     db.chats = r.chats; save();
     return { changed: r.changed, skipped: r.skipped };
+  }],
+  // Contas do Claude (assinatura): status, login num terminal desta máquina e teste (e-mail, organização, plano).
+  ['GET', /^\/api\/claude\/accounts$/, () => allAccounts(db.settings).map(a => ({
+    ...a, loggedIn: isLoggedIn(a.id), limitedUntil: exhaustedUntil(a.id), configDir: configDirOf(a.id), loginCommand: loginCommand(a.id),
+    isDefault: (db.settings.claude.defaultAccount || 'principal') === a.id,
+    agents: db.agents.filter(x => (x.claudeAccount || db.settings.claude.defaultAccount || 'principal') === a.id).map(x => x.name)
+  }))],
+  ['POST', /^\/api\/claude\/accounts\/([\w-]+)\/login$/, (req, [aid]) => {
+    if (!isLocalRequest(req)) throw new HttpError(403, 'O login abre um terminal nesta máquina: faça pelo computador do Ripper.');
+    if (!allAccounts(db.settings).some(a => a.id === aid)) throw new HttpError(404, 'Conta não encontrada. Salve as configurações primeiro.');
+    return { opened: openLoginTerminal(aid), command: loginCommand(aid) };
+  }],
+  ['POST', /^\/api\/claude\/accounts\/([\w-]+)\/test$/, async (req, [aid]) => {
+    if (!allAccounts(db.settings).some(a => a.id === aid)) throw new HttpError(404, 'Conta não encontrada. Salve as configurações primeiro.');
+    return testAccount(aid, CLAUDE_FAST_ENV);
   }],
   // Seletor de pasta de trabalho: só quem está nesta máquina navega pelas pastas dela.
   ['GET', /^\/api\/fs\/dirs$/, (req, _, url) => {

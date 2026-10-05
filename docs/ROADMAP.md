@@ -41,6 +41,7 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 
 ## 1b. Provedores de IA (P0)
 - ✅ Tela "Provedores de IA": grade com todos os provedores (logo, status, nº de modelos, "assinatura" ou "pago por uso") e detalhe de cada um (o que faz no Ripper, o que ainda não faz, conexão e modelos).
+- ✅ Várias contas do Claude por assinatura (ex.: Pro e Teams): login de cada uma num terminal, teste (e-mail/plano), conta padrão, conta por agente e troca automática quando uma bate o limite (lê o horário de volta).
 - ✅ OpenRouter com as ferramentas do Ripper (computador, navegador, memória, delegação; web pelo plugin do OpenRouter); escolha de modelos pelo catálogo; teste de chave. Falha → cai no Claude pela assinatura.
 - ✅ **OpenAI direto, Gemini (AI Studio — os modelos do Antigravity) e Ollama (local, grátis)**, com as ferramentas do Ripper. Um executor só para os quatro provedores compatíveis com OpenAI (`lib/openrouter.mjs`): escolha de modelos pelo catálogo de cada um, teste de conexão, esforço só em modelos de raciocínio. OpenAI/Gemini entram no consentimento e limite de uso pago, com custo **estimado pelos tokens** (tabela de preços; modelo desconhecido = estimativa alta). Ollama sem chave e sem custo. Chaves cifradas.
 - [ ] Atualizar a tabela de preços de OpenAI/Gemini periodicamente (ou ler da API quando houver).

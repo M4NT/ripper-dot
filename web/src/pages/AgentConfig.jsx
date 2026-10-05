@@ -51,7 +51,7 @@ const pick = a => ({
   name: a.name, description: a.description, category: a.category, status: a.status,
   instructions: a.instructions, tone: a.tone, style: agentStyleDraft(a),
   model: a.model, effort: a.effort || 'auto', tools: a.tools, avatar: a.avatar,
-  autonomyLevel: a.autonomyLevel || 'semi_autonomous'
+  autonomyLevel: a.autonomyLevel || 'semi_autonomous', claudeAccount: a.claudeAccount || ''
 });
 
 function Knowledge({ agent }) {
@@ -208,6 +208,15 @@ export default function AgentConfig({ id }) {
             <summary><Icon name="down" size={14} className="adv-chev" />Modelo e esforço <small>Avançado · o Ripper Auto escolhe sozinho</small></summary>
             <ModelPick v={v} set={set} />
           </details>
+          {S.settings.claude?.accounts?.length > 0 && (
+            <div className="set-row">
+              <div className="set-label"><b>Conta do Claude</b><small>Qual assinatura este agente usa. Se ela bater o limite, o Ripper continua pela outra (quando a troca automática está ligada).</small></div>
+              <div className="set-control">
+                <Select label="Conta do Claude" value={v.claudeAccount} onChange={x => set('claudeAccount', x)}
+                  options={[{ value: '', label: 'Padrão do Ripper' }, { value: 'principal', label: 'Principal (login desta máquina)' }, ...S.settings.claude.accounts.map(c => ({ value: c.id, label: c.label }))]} />
+              </div>
+            </div>
+          )}
         </>}
         {tab === 'routines' && <Routines agent={agent} />}
         {tab === 'activity' && <Activity agent={agent} />}
