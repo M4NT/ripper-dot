@@ -119,3 +119,10 @@ test('memória em níveis: perfil inteiro, registro só o mais recente e datado'
   assert.match(ctx, /\[\d\d\/\d\d\/2026\] evento 12/);
   assert.equal(memoryContext([], 5), '');
 });
+
+test('@Apelido chama o agente (ex.: @Ripper → Engenheiro de Software)', async () => {
+  const { mentionOrder } = await import('../lib/agent-flow.mjs');
+  const ms = [{ id: 1, name: 'Engenheiro de Software', nickname: 'Ripper' }, { id: 2, name: 'Donald' }];
+  assert.deepEqual(mentionOrder('@Donald e @Ripper, vejam isso', ms).map(a => a.id), [2, 1]);
+  assert.deepEqual(mentionOrder('@Ripperzao', ms), [], 'apelido precisa ser a palavra inteira');
+});

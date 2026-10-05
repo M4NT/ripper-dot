@@ -48,7 +48,7 @@ function Channels({ agent }) {
 }
 
 const pick = a => ({
-  name: a.name, description: a.description, category: a.category, status: a.status,
+  name: a.name, nickname: a.nickname || '', description: a.description, category: a.category, status: a.status,
   instructions: a.instructions, tone: a.tone, style: agentStyleDraft(a),
   model: a.model, effort: a.effort || 'auto', tools: a.tools, avatar: a.avatar,
   autonomyLevel: a.autonomyLevel || 'semi_autonomous', claudeAccount: a.claudeAccount || ''

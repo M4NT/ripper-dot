@@ -12,6 +12,7 @@ const COLORS = [null, '#1a1917', '#f2efe9', '#e8537a', '#f08a3c', '#f2c94c', '#3
 export function Basics({ v, set, categories }) {
   return <>
     <label className="field">Nome do agente<input value={v.name} maxLength={60} onChange={e => set({ name: e.target.value })} placeholder="Ex.: Analista de dados" required /></label>
+    <label className="field">Apelido <small className="muted">(opcional)</small><input value={v.nickname || ''} maxLength={30} onChange={e => set({ nickname: e.target.value })} placeholder="Ex.: Ripper — no grupo, @Ripper também chama este agente" /></label>
     <label className="field">Descrição<textarea rows={3} value={v.description} maxLength={200} onChange={e => set({ description: e.target.value })} placeholder="O que ele faz, para quem e quais problemas resolve." /><small>{v.description.length}/200</small></label>
     <div className="field"><span>Categoria</span>
       <div className="pills" role="radiogroup" aria-label="Categoria">

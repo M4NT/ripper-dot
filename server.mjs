@@ -1507,7 +1507,7 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
     })(),
     visibleSkills(chat).length ? `Skills no banco (use_skill / list_skills): ${visibleSkills(chat).map(k => `${k.name}: ${k.description}`).join(' | ')}` : 'Skills extras podem vir de skills/ ou ~/.cursor/skills-cursor — use list_skills. Quando um passo a passo funcionar, guarde com save_skill.',
     group && [
-      `Você trabalha num time: ${group.map(a => `${a.name} (${a.description || a.category})`).join('; ')}.`,
+      `Você trabalha num time: ${group.map(a => `${a.name}${a.nickname ? ` (chamado de @${a.nickname})` : ''} — ${a.description || a.category}`).join('; ')}.`,
       'Regras do time:',
       '1. Faça só o que é da sua função. Não faça o trabalho de um colega.',
       '2. Se o pedido (ou parte dele) é de outro, delegue escrevendo @Nome e o que precisa dele. Esse colega fala logo depois de você.',
