@@ -66,7 +66,10 @@ code { font: .88em var(--mono); }
 .wrap { white-space: normal !important; }
 
 /* ============ shell ============ */
-.shell { display: grid; grid-template-columns: 264px minmax(0, 1fr); height: 100dvh; }
+.shell { display: grid; grid-template-columns: 264px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); height: 100dvh; overflow: hidden; }
+/* cada coluna rola por conta própria; sem isso a lista de conversas estica a página inteira */
+.shell > * { min-height: 0; }
+
 .sidebar { display: flex; flex-direction: column; gap: 4px; padding: 20px 14px 14px; background: var(--side); border-right: 1px solid var(--line); overflow: hidden; }
 .brand { display: flex; align-items: center; gap: 10px; padding: 2px 8px 14px; font-size: 18px; font-weight: 600; letter-spacing: -.03em; }
 .brand-logo { width: 30px; height: 30px; border-radius: 8px; object-fit: contain; flex-shrink: 0; background: var(--chip); }
@@ -1872,3 +1875,11 @@ code, .mono, pre { overflow-wrap: anywhere; }
 @media (max-width: 600px) { .question-answer { flex-direction: column; align-items: stretch; } }
 .outbox-row.dead .thumb { color: var(--err); }
 .outbox-err { color: var(--err); overflow-wrap: anywhere; }
+
+/* telas baixas (notebook): menu e rodapé mais compactos para sobrar espaço para as conversas (no fim: vence regras acima) */
+@media (max-height: 820px) {
+  .sidebar { padding-top: 12px; padding-bottom: 10px; gap: 2px; }
+  .brand { padding-bottom: 6px; }
+  .sidebar .nav a { padding: 5px 10px; }
+  .side-foot { padding-top: 8px; margin-top: 4px; }
+}

@@ -183,7 +183,8 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   const [notFound, setNotFound] = useState(false);
   const [live, setLive] = useState(null); // mensagem em construção
   const [phase, setPhase] = useState(null);
-  const [panel, setPanel] = useState(() => local.get('panel', true));
+  // painel da direita: abre sozinho só em tela larga; abaixo de 1440 px o chat fica com a largura toda (o botão reabre)
+  const [panel, setPanel] = useState(() => local.get('panel.v2', typeof matchMedia === 'function' && matchMedia('(min-width: 1440px)').matches));
   const wide = useMediaQuery('(min-width: 1200px)');
   const ctrl = useRef(null), scroller = useRef(null), stick = useRef(true);
   const queueRef = useRef(null);
@@ -284,7 +285,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   }
   // Ctrl+. recolhe/mostra o painel da direita.
   useEffect(() => {
-    const k = e => { if ((e.ctrlKey || e.metaKey) && e.key === '.') { e.preventDefault(); setPanel(p => { local.set('panel', !p); return !p; }); } };
+    const k = e => { if ((e.ctrlKey || e.metaKey) && e.key === '.') { e.preventDefault(); setPanel(p => { local.set('panel.v2', !p); return !p; }); } };
     addEventListener('keydown', k); return () => removeEventListener('keydown', k);
   }, []);
 
@@ -439,7 +440,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   }
 
   const showPanel = panel && wide;
-  const togglePanel = () => { setPanel(!panel); local.set('panel', !panel); };
+  const togglePanel = () => { setPanel(!panel); local.set('panel.v2', !panel); };
   function openMenu(e) {
     if (e.target.closest('a, button, input, textarea, .md code, .md pre')) return; // mantém o menu nativo em links e textos de código
     if (window.getSelection()?.toString()) return;                              // e quando há texto selecionado (para copiar)
@@ -517,7 +518,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
       </div>
       {!showPanel && wide && <div className="panel-collapsed-edge"><ResizeHandle side="right" cssVar="panel-w" min={280} max={620} collapsed label="Abrir painel" onExpand={togglePanel} /><button className="panel-reopen" onClick={togglePanel} aria-label="Mostrar painel" title="Mostrar painel (Ctrl .)"><Icon name="sidebar" size={16} style={{ transform: 'scaleX(-1)' }} /></button></div>}
       {pip && !showPanel && getAgent(pip) && <MiniScreen agent={getAgent(pip)} working={!!busy[pip]} onClose={() => setPip(null)} />}
-      {showPanel && <ChatPanel members={members} project={project} chatId={chatId} messages={messages} files={files} onCollapse={() => { setPanel(false); local.set('panel', false); }} />}
+      {showPanel && <ChatPanel members={members} project={project} chatId={chatId} messages={messages} files={files} onCollapse={() => { setPanel(false); local.set('panel.v2', false); }} />}
       {confirmNode}
     </div>
   );
