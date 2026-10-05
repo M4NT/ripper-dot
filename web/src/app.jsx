@@ -22,6 +22,7 @@ const lazy = load => reactLazy(() => load().catch(err => {
 }));
 const Agents = lazy(() => import('./pages/Agents.jsx'));
 const Inbox = lazy(() => import('./pages/Inbox.jsx'));
+const ExternalLog = lazy(() => import('./pages/ExternalLog.jsx'));
 const Projects = lazy(() => import('./pages/Projects.jsx'));
 const Project = lazy(() => import('./pages/Project.jsx'));
 const Chats = lazy(() => import('./pages/Chats.jsx'));
@@ -286,6 +287,7 @@ function Shell() {
     p0 === 'agents' && p1 && p2 === 'settings' ? <AgentConfig id={p1} /> :
     p0 === 'agents' ? <Agents /> :
     p0 === 'inbox' ? <Inbox /> :
+    p0 === 'log' ? <ExternalLog /> :
     p0 === 'new' ? <NewAgent key={query.get('template') || 'blank'} /> :
     p0 === 'explore' ? <Explore /> :
     p0 === 'library' ? <Library /> :

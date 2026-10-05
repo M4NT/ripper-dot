@@ -392,6 +392,15 @@ img.delivered-preview { max-height: 360px; object-fit: contain; }
 .paid-box .icon { color: var(--warn); flex: none; margin-top: 2px; }
 .paid-box b { color: var(--ink); }
 .paid-inline { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--warn); margin: 0 0 8px; }
+.extlog-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.extlog-list { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-direction: column; }
+.extlog-item { display: grid; grid-template-columns: 28px 1fr auto; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); align-items: start; }
+.extlog-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.extlog-main p { margin: 0; overflow-wrap: anywhere; }
+.extlog-main .tag { margin-left: 8px; }
+.extlog-preview { font-size: 13px; color: var(--muted); }
+.extlog-main small, .extlog-item time { font-size: 12px; color: var(--faint); }
+.extlog-item.is-failed b { color: var(--warn); }
 .or-catalog { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .or-catalog .rows { max-height: 320px; overflow: auto; }
 .subtasks { list-style: none; margin: 0; padding: 0; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 8px; }

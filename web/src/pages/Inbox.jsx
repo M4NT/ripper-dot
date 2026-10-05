@@ -30,6 +30,7 @@ export default function Inbox() {
     <div className="page inbox-page">
       <header className="page-head">
         <div><h1>Caixa</h1><p className="lede">O que os agentes precisam de você: aprovações, recados de clientes e novidades das rotinas.</p></div>
+        <a className="btn" href="#/log">Ações externas</a>
       </header>
       <div className="toolbar">
         <Segmented label="Filtrar a caixa" value={filter} onChange={setFilter} items={FILTERS.map(([k, l]) => [k, l, count(k)])} />

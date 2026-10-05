@@ -43,6 +43,7 @@ import { tryClaimRoutine, releaseRoutineClaim } from './lib/persist-coord.mjs';
 import { browserFor, browserRisk } from './lib/browser.mjs';
 import { runClaude, runCodex, systemPrompt, describeImage } from './lib/providers.mjs';
 import { runOpenRouter, syncOpenRouterModels, checkOpenRouterKey, openRouterCatalog } from './lib/openrouter.mjs';
+import { recordExternal, listExternal, externalCsv, EXTERNAL_KINDS } from './lib/external-actions.mjs';
 import { isPaidModel, paidBlockReason, addSpend, spendToday, spendLimits, normalizeBilling } from './lib/paid-usage.mjs';
 import { runTestProvider } from './lib/test-provider.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
@@ -572,7 +573,9 @@ async function handleWhatsappMessage(msg) {
   recordWaMessage({ id: msg.id, phone: msg.from, fromMe: false, text: msg.text, name: msg.name });
   const { reply } = await channelReply('whatsapp', msg, agent, whatsappPrompt(msg));
   if (!reply) return;
-  await sendWhatsappText(w, msg.from, reply.content);
+  try { await sendWhatsappText(w, msg.from, reply.content); }
+  catch (e) { recordExternal({ kind: 'whatsapp.auto_reply', agentId: agent.id, target: `+${msg.from}`, text: reply.content, approved: 'auto', ok: false, error: e.message }); throw e; }
+  recordExternal({ kind: 'whatsapp.auto_reply', agentId: agent.id, target: `+${msg.from}`, text: reply.content, approved: 'auto' });
   recordWaMessage({ id: `out-${reply.id}`, phone: msg.from, fromMe: true, text: reply.content });
 }
 
@@ -609,7 +612,10 @@ async function handleWhatsappWebMessage(msg) {
     const ok = await askApproval({ agent, chat: c, emit: () => {}, signal: null }, 'whatsapp', `Para ${msg.name || ''} +${msg.from}:\n${reply.content}`, 'Rascunho de resposta no seu WhatsApp.', false);
     if (!ok) return;
   }
-  await sendEvolutionText(msg.from, reply.content);
+  const approved = mode === 'draft' ? 'user' : 'auto';
+  try { await sendEvolutionText(msg.from, reply.content); }
+  catch (e) { recordExternal({ kind: 'whatsapp.auto_reply', agentId: agent.id, target: `${msg.name || ''} +${msg.from}`.trim(), text: reply.content, approved, ok: false, error: e.message }); throw e; }
+  recordExternal({ kind: 'whatsapp.auto_reply', agentId: agent.id, target: `${msg.name || ''} +${msg.from}`.trim(), text: reply.content, approved });
   recordWaMessage({ id: `out-${reply.id}`, phone: msg.from, fromMe: true, text: reply.content });
 }
 
@@ -752,7 +758,9 @@ function guarded(computer, { agent, chat, emit, signal }) {
       if (typeof autonomy === 'string') return `Esta ação não é permitida (${autonomy}).`;
       // Link público na internet (boat) pede aprovação; localhost não.
       if (computer.kind === 'boat' && autonomy === undefined && !(await ask('share', `compartilhar porta ${port}`, 'publica um link na internet'))) return 'O usuário não aprovou publicar o link.';
-      return computer.share(port);
+      const link = await computer.share(port);
+      if (computer.kind === 'boat') recordExternal({ kind: 'link.shared', agentId: agent.id, chatId: chat.id, target: String(link), text: `porta ${port}`, approved: autonomy === undefined ? 'user' : 'rule' });
+      return link;
     }
   };
 }
@@ -827,7 +835,12 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
       const autonomy = browserAutonomyGate(agent, action, s);
       if (typeof autonomy === 'string') return Promise.resolve(false);
       const reason = autonomy === null ? null : browserRisk(action, opts);
-      return reason ? askApproval({ agent, chat, emit, signal }, 'browser', label, reason) : Promise.resolve(true);
+      if (!reason) return Promise.resolve(true);
+      // Ação arriscada (envio, compra, login…) aprovada: entra no registro de ações externas.
+      return askApproval({ agent, chat, emit, signal }, 'browser', label, reason).then(ok => {
+        if (ok) recordExternal({ kind: 'browser.action', agentId: agent.id, chatId: chat.id, target: label, text: reason, approved: 'user' });
+        return ok;
+      });
     };
     const denied = 'O usuário NÃO aprovou esta ação no navegador. Não tente contornar; explique o que ia fazer e pare.';
     browser = {
@@ -1056,10 +1069,12 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
         const ok = await askApproval({ agent, chat, emit, signal }, 'whatsapp', `Para +${to}:\n${msgText}`, 'A mensagem sai no WhatsApp em seu nome.', false);
         if (!ok) return 'O usuário NÃO aprovou o envio. Nada foi enviado.';
         try { viaQr ? await sendEvolutionText(to, msgText) : await sendWhatsappText(s.whatsapp, to, msgText); }
-        catch (e) { return `Falha ao enviar pelo WhatsApp: ${e.message}${viaQr ? '' : ' (na API oficial, fora da janela de 24 h só vale mensagem de template)'}`; }
+        catch (e) {
+          recordExternal({ kind: 'whatsapp.sent', agentId: agent.id, chatId: chat.id, target: `+${to}`, text: msgText, approved: 'user', ok: false, error: e.message });
+          return `Falha ao enviar pelo WhatsApp: ${e.message}${viaQr ? '' : ' (na API oficial, fora da janela de 24 h só vale mensagem de template)'}`; }
         // Vai para o histórico do WhatsApp (o agente vê a continuação); não vira conversa no Ripper.
         recordWaMessage({ id: `out-${id()}`, phone: to, fromMe: true, text: msgText });
-        recordCorporateAudit(db.settings, { category: 'whatsapp', action: 'whatsapp.sent', agentId: agent.id, chatId: chat.id, at: Date.now() });
+        recordExternal({ kind: 'whatsapp.sent', agentId: agent.id, chatId: chat.id, target: `+${to}`, text: msgText, approved: 'user' });
         return `Mensagem enviada para +${to}.`;
       }
     } : null,
@@ -1086,6 +1101,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
           return 'O usuário NÃO aprovou publicar neste webhook. Não tente contornar; ofereça editar o rascunho ou publicar depois.';
         }
         const result = await postToSocialWebhook(hook, body);
+        recordExternal({ kind: 'social.posted', agentId: agent.id, chatId: chat.id, target: hook.name, text: body, approved: reason ? 'user' : 'rule', ok: !!result.ok, error: result.ok ? undefined : `HTTP ${result.status}` });
         if (!result.ok) return `Webhook respondeu ${result.status}: ${result.body || '(sem corpo)'}`;
         return `Publicado em "${hook.name}" (HTTP ${result.status}).`;
       }
@@ -1874,6 +1890,7 @@ const routes = [
       throw new HttpError(400, e.message);
     }
     recordCorporateAudit(s, auditSettingsPatch(before, s, b));
+    if (!before.billing?.paidConsentAt !== !s.billing?.paidConsentAt) recordExternal({ kind: s.billing?.paidConsentAt ? 'billing.paid_on' : 'billing.paid_off', approved: 'user' });
     save();
     configureLogger({ settings: s });
     return redact(s);
@@ -1910,6 +1927,14 @@ const routes = [
   ['GET', /^\/api\/audit$/, (req, _, url) => ({
     entries: listAudit(db, { limit: +(url.searchParams.get('limit') || 50) })
   })],
+  // Registro de ações externas (sempre ligado). ?kind, ?agentId, ?since; .csv exporta.
+  ['GET', /^\/api\/external-actions(\.csv)?$/, (req, [csv], url, res) => {
+    const q = { since: +(url.searchParams.get('since') || 0) || 0, kind: url.searchParams.get('kind') || undefined, agentId: url.searchParams.get('agentId') || undefined };
+    const entries = listExternal({ ...q, limit: csv ? 5000 : 300 });
+    if (!csv) return { kinds: EXTERNAL_KINDS, entries };
+    res.writeHead(200, hdr(req, { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="acoes-externas-${new Date().toISOString().slice(0, 10)}.csv"` }));
+    res.end(externalCsv(entries, aid => db.agents.find(a => a.id === aid)?.name || aid));
+  }],
   ['GET', /^\/api\/audit-trail$/, (req, _, url) => {
     if (!isEnterpriseMode(db.settings)) throw new HttpError(403, 'Trilha de auditoria corporativa exige modo enterprise.');
     const since = +(url.searchParams.get('since') || 0);
