@@ -1729,3 +1729,12 @@ code, .mono, pre { overflow-wrap: anywhere; }
 .flow-cond { position: absolute; top: calc(50% + 10px); left: 50%; transform: translateX(-50%); padding: 1px 7px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); color: var(--ink-2); font-size: 11.5px; white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
 .flow-chip-cond { color: var(--muted); font-size: 12px; }
 @media (max-width: 720px) { .flow-cond { top: 50%; left: auto; right: calc(50% + 14px); transform: translateY(-50%); } }
+
+/* Atividade do agente (linha do tempo) */
+.tl-summary { margin: 0 0 16px; }
+.tl-day h4 { margin: 16px 0 6px; font-size: 13px; font-weight: 500; color: var(--muted); text-transform: capitalize; }
+.tl { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 1px solid var(--line); }
+.tl li { padding: 6px 0 10px; min-width: 0; overflow-wrap: anywhere; }
+.tl-head time { font-variant-numeric: tabular-nums; color: var(--muted); margin-right: 4px; }
+.tl-line { font-size: 13px; margin-top: 2px; }
+.tl-err .tl-head time { color: var(--err); }

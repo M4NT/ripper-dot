@@ -193,6 +193,7 @@ import { attachRequestId } from './lib/request-id.mjs';
 import { isShuttingDown, registerGracefulShutdown, SHUTDOWN_MESSAGE } from './lib/shutdown.mjs';
 import { closeUsageEventsStore, listUsageEventsSince } from './lib/usage-events.mjs';
 import { agentDayStats } from './lib/agent-day-stats.mjs';
+import { agentTimeline } from './lib/agent-timeline.mjs';
 import { closeJuliaEventsStore } from './lib/julia-events.mjs';
 import { closePersistCoordStore } from './lib/persist-coord.mjs';
 import { checkRateLimit } from './lib/rate-limit.mjs';
@@ -2510,6 +2511,11 @@ const routes = [
     db.routines = db.routines.filter(r => r.agentId !== aid);
     db.projects.forEach(p => { p.agentIds = p.agentIds.filter(x => x !== aid); });
     save(); return {};
+  }],
+  ['GET', /^\/api\/agents\/([\w-]+)\/timeline$/, async (req, [aid], url) => {
+    agentOr404(aid);
+    const days = Math.min(30, Math.max(1, Number(url.searchParams.get('days')) || 7));
+    return agentTimeline(db, aid, { since: Date.now() - days * 864e5 });
   }],
   ['GET', /^\/api\/agents\/([\w-]+)\/computer$/, async (req, [aid]) => {
     const a = agentOr404(aid);
