@@ -100,6 +100,7 @@ function LiveText({ text }) {
 
 const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, models, group, showModel, allFiles, onFileError }) {
   // ids (resposta salva) ou objetos (chegando ao vivo)
+  const { agent: getAgent } = useApp();
   const delivered = (m.files || []).map(x => (typeof x === 'string' ? allFiles?.find(f => f.id === x) : x)).filter(Boolean);
   return (
     <div className="msg bot">
@@ -126,10 +127,28 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, mo
             {onRetry && <button className="meta-btn" onClick={onRetry}><Icon name="retry" size={14} />Refazer</button>}
           </>}
         </div>
+        {group && m.delegations?.map(d => <Delegation key={d.to} from={agent} to={getAgent(d.to)} task={d.task} />)}
+        {live && group && m.plan?.length > 0 && (() => {
+          const after = m.plan.filter(id => id !== m.agentId).map(id => getAgent(id)?.name).filter(Boolean);
+          return <p className="turn-plan">Agora: {agent.name}{after.length ? ` · depois: ${after.join(', ')}` : ''}</p>;
+        })()}
       </div>
     </div>
   );
 }, (a, b) => a.m === b.m && a.agent === b.agent && a.live === b.live && a.phase === b.phase && a.group === b.group && a.showModel === b.showModel && a.allFiles === b.allFiles && a.models === b.models && !!a.onRetry === !!b.onRetry);
+
+/** "Ana → Bruno: pesquisar preços" — quem passou a palavra para quem, e para quê. */
+function Delegation({ from, to, task }) {
+  if (!to) return null;
+  return (
+    <div className="delegation">
+      <AgentAvatar agent={from} size={18} paused /><span>{from?.name}</span>
+      <span aria-label="delegou para">→</span>
+      <AgentAvatar agent={to} size={18} paused /><span>{to.name}</span>
+      {task && <span className="delegation-task">: {task}</span>}
+    </div>
+  );
+}
 
 function InboxMessage({ m, from }) {
   return (
@@ -289,11 +308,12 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
       setChat(c => ({ ...(c || { title: 'Nova conversa', agentId: agent.id, agentIds: isGroup ? memberIds : undefined, projectId }), messages: [...(c?.messages || []), userMsg] }));
     } else setInterrupted(false);
     let building = { role: 'assistant', agentId: agent.id, content: '', steps: [], at: Date.now() };
+    let plan = []; // ordem de fala da rodada em grupo (turnPlan + delegados)
     setLive(building); setPhase(['xhigh', 'max'].includes(use.effort) ? 'think' : 'route');
     stick.current = true;
     const ac = new AbortController(); ctrl.current = ac;
     let cid = chatId, pending = false, finished = false, sawDone = false;
-    const flush = () => { if (pending) return; pending = true; requestAnimationFrame(() => { pending = false; if (!finished) setLive({ ...building, steps: [...building.steps] }); }); };
+    const flush = () => { if (pending) return; pending = true; requestAnimationFrame(() => { pending = false; if (!finished) setLive({ ...building, steps: [...building.steps], plan }); }); };
     try {
       const endpoint = resume ? `/api/chats/${chatId}/resume` : '/api/chat';
       const payload = resume
@@ -342,6 +362,10 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
             const sec = Math.max(1, Math.round(e.providerRetry.waitMs / 1000));
             building.steps.push({ kind: 'warn', label: `Limite do provedor — tentativa ${e.providerRetry.attempt}/${e.providerRetry.maxAttempts} em ~${sec}s` });
           }
+          if (e.turnPlan) plan = e.turnPlan;
+          if (e.turnDone) plan = plan.filter(id => id !== e.turnDone);
+          if (e.delegated) plan = [...plan, ...e.delegated.filter(id => !plan.includes(id))];
+          if (e.delegation) building.delegations = [...(building.delegations || []), e.delegation];
           if (e.delegated?.length) {
             const names = e.delegated.map(id => getAgent(id)?.name || 'colega').join(', ');
             building.steps.push({ kind: 'done', label: 'Palavra delegada', detail: names });
