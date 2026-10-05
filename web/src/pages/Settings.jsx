@@ -549,6 +549,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
 
         {tab === 'plugins' && <Plugins s={s} set={set} />}
         {tab === 'channels' && <EmailCard s={s} set={set} toast={toast} />}
+        {tab === 'channels' && <GithubCard s={s} toast={toast} refresh={refresh} />}
         {tab === 'channels' && !enterprise && <p className="muted small">WhatsApp fica no <a href="#/settings/appearance">modo Enterprise</a>.</p>}
         {tab === 'channels' && enterprise && (() => {
           const w = s.whatsapp || {};
@@ -825,6 +826,47 @@ function EmailCard({ s, set, toast }) {
           </div>
         </Row>
       </>}
+    </Card>
+  );
+}
+
+// Guardião do GitHub: token + repositórios → um agente que revisa PRs, investiga CI e delega correções.
+function GithubCard({ s, toast, refresh }) {
+  const g = s.github || {};
+  const [token, setToken] = useState(g.token || '');
+  const [repos, setRepos] = useState((g.repos || []).join('\n'));
+  const [busy, setBusy] = useState(false);
+  const { S } = useApp();
+  const guardian = S.agents.find(a => a.id === g.agentId);
+  async function create() {
+    setBusy(true);
+    try {
+      await api('/api/settings', { method: 'PUT', body: { github: { token, repos: repos.split(/[\s,]+/).filter(Boolean) } } });
+      const r = await api('/api/github/guardian', { method: 'POST' });
+      toast(`Guardião ativo como ${r.login} em ${r.repos.length} repositório(s)`);
+      refresh();
+    } catch (e) { toast(e.message, 'error'); }
+    finally { setBusy(false); }
+  }
+  return (
+    <Card title="GitHub — Guardião" desc="Um agente vigia seus repositórios: revisa cada PR, investiga CI quebrado, organiza issues e delega correções aos colegas. Ele consulta o GitHub a cada 5 minutos (não precisa expor o Ripper). Comentar ou abrir issue sempre pede a sua aprovação.">
+      <Row title="Token do GitHub" desc="Token fine-grained com leitura de código, PRs, issues e Actions, e escrita em PRs e issues.">
+        <div className="row">
+          <input className="input grow" type="password" autoComplete="off" value={token} onChange={e => setToken(e.target.value)} placeholder="github_pat_…" />
+          <a className="btn btn-sm" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noreferrer">Criar token</a>
+        </div>
+      </Row>
+      <Row title="Repositórios" desc="Um por linha: dono/repositório ou o link." stack>
+        <textarea className="input" rows={3} value={repos} onChange={e => setRepos(e.target.value)} placeholder="minha-empresa/site&#10;https://github.com/minha-empresa/api" />
+      </Row>
+      <Row title={guardian ? 'Guardião ativo' : 'Ativar'} desc={guardian
+        ? (g.lastError ? `Última consulta falhou: ${g.lastError}` : g.lastCheck ? `Última consulta: ${new Date(g.lastCheck).toLocaleString('pt-BR')}` : 'A primeira consulta sai em até 5 minutos.')
+        : 'Confere o token e o acesso aos repositórios e cria o agente Guardião com a rotina de eventos.'}>
+        <div className="row">
+          <button type="button" className="btn btn-sm btn-primary" disabled={!token || !repos.trim() || busy} onClick={create}><Icon name="plug" size={14} />{busy ? 'Conferindo…' : guardian ? 'Atualizar' : 'Criar o Guardião'}</button>
+          {guardian && <a className="btn btn-sm" href={`#/agents/${guardian.id}/settings`}>Ver agente</a>}
+        </div>
+      </Row>
     </Card>
   );
 }

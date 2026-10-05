@@ -46,6 +46,7 @@ import { runOpenRouter, syncOpenRouterModels, checkOpenRouterKey, openRouterCata
 import { recordExternal, listExternal, externalCsv, EXTERNAL_KINDS } from './lib/external-actions.mjs';
 import { buildPulse, pulseDue } from './lib/pulse.mjs';
 import { emailReady, listEmails, readEmail, sendEmail, newEmailsSince, testEmail } from './lib/email.mjs';
+import { gh, githubReady, normalizeRepo, repoChanges, describeChange } from './lib/github.mjs';
 import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './lib/event-triggers.mjs';
 import { isPaidModel, paidBlockReason, addSpend, spendToday, spendLimits, normalizeBilling } from './lib/paid-usage.mjs';
 import { runTestProvider } from './lib/test-provider.mjs';
@@ -1054,6 +1055,32 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
         return 'Recado entregue ao responsável no Ripper. Diga ao contato que vai confirmar e retorna em breve; não confirme nada antes disso.';
       }
     } : null,
+    // GitHub (Guardião): lê só os repositórios configurados; comentar/abrir issue sempre com a sua aprovação.
+    github: !chat.channel && githubReady(s.github) ? (() => {
+      const g = s.github;
+      const allowed = repo => g.repos.includes(normalizeRepo(repo));
+      const write = async (kind, repo, label, run) => {
+        if (!allowed(repo)) return `${repo} não está na lista do Guardião (Configurações → Canais → GitHub).`;
+        const ok = await askApproval({ agent, chat, emit, signal }, 'github', label, 'Publica no GitHub em seu nome.', false);
+        if (!ok) return 'O usuário NÃO aprovou. Nada foi publicado.';
+        try { const r = await run(); recordExternal({ kind, agentId: agent.id, chatId: chat.id, target: r.html_url || repo, approved: 'user' }); return `Publicado: ${r.html_url}`; }
+        catch (e) { recordExternal({ kind, agentId: agent.id, chatId: chat.id, target: repo, approved: 'user', ok: false, error: e.message }); return `Falhou: ${e.message}`; }
+      };
+      return {
+        read: async a => {
+          const path = '/' + String(a.path || '').replace(/^\/+/, '');
+          const m = /^\/repos\/([\w.-]+\/[\w.-]+)/.exec(path);
+          if (!m || !allowed(m[1])) return `Só leio os repositórios do Guardião: ${g.repos.join(', ')}.`;
+          try {
+            const r = await gh(g, path, a.diff ? { accept: 'application/vnd.github.diff' } : {});
+            const out = typeof r === 'string' ? r : JSON.stringify(r, null, 1);
+            return out.length > 30000 ? out.slice(0, 30000) + '\n[… cortado]' : out;
+          } catch (e) { return e.message; }
+        },
+        comment: a => write('github.comment', a.repo, `Comentar em ${a.repo} #${a.number}:\n\n${a.text}`, () => gh(g, `/repos/${normalizeRepo(a.repo)}/issues/${a.number}/comments`, { method: 'POST', body: { body: a.text } })),
+        issue: a => write('github.issue', a.repo, `Abrir issue em ${a.repo}: ${a.title}\n\n${a.text}`, () => gh(g, `/repos/${normalizeRepo(a.repo)}/issues`, { method: 'POST', body: { title: a.title, body: a.text } }))
+      };
+    })() : null,
     // E-mail (IMAP/SMTP): lê ao vivo, sem cópia local; enviar sempre com a sua aprovação. Só em conversa sua.
     email: !chat.channel && emailReady(s.email) ? {
       list: async a => {
@@ -2083,6 +2110,39 @@ const routes = [
     if (db.settings.claude?.mode === 'api') return { connectors: [], note: 'Conectores do claude.ai só existem no modo assinatura.' };
     return { connectors: await listClaudeConnectors({ force: url.searchParams.get('refresh') === '1' }).catch(e => { throw new HttpError(502, `Não consegui ler os conectores do claude.ai: ${e.message}`); }) };
   }],
+  // Guardião do GitHub: confere o token e cria (ou reaproveita) o agente + a rotina que recebe os eventos.
+  ['POST', /^\/api\/github\/guardian$/, async () => {
+    const g = db.settings.github;
+    if (!githubReady(g)) throw new HttpError(400, 'Salve o token e pelo menos um repositório antes.');
+    let me;
+    try { me = (await gh(g, '/user')).login; } catch (e) { throw new HttpError(400, `O token não funcionou: ${e.message}`); }
+    for (const repo of g.repos) { try { await gh(g, `/repos/${repo}`); } catch (e) { throw new HttpError(400, `Sem acesso a ${repo}: ${e.message}`); } }
+    let a = db.agents.find(x => x.id === g.agentId);
+    if (!a) {
+      a = newAgent({
+        name: 'Guardião', category: 'Engenharia', description: 'Vigia os repositórios do GitHub: revisa PRs, investiga CI quebrado e delega correções.',
+        tools: ['web', 'memory', 'routines', 'files'], model: 'auto',
+        instructions: [
+          'Você é o Guardião do GitHub. Cada evento (PR, issue, CI que falhou) chega pela sua rotina.',
+          'PR: leia o diff (github_read com diff=true) e os arquivos alterados. Aponte bugs, riscos de segurança e o que falta de teste. Seja específico (arquivo e linha). Publique a revisão com github_comment.',
+          'CI que falhou: descubra a causa pelo log/commit e diga quem deve corrigir.',
+          'Issue: classifique (bug, pedido, dúvida), estime o esforço e sugira o próximo passo.',
+          'Delegue o conserto a um colega com send_message, com o repositório, o arquivo e o que fazer. Não faça o trabalho dele.',
+          'Nada relevante (PR trivial, issue já resolvida): responda NADA_NOVO.'
+        ].join('\n')
+      });
+      db.agents.push(a);
+      recordCorporateAudit(db.settings, auditAgentLifecycle('create', a));
+    }
+    let r = db.routines.find(x => x.trigger === 'github' && x.agentId === a.id);
+    if (!r) {
+      r = { id: id(), agentId: a.id, name: 'Eventos do GitHub', prompt: 'Trate este evento do GitHub conforme as suas instruções.', trigger: 'github', quiet: true, lastRun: 0, lastStatus: 'never', lastError: null };
+      db.routines.push(r);
+    }
+    db.settings.github = { ...g, agentId: a.id, me, since: g.since || Date.now() };
+    save();
+    return { agentId: a.id, login: me, repos: g.repos };
+  }],
   // Testa login IMAP + SMTP com o que está salvo (ou com o que veio no corpo, antes de salvar)
   ['POST', /^\/api\/email\/test$/, async req => {
     const b = await body(req);
@@ -3027,6 +3087,29 @@ setInterval(() => {
   if (out?.error) raiseSystemAlert({ key: 'backup', title: 'O backup automático falhou', body: `${out.error} Seus dados de hoje ainda não têm cópia.`, href: '/settings/backup', hrefLabel: 'Ver backup' });
   else if (out?.created) { resolveSystemAlert('backup'); save(); }
 }, 60_000);
+
+// Guardião do GitHub: a cada N min (5 por padrão) pergunta ao GitHub o que mudou; cada novidade vira um evento da rotina.
+let githubPolling = false;
+setInterval(async () => {
+  const g = db.settings.github;
+  const r = db.routines.find(x => x.trigger === 'github' && x.agentId === g?.agentId);
+  if (githubPolling || !githubReady(g) || !r || Date.now() - (g.lastCheck || 0) < (g.everyMinutes || 5) * 60_000) return;
+  githubPolling = true;
+  const now = Date.now();
+  try {
+    const events = [];
+    for (const repo of g.repos) events.push(...await repoChanges(g, repo, g.since || now, g.me));
+    db.settings.github = { ...db.settings.github, since: now, lastCheck: now, lastError: null };
+    // ponytail: uma rodada da rotina por evento, em sequência; agrupar se vier muita coisa de uma vez
+    for (const ev of events.slice(0, 10)) {
+      while (r.lastStatus === 'running') await new Promise(res => setTimeout(res, 5000));
+      runRoutine(r, { source: 'GitHub', type: `${ev.kind} ${ev.repo}#${ev.number}`, body: describeChange(ev) });
+    }
+  } catch (err) {
+    db.settings.github = { ...db.settings.github, lastCheck: now, lastError: err.message };
+    console.error('github.poll', ...redactForLog(db.settings, err.message));
+  } finally { githubPolling = false; save(); }
+}, 60_000).unref?.();
 
 // Gatilho "chegou e-mail": a cada 2 min olha só os e-mails novos — e só se alguma rotina usa esse gatilho.
 let emailPolling = false;

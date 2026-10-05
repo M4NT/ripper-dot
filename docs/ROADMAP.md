@@ -12,7 +12,7 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 ---
 
 ## Próximos passos (em ordem)
-1. **Agente Guardião do GitHub** (§3) — usa o gatilho por webhook que já existe.
+1. Guardião abrindo PR com a correção (§3).
 2. Provedores diretos: OpenAI, Gemini, Ollama (§1b).
 3. E-mail com anexos (§3).
 
@@ -64,9 +64,11 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 - ✅ Gatilho "mensagem no WhatsApp": palavras-chave (palavra inteira, sem acento/maiúscula; vazio = toda mensagem), de contatos, grupos ou ambos; áudios transcritos também disparam; mensagens suas não; no máximo 1 disparo por minuto por rotina. Grupos exigem "Ler grupos" e o agente nunca responde no grupo.
 - ✅ Gatilho "chegou e-mail": palavras-chave no remetente/assunto; checa a cada 2 min só quando alguma rotina usa.
 - [ ] Gatilho "planilha mudou" (Google Drive).
-- [ ] **Agente Guardião do GitHub**: observa repositórios, abre issues/PRs, delega correções, revisa antes de pedir merge.
+- ✅ **Guardião do GitHub** (Configurações → Canais → GitHub): token + repositórios → agente "Guardião" com rotina de eventos. Consulta o GitHub a cada 5 min (sem expor o Ripper): PR aberto/atualizado, issue nova/atualizada, CI que falhou no branch padrão; ignora o que você mesmo fez. Lê PR, diff, arquivos e issues (só dos repositórios configurados); comenta e abre issue com aprovação; delega correções aos colegas. Token cifrado.
+- [ ] Guardião: abrir PR com a correção (agente com computador clona, corrige, roda os testes e propõe o PR para aprovação).
+- [ ] Guardião: aprovar/mesclar PR com aprovação do dono.
 - [ ] Fluxos visuais: encadear agentes num canvas (A pesquisa → B escreve → C publica), com aprovação em qualquer passo.
-- ✅ **E-mail como canal** (IMAP/SMTP, qualquer provedor; Gmail/Outlook/Yahoo/iCloud configuram sozinhos): agentes listam, buscam, leem e respondem — leitura ao vivo, sem cópia local; todo envio com aprovação e no registro de ações externas; senha cifrada no disco. Configurações → Canais → E-mail.
+- ✅ **E-mail como canal** (botões por provedor; Gmail com 1 clique pelo conector da conta Claude; senha de app com link direto; "Outro (IMAP)" para e-mail de empresa; aba Canais também no modo Simples): agentes listam, buscam, leem e respondem — leitura ao vivo, sem cópia local; todo envio com aprovação e no registro de ações externas; senha cifrada no disco. Configurações → Canais → E-mail.
 - [ ] E-mail: anexos (ler PDF/planilha anexados; enviar arquivo entregue pelo agente).
 - [ ] E-mail: resposta automática por remetente (como a autonomia por contato do WhatsApp).
 - [ ] Telegram, Instagram DM, Slack, Discord como canais.
