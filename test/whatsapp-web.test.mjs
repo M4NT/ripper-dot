@@ -210,3 +210,40 @@ test('grupo: parser lê quem falou; só guarda com "Ler grupos" e nunca responde
     assert.equal(sent.filter(u => u.startsWith('/message/sendText')).length, 0); // nunca responde em grupo
   } finally { child.kill(); evo.close(); }
 });
+
+test('gatilho por evento: palavra-chave no WhatsApp dispara a rotina (mensagem sua não)', async () => {
+  const evo = http.createServer((req, res) => { req.resume(); req.on('end', () => res.end('{}')); });
+  await new Promise(r => evo.listen(0, '127.0.0.1', r));
+  const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r)); const port = probe.address().port; await new Promise(r => probe.close(r));
+  const dataDir = mkdtempSync(join(tmpdir(), 'ripper-watrig-'));
+  const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
+    env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'stream', HOME: dataDir, USERPROFILE: dataDir, JULIA_AUTOSTART: '0', EVOLUTION_URL: `http://127.0.0.1:${evo.address().port}` },
+    stdio: 'ignore'
+  });
+  const base = `http://127.0.0.1:${port}`;
+  const wait = async (fn, ms = 10_000) => { for (let i = 0; i < ms / 200 && !(await fn()); i++) await new Promise(r => setTimeout(r, 200)); };
+  try {
+    await wait(async () => { try { return (await fetch(base + '/api/health')).ok; } catch { return false; } });
+    const st = await (await fetch(base + '/api/state')).json();
+    const post = (path, b, method = 'POST') => fetch(base + path, { method, headers: { 'content-type': 'application/json', origin: base }, body: JSON.stringify(b) });
+    await post('/api/settings', { ui: { mode: 'enterprise' } }, 'PUT');
+    await post('/api/settings', { whatsappWeb: { enabled: true, agentId: st.agents[0].id, allowlist: [] } }, 'PUT');
+    const r = await (await post('/api/routines', { agentId: st.agents[0].id, name: 'Urgências', prompt: 'Me avise.', trigger: 'whatsapp', keywords: 'urgente, orçamento', scope: 'contacts', quiet: false })).json();
+    assert.deepEqual(r.keywords, ['urgente', 'orçamento']);
+    await fetch(base + '/api/channels/whatsapp-web/' + 'f'.repeat(48), { method: 'POST', body: '{}' });
+    const { hookToken } = JSON.parse(readFileSync(join(dataDir, 'evolution.json'), 'utf8'));
+    const send = ev => fetch(base + '/api/channels/whatsapp-web/' + hookToken, { method: 'POST', body: JSON.stringify(ev), headers: { 'content-type': 'application/json', 'x-ripper-token': hookToken } });
+
+    await send(msg({ remoteJid: '5511988887777@s.whatsapp.net', id: 'eu', fromMe: true }, 'isso é urgente'));
+    await send(msg({ remoteJid: '5511988887777@s.whatsapp.net', id: 'nada' }, 'bom dia'));
+    await new Promise(res => setTimeout(res, 600));
+    assert.equal((await (await fetch(base + '/api/state')).json()).routines[0].lastRun, 0, 'mensagem sua ou sem palavra-chave não dispara');
+
+    await send(msg({ remoteJid: '5511988887777@s.whatsapp.net', id: 'sim' }, 'Preciso de um ORCAMENTO hoje'));
+    let chat;
+    await wait(async () => (chat = (await (await fetch(base + '/api/state')).json()).chats.find(c => /Urgências · WhatsApp/.test(c.title))));
+    assert.ok(chat, 'a rotina deveria ter rodado com a mensagem como evento');
+  } finally {
+    child.kill(); evo.close();
+  }
+});

@@ -45,6 +45,7 @@ import { runClaude, runCodex, systemPrompt, describeImage } from './lib/provider
 import { runOpenRouter, syncOpenRouterModels, checkOpenRouterKey, openRouterCatalog } from './lib/openrouter.mjs';
 import { recordExternal, listExternal, externalCsv, EXTERNAL_KINDS } from './lib/external-actions.mjs';
 import { buildPulse, pulseDue } from './lib/pulse.mjs';
+import { whatsappTriggerMatches, parseKeywords } from './lib/event-triggers.mjs';
 import { isPaidModel, paidBlockReason, addSpend, spendToday, spendLimits, normalizeBilling } from './lib/paid-usage.mjs';
 import { runTestProvider } from './lib/test-provider.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
@@ -2352,6 +2353,7 @@ const routes = [
     const r = { id: id(), agentId: b.agentId, name: String(b.name || 'Rotina').slice(0, 80), prompt: String(b.prompt).slice(0, 4000), lastRun: 0, lastStatus: 'never', lastError: null,
       quiet: b.quiet !== false,
       ...(b.trigger === 'webhook' ? { trigger: 'webhook', hookToken: newHookToken(), hookSecret: String(b.hookSecret || '').slice(0, 200) || undefined }
+        : b.trigger === 'whatsapp' ? { trigger: 'whatsapp', keywords: parseKeywords(b.keywords), scope: ['contacts', 'groups', 'any'].includes(b.scope) ? b.scope : 'contacts' }
         : b.everyMinutes ? { everyMinutes: Math.max(5, +b.everyMinutes) } : { dailyAt: /^\d\d:\d\d$/.test(b.dailyAt) ? b.dailyAt : '08:00', weekday: b.weekday ?? undefined }) };
     db.routines.push(r); save(); return redactRoutine(r);
   }],
@@ -2705,10 +2707,14 @@ const server = createServer(async (req, res) => {
         // grupo: só guardar para leitura (opt-in "Ler grupos"); nunca entra no fluxo de resposta
         const grp = parseEvolutionGroup(ev);
         if (grp) {
-          if (readGroups) groupName(grp.groupJid).then(name => recordWaMessage({ id: grp.id, phone: grp.key, fromMe: false, text: grp.text, name: name || 'Grupo', at: grp.at })).catch(() => {});
+          if (readGroups) groupName(grp.groupJid).then(name => {
+            recordWaMessage({ id: grp.id, phone: grp.key, fromMe: false, text: grp.text, name: name || 'Grupo', at: grp.at });
+            fireWhatsappTriggers({ text: grp.text, isGroup: true, fromMe: grp.fromMe, where: `grupo ${name || 'sem nome'}` });
+          }).catch(() => {});
           return;
         }
         const msg = parseEvolutionAny(ev);
+        if (msg && isEnterpriseMode(db.settings)) fireWhatsappTriggers({ text: msg.text, isGroup: false, fromMe: msg.fromMe, where: `${msg.name || 'contato'} (+${msg.from})` });
         if (msg) handleWhatsappWebMessage(msg).catch(e => console.error('whatsapp-web', ...redactForLog(db.settings, e.message)));
       };
       // Áudio e imagem viram texto antes de tudo (só se o Ripper vai usar: contato atendido, leitura ou grupo lido).
@@ -2913,6 +2919,13 @@ registerGracefulShutdown(server, {
 });
 
 // Rotinas: o agente dono acorda (por horário ou evento), executa e só deixa conversa se houver novidade.
+/** Rotinas com gatilho "mensagem no WhatsApp" que casam com esta mensagem. */
+function fireWhatsappTriggers({ text, isGroup, fromMe, where }) {
+  for (const r of db.routines) {
+    if (whatsappTriggerMatches(r, { text, isGroup, fromMe })) runRoutine(r, { source: 'WhatsApp', type: where, body: String(text).slice(0, 4000) });
+  }
+}
+
 function runRoutine(r, event) {
   const agent = db.agents.find(a => a.id === r.agentId);
   if (!agent || agent.status === 'paused' || r.lastStatus === 'running') return false;

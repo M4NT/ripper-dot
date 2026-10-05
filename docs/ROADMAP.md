@@ -12,7 +12,7 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 ---
 
 ## Próximos passos (em ordem)
-1. **Gatilhos por evento** (§3) — e-mail chegou, palavra-chave no WhatsApp, webhook.
+1. **E-mail como canal** (§3) — ler, rascunhar e responder com aprovação; destrava o gatilho "e-mail chegou".
 5. Provedores diretos: OpenAI, Gemini, Ollama (§1b).
 
 ---
@@ -59,7 +59,9 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 ## 3. Automação (P1 — onde viramos nº 1)
 - ✅ **Resumo diário ("Pulse")**: todo dia (8h, ajustável em Configurações → Perfil) na Caixa — o que cada agente fez, arquivos, rotinas (e quais falharam), ações em seu nome, gasto e o que espera você. Montado sem chamar modelo (zero tokens); `GET /api/pulse` mostra na hora.
 - [ ] Pulse também no WhatsApp do dono e na tela Início.
-- [ ] Gatilhos por evento (e-mail chegou, planilha mudou, webhook, mensagem no WhatsApp com palavra-chave) além de horário.
+- ✅ Gatilho por webhook (GitHub, formulários, qualquer sistema).
+- ✅ Gatilho "mensagem no WhatsApp": palavras-chave (palavra inteira, sem acento/maiúscula; vazio = toda mensagem), de contatos, grupos ou ambos; áudios transcritos também disparam; mensagens suas não; no máximo 1 disparo por minuto por rotina. Grupos exigem "Ler grupos" e o agente nunca responde no grupo.
+- [ ] Gatilho "e-mail chegou" (depende do e-mail como canal) e "planilha mudou" (Google Drive).
 - [ ] **Agente Guardião do GitHub**: observa repositórios, abre issues/PRs, delega correções, revisa antes de pedir merge.
 - [ ] Fluxos visuais: encadear agentes num canvas (A pesquisa → B escreve → C publica), com aprovação em qualquer passo.
 - [ ] E-mail como canal (ler, rascunhar, responder com aprovação), igual ao WhatsApp.
