@@ -1721,3 +1721,8 @@ code, .mono, pre { overflow-wrap: anywhere; }
 .flow-autos { margin-top: 12px; }
 .flow-autos .rows { margin: 0; }
 .flow-run .card-form { margin: 0; padding: 0; border: 0; background: none; box-shadow: none; }
+.flow-when { display: grid; gap: 6px; }
+.flow-when .select-wrap > button { width: 100%; }
+.flow-cond { position: absolute; top: calc(50% + 10px); left: 50%; transform: translateX(-50%); padding: 1px 7px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); color: var(--ink-2); font-size: 11.5px; white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+.flow-chip-cond { color: var(--muted); font-size: 12px; }
+@media (max-width: 720px) { .flow-cond { top: 50%; left: auto; right: calc(50% + 14px); transform: translateY(-50%); } }

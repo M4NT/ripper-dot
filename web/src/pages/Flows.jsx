@@ -66,7 +66,7 @@ export default function Flows() {
                 return (
                   <li key={i}>
                     {i > 0 && <Icon name="arrowR" size={14} className="flow-chain-arrow" />}
-                    <span className="flow-chip" title={st.instruction}>{a ? <AgentAvatar agent={a} size={22} /> : <Icon name="x" size={14} />}<span>{a?.name || 'agente apagado'}</span>{st.approve && <Icon name="check" size={13} className="flow-chip-gate" aria-label="pede aprovação" />}</span>
+                    <span className="flow-chip" title={st.instruction}>{a ? <AgentAvatar agent={a} size={22} /> : <Icon name="x" size={14} />}<span>{a?.name || 'agente apagado'}</span>{st.approve && <Icon name="check" size={13} className="flow-chip-gate" aria-label="pede aprovação" />}{st.when && <small className="flow-chip-cond">{st.when.mode === 'not' ? 'se não' : 'se'} “{st.when.keywords.join(', ')}”</small>}</span>
                   </li>
                 );
               })}
@@ -99,13 +99,20 @@ function FlowEditor({ edit, setEdit, agents, agentOf, onSave }) {
       <ol className="flow-canvas" aria-label="Passos do fluxo">
         {edit.steps.map((st, i) => (
             <li key={i} className="flow-node">
-              {i > 0 && <span className={`flow-link ${edit.steps[i - 1].approve ? 'gated' : ''}`} aria-hidden="true">{edit.steps[i - 1].approve && <span className="flow-gate"><Icon name="check" size={12} />você aprova</span>}<Icon name="arrowR" size={16} /></span>}
+              {i > 0 && <span className={`flow-link ${edit.steps[i - 1].approve ? 'gated' : ''}`} aria-hidden="true">{edit.steps[i - 1].approve && <span className="flow-gate"><Icon name="check" size={12} />você aprova</span>}{st.when && <span className="flow-cond">{st.when.mode === 'not' ? 'se não' : 'se'} “{String(Array.isArray(st.when.keywords) ? st.when.keywords.join(', ') : st.when.keywords).slice(0, 18) || '…'}”</span>}<Icon name="arrowR" size={16} /></span>}
               <div className="flow-step">
                 <div className="flow-step-head">
                   <span className="flow-num">{i + 1}</span>
                   <Select label={`Agente do passo ${i + 1}`} value={st.agentId} onChange={v => setStep(i, { agentId: v })} options={options} size="sm" />
                 </div>
                 <textarea className="input" rows={4} value={st.instruction} onChange={e => setStep(i, { instruction: e.target.value })} placeholder={i === 0 ? 'Ex.: Pesquise as 5 notícias mais importantes sobre o tema, com fontes.' : 'Ex.: Com a pesquisa acima, escreva um post de 300 palavras.'} aria-label={`O que o passo ${i + 1} faz`} />
+                {i > 0 && (
+                  <div className="flow-when">
+                    <Select label={`Quando o passo ${i + 1} roda`} size="sm" value={st.when?.mode || 'always'} onChange={mode => setStep(i, { when: mode === 'always' ? undefined : { mode, keywords: st.when?.keywords || '' } })}
+                      options={[{ value: 'always', label: 'Sempre roda' }, { value: 'has', label: 'Só se o anterior contiver…' }, { value: 'not', label: 'Só se o anterior NÃO contiver…' }]} />
+                    {st.when && <input className="input" value={Array.isArray(st.when.keywords) ? st.when.keywords.join(', ') : st.when.keywords} onChange={e => setStep(i, { when: { ...st.when, keywords: e.target.value } })} placeholder="cliente, urgente" aria-label="Palavras da condição" />}
+                  </div>
+                )}
                 {i < edit.steps.length - 1 && <label className="switch-row compact"><span>Pedir minha aprovação antes de seguir</span><Switch checked={st.approve} onChange={v => setStep(i, { approve: v })} label="Pedir aprovação" /></label>}
                 <div className="flow-step-tools">
                   <button type="button" className="icon-btn sm" disabled={i === 0} aria-label="Mover para a esquerda" onClick={() => move(i, -1)}><Icon name="arrowL" size={15} /></button>

@@ -45,7 +45,7 @@ import { runClaude, runCodex, systemPrompt, describeImage } from './lib/provider
 import { runOpenRouter, syncOpenRouterModels, checkCompatKey, compatCatalog, COMPAT } from './lib/openrouter.mjs';
 import { recordExternal, listExternal, externalCsv, EXTERNAL_KINDS } from './lib/external-actions.mjs';
 import { buildPulse, pulseDue } from './lib/pulse.mjs';
-import { normalizeFlow, stepPrompt } from './lib/flows.mjs';
+import { normalizeFlow, stepPrompt, stepRuns } from './lib/flows.mjs';
 import { emailReady, listEmails, readEmail, sendEmail, newEmailsSince, testEmail, getAttachment, safeName, attachmentText, readHint } from './lib/email.mjs';
 import { gh, githubReady, normalizeRepo, repoChanges, describeChange, prBranch, gitAuthArg, hideToken } from './lib/github.mjs';
 import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './lib/event-triggers.mjs';
@@ -3130,13 +3130,16 @@ function runFlow(flow, input, { routineId } = {}) {
   };
   db.chats.unshift(c); save();
   (async () => {
+    let previous = input; // a condição de um passo olha o resultado do último que rodou (no 1º, o pedido)
     for (let i = 0; i < flow.steps.length; i++) {
       const st = flow.steps[i], agent = db.agents.find(a => a.id === st.agentId);
+      if (!stepRuns(st, previous)) { c.flowRun = { ...c.flowRun, skipped: [...(c.flowRun.skipped || []), i] }; save(); continue; }
       if (!agent) { c.flowRun = { ...c.flowRun, status: 'failed', error: `Passo ${i + 1}: agente apagado.` }; break; }
       c.agentId = agent.id; c.flowRun = { ...c.flowRun, step: i }; save();
       await chat({ chat: c, text: stepPrompt(flow, i, input, null), skipUserPush: true }, () => {});
       const out = [...c.messages].reverse().find(m => m.role === 'assistant' && m.agentId === agent.id);
       if (!out || out.error || !out.content) { c.flowRun = { ...c.flowRun, status: 'failed', error: out?.error || `Passo ${i + 1} não respondeu.` }; break; }
+      previous = out.content;
       if (st.approve && i < flow.steps.length - 1) {
         c.flowRun = { ...c.flowRun, status: 'waiting' }; save();
         const next = db.agents.find(a => a.id === flow.steps[i + 1].agentId);
