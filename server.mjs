@@ -47,6 +47,7 @@ import { runOpenRouter, syncOpenRouterModels, checkCompatKey, compatCatalog, COM
 import { recordExternal, listExternal, externalCsv, EXTERNAL_KINDS } from './lib/external-actions.mjs';
 import { buildPulse, pulseDue, pulseWhatsappTo } from './lib/pulse.mjs';
 import { normalizeFlow, stepPrompt, stepRuns } from './lib/flows.mjs';
+import { DRAFT_SYSTEM, sanitizeDraft, heuristicDraft } from './lib/agent-draft.mjs';
 import { emailReady, listEmails, readEmail, sendEmail, newEmailsSince, testEmail, getAttachment, safeName, attachmentText, readHint } from './lib/email.mjs';
 import { gh, githubReady, normalizeRepo, repoChanges, describeChange, prBranch, gitAuthArg, hideToken } from './lib/github.mjs';
 import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './lib/event-triggers.mjs';
@@ -2243,6 +2244,20 @@ const routes = [
     const b = await body(req);
     const e = { ...db.settings.email, ...b, pass: b.pass && b.pass !== '••••' ? b.pass : db.settings.email?.pass };
     try { return await testEmail(e); } catch (err) { throw new HttpError(400, `Não conectou: ${err.message}`); }
+  }],
+  // Criar agente em 1 frase: o modelo econômico propõe a configuração; a tela mostra para revisar antes de criar.
+  ['POST', /^\/api\/agents\/draft$/, async req => {
+    const sentence = String((await body(req)).text || '').trim().slice(0, 600);
+    if (sentence.length < 8) throw new HttpError(400, 'Descreva o agente numa frase (o que ele faz e para quem).');
+    if (process.env.RIPPER_TEST_PROVIDER) return { ...heuristicDraft(sentence), by: 'heuristic' };
+    try {
+      const helper = newAgent({ name: 'Configurador', tools: [], instructions: '', model: channelModel(db.settings) });
+      let out = '';
+      for await (const ev of runClaude({ agent: helper, model: helper.model, effort: 'low', prompt: sentence, history: [], system: DRAFT_SYSTEM, settings: db.settings, ctx: { db } })) if (ev.text) out += ev.text;
+      const d = sanitizeDraft(out, sentence);
+      if (d) return { ...d, by: 'model' };
+    } catch (e) { console.error('agent.draft', ...redactForLog(db.settings, e.message)); }
+    return { ...heuristicDraft(sentence), by: 'heuristic' };
   }],
   // Fluxos: agentes em sequência, com aprovação nos passos marcados
   ['GET', /^\/api\/flows$/, () => ({ flows: db.flows || [] })],

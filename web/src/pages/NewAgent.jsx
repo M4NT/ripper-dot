@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { BotAvatar } from 'bot-avatars';
 import { useApp } from '../app.jsx';
 import { api, go, useRoute, fmtSize, TOOL_INFO, TONES, useDark } from '../lib.js';
-import { AgentAvatar, Icon, Select } from '../ui.jsx';
+import { AgentAvatar, Icon, Select, Switch } from '../ui.jsx';
 import { EffortScale, MODEL_DESC } from '../modelPicker.jsx';
 import { uploadFile } from '../composer.jsx';
 
@@ -33,6 +33,9 @@ export default function NewAgent() {
   const [look, setLook] = useState(false);
   const [more, setMore] = useState(!!first?.instructions);
   const [saving, setSaving] = useState(false);
+  const [sentence, setSentence] = useState('');
+  const [drafting, setDrafting] = useState(false);
+  const [extras, setExtras] = useState(null); // { whatsapp, routine, useWhatsapp, useRoutine } sugeridos pela frase
   const input = useRef(null), nameRef = useRef(null);
   const set = p => setV(x => ({ ...x, ...p }));
 
@@ -40,6 +43,18 @@ export default function NewAgent() {
     if (!t) { setV(x => ({ ...x, ...BLANK, avatar: x.avatar })); nameRef.current?.focus(); return; }
     setV(x => ({ ...x, name: t.name, description: t.description, category: t.category, instructions: t.instructions, tools: t.tools, templateId: t.id, avatar: { ...x.avatar, type: t.avatar.type } }));
     setMore(true);
+  }
+  async function draft() {
+    if (sentence.trim().length < 8) return toast('Descreva o que o agente faz e para quem.', 'error');
+    setDrafting(true);
+    try {
+      const d = await api('/api/agents/draft', { method: 'POST', body: { text: sentence } });
+      setV(x => ({ ...x, name: d.name, description: d.description, category: d.category, instructions: d.instructions, tone: d.tone, tools: d.tools, templateId: null, savedTemplateId: null }));
+      setExtras({ whatsapp: d.whatsapp, routine: d.routine, useWhatsapp: d.whatsapp, useRoutine: !!d.routine });
+      setMore(true);
+      toast('Pronto. Revise e clique em Criar agente.');
+    } catch (err) { toast(err.message, 'error'); }
+    finally { setDrafting(false); }
   }
   const toggleTool = t => set({ tools: v.tools.includes(t) ? v.tools.filter(x => x !== t) : [...v.tools, t] });
 
@@ -52,12 +67,16 @@ export default function NewAgent() {
       if (v.savedTemplateId) { body.savedTemplateId = v.savedTemplateId; delete body.templateId; }
       const a = await api('/api/agents', { method: 'POST', body });
       for (const f of files) { try { await uploadFile(a.id, null, f); } catch (err) { toast(err.message, 'error'); } }
+      // extras sugeridos pela frase e confirmados aqui
+      if (extras?.useWhatsapp && waReady) await api('/api/settings', { method: 'PUT', body: { whatsappWeb: { agentId: a.id, enabled: true } } }).catch(err => toast(err.message, 'error'));
+      if (extras?.useRoutine && extras.routine) await api('/api/routines', { method: 'POST', body: { agentId: a.id, name: extras.routine.weekday != null ? 'Rotina semanal' : 'Rotina diária', prompt: extras.routine.prompt, dailyAt: extras.routine.dailyAt, weekday: extras.routine.weekday, quiet: true } }).catch(err => toast(err.message, 'error'));
       await refresh();
       toast(`${a.name} está pronto`);
       go(`/a/${a.id}`);
     } catch (err) { toast(err.message, 'error'); setSaving(false); }
   }
 
+  const waReady = !!S.settings.whatsappWeb?.agentId || !!S.settings.whatsappWeb?.enabled;
   const computerNote = S.settings.computer.mode === 'off' ? 'Computador desligado em Integrações.' : S.settings.computer.mode === 'boat' && !S.settings.computer.boatApiKey ? 'Falta a chave do boat.dev em Integrações.' : null;
 
   return (
@@ -72,7 +91,25 @@ export default function NewAgent() {
 
       <div className="na-grid">
         <div className="na-form">
-          <Section n="1" title="Comece por um modelo" hint="Um ponto de partida preenche tudo. Dá para mudar qualquer coisa depois.">
+          <section className="na-quick">
+            <label htmlFor="na-sentence"><b>Descreva o agente numa frase</b><small>O Ripper monta o resto: nome, instruções e habilidades. Você revisa antes de criar.</small></label>
+            <div className="na-quick-row">
+              <textarea id="na-sentence" className="input" rows={2} value={sentence} onChange={e => setSentence(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); draft(); } }}
+                placeholder="Ex.: um agente que responde clientes no WhatsApp e todo dia às 18h me manda um resumo" />
+              <button type="button" className="btn btn-primary" disabled={drafting || sentence.trim().length < 8} onClick={draft}><Icon name="bolt" size={16} />{drafting ? 'Montando…' : 'Montar'}</button>
+            </div>
+            {extras && (extras.whatsapp || extras.routine) && (
+              <div className="na-extras">
+                {extras.whatsapp && (waReady
+                  ? <label className="switch-row compact"><span>Atender o seu WhatsApp</span><Switch checked={extras.useWhatsapp} onChange={useWhatsapp => setExtras({ ...extras, useWhatsapp })} label="Atender o WhatsApp" /></label>
+                  : <p className="muted small">Para atender o WhatsApp, conecte primeiro em Configurações → Canais.</p>)}
+                {extras.routine && <label className="switch-row compact"><span>Rotina {extras.routine.weekday != null ? `toda ${['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'][extras.routine.weekday]}` : 'todo dia'} às {extras.routine.dailyAt}: {extras.routine.prompt.slice(0, 80)}</span><Switch checked={extras.useRoutine} onChange={useRoutine => setExtras({ ...extras, useRoutine })} label="Criar a rotina" /></label>}
+              </div>
+            )}
+          </section>
+
+          <Section n="1" title="Ou comece por um modelo" hint="Um ponto de partida preenche tudo. Dá para mudar qualquer coisa depois.">
             <div className="na-templates">
               <button type="button" className={`na-tpl ${!v.templateId ? 'on' : ''}`} onClick={() => applyTemplate(null)}>
                 <span className="na-tpl-ico"><Icon name="plus" size={18} /></span><span className="na-tpl-text"><b>Do zero</b><small>Em branco</small></span>

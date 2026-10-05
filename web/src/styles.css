@@ -1752,3 +1752,12 @@ code, .mono, pre { overflow-wrap: anywhere; }
 .mini-screen iframe { display: block; width: 100%; aspect-ratio: 16 / 10; border: 0; pointer-events: none; background: #000; }
 .mini-screen-msg { margin: 0; padding: 28px 14px; text-align: center; color: var(--muted); font-size: 13px; }
 @media (max-width: 720px) { .mini-screen { right: 16px; bottom: 110px; width: min(240px, calc(100vw - 32px)); } }
+
+/* novo agente: criar em 1 frase */
+.na-quick { display: grid; gap: 10px; margin-bottom: 28px; padding: 18px; border-radius: var(--r-lg); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-1); }
+.na-quick label b { display: block; font-weight: 500; font-size: 16px; }
+.na-quick label small { color: var(--muted); font-size: 13px; }
+.na-quick-row { display: flex; gap: 10px; align-items: flex-start; }
+.na-quick-row textarea { flex: 1; min-width: 0; resize: vertical; }
+.na-extras { display: grid; gap: 2px; animation: rise .3s var(--out); }
+@media (max-width: 600px) { .na-quick-row { flex-direction: column; align-items: stretch; } }
