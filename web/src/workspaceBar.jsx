@@ -10,11 +10,14 @@ const base = p => String(p || '').split(/[\\/]/).filter(Boolean).pop() || p;
  * Faixa acima do composer: onde o agente trabalha nesta conversa — computador, pasta (ou repositório) e branch.
  * Conversa nova: a escolha fica pendente e vai junto com a 1ª mensagem.
  */
-export default function WorkspaceBar({ chat, chatId, agent, pending, setPending, onChanged }) {
+export default function WorkspaceBar({ chat, chatId, agents, pending, setPending, onChanged }) {
   const { S, toast } = useApp();
   const [open, setOpen] = useState(false);
   const ws = chatId ? chat?.workspace || null : pending;
-  const hasComputer = agent?.tools?.includes('computer') && S.settings.computer?.mode !== 'off';
+  // grupo: a pasta vale para todos os membros com computador (cada um a monta no próprio contêiner)
+  const withComputer = (agents || []).filter(a => a?.tools?.includes('computer'));
+  const hasComputer = withComputer.length > 0 && S.settings.computer?.mode !== 'off';
+  const group = (agents || []).length > 1;
 
   async function apply(next) {
     setOpen(false);
@@ -25,8 +28,8 @@ export default function WorkspaceBar({ chat, chatId, agent, pending, setPending,
 
   return (
     <div className="ws-bar" role="group" aria-label="Onde o agente trabalha">
-      <span className="ws-chip is-static" title={hasComputer ? 'Computador do agente' : 'Este agente não tem computador: só conversa e pesquisa.'}>
-        <Icon name="terminal" size={13} />{hasComputer ? MODE[S.settings.computer.mode] : 'Sem computador'}
+      <span className="ws-chip is-static" title={!hasComputer ? (group ? 'Nenhum membro do grupo tem computador: só conversam e pesquisam.' : 'Este agente não tem computador: só conversa e pesquisa.') : group ? `Com computador: ${withComputer.map(a => a.name).join(', ')}` : 'Computador do agente'}>
+        <Icon name="terminal" size={13} />{hasComputer ? `${MODE[S.settings.computer.mode]}${group ? ` · ${withComputer.length} de ${agents.length}` : ''}` : 'Sem computador'}
       </span>
       <button type="button" className={`ws-chip ${ws ? 'is-set' : ''}`} onClick={() => setOpen(true)} disabled={!hasComputer}
         title={ws?.path || ws?.repo || 'Escolher a pasta ou o repositório desta conversa'}>

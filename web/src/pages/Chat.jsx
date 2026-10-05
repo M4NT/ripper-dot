@@ -507,7 +507,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
               <button type="button" className="btn sm" onClick={() => send({ resume: true })}>Retomar resposta</button>
             </div>
           )}
-          {!isGroup && <WorkspaceBar chat={chat} chatId={chatId} agent={agent} pending={pendingWs} setPending={setPendingWs} onChanged={c => setChat(x => ({ ...x, ...c }))} />}
+          {<WorkspaceBar chat={chat} chatId={chatId} agents={isGroup ? members : [agent]} pending={pendingWs} setPending={setPendingWs} onChanged={c => setChat(x => ({ ...x, ...c }))} />}
           <Composer agent={agent} chatId={chatId} projectId={projectId} streaming={!!live} onSend={queueSend} onStop={() => { queueRef.current?.cancel(); if (chatId) api(`/api/chats/${chatId}/cancel`, { method: 'POST' }).catch(() => {}); ctrl.current?.abort(); }}
             choice={choice} setChoice={setChoice} group={isGroup} mentions={isGroup ? members : null}
             placeholder={isGroup ? 'Mensagem para o grupo… use @Nome para chamar alguém' : `Mensagem para ${agent.name}…`} autoFocus draftKey={chatId || 'new-' + memberIds.join('-')} />
