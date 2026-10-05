@@ -20,8 +20,8 @@ Legenda: **P0** bloqueia uso/confiança · **P1** diferencial forte · **P2** po
 - ✅ Tempos por etapa gravados em cada resposta (preparo, roteamento, 1ª palavra, total) e mostrados na mensagem.
 - ✅ Sem telemetria/checagem de atualização do CLI por turno (1ª palavra ~5s → ~1–2s no teste puro).
 - ✅ Conectores do claude.ai sob demanda (custavam 3–5s por mensagem): memória 5.4→2.9s, delegação 13.8→5.9s.
-- [ ] Processo do SDK pré-aquecido (`prewarm`) por agente — exige prompt de sistema estável (memórias via contexto, não no system).
-- [ ] Prompt de sistema enxuto: blocos só quando a ferramenta é usada; cache de prompt (prefixo estável primeiro).
+- ✅ Processo do SDK pré-aquecido (`prewarm`) por agente; memórias e contexto do turno no fim (`appendSystemPrompt`). 1ª palavra 2.6s → 1.3–2.0s (`scripts/bench-prewarm.mjs`).
+- [ ] Prompt de sistema enxuto: blocos só quando a ferramenta é usada. ✅ Cache de prompt: prefixo fixo primeiro, memórias saíram do meio.
 - [ ] Roteador Julia com rota Haiku para conversa curta; Opus só sob esforço alto.
 - [ ] Multitarefa real: subtarefas em paralelo (pesquisa + planilha) com barra de progresso por subtarefa.
 - [ ] Painel de custo por agente/dia (tokens, R$, tempo médio) — já existe base em Admin/Uso, trazer para o card do agente.

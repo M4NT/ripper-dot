@@ -44,7 +44,7 @@ import { browserFor, browserRisk } from './lib/browser.mjs';
 import { runClaude, runCodex, systemPrompt, describeImage } from './lib/providers.mjs';
 import { runTestProvider } from './lib/test-provider.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
-import { isDuplicateMemory, canUseFile, selectSpeakers, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent, turnPlanIds } from './lib/agent-flow.mjs';
+import { memoryContext, isDuplicateMemory, canUseFile, selectSpeakers, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent, turnPlanIds } from './lib/agent-flow.mjs';
 import { providerAttemptOrder, runProviderAttemptLoop } from './lib/provider-turn.mjs';
 import { normalizeProviderRetry } from './lib/provider-retry.mjs';
 import { patchSettings, settingsMeta, SettingsValidationError } from './lib/settings-patch.mjs';
@@ -104,6 +104,7 @@ import {
 } from './lib/semantic-cache.mjs';
 import { verifyMcpConnector } from './lib/mcp-probe.mjs';
 import { shutdownStdioSupervisors } from './lib/mcp-stdio-supervisor.mjs';
+import { closeSpares } from './lib/claude-prewarm.mjs';
 import {
   applyOAuthTokensToPlugin,
   refreshPluginOAuthToken,
@@ -428,7 +429,7 @@ function usageContextMeasures(chatId) {
   const groupContextChars = members.length > 1
     ? members.reduce((n, a) => n + String(a.name).length + String(a.description || '').length, 0) : 0;
   return {
-    systemChars: agent ? systemPrompt(agent, db.settings, memories).length : 0,
+    systemChars: agent ? systemPrompt(agent, db.settings).length + memoryContext(memories, db.settings.memoryLogInContext ?? 10).length : 0,
     skillsListChars,
     pluginsChars,
     mcpPluginCount: plugins.length,
@@ -1075,8 +1076,10 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
     } : null
   };
   const project = chat.projectId && db.projects.find(p => p.id === chat.projectId);
+  const systemStable = systemPrompt(agent, s);
   const system = [
-    systemPrompt(agent, s, memories),
+    systemStable,
+    memoryContext(memories, s.memoryLogInContext ?? 10),
     await projectContext(project),
     visibleArtifacts(chat).length && `Artefatos do time (leia com read_artifact; salve entregas com save_artifact): ${visibleArtifacts(chat).slice(-20).map(x => `"${x.title}" (${x.kind}, v${x.version})`).join('; ')}`,
     (() => {
@@ -1183,7 +1186,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
       if (testProvider) return runTestProvider({ prompt, signal });
       const providerSystem = MODELS[m].provider === 'codex' && s.computer.mode !== 'local'
         ? `${system}\n\nNesta execução do Codex, o computador está em modo somente leitura; não prometa executar comandos nem acessar a VM Boat.` : system;
-      const args = { agent, effort: clampEffort(s, m, effort), prompt, images, history, system: providerSystem, settings: { ...s, plugins: turnPlugins }, signal };
+      const args = { agent, effort: clampEffort(s, m, effort), prompt, images, history, system: providerSystem, systemStable, settings: { ...s, plugins: turnPlugins }, signal };
       return MODELS[m].provider === 'codex'
         ? runCodex({ ...args, cwd: sandboxDir(agent), ctx })
         : runClaude({ ...args, model: m, ctx });
@@ -2777,6 +2780,7 @@ registerGracefulShutdown(server, {
   onBeginShutdown: () => {
     clearInterval(routineTimer);
     shutdownStdioSupervisors().catch(() => {});
+    closeSpares();
   },
   getActiveConnections: () => activeHttpConnections,
   flush,
