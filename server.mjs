@@ -574,12 +574,12 @@ function notifyApproval(agent, command) {
 }
 
 /** Aviso do sistema na Caixa (backup falhou etc.). Um por chave enquanto não for resolvido. */
-function raiseSystemAlert({ key, title, body, href, hrefLabel, quiet }) {
+function raiseSystemAlert({ key, title, body, href, hrefLabel, quiet, error }) {
   db.systemAlerts ||= [];
   const open = db.systemAlerts.find(a => a.key === key && !a.done);
-  if (open) Object.assign(open, { body, at: Date.now() });
+  if (open) Object.assign(open, { body, error, at: Date.now() });
   else {
-    db.systemAlerts.push({ id: id(), key, at: Date.now(), title, body, href, hrefLabel, ...(quiet ? { quiet: true } : {}) });
+    db.systemAlerts.push({ id: id(), key, at: Date.now(), title, body, href, hrefLabel, ...(error ? { error } : {}), ...(quiet ? { quiet: true } : {}) });
     if (!quiet) notifyOwner({ title, body, url: '#/inbox' });
   }
   if (db.systemAlerts.length > 100) db.systemAlerts.splice(0, db.systemAlerts.length - 100);
@@ -3489,7 +3489,7 @@ if (typeof routineTimer.unref === 'function') routineTimer.unref();
 
 setInterval(() => {
   const out = maybeRunScheduledBackup(db);
-  if (out?.error) raiseSystemAlert({ key: 'backup', title: 'O backup automático falhou', body: `${out.error} Seus dados de hoje ainda não têm cópia.`, href: '/settings/backup', hrefLabel: 'Ver backup' });
+  if (out?.error) raiseSystemAlert({ key: 'backup', title: 'O backup automático falhou', body: 'Seus dados de hoje ainda não têm cópia.', error: out.error, href: '/settings/backup', hrefLabel: 'Ver backup' });
   else if (out?.created) { resolveSystemAlert('backup'); save(); }
 }, 60_000);
 

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useApp } from './app.jsx';
 import { api, fmtAgo } from './lib.js';
 import { Icon, Select, Switch } from './ui.jsx';
+import ErrorNote from './errorNote.jsx';
 
 const DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const SCOPE = { contacts: 'de contatos', groups: 'em grupos', any: 'de contatos ou grupos' };
@@ -34,7 +35,8 @@ export function RoutineList({ list }) {
           {r.trigger === 'webhook' && (
             <div className="hook-url"><code>{hookUrl(r)}</code><button type="button" className="btn btn-sm" onClick={() => { navigator.clipboard.writeText(hookUrl(r)); toast('Endereço copiado'); }}><Icon name="copy" size={13} />Copiar</button></div>
           )}
-          {r.lastRun > 0 && <small>Última execução: {fmtAgo(r.lastRun)} · {STATUS[r.lastStatus] || 'Sem resultado'}{r.lastError ? ` · ${r.lastError}` : ''}{r.lastChatId && r.lastStatus !== 'quiet' && <> · <a className="link" href={`#/c/${r.lastChatId}`}>ver resultado</a></>}</small>}
+          {r.lastRun > 0 && <small>Última execução: {fmtAgo(r.lastRun)} · {STATUS[r.lastStatus] || 'Sem resultado'}{r.lastChatId && r.lastStatus !== 'quiet' && <> · <a className="link" href={`#/c/${r.lastChatId}`}>ver resultado</a></>}</small>}
+          {r.lastError && r.lastStatus === 'failed' && <ErrorNote raw={r.lastError} compact />}
         </div>
         <button type="button" className="icon-btn sm" aria-label={`Remover ${r.name}`} onClick={() => api(`/api/routines/${r.id}`, { method: 'DELETE' }).then(refresh)}><Icon name="trash" size={16} /></button>
       </li>
