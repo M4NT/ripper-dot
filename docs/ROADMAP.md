@@ -22,7 +22,7 @@ Legenda: **P0** bloqueia uso/confiança · **P1** diferencial forte · **P2** po
 - ✅ Conectores do claude.ai sob demanda (custavam 3–5s por mensagem): memória 5.4→2.9s, delegação 13.8→5.9s.
 - ✅ Processo do SDK pré-aquecido (`prewarm`) por agente; memórias e contexto do turno no fim (`appendSystemPrompt`). 1ª palavra 2.6s → 1.3–2.0s (`scripts/bench-prewarm.mjs`).
 - [ ] Prompt de sistema enxuto: blocos só quando a ferramenta é usada. ✅ Cache de prompt: prefixo fixo primeiro, memórias saíram do meio.
-- [ ] Roteador Julia com rota Haiku para conversa curta; Opus só sob esforço alto.
+- ✅ Roteador Julia com rota Haiku para conversa curta (Julia + heurística). Opus: a cascata de custo já escolhe; teto por modelo em Configurações.
 - [ ] Multitarefa real: subtarefas em paralelo (pesquisa + planilha) com barra de progresso por subtarefa.
 - [ ] Painel de custo por agente/dia (tokens, R$, tempo médio) — já existe base em Admin/Uso, trazer para o card do agente.
 
