@@ -44,7 +44,7 @@ import { browserFor, browserRisk } from './lib/browser.mjs';
 import { runClaude, runCodex, systemPrompt, describeImage } from './lib/providers.mjs';
 import { runOpenRouter, syncOpenRouterModels, checkCompatKey, compatCatalog, COMPAT } from './lib/openrouter.mjs';
 import { recordExternal, listExternal, externalCsv, EXTERNAL_KINDS } from './lib/external-actions.mjs';
-import { buildPulse, pulseDue } from './lib/pulse.mjs';
+import { buildPulse, pulseDue, pulseWhatsappTo } from './lib/pulse.mjs';
 import { normalizeFlow, stepPrompt } from './lib/flows.mjs';
 import { emailReady, listEmails, readEmail, sendEmail, newEmailsSince, testEmail, getAttachment, safeName, attachmentText, readHint } from './lib/email.mjs';
 import { gh, githubReady, normalizeRepo, repoChanges, describeChange, prBranch, gitAuthArg, hideToken } from './lib/github.mjs';
@@ -3285,7 +3285,21 @@ setInterval(() => {
   resolveSystemAlert('pulse'); // o de ontem sai; fica só o mais recente
   const p = currentPulse();
   raiseSystemAlert({ key: 'pulse', title: p.title, body: p.body, href: '/agents', hrefLabel: 'Ver agentes', quiet: true });
+  sendPulseWhatsapp(p).catch(e => console.error('pulse.whatsapp', ...redactForLog(db.settings, e.message)));
 }, 60_000).unref?.();
+
+// Só para o número do próprio dono, que optou nas Configurações; nunca para terceiros.
+async function sendPulseWhatsapp(p) {
+  const to = pulseWhatsappTo(db.settings), s = db.settings;
+  if (!to) return;
+  const viaQr = !!s.whatsappWeb?.enabled;
+  if (!viaQr && !whatsappReady(s.whatsapp)) return;
+  if (viaQr && !waWebRate(to)) return;
+  const text = `*${p.title}*\n${p.body}`;
+  try { viaQr ? await sendEvolutionText(to, text) : await sendWhatsappText(s.whatsapp, to, text); }
+  catch (e) { recordExternal({ kind: 'whatsapp.sent', target: `+${to}`, text, approved: 'rule', ok: false, error: e.message }); throw e; }
+  recordExternal({ kind: 'whatsapp.sent', target: `+${to}`, text, approved: 'rule' });
+}
 
 process.on('unhandledRejection', e => console.error('unhandledRejection', ...redactForLog(db?.settings, e?.message || String(e))));
 if (!existsSync(DIST)) console.warn('Aviso: frontend não compilado. Rode `npm run build`.');

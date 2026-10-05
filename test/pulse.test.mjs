@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildPulse, pulseDue } from '../lib/pulse.mjs';
+import { buildPulse, pulseDue, pulseWhatsappTo } from '../lib/pulse.mjs';
 
 const now = Date.UTC(2026, 9, 5, 11);
 const db = {
@@ -35,4 +35,11 @@ test('dia parado e agenda', () => {
   assert.ok(pulseDue({}, null, at9));
   assert.equal(pulseDue({}, at9.toLocaleDateString('sv'), at9), null, 'uma vez por dia');
   assert.equal(pulseDue({ pulse: { enabled: false } }, null, at9), null);
+});
+
+test('WhatsApp do resumo: só com opt-in e número válido do dono', () => {
+  assert.equal(pulseWhatsappTo({ pulse: { whatsappTo: '+55 16 99999-9999' } }), null);
+  assert.equal(pulseWhatsappTo({ pulse: { whatsapp: true, whatsappTo: '+55 16 99999-9999' } }), '5516999999999');
+  assert.equal(pulseWhatsappTo({ pulse: { whatsapp: true, whatsappTo: '123' } }), null);
+  assert.equal(pulseWhatsappTo({ pulse: { enabled: false, whatsapp: true, whatsappTo: '5516999999999' } }), null);
 });

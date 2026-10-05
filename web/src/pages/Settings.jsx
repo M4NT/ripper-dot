@@ -450,6 +450,12 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
                 {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
               </select>
             </Row>}
+            {s.pulse?.enabled !== false && (s.whatsappWeb?.enabled || s.whatsapp?.agentId) && <Row title="Também no meu WhatsApp" desc="Só para o seu próprio número, com DDI e DDD. Nunca vai para outra pessoa.">
+              <Switch checked={!!s.pulse?.whatsapp} onChange={v => set('pulse', { ...(s.pulse || {}), whatsapp: v })} label="Resumo no WhatsApp" />
+            </Row>}
+            {s.pulse?.enabled !== false && s.pulse?.whatsapp && <Row title="Meu número">
+              <input className="input" inputMode="tel" placeholder="+55 16 99999-9999" value={s.pulse?.whatsappTo || ''} onChange={e => set('pulse', { ...(s.pulse || {}), whatsappTo: e.target.value })} />
+            </Row>}
           </Card>
         </>}
 

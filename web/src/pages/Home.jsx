@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { MetalFx } from 'metal-fx';
-import { go, local, useDark } from '../lib.js';
+import { api, go, local, useDark } from '../lib.js';
 import { AgentAvatar, Icon, Menu, Dialog } from '../ui.jsx';
 import { useApp } from '../app.jsx';
 import { isEnterpriseMode } from '../uiMode.js';
@@ -89,6 +89,8 @@ export default function Home() {
   const [choice, setChoice] = useState({ model: current.model || S.settings.defaultModel, effort: current.effort || 'auto' });
   const dark = useDark();
   const enterprise = isEnterpriseMode(S.settings);
+  const [pulse, setPulse] = useState(null);
+  useEffect(() => { api('/api/pulse').then(setPulse, () => {}); }, []);
 
   function start({ text, fileIds }) {
     // A conversa nasce na tela de chat; a mensagem vai junto.
@@ -98,7 +100,12 @@ export default function Home() {
 
   return (
     <div className="page home">
-      <section className="hero">
+      {pulse && !pulse.empty ? (
+        <section className="pulse-card" aria-label="Resumo do dia">
+          <header className="section-head"><h2>O que seus agentes fizeram hoje</h2><a href="#/agents" className="link">Ver agentes<Icon name="arrowR" size={16} /></a></header>
+          <p className="pulse-body">{pulse.body}</p>
+        </section>
+      ) : <section className="hero">
         <div className="hero-copy">
           <h1>Crie agentes<br />que realmente<br /><em>trabalham</em> por você.</h1>
           <p className="lede">Agentes com computador próprio, memória e rotinas. Rodam nas assinaturas do Claude e do ChatGPT que você já tem.</p>
@@ -112,7 +119,7 @@ export default function Home() {
           </div>
         </div>
         <HeroArt agent={current} />
-      </section>
+      </section>}
 
       <section className="home-composer">
         <Composer agent={current} choice={choice} setChoice={setChoice} onSend={start} draftKey="home"
