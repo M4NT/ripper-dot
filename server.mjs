@@ -44,6 +44,7 @@ import { browserFor, browserRisk } from './lib/browser.mjs';
 import { runClaude, runCodex, systemPrompt, describeImage } from './lib/providers.mjs';
 import { runOpenRouter, syncOpenRouterModels, checkOpenRouterKey, openRouterCatalog } from './lib/openrouter.mjs';
 import { recordExternal, listExternal, externalCsv, EXTERNAL_KINDS } from './lib/external-actions.mjs';
+import { buildPulse, pulseDue } from './lib/pulse.mjs';
 import { isPaidModel, paidBlockReason, addSpend, spendToday, spendLimits, normalizeBilling } from './lib/paid-usage.mjs';
 import { runTestProvider } from './lib/test-provider.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
@@ -534,11 +535,11 @@ ${media.caption}` : ''}`;
  * rodamos o turno e descartamos. Modelo: o mais econômico liberado, esforço baixo — são só mensagens.
  */
 /** Aviso do sistema na Caixa (backup falhou etc.). Um por chave enquanto não for resolvido. */
-function raiseSystemAlert({ key, title, body, href, hrefLabel }) {
+function raiseSystemAlert({ key, title, body, href, hrefLabel, quiet }) {
   db.systemAlerts ||= [];
   const open = db.systemAlerts.find(a => a.key === key && !a.done);
   if (open) Object.assign(open, { body, at: Date.now() });
-  else db.systemAlerts.push({ id: id(), key, at: Date.now(), title, body, href, hrefLabel });
+  else db.systemAlerts.push({ id: id(), key, at: Date.now(), title, body, href, hrefLabel, ...(quiet ? { quiet: true } : {}) });
   if (db.systemAlerts.length > 100) db.systemAlerts.splice(0, db.systemAlerts.length - 100);
   save();
 }
@@ -2038,6 +2039,8 @@ const routes = [
     if (db.settings.claude?.mode === 'api') return { connectors: [], note: 'Conectores do claude.ai só existem no modo assinatura.' };
     return { connectors: await listClaudeConnectors({ force: url.searchParams.get('refresh') === '1' }).catch(e => { throw new HttpError(502, `Não consegui ler os conectores do claude.ai: ${e.message}`); }) };
   }],
+  // Resumo do dia na hora (o mesmo que chega na Caixa às 8h)
+  ['GET', /^\/api\/pulse$/, () => currentPulse()],
   // Caixa: aprovações + recados de canal + novidades de rotina
   ['GET', /^\/api\/inbox$/, () => {
     const box = buildInbox(db);
@@ -2961,6 +2964,19 @@ setInterval(() => {
   if (out?.error) raiseSystemAlert({ key: 'backup', title: 'O backup automático falhou', body: `${out.error} Seus dados de hoje ainda não têm cópia.`, href: '/settings/backup', hrefLabel: 'Ver backup' });
   else if (out?.created) { resolveSystemAlert('backup'); save(); }
 }, 60_000);
+
+// Resumo diário ("Pulse"): uma vez por dia, a partir da hora escolhida, na Caixa. Sem tokens.
+function currentPulse() {
+  return buildPulse(db, { external: listExternal({ since: Date.now() - 24 * 3600_000, limit: 5000 }), inboxCount: buildInbox(db).items.filter(i => i.kind !== 'system' || !i.quiet).length });
+}
+setInterval(() => {
+  const day = pulseDue(db.settings, db.pulseLastDay);
+  if (!day) return;
+  db.pulseLastDay = day;
+  resolveSystemAlert('pulse'); // o de ontem sai; fica só o mais recente
+  const p = currentPulse();
+  raiseSystemAlert({ key: 'pulse', title: p.title, body: p.body, href: '/agents', hrefLabel: 'Ver agentes', quiet: true });
+}, 60_000).unref?.();
 
 process.on('unhandledRejection', e => console.error('unhandledRejection', ...redactForLog(db?.settings, e?.message || String(e))));
 if (!existsSync(DIST)) console.warn('Aviso: frontend não compilado. Rode `npm run build`.');

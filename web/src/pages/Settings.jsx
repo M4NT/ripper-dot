@@ -418,6 +418,14 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
               <textarea className="input" rows={2} maxLength={500} value={s.defaults?.agentStyle?.customHints || ''} onChange={e => set('defaults', { ...s.defaults, agentStyle: { ...(s.defaults?.agentStyle || {}), customHints: e.target.value } })} placeholder="Ex.: sempre em português do Brasil." />
             </Row>
           </Card>
+          <Card title="Resumo do dia" desc="Todo dia, na Caixa: o que cada agente fez, o que espera você e quanto gastou. Montado sem gastar tokens.">
+            <Row title="Receber o resumo"><Switch checked={s.pulse?.enabled !== false} onChange={v => set('pulse', { ...(s.pulse || {}), enabled: v })} label="Resumo do dia" /></Row>
+            {s.pulse?.enabled !== false && <Row title="Horário">
+              <select className="select" value={s.pulse?.hour ?? 8} onChange={e => set('pulse', { ...(s.pulse || {}), hour: +e.target.value })}>
+                {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
+              </select>
+            </Row>}
+          </Card>
         </>}
 
         {tab === 'models' && !P && <>

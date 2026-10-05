@@ -4,7 +4,7 @@ import { useApp } from '../app.jsx';
 import { AgentAvatar, Icon, Segmented, EmptyState } from '../ui.jsx';
 import { ApprovalCard } from '../approvals.jsx';
 
-const FILTERS = [['all', 'Tudo'], ['approval', 'Aprovações'], ['notice', 'Recados'], ['routine', 'Rotinas']];
+const FILTERS = [['all', 'Tudo'], ['approval', 'Aprovações'], ['notice', 'Recados'], ['routine', 'Rotinas'], ['spend', 'Gasto'], ['system', 'Sistema']];
 
 /**
  * Caixa: o que pede a sua atenção, num lugar só. Aprovações (alguém está esperando), recados dos
@@ -100,7 +100,7 @@ function NoticeItem({ it, onDone }) {
 function SystemItem({ it, onDone }) {
   const ok = async () => { await api(`/api/inbox/system/${it.id}/done`, { method: 'POST' }); onDone(); };
   return <>
-    <div className="inbox-who"><Icon name="bolt" size={18} /><span><b>{it.title}</b><span className="tag warn inbox-urgent">sistema</span></span><time>{fmtAgo(it.at)}</time></div>
+    <div className="inbox-who"><Icon name={it.quiet ? 'inbox' : 'bolt'} size={18} /><span><b>{it.title}</b><span className={`tag ${it.quiet ? '' : 'warn '}inbox-urgent`}>{it.quiet ? 'resumo' : 'sistema'}</span></span><time>{fmtAgo(it.at)}</time></div>
     <p className="inbox-summary">{it.body}</p>
     <div className="inbox-actions">
       {it.href && <button type="button" className="btn btn-sm" onClick={() => go(it.href)}>{it.hrefLabel || 'Abrir'}</button>}
