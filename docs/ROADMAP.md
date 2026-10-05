@@ -13,8 +13,8 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 
 ## Próximos passos (em ordem)
 1. Acesso remoto seguro com HTTPS (destrava notificações no celular; precisa do login — decisão do dono) (§6/§7).
-2. Biblioteca: busca em texto completo de artefatos e arquivos (§5).
-3. Admin: gráficos de uso por período e exportar CSV (§5).
+2. Biblioteca: busca em texto completo (§5) e Admin: gráficos e CSV (§5) — em andamento.
+3. Seção 9 (observações do dono): começar por "Preciso de você" e a fila de mensagens mortas.
 
 ---
 
@@ -129,6 +129,25 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 - [ ] Pesquisa de concorrentes atualizada a cada trimestre (este arquivo).
 
 ---
+
+## 9. Observações do dono (06/10/2026) — operação séria para empresas
+
+Registradas como vieram, com o estado real do código e a prioridade.
+
+### P0 — confiança em produção
+- [ ] **"Preciso de você" (handoff humano / PENDING_HUMAN).** Agente diante de algo ambíguo pausa a tarefa e cria na Caixa um cartão destacado com o contexto exato e a pergunta "O que faço aqui?"; a sua resposta retoma de onde parou, sem afetar outras tarefas. *Base existente:* aprovações (pausa e retomada já funcionam), notify_owner, Caixa. Falta: ferramenta `ask_owner` (pergunta aberta, não só sim/não) e retomada com a resposta.
+- [ ] **Fila de mensagens mortas (dead-letter) no SQLite WAL.** WhatsApp (Evolution), e-mail, webhooks e APIs externas: falha de rede vira item na fila com nova tentativa com espera crescente; nada se perde; tela para ver/reenviar/descartar. *Hoje:* falha é registrada em Ações externas, sem nova tentativa.
+- [ ] **Erros em linguagem humana com ação de 1 clique.** Mapear erros conhecidos (sessão expirada, site fora do ar, chave inválida, limite) para frases simples + botão ("Reconectar", "Tentar de novo"). *Base:* `humanError` no chat; estender a rotinas, fluxos, Caixa e canais.
+- [ ] **Sessões de portais nas VMs com auto-cura.** Detectar sessão expirada (Omie e outros portais) no meio de uma rotina, pausar o lote sem corromper, pedir reautenticação na Caixa ("Reconectar") e retomar. *Base:* cofre (`lib/credential-vault.mjs`), navegador da VM, noVNC para o humano logar. *Não existe integração com o Omie ainda.*
+
+### P1 — negócio e governança
+- [ ] **Custo por cliente (CNPJ/empresa) — FinOps.** Etiquetar conversas/rotinas/fluxos por cliente e somar tokens e US$ por cliente e período, para medir margem por atendimento. *Base:* MeteringPanel, TokenBudgetPanel, uso por agente/modelo, etiquetas de conversa (novo). Exportar CSV.
+- [ ] **X9 Guard em tempo real.** Além da varredura (`lib/x9-scan.mjs`, `x9Auditor.jsx`): filtro na saída de WhatsApp, e-mail e logs que bloqueia/mascara senhas, tokens e dados de faturamento antes de enviar, com aviso na Caixa.
+- [ ] **Agente Radar (estilo Ro-DOU).** Modelo pronto: varredura diária em fontes (DOU, sites, e-mails) por palavras-chave, relatório consolidado na Caixa/WhatsApp do responsável, sem comando manual. *Base:* rotinas por horário, gatilhos, fluxos, Pulse.
+- [ ] **Contrato entre modelos validado por esquema.** Toda troca estruturada entre modelos (rascunho de agente, orquestrador de times, triagem, fluxos) validada por esquema (zod) com correção/repetição automática quando o modelo variar. *Hoje:* o áudio é transcrito pelo Whisper local (não pelo Gemini); validações existem caso a caso (ex.: `sanitizeDraft`).
+
+### P2 — UX
+- [ ] **Zero tela parada.** Progresso visível em tarefas longas em todo lugar ("O Porteiro está consultando a agenda…"). *Base:* status ao vivo nos cards, linha de ação no chat, miniatura da tela, barra de fluxo; falta em rotinas em segundo plano e canais.
 
 ## Pontes a construir ou corrigir
 
