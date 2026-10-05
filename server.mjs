@@ -50,6 +50,7 @@ import { buildPulse, pulseDue, pulseWhatsappTo } from './lib/pulse.mjs';
 import { normalizeFlow, stepPrompt, stepRuns } from './lib/flows.mjs';
 import { DRAFT_SYSTEM, sanitizeDraft, heuristicDraft } from './lib/agent-draft.mjs';
 import { applyBulk } from './lib/chat-bulk.mjs';
+import { searchLibrary } from './lib/library-search.mjs';
 import { emailReady, listEmails, readEmail, sendEmail, newEmailsSince, testEmail, getAttachment, safeName, attachmentText, readHint } from './lib/email.mjs';
 import { gh, githubReady, normalizeRepo, repoChanges, describeChange, prBranch, gitAuthArg, hideToken } from './lib/github.mjs';
 import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './lib/event-triggers.mjs';
@@ -2791,6 +2792,26 @@ const routes = [
     db.chats.unshift(chat);
     save();
     return { chat: summary(chat), warnings };
+  }],
+  // Biblioteca: busca dentro do conteúdo (artefatos, arquivos de texto, memórias, skills)
+  // ponytail: lê os arquivos a cada busca (até 1 MB cada); índice se a biblioteca crescer muito
+  ['GET', /^\/api\/library\/search$/, async (req, _, url) => {
+    const q = String(url.searchParams.get('q') || '').slice(0, 200);
+    if (q.trim().length < 2) return { results: [] };
+    const items = [];
+    for (const a of db.artifacts.slice(-500)) {
+      let text = '';
+      try { text = String(await readArtifactContent(a)).slice(0, 200_000); } catch {}
+      items.push({ kind: 'artifact', id: a.id, title: a.title, text, href: a.chatId ? `#/c/${a.chatId}` : a.projectId ? `#/p/${a.projectId}` : '#/library', at: a.updatedAt || a.createdAt });
+    }
+    for (const f of db.files.slice(-1000)) {
+      let text = '';
+      if (TEXT_EXT.test(f.name) && f.size <= 1_000_000) text = await readFile(dataUrl(f.path), 'utf8').catch(() => '');
+      items.push({ kind: 'file', id: f.id, title: f.name, text, href: `/api/files/${f.id}`, at: f.createdAt });
+    }
+    for (const m of db.memories) items.push({ kind: 'memory', id: m.id, title: String(m.text || '').slice(0, 60) + (String(m.text || '').length > 60 ? '…' : ''), text: m.text, href: '#/library', at: m.createdAt });
+    for (const k of db.skills) items.push({ kind: 'skill', id: k.id, title: k.name, text: `${k.description || ''}\n${k.content || ''}`, href: '#/library', at: k.updatedAt || k.createdAt });
+    return { results: searchLibrary(items, q) };
   }],
   // Conversas em lote: arquivar, desarquivar, etiquetar, tirar etiqueta, apagar
   ['POST', /^\/api\/chats\/bulk$/, async req => {

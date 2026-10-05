@@ -63,6 +63,13 @@ export default function Library() {
   const { S, agent, refresh, toast } = useApp();
   const [tab, setTab] = useState('artifacts');
   const [memories, setMemories] = useState(null);
+  const [q, setQ] = useState('');
+  const [found, setFound] = useState(null); // resultados da busca (null = sem busca)
+  useEffect(() => {
+    if (q.trim().length < 2) { setFound(null); return; }
+    const t = setTimeout(() => api(`/api/library/search?q=${encodeURIComponent(q.trim())}`).then(r => setFound(r.results), () => setFound([])), 250);
+    return () => clearTimeout(t);
+  }, [q]);
   useEffect(() => {
     if (tab !== 'memories') return;
     Promise.all(S.agents.map(a => api(`/api/agents/${a.id}/memories`))).then(r => setMemories(r.flat().sort((a, b) => b.createdAt - a.createdAt)));
@@ -74,6 +81,8 @@ export default function Library() {
   return (
     <div className="page narrow">
       <header className="page-head"><div><h1>Biblioteca</h1><p className="lede">Tudo o que seus agentes guardam e compartilham: artefatos, skills, arquivos, memórias e rotinas.</p></div></header>
+      <label className="search-field lib-search"><Icon name="search" size={16} /><input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar dentro de artefatos, arquivos, memórias e skills" aria-label="Buscar na biblioteca" /></label>
+      {found ? <LibraryResults results={found} q={q} /> : <>
       <Segmented label="Seção" value={tab} onChange={setTab} items={[['artifacts', 'Artefatos', S.artifacts.length], ['skills', 'Skills', S.skills.length], ['scripts', 'Scripts'], ['messages', 'Mensagens'], ['files', 'Arquivos', files.length], ['memories', 'Memórias', S.memoriesCount], ['routines', 'Rotinas', routines.length]]} className="seg-scroll" />
       <div className="library">
         {tab === 'files' && (files.length === 0 ? <EmptyState title="Nenhum arquivo" body="Anexe arquivos numa conversa: eles aparecem aqui e ficam no computador do agente." /> :
@@ -99,6 +108,24 @@ export default function Library() {
             </li>
           ))}</ul>)}
       </div>
+      </>}
     </div>
+  );
+}
+
+const KIND = { artifact: ['Artefato', 'book'], file: ['Arquivo', 'file'], memory: ['Memória', 'brain'], skill: ['Skill', 'bulb'] };
+function LibraryResults({ results, q }) {
+  if (!results.length) return <EmptyState title="Nada encontrado" body={`Nada com “${q.trim()}” em artefatos, arquivos de texto, memórias ou skills.`} />;
+  return (
+    <ul className="rows lib-results" aria-label="Resultados da busca">{results.map(r => (
+      <li key={`${r.kind}-${r.id}`} className="row-item">
+        <span className="thumb file-ico"><Icon name={KIND[r.kind]?.[1] || 'file'} size={18} /></span>
+        <a className="row-main" href={r.href} {...(r.href.startsWith('/api/') ? { target: '_blank', rel: 'noreferrer' } : {})}>
+          <b>{r.title}</b>
+          <small>{KIND[r.kind]?.[0]}{r.at ? ` · ${fmtAgo(r.at)}` : ''}</small>
+          {r.snippet && <span className="lib-snippet">{r.snippet}</span>}
+        </a>
+      </li>
+    ))}</ul>
   );
 }
