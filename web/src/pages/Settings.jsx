@@ -8,6 +8,7 @@ import { Icon, Switch, Select, EmptyState, Segmented } from '../ui.jsx';
 import { AdvancedBlock, HelpTip } from '../disclosure.jsx';
 import { ApprovalHistory } from '../approvals.jsx';
 import { MODEL_DESC, EffortScale, EFFORTS } from '../modelPicker.jsx';
+import { PROVIDERS, ProviderGrid, ProviderHeader } from '../providersCatalog.jsx';
 
 const EFFORT_CAPS = EFFORTS.filter(([k]) => k !== 'auto');
 import { useSettingsDraft } from '../settingsForm.js';
@@ -320,6 +321,15 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
   const [docker, setDocker] = useState(undefined);
   const [image, setImage] = useState(null);
   const [julia, setJulia] = useState(null);
+  const [prov, setProv] = useState(null); // provedor aberto em Provedores de IA
+  const P = PROVIDERS.find(p => p.id === prov);
+  const provCounts = Object.values(S.models).reduce((o, m) => (m.provider && (o[m.provider] = (o[m.provider] || 0) + 1), o), {});
+  const provStatus = {
+    julia: julia === null ? { tone: 'off', label: 'verificando…' } : julia ? { tone: 'ok', label: 'no ar' } : { tone: 'warn', label: 'fora do ar' },
+    claude: s.claude.mode === 'api' && !s.claude.apiKey ? { tone: 'warn', label: 'falta a chave' } : { tone: 'ok', label: s.claude.mode === 'api' ? 'API key' : 'assinatura' },
+    codex: S.meta?.codexInstalled ? { tone: 'ok', label: 'conectado' } : { tone: 'warn', label: 'não instalado' },
+    openrouter: s.openrouter?.apiKey ? { tone: 'ok', label: 'chave salva' } : { tone: 'off', label: 'não conectado' }
+  };
   const [sandboxSt, setSandboxSt] = useState(null);
   useEffect(() => {
     if (tab === 'computer') api('/api/computer/docker').then(r => { setDocker(r.version); setImage(r.image); }).catch(() => setDocker(null));
@@ -369,9 +379,58 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
           </Card>
         </>}
 
-        {tab === 'models' && <>
-          <Card title="Modelos disponíveis" desc="Desligue as IAs que você não quer usar e limite o esforço de cada uma. O Ripper Auto e a Julia 1 só escolhem dentro disso, e nenhum pedido passa do teto.">
-            {Object.entries(S.models).filter(([k]) => k !== 'auto').map(([k, m]) => {
+        {tab === 'models' && !P && <>
+          <ProviderGrid status={provStatus} counts={provCounts} dark={dark} onOpen={setProv} />
+          <Card title="Padrão para agentes novos">
+            <Row title="Modelo" desc="Cada agente e cada conversa podem trocar depois.">
+              <Select label="Modelo padrão" value={s.defaultModel} onChange={v => set('defaultModel', v)} options={Object.entries(S.models).filter(([k]) => k === 'auto' || s.models?.enabled?.[k] !== false).map(([k, m]) => ({ value: k, label: m.label, hint: MODEL_DESC[k] }))} />
+            </Row>
+          </Card>
+          <Card title="Fila de entrada" desc="Mensagens seguidas no composer são agrupadas num único turno. Enter reinicia a janela; o botão Enviar manda na hora.">
+            <Row title="Agrupar mensagens consecutivas"><Switch checked={s.inputQueue?.enabled !== false} onChange={v => set('inputQueue', { ...(s.inputQueue || {}), enabled: v })} label="Coalescing ativo" /></Row>
+            <Row title="Janela de agrupamento" desc="Tempo de espera após Enter antes de mandar ao agente (0 desliga o atraso quando o coalescing está ativo).">
+              <div className="input-unit"><input className="input" type="number" min={0} max={10} step={0.5} value={(s.inputQueue?.windowMs ?? 2500) / 1000} onChange={e => set('inputQueue', { ...(s.inputQueue || {}), windowMs: Math.round(+e.target.value * 1000) })} /><span>segundos</span></div>
+            </Row>
+          </Card>
+        </>}
+        {tab === 'models' && P && <>
+          <ProviderHeader p={P} status={provStatus} dark={dark} onBack={() => setProv(null)} />
+          {P.id === 'claude' && <>
+          <Card title="Conexão" badge={<span className="tag">Opus 5.5 · Sonnet 5.5 · Fable 5.1</span>}>
+            <Row title="Como conectar">
+              <div className="seg-choice">
+                {[['subscription', 'Assinatura', 'claude login desta máquina'], ['api', 'API key', 'paga por token']].map(([k, l, h]) => (
+                  <button key={k} type="button" className={s.claude.mode === k ? 'on' : ''} onClick={() => set('claude.mode', k)}><b>{l}</b><small>{h}</small></button>
+                ))}
+              </div>
+            </Row>
+            {s.claude.mode === 'api' && <Row title="Anthropic API key"><input className="input" type="password" autoComplete="off" value={s.claude.apiKey} onChange={e => set('claude.apiKey', e.target.value)} placeholder="sk-ant-…" /></Row>}
+            <Row title="Conectores do claude.ai" desc="Gmail, Drive e outros. Carregar custa tokens: só vale para agentes com Plugins MCP."><Switch checked={s.claude.useConnectors} onChange={v => set('claude.useConnectors', v)} label="Conectores do claude.ai" /></Row>
+          </Card>
+          </>}
+          {P.id === 'codex' && <>
+          <Card title="Conexão" badge={<span className="tag">Codex</span>}>
+            <Row title="Login" desc="Rode codex login uma vez nesta máquina. Sem o Codex instalado, o Ripper Auto usa só o Claude."><code className="inline-code">npm i -g @openai/codex</code></Row>
+            <Row title="Apps conectados do ChatGPT" desc="Quando houver suporte."><Switch checked={s.chatgpt.useConnectedApps} onChange={v => set('chatgpt.useConnectedApps', v)} label="Apps do ChatGPT" /></Row>
+          </Card>
+          </>}
+          {P.id === 'openrouter' && <OpenRouterCard s={s} set={set} />}
+          {P.id === 'julia' && <>
+          <Card title="Como a Julia trabalha" badge={<><MetalBadge theme={dark ? 'dark' : 'light'}>Julia 1</MetalBadge>{julia === null ? <span className="tag" role="status">Verificando…</span> : <span className={`tag ${julia ? 'tag-ok' : 'tag-warn'}`}>{julia ? 'no ar' : 'fora do ar'}</span>}</>} desc="A Julia 1 escolhe modelo e prioridades antes do modelo grande. Fora do ar, as regras de reserva decidem.">
+            <AdvancedBlock settings={s} hint="Limites de API, Julia e detalhes do Codex" className="in-card">
+              <p className="set-card-desc">Quando a API devolve rate limit (429), o Ripper espera antes de tentar de novo ou mudar de modelo.</p>
+              <Row title="Tentativas por modelo" desc="Inclui a primeira chamada. Depois disso, pode haver fallback para outro provedor.">
+                <div className="input-unit"><input className="input" type="number" min={1} max={6} value={s.providerRetry?.maxAttempts ?? 3} onChange={e => set('providerRetry', { ...(s.providerRetry || {}), maxAttempts: +e.target.value })} /><span>tentativas</span></div>
+              </Row>
+              <Row title="Espera máxima entre tentativas"><div className="input-unit"><input className="input" type="number" min={1} max={120} value={Math.round((s.providerRetry?.maxDelayMs ?? 60000) / 1000)} onChange={e => set('providerRetry', { ...(s.providerRetry || {}), maxDelayMs: +e.target.value * 1000 })} /><span>segundos</span></div></Row>
+              <Row title="Endereço do Julia 1" desc="Serviço local de triagem (npm run julia)."><input className="input" value={s.julia.url} onChange={e => set('julia.url', e.target.value)} /></Row>
+              <Row title="Ferramentas Ripper no Codex" desc="Com o Codex, remember, artefatos, inbox e o MCP ripper vão por stdio. WebSearch do Claude e conectores claude.ai não existem no Codex." />
+            </AdvancedBlock>
+          </Card>
+          </>}
+          {P.provider && (provCounts[P.provider] || 0) > 0 && <>
+          <Card title="Modelos" desc="Desligue os que você não quer usar e limite o esforço de cada um. O Ripper Auto e a Julia 1 só escolhem dentro disso.">
+            {Object.entries(S.models).filter(([k, m]) => k !== 'auto' && m.provider === P.provider).map(([k, m]) => {
               const on = s.models?.enabled?.[k] !== false;
               const connected = m.provider === 'codex' ? S.meta?.codexInstalled : true;
               const others = Object.keys(S.models).filter(x => x !== 'auto' && x !== k && s.models?.enabled?.[x] !== false);
@@ -389,44 +448,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
               );
             })}
           </Card>
-          <Card title="Padrão para agentes novos">
-            <Row title="Modelo" desc="Cada agente e cada conversa podem trocar depois.">
-              <Select label="Modelo padrão" value={s.defaultModel} onChange={v => set('defaultModel', v)} options={Object.entries(S.models).filter(([k]) => k === 'auto' || s.models?.enabled?.[k] !== false).map(([k, m]) => ({ value: k, label: m.label, hint: MODEL_DESC[k] }))} />
-            </Row>
-          </Card>
-          <Card title="Claude" badge={<span className="tag">Opus 5.5 · Sonnet 5.5 · Fable 5.1</span>}>
-            <Row title="Como conectar">
-              <div className="seg-choice">
-                {[['subscription', 'Assinatura', 'claude login desta máquina'], ['api', 'API key', 'paga por token']].map(([k, l, h]) => (
-                  <button key={k} type="button" className={s.claude.mode === k ? 'on' : ''} onClick={() => set('claude.mode', k)}><b>{l}</b><small>{h}</small></button>
-                ))}
-              </div>
-            </Row>
-            {s.claude.mode === 'api' && <Row title="Anthropic API key"><input className="input" type="password" autoComplete="off" value={s.claude.apiKey} onChange={e => set('claude.apiKey', e.target.value)} placeholder="sk-ant-…" /></Row>}
-            <Row title="Conectores do claude.ai" desc="Gmail, Drive e outros. Carregar custa tokens: só vale para agentes com Plugins MCP."><Switch checked={s.claude.useConnectors} onChange={v => set('claude.useConnectors', v)} label="Conectores do claude.ai" /></Row>
-          </Card>
-          <OpenRouterCard s={s} set={set} />
-          <Card title="Fila de entrada" desc="Mensagens seguidas no composer são agrupadas num único turno. Enter reinicia a janela; o botão Enviar manda na hora.">
-            <Row title="Agrupar mensagens consecutivas"><Switch checked={s.inputQueue?.enabled !== false} onChange={v => set('inputQueue', { ...(s.inputQueue || {}), enabled: v })} label="Coalescing ativo" /></Row>
-            <Row title="Janela de agrupamento" desc="Tempo de espera após Enter antes de mandar ao agente (0 desliga o atraso quando o coalescing está ativo).">
-              <div className="input-unit"><input className="input" type="number" min={0} max={10} step={0.5} value={(s.inputQueue?.windowMs ?? 2500) / 1000} onChange={e => set('inputQueue', { ...(s.inputQueue || {}), windowMs: Math.round(+e.target.value * 1000) })} /><span>segundos</span></div>
-            </Row>
-          </Card>
-          <Card title="ChatGPT" badge={<span className="tag">Codex</span>}>
-            <Row title="Login" desc="Rode codex login uma vez nesta máquina. Sem o Codex instalado, o Ripper Auto usa só o Claude."><code className="inline-code">npm i -g @openai/codex</code></Row>
-            <Row title="Apps conectados do ChatGPT" desc="Quando houver suporte."><Switch checked={s.chatgpt.useConnectedApps} onChange={v => set('chatgpt.useConnectedApps', v)} label="Apps do ChatGPT" /></Row>
-          </Card>
-          <Card title="Ripper Auto" badge={<><MetalBadge theme={dark ? 'dark' : 'light'}>Julia 1</MetalBadge>{julia === null ? <span className="tag" role="status">Verificando…</span> : <span className={`tag ${julia ? 'tag-ok' : 'tag-warn'}`}>{julia ? 'no ar' : 'fora do ar'}</span>}</>} desc="A Julia 1 escolhe modelo e prioridades antes do modelo grande. Fora do ar, as regras de reserva decidem.">
-            <AdvancedBlock settings={s} hint="Limites de API, Julia e detalhes do Codex" className="in-card">
-              <p className="set-card-desc">Quando a API devolve rate limit (429), o Ripper espera antes de tentar de novo ou mudar de modelo.</p>
-              <Row title="Tentativas por modelo" desc="Inclui a primeira chamada. Depois disso, pode haver fallback para outro provedor.">
-                <div className="input-unit"><input className="input" type="number" min={1} max={6} value={s.providerRetry?.maxAttempts ?? 3} onChange={e => set('providerRetry', { ...(s.providerRetry || {}), maxAttempts: +e.target.value })} /><span>tentativas</span></div>
-              </Row>
-              <Row title="Espera máxima entre tentativas"><div className="input-unit"><input className="input" type="number" min={1} max={120} value={Math.round((s.providerRetry?.maxDelayMs ?? 60000) / 1000)} onChange={e => set('providerRetry', { ...(s.providerRetry || {}), maxDelayMs: +e.target.value * 1000 })} /><span>segundos</span></div></Row>
-              <Row title="Endereço do Julia 1" desc="Serviço local de triagem (npm run julia)."><input className="input" value={s.julia.url} onChange={e => set('julia.url', e.target.value)} /></Row>
-              <Row title="Ferramentas Ripper no Codex" desc="Com o Codex, remember, artefatos, inbox e o MCP ripper vão por stdio. WebSearch do Claude e conectores claude.ai não existem no Codex." />
-            </AdvancedBlock>
-          </Card>
+          </>}
         </>}
 
         {tab === 'computer' && <>

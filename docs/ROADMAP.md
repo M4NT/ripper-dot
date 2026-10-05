@@ -27,7 +27,7 @@ Legenda: **P0** bloqueia uso/confiança · **P1** diferencial forte · **P2** po
 - ✅ Custo do dia no card do agente (respostas, tokens e US$ estimados, tempo médio). Falta: R$ (câmbio) e tokens reais do SDK.
 
 ## 1b. Provedores de IA (P0)
-- ✅ Tela "Provedores de IA" (Configurações): Claude, ChatGPT/Codex, OpenRouter e a política de modelos num lugar só.
+- ✅ Tela "Provedores de IA": grade com todos os provedores (logo, status, quantos modelos) e detalhe de cada um (o que faz no Ripper, o que ainda não faz, conexão e modelos).
 - ✅ OpenRouter com as ferramentas do Ripper (computador, navegador, memória, delegação; web pelo plugin do OpenRouter); escolha de modelos pelo catálogo.
 - [ ] OpenAI direto (chave), Gemini (AI Studio — cobre os modelos do Antigravity), Cursor (`cursor-agent`), Ollama (local).
 - [ ] Plugins MCP do usuário nos provedores novos (hoje só Claude/Codex).
