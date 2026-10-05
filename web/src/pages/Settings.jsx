@@ -398,7 +398,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
   };
   const [sandboxSt, setSandboxSt] = useState(null);
   useEffect(() => {
-    if (tab === 'computer') api('/api/computer/docker').then(r => { setDocker(r.version); setImage(r.image); }).catch(() => setDocker(null));
+    if (tab === 'computer') api('/api/computer/docker').then(r => { setDocker(r.version); setImage(r.outdated && r.image === 'missing' ? 'outdated' : r.image); }).catch(() => setDocker(null));
     if (tab === 'models') api('/api/julia/status').then(r => setJulia(r.online)).catch(() => setJulia(false));
     if (tab === 'security') api('/api/sandbox/status').then(setSandboxSt).catch(() => setSandboxSt(null));
   }, [tab]);
@@ -546,9 +546,9 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
           {s.computer.mode === 'docker' && (
             <Card title="Docker" badge={docker === undefined ? <span className="tag" role="status">Verificando…</span> : docker ? <span className="tag tag-ok">Docker {docker} ativo</span> : <span className="tag tag-warn">Docker não encontrado</span>} aria-busy={docker === undefined}>
               {docker === null && <p className="form-error">Abra o Docker Desktop e recarregue esta página.</p>}
-              <Row title="Imagem de referência" desc="ripper-agent:1 já vem com Chromium, tela virtual (noVNC), Node 22 e Python 3." tip="Cada agente ganha um contêiner isolado; arquivos ficam na pasta do agente, não na sua máquina.">
-                <div className="row">{image && <span className={`tag ${image === 'ready' ? 'tag-ok' : 'tag-warn'}`}>{image === 'ready' ? 'pronta' : image === 'building' ? 'construindo…' : 'não construída'}</span>}
-                  {image === 'missing' && <button className="btn btn-sm" onClick={() => api('/api/computer/image', { method: 'POST' }).then(r => setImage(r.image))}>Construir agora</button>}</div>
+              <Row title="Imagem de referência" desc="A imagem do Ripper já vem com Chromium, tela virtual (noVNC), Node 22 e Python 3." tip="Cada agente ganha um contêiner isolado; arquivos ficam na pasta do agente, não na sua máquina.">
+                <div className="row">{image && <span className={`tag ${image === 'ready' ? 'tag-ok' : 'tag-warn'}`}>{image === 'ready' ? 'pronta' : image === 'building' ? 'construindo…' : image === 'outdated' ? 'desatualizada' : 'não construída'}</span>}
+                  {(image === 'missing' || image === 'outdated') && <button className="btn btn-sm" onClick={() => api('/api/computer/image', { method: 'POST' }).then(r => setImage(r.image === 'missing' ? 'building' : r.image))}>{image === 'outdated' ? 'Atualizar imagem' : 'Construir agora'}</button>}</div>
               </Row>
               <AdvancedBlock settings={s} hint="Imagem customizada e tempo ocioso" className="in-card">
                 <Row title="Imagem usada" desc="Deixe ripper-agent:1, a não ser que você tenha uma imagem própria."><input className="input" value={['', 'node:22-bookworm'].includes(s.computer.dockerImage || '') ? 'ripper-agent:1' : s.computer.dockerImage} onChange={e => set('computer.dockerImage', e.target.value)} /></Row>

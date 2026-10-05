@@ -9,7 +9,7 @@ import { authed as checkAuth } from './lib/auth.mjs';
 import { load, save, flush, id, newAgent, patchAgent, dataUrl, safeCheckStoreReady } from './lib/store.mjs';
 import { route, classifySpeaker, MODELS, EFFORTS, enabledModels, clampEffort } from './lib/router.mjs';
 import { computerFor } from './lib/boat.mjs';
-import { dockerAvailable, imageStatus, ensureImage, hostnameOf, transcribeAudio } from './lib/docker.mjs';
+import { dockerAvailable, imageStatus, ensureImage, outdatedImage, hostnameOf, transcribeAudio } from './lib/docker.mjs';
 import { sandboxStatus } from './lib/exec-sandbox.mjs';
 import { ApprovalGate } from './lib/approvals.mjs';
 import { autoStartJulia, juliaOnline, juliaChoose, juliaStatus, measureTriagePromptChars, RISK_OPTIONS, NOTIFY_OPTIONS, MEMORY_OPTIONS, REPLY_OPTIONS } from './lib/julia.mjs';
@@ -482,7 +482,7 @@ const codexInstalled = new Promise(resolve => {
 let codexOk = false; // espelho síncrono para o estado da UI
 codexInstalled.then(ok => { codexOk = ok; if (!ok) console.log('Codex não encontrado: o Ripper Auto usa só o Claude. Instale com: npm i -g @openai/codex'); });
 
-const dockerStatusCached = memoAsync(async () => ({ version: await dockerAvailable(), image: await imageStatus() }), 30_000);
+const dockerStatusCached = memoAsync(async () => ({ version: await dockerAvailable(), image: await imageStatus(), outdated: await outdatedImage() }), 30_000);
 
 // ---------- mensagens entre agentes ----------
 const inboxBusy = new Set();
@@ -2318,7 +2318,7 @@ const routes = [
   }],
   ['GET', /^\/api\/computer\/docker$/, async () => dockerStatusCached()],
   ['GET', /^\/api\/sandbox\/status$/, async () => sandboxStatus(db.settings)],
-  ['POST', /^\/api\/computer\/image$/, async () => { ensureImage().catch(e => console.error('imagem', e.message)); return { image: await imageStatus() }; }],
+  ['POST', /^\/api\/computer\/image$/, async () => { ensureImage().then(() => { resolveSystemAlert('agent-image'); save(); }).catch(e => console.error('imagem', e.message)); return { image: await imageStatus() }; }],
   ['GET', /^\/api\/agents\/([\w-]+)\/vnc$/, async (req, [aid]) => {
     const a = agentOr404(aid);
     if (db.settings.computer.mode !== 'docker') throw new HttpError(409, 'A tela ao vivo precisa do computador em modo Docker.');
@@ -3223,6 +3223,15 @@ setInterval(() => {
   if (out?.error) raiseSystemAlert({ key: 'backup', title: 'O backup automático falhou', body: `${out.error} Seus dados de hoje ainda não têm cópia.`, href: '/settings/backup', hrefLabel: 'Ver backup' });
   else if (out?.created) { resolveSystemAlert('backup'); save(); }
 }, 60_000);
+
+// Imagem dos agentes desatualizada (só no modo Docker): aviso na Caixa com atalho para atualizar.
+async function checkAgentImage() {
+  if (db.settings.computer?.mode !== 'docker') return;
+  if (await outdatedImage()) raiseSystemAlert({ key: 'agent-image', title: 'A imagem dos agentes está desatualizada', body: 'Ditado, áudio do WhatsApp, leitura de PDF e slides precisam da versão nova. Atualizar leva alguns minutos e roda em segundo plano.', href: '/settings/computer', hrefLabel: 'Atualizar agora' });
+  else if (await imageStatus() === 'ready') { resolveSystemAlert('agent-image'); save(); }
+}
+setTimeout(checkAgentImage, 20_000).unref?.();
+setInterval(checkAgentImage, 6 * 3600_000).unref?.();
 
 // Guardião do GitHub: a cada N min (5 por padrão) pergunta ao GitHub o que mudou; cada novidade vira um evento da rotina.
 let githubPolling = false;
