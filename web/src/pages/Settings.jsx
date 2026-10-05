@@ -191,70 +191,103 @@ function Row({ title, desc, children, stack, tip }) {
     </div>
   );
 }
-/** Contas do Claude por assinatura (ex.: Pro e Teams): login de cada uma, conta padrão e troca automática no limite. */
+/** Contas do Claude por assinatura: botões lado a lado (como "Como conectar"); clicar troca na hora. */
 function ClaudeAccountsCard({ s, set, S }) {
-  const { toast } = useApp();
+  const { refresh, toast } = useApp();
   const [rows, setRows] = useState(null);
-  const [tests, setTests] = useState({}); // id → 'testing' | { ok, email, plan, error }
-  const [label, setLabel] = useState('');
-  const load = () => api('/api/claude/accounts').then(setRows).catch(() => setRows([]));
-  useEffect(() => { load(); }, [S.settings.claude?.accounts?.length]);
-  const claude = s.claude;
-  const saved = id => id === 'principal' || (S.settings.claude?.accounts || []).some(a => a.id === id);
-  const accounts = [{ id: 'principal', label: 'Principal (login desta máquina)' }, ...(claude.accounts || [])];
-  const info = id => rows?.find(r => r.id === id);
-  async function test(id) {
-    setTests(t => ({ ...t, [id]: 'testing' }));
-    const r = await api(`/api/claude/accounts/${id}/test`, { method: 'POST' }).catch(e => ({ ok: false, error: e.message }));
-    setTests(t => ({ ...t, [id]: r })); load();
+  const [info, setInfo] = useState({}); // id → { ok, email, plan, error }
+  const [adding, setAdding] = useState(null); // nome da conta nova sendo digitado
+  const [busy, setBusy] = useState('');
+  const [manage, setManage] = useState(false);
+  const saved = S.settings.claude || {};
+  const current = saved.defaultAccount || 'principal';
+  const accounts = [{ id: 'principal', label: 'Conta pessoal' }, ...(saved.accounts || [])];
+
+  const load = () => api('/api/claude/accounts').then(r => {
+    setRows(r);
+    for (const a of r) if (a.loggedIn && !info[a.id]) api(`/api/claude/accounts/${a.id}/test`, { method: 'POST' }).then(x => setInfo(i => ({ ...i, [a.id]: x }))).catch(() => {});
+  }).catch(() => setRows([]));
+  useEffect(() => { load(); }, [saved.accounts?.length]);
+
+  // Salva já (sem esperar o "Salvar alterações") e mantém o rascunho da tela igual ao salvo.
+  async function saveClaude(patch) {
+    const next = { ...saved, ...patch };
+    const r = await api('/api/settings', { method: 'PUT', body: { claude: next } });
+    set('claude', r.claude); // rascunho = salvo (ids das contas vêm do servidor)
+    await refresh();
   }
   async function login(id) {
-    try {
-      const r = await api(`/api/claude/accounts/${id}/login`, { method: 'POST' });
-      toast(r.opened ? 'Abri um terminal: faça o login lá e depois clique em Testar.' : `Rode no terminal: ${r.command}`);
-    } catch (e) { toast(e.message, 'error'); }
+    const r = await api(`/api/claude/accounts/${id}/login`, { method: 'POST' });
+    toast(r.opened ? 'Abri um terminal: faça o login lá. Depois clique na conta de novo.' : `Rode no terminal: ${r.command}`);
   }
-  const add = () => {
-    const l = label.trim(); if (!l) return;
-    set('claude', { ...claude, accounts: [...(claude.accounts || []), { label: l }] }); setLabel('');
+  async function choose(id) {
+    if (id === current) return;
+    const row = rows?.find(r => r.id === id);
+    setBusy(id);
+    try {
+      if (!row?.loggedIn) return await login(id);
+      await saveClaude({ defaultAccount: id });
+      toast(`Agora o Ripper usa a conta "${accounts.find(a => a.id === id)?.label}".`);
+    } catch (e) { toast(e.message, 'error'); }
+    finally { setBusy(''); }
+  }
+  async function add() {
+    const label = (adding || '').trim();
+    if (!label) return;
+    setBusy('add');
+    try {
+      await saveClaude({ accounts: [...(saved.accounts || []), { label }] });
+      const r = await api('/api/claude/accounts');
+      setRows(r); setAdding(null);
+      const created = r.find(a => a.label === label);
+      if (created) await login(created.id);
+    } catch (e) { toast(e.message, 'error'); }
+    finally { setBusy(''); }
+  }
+  async function remove(id) {
+    try { await saveClaude({ accounts: saved.accounts.filter(a => a.id !== id), defaultAccount: current === id ? 'principal' : current }); }
+    catch (e) { toast(e.message, 'error'); }
+  }
+  const sub = id => {
+    const r = rows?.find(x => x.id === id), t = info[id];
+    if (r?.limitedUntil) return `no limite até ${new Date(r.limitedUntil).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+    if (busy === id) return 'abrindo…';
+    if (t?.ok) return [t.plan, t.email].filter(Boolean).join(' · ');
+    return r?.loggedIn ? 'conectada' : 'clique para fazer login';
   };
+
   return (
-    <Card title="Contas" desc="Use mais de uma assinatura do Claude (ex.: Pro pessoal e Teams da empresa). Cada conta faz login uma vez; você escolhe a padrão e, por agente, qual usar. Nenhuma gasta crédito extra.">
-      <ul className="rows flat">
-        {accounts.map(a => {
-          const r = info(a.id), t = tests[a.id];
-          const st = t === 'testing' ? <span className="tag" role="status">testando…</span>
-            : t?.ok ? <span className="tag tag-ok">{t.plan || 'conectada'}{t.email ? ` · ${t.email}` : ''}</span>
-            : t ? <span className="tag tag-warn">{t.error}</span>
-            : r?.limitedUntil ? <span className="tag tag-warn">no limite até {new Date(r.limitedUntil).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-            : !saved(a.id) ? <span className="tag">salve para conectar</span>
-            : r?.loggedIn ? <span className="tag tag-ok">conectada</span> : <span className="tag tag-warn">falta o login</span>;
-          return (
-            <li key={a.id || a.label} className="row-item claude-acc">
-              <div className="row-main">
-                <b>{a.label}{(claude.defaultAccount || 'principal') === a.id && <span className="tag">padrão</span>}</b>
-                <small>{st}{r?.agents?.length ? ` · usada por ${r.agents.join(', ')}` : ''}</small>
-              </div>
+    <Card title="Conta do Claude" desc="Qual assinatura o Ripper usa. Clique para trocar; conta nova pede login uma vez.">
+      <div className="seg-choice claude-accs" style={{ gridTemplateColumns: `repeat(${Math.min(accounts.length + 1, 4)}, 1fr)` }}>
+        {accounts.map(a => (
+          <button key={a.id} type="button" className={current === a.id ? 'on' : ''} aria-pressed={current === a.id} onClick={() => choose(a.id)} disabled={!!busy}>
+            <b>{a.label}</b><small>{sub(a.id)}</small>
+          </button>
+        ))}
+        {adding === null
+          ? <button type="button" onClick={() => setAdding(accounts.some(a => /teams/i.test(a.label)) ? '' : 'Teams')} disabled={!!busy}><b>+ Adicionar</b><small>outra conta (ex.: Teams)</small></button>
+          : <form className="claude-acc-new" onSubmit={e => { e.preventDefault(); add(); }}>
+              <input className="input" autoFocus value={adding} maxLength={40} onChange={e => setAdding(e.target.value)} placeholder="Nome da conta" aria-label="Nome da conta nova" />
+              <div className="row"><button type="submit" className="btn btn-sm btn-primary" disabled={!adding.trim() || busy === 'add'}>Adicionar e entrar</button><button type="button" className="btn btn-sm" onClick={() => setAdding(null)}>Cancelar</button></div>
+            </form>}
+      </div>
+      <Row title="Trocar sozinho no limite" desc="Se a conta em uso bater o limite, o Ripper continua pela outra e avisa no chat.">
+        <Switch checked={saved.autoSwitch !== false} onChange={v => saveClaude({ autoSwitch: v }).catch(e => toast(e.message, 'error'))} label="Trocar sozinho no limite" />
+      </Row>
+      <button type="button" className="btn btn-sm claude-acc-manage" onClick={() => setManage(m => !m)} aria-expanded={manage}>{manage ? 'Fechar' : 'Gerenciar contas'}</button>
+      {manage && (
+        <ul className="rows flat">
+          {accounts.map(a => (
+            <li key={a.id} className="row-item">
+              <div className="row-main"><b>{a.label}</b><small>{info[a.id]?.error || sub(a.id)}{rows?.find(r => r.id === a.id)?.agents?.length ? ` · usada por ${rows.find(r => r.id === a.id).agents.join(', ')}` : ''}</small></div>
               <div className="row">
-                <button type="button" className="btn btn-sm" disabled={!saved(a.id)} onClick={() => login(a.id)}>{r?.loggedIn ? 'Trocar login' : 'Conectar'}</button>
-                <button type="button" className="btn btn-sm" disabled={!saved(a.id) || t === 'testing'} onClick={() => test(a.id)}>Testar</button>
-                {(claude.defaultAccount || 'principal') !== a.id && a.id && <button type="button" className="btn btn-sm" onClick={() => set('claude', { ...claude, defaultAccount: a.id })}>Tornar padrão</button>}
-                {a.id !== 'principal' && <button type="button" className="btn btn-sm" onClick={() => set('claude', { ...claude, accounts: claude.accounts.filter(x => x !== a), defaultAccount: claude.defaultAccount === a.id ? 'principal' : claude.defaultAccount })}>Remover</button>}
+                <button type="button" className="btn btn-sm" onClick={() => login(a.id).catch(e => toast(e.message, 'error'))}>Trocar login</button>
+                {a.id !== 'principal' && <button type="button" className="btn btn-sm" onClick={() => remove(a.id)}>Remover</button>}
               </div>
             </li>
-          );
-        })}
-      </ul>
-      <Row title="Adicionar conta" desc="Dê um nome (ex.: Teams da empresa), salve e clique em Conectar. Abre um terminal nesta máquina para o login.">
-        <div className="row">
-          <input className="input" value={label} maxLength={40} onChange={e => setLabel(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()} placeholder="Ex.: Teams da empresa" aria-label="Nome da nova conta" />
-          <button type="button" className="btn" disabled={!label.trim()} onClick={add}>Adicionar</button>
-        </div>
-      </Row>
-      <Row title="Trocar de conta no limite" desc="Quando a conta da vez bater o limite da assinatura, o Ripper continua pela próxima conta conectada e avisa no chat.">
-        <Switch checked={claude.autoSwitch !== false} onChange={v => set('claude', { ...claude, autoSwitch: v })} label="Trocar de conta no limite" />
-      </Row>
-      <p className="muted small">Conta Teams costuma ser da empresa: use para o trabalho dela. Conectores do claude.ai (Gmail, Drive…) são de cada conta.</p>
+          ))}
+        </ul>
+      )}
     </Card>
   );
 }

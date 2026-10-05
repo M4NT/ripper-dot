@@ -418,6 +418,11 @@ img.delivered-preview { max-height: 360px; object-fit: contain; }
 .extlog-preview { font-size: 13px; color: var(--muted); }
 .extlog-main small, .extlog-item time { font-size: 12px; color: var(--faint); }
 .extlog-item.is-failed b { color: var(--warn); }
+.claude-accs { margin-bottom: 12px; }
+.claude-accs small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.claude-acc-new { display: flex; flex-direction: column; gap: 6px; padding: 6px; }
+.claude-acc-manage { margin-top: 8px; }
+@media (max-width: 640px) { .claude-accs { grid-template-columns: 1fr !important; } }
 .ws-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 4px 8px; }
 .ws-chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); font-size: 12.5px; max-width: 280px; }
 .ws-chip > :not(.icon) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

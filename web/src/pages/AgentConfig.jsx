@@ -213,7 +213,7 @@ export default function AgentConfig({ id }) {
               <div className="set-label"><b>Conta do Claude</b><small>Qual assinatura este agente usa. Se ela bater o limite, o Ripper continua pela outra (quando a troca automática está ligada).</small></div>
               <div className="set-control">
                 <Select label="Conta do Claude" value={v.claudeAccount} onChange={x => set('claudeAccount', x)}
-                  options={[{ value: '', label: 'Padrão do Ripper' }, { value: 'principal', label: 'Principal (login desta máquina)' }, ...S.settings.claude.accounts.map(c => ({ value: c.id, label: c.label }))]} />
+                  options={[{ value: '', label: 'Padrão do Ripper' }, { value: 'principal', label: 'Conta pessoal' }, ...S.settings.claude.accounts.map(c => ({ value: c.id, label: c.label }))]} />
               </div>
             </div>
           )}
