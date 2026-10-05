@@ -12,9 +12,9 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 ---
 
 ## Próximos passos (em ordem)
-1. Fluxos disparados por rotina e gatilho (§3).
-2. Plugins MCP nos provedores compatíveis com OpenAI (§1b).
-3. Aviso na Caixa quando a imagem dos agentes está desatualizada (Pontes P1).
+1. Plugins MCP nos provedores compatíveis com OpenAI (§1b).
+2. Aviso na Caixa quando a imagem dos agentes está desatualizada (Pontes P1).
+3. Fluxos com ramificação (§3).
 
 ---
 
@@ -69,7 +69,8 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 - ✅ Guardião abre PR com a correção: `github_clone` (no computador do agente, em /work/repos) → branch `ripper/…` → corrige, roda os testes, commit → `github_open_pr` mostra o diff e pede aprovação antes de enviar. O token nunca fica no computador do agente (vai só no comando, cifrado em base64 no cabeçalho, e é removido de qualquer saída). Correção grande: delega a um colega, que usa as mesmas ferramentas.
 - [ ] Guardião: aprovar/mesclar PR com aprovação do dono.
 - ✅ **Fluxos** (menu Fluxos, também no modo Simples): editor visual com os passos como cartões ligados por setas (reordenar, até 10 passos); cada passo = agente + instrução + "pedir minha aprovação antes de seguir". Rodar abre uma conversa onde cada agente fala na sua vez vendo o que os anteriores fizeram, com barra de progresso; nos passos com aprovação o fluxo pausa e pede o OK na Caixa (recusar para). No celular os passos ficam empilhados.
-- [ ] Fluxos: disparar por rotina/gatilho (horário, WhatsApp, e-mail, GitHub) e ramificações (se/senão).
+- ✅ Fluxos automatizados: botão "Automatizar" em cada fluxo, com os mesmos gatilhos das rotinas (horário, a cada N min, webhook, e-mail, WhatsApp); o evento vira o pedido do fluxo e o resultado chega na Caixa. Rodadas não se sobrepõem; apagar o fluxo apaga as automações. Formulário de rotina agora é um componente só (`web/src/routines.jsx`).
+- [ ] Fluxos com ramificação (se/senão) e passo de ação direta (enviar e-mail/WhatsApp sem agente).
 - ✅ **E-mail como canal** (botões por provedor; Gmail com 1 clique pelo conector da conta Claude; senha de app com link direto; "Outro (IMAP)" para e-mail de empresa; aba Canais também no modo Simples): agentes listam, buscam, leem e respondem — leitura ao vivo, sem cópia local; todo envio com aprovação e no registro de ações externas; senha cifrada no disco. Configurações → Canais → E-mail.
 - ✅ E-mail com anexos: `email_attachment` baixa o anexo (aparece na conversa com Abrir/Baixar e fica em /work/anexos); texto/CSV/HTML vêm lidos, PDF/Word/Excel/PowerPoint com o comando pronto para ler no computador (pypdf na imagem `ripper-agent:3`). `email_send` anexa arquivos do computador do agente (até 20 MB), listados na aprovação.
 - [ ] E-mail: resposta automática por remetente (como a autonomia por contato do WhatsApp).

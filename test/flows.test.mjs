@@ -70,3 +70,43 @@ test('rodar: passo 1 → pausa para aprovação → passo 2; recusar para o flux
     assert.equal(stopped.messages.filter(m => m.role === 'assistant').length, 1);
   } finally { child.kill(); }
 });
+
+test('automatizar: webhook dispara o fluxo com o evento como pedido; resultado na Caixa; apagar o fluxo apaga a automação', async () => {
+  const http = await import('node:http');
+  const { spawn } = await import('node:child_process');
+  const { mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r)); const port = probe.address().port; await new Promise(r => probe.close(r));
+  const dataDir = mkdtempSync(join(tmpdir(), 'ripper-flowauto-'));
+  const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
+    env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'stream', HOME: dataDir, USERPROFILE: dataDir, JULIA_AUTOSTART: '0' }, stdio: 'ignore'
+  });
+  const base = `http://127.0.0.1:${port}`;
+  const send = (path, b, method = 'POST') => fetch(base + path, { method, headers: { 'content-type': 'application/json', origin: base }, body: JSON.stringify(b || {}) }).then(r => r.json());
+  const wait = async (fn, ms = 20_000) => { let v; for (let i = 0; i < ms / 200 && !(v = await fn()); i++) await new Promise(r => setTimeout(r, 200)); return v; };
+  try {
+    await wait(async () => { try { return (await fetch(base + '/api/health')).ok; } catch { return false; } });
+    const [a] = (await (await fetch(base + '/api/state')).json()).agents;
+    const b = await send('/api/agents', { name: 'Redatora' });
+    const flow = await send('/api/flows', { name: 'Triagem', steps: [{ agentId: a.id, instruction: 'Classifique' }, { agentId: b.id, instruction: 'Responda' }] });
+    const r = await send('/api/routines', { agentId: a.id, flowId: flow.id, name: 'Triagem de eventos', trigger: 'webhook' });
+    assert.equal(r.flowId, flow.id, 'rotina de fluxo não exige "o que fazer"');
+    const hook = await fetch(`${base}/api/hooks/${r.hookToken}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ cliente: 'Ana', pedido: 'orçamento' }) });
+    assert.ok([200, 202].includes(hook.status));
+    const done = await wait(async () => {
+      const st = await (await fetch(base + '/api/state')).json();
+      const c = st.chats.find(x => x.routineId === r.id);
+      return c?.flowRun?.status === 'done' && c; // pela lista: abrir a conversa marca como lida
+    });
+    assert.ok(done, 'o fluxo deveria rodar até o fim');
+    const inbox = await (await fetch(base + '/api/inbox')).json();
+    assert.ok(inbox.items.some(i => i.kind === 'routine' && i.chatId === done.id), 'resultado chega na Caixa');
+    const full = await (await fetch(base + `/api/chats/${done.id}`)).json();
+    assert.match(full.messages[0].content, /orçamento/, 'o evento vira o pedido do fluxo');
+    assert.equal(full.messages.filter(m => m.role === 'assistant').length, 2);
+    await fetch(`${base}/api/flows/${flow.id}`, { method: 'DELETE', headers: { origin: base } });
+    assert.equal((await (await fetch(base + '/api/state')).json()).routines.some(x => x.id === r.id), false);
+  } finally { child.kill(); }
+});

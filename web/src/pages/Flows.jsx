@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, go, fmtAgo } from '../lib.js';
 import { useApp } from '../app.jsx';
 import { AgentAvatar, Icon, Select, Switch, EmptyState, useConfirm } from '../ui.jsx';
+import { RoutineList, RoutineForm } from '../routines.jsx';
 
 const blankStep = agentId => ({ agentId, instruction: '', approve: false });
 
@@ -15,6 +16,7 @@ export default function Flows() {
   const [flows, setFlows] = useState(null);
   const [edit, setEdit] = useState(null); // { id?, name, steps } em edição
   const [running, setRunning] = useState(null); // { flow, input }
+  const [automating, setAutomating] = useState(null); // id do fluxo com o formulário de gatilho aberto
   const load = () => api('/api/flows').then(r => setFlows(r.flows)).catch(() => setFlows([]));
   useEffect(() => { load(); }, []);
   const agents = S.agents.filter(a => a.status !== 'paused');
@@ -52,7 +54,8 @@ export default function Flows() {
             <div className="flow-card-head">
               <div><b>{f.name}</b><small>{f.steps.length} {f.steps.length === 1 ? 'passo' : 'passos'} · editado {fmtAgo(f.updatedAt)}</small></div>
               <div className="row">
-                <button type="button" className="btn btn-sm btn-primary" onClick={() => setRunning({ flow: f, input: '' })}><Icon name="play" size={14} />Rodar</button>
+                <button type="button" className="btn btn-sm btn-primary" onClick={() => { setAutomating(null); setRunning({ flow: f, input: '' }); }}><Icon name="play" size={14} />Rodar</button>
+                <button type="button" className="btn btn-sm" onClick={() => { setRunning(null); setAutomating(automating === f.id ? null : f.id); }}><Icon name="bolt" size={14} />Automatizar</button>
                 <button type="button" className="icon-btn sm" aria-label={`Editar ${f.name}`} onClick={() => setEdit(structuredClone(f))}><Icon name="edit" size={16} /></button>
                 <button type="button" className="icon-btn sm" aria-label={`Apagar ${f.name}`} onClick={() => remove(f)}><Icon name="trash" size={16} /></button>
               </div>
@@ -68,6 +71,8 @@ export default function Flows() {
                 );
               })}
             </ol>
+            {S.routines.some(r => r.flowId === f.id) && <div className="flow-autos"><RoutineList list={S.routines.filter(r => r.flowId === f.id)} /></div>}
+            {automating === f.id && <div className="flow-run"><RoutineForm agentId={f.steps[0].agentId} flow={f} onDone={() => setAutomating(null)} /></div>}
             {running?.flow.id === f.id && (
               <div className="flow-run">
                 <textarea className="input" rows={2} autoFocus value={running.input} onChange={e => setRunning({ ...running, input: e.target.value })} placeholder="O que o fluxo deve fazer desta vez? (ex.: o tema do post)" aria-label="Pedido para o fluxo" />

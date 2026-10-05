@@ -1718,3 +1718,6 @@ code, .mono, pre { overflow-wrap: anywhere; }
   .flow-step, .flow-add { width: 100%; }
   .flow-add { min-height: 64px; grid-auto-flow: column; }
 }
+.flow-autos { margin-top: 12px; }
+.flow-autos .rows { margin: 0; }
+.flow-run .card-form { margin: 0; padding: 0; border: 0; background: none; box-shadow: none; }

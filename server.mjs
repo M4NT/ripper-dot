@@ -2226,7 +2226,7 @@ const routes = [
     try { Object.assign(cur, normalizeFlow(await body(req), db.agents, cur), { updatedAt: Date.now() }); } catch (e) { throw new HttpError(400, e.message); }
     save(); return cur;
   }],
-  ['DELETE', /^\/api\/flows\/([\w-]+)$/, (req, [fid]) => { db.flows = (db.flows || []).filter(f => f.id !== fid); save(); return {}; }],
+  ['DELETE', /^\/api\/flows\/([\w-]+)$/, (req, [fid]) => { db.flows = (db.flows || []).filter(f => f.id !== fid); db.routines = db.routines.filter(r => r.flowId !== fid); save(); return {}; }],
   ['POST', /^\/api\/flows\/([\w-]+)\/run$/, async (req, [fid]) => {
     const flow = (db.flows || []).find(f => f.id === fid);
     if (!flow) throw new HttpError(404, 'Fluxo não encontrado.');
@@ -2544,8 +2544,10 @@ const routes = [
       { agents: db.agents }
     );
     if (!routineGate.ok) throw new HttpError(403, routineGate.error);
-    if (!b.prompt) throw new HttpError(400, 'Diga o que a rotina deve fazer.');
-    const r = { id: id(), agentId: b.agentId, name: String(b.name || 'Rotina').slice(0, 80), prompt: String(b.prompt).slice(0, 4000), lastRun: 0, lastStatus: 'never', lastError: null,
+    const flow = b.flowId ? (db.flows || []).find(f => f.id === b.flowId) : null;
+    if (b.flowId && !flow) throw new HttpError(400, 'Fluxo não encontrado.');
+    if (!b.prompt && !flow) throw new HttpError(400, 'Diga o que a rotina deve fazer.');
+    const r = { id: id(), agentId: b.agentId, ...(flow ? { flowId: flow.id } : {}), name: String(b.name || 'Rotina').slice(0, 80), prompt: String(b.prompt || '').slice(0, 4000), lastRun: 0, lastStatus: 'never', lastError: null,
       quiet: b.quiet !== false,
       ...(b.trigger === 'webhook' ? { trigger: 'webhook', hookToken: newHookToken(), hookSecret: String(b.hookSecret || '').slice(0, 200) || undefined }
         : b.trigger === 'email' ? { trigger: 'email', keywords: parseKeywords(b.keywords) }
@@ -3119,8 +3121,9 @@ registerGracefulShutdown(server, {
  * Roda um fluxo numa conversa: um agente por vez, cada um vendo o que os anteriores responderam.
  * Passo com "approve": pausa e pede o seu OK na Caixa antes do próximo. Devolve o id da conversa.
  */
-function runFlow(flow, input) {
+function runFlow(flow, input, { routineId } = {}) {
   const c = {
+    ...(routineId ? { routineId } : {}),
     id: id(), agentId: flow.steps[0].agentId, title: `${flow.name}${input ? ` · ${input.slice(0, 40)}` : ''}`, flowId: flow.id,
     flowRun: { step: 0, total: flow.steps.length, status: 'running' }, messages: [{ id: id(), role: 'user', content: input ? `▶ ${flow.name}: ${input}` : `▶ ${flow.name}`, at: Date.now() }],
     createdAt: Date.now(), updatedAt: Date.now()
@@ -3158,6 +3161,18 @@ function fireWhatsappTriggers({ text, isGroup, fromMe, where }) {
 }
 
 function runRoutine(r, event) {
+  // Rotina que dispara um fluxo: o evento vira o pedido; o resultado chega na Caixa como novidade de rotina.
+  if (r.flowId) {
+    const flow = (db.flows || []).find(f => f.id === r.flowId);
+    // ponytail: rodada nova enquanto a anterior roda/espera aprovação é descartada; fila se o volume pedir
+    if (!flow || db.chats.some(c => c.routineId === r.id && ['running', 'waiting'].includes(c.flowRun?.status)) || !tryClaimRoutine(r.id)) return false;
+    if (flow.steps.some(st => !db.agents.some(a => a.id === st.agentId && a.status !== 'paused'))) { releaseRoutineClaim(r.id); r.lastStatus = 'failed'; r.lastError = 'Um agente do fluxo foi apagado ou está pausado.'; save(); return false; }
+    const input = [r.prompt, event && `Evento (${event.source || 'webhook'}${event.type ? `, ${event.type}` : ''}):\n${event.body}`].filter(Boolean).join('\n\n');
+    const chatId = runFlow(flow, input, { routineId: r.id });
+    releaseRoutineClaim(r.id); // o fluxo segue sozinho; a trava acima evita rodadas sobrepostas
+    Object.assign(r, { lastRun: Date.now(), lastStatus: 'succeeded', lastError: null, lastChatId: chatId }); save();
+    return true;
+  }
   const agent = db.agents.find(a => a.id === r.agentId);
   if (!agent || agent.status === 'paused' || r.lastStatus === 'running') return false;
   if (!tryClaimRoutine(r.id)) return false;
