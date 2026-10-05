@@ -24,7 +24,7 @@ Legenda: **P0** bloqueia uso/confiança · **P1** diferencial forte · **P2** po
 - [ ] Prompt de sistema enxuto: blocos só quando a ferramenta é usada. ✅ Cache de prompt: prefixo fixo primeiro, memórias saíram do meio.
 - ✅ Roteador Julia com rota Haiku para conversa curta (Julia + heurística). Opus: a cascata de custo já escolhe; teto por modelo em Configurações.
 - [ ] Multitarefa real: subtarefas em paralelo (pesquisa + planilha) com barra de progresso por subtarefa.
-- [ ] Painel de custo por agente/dia (tokens, R$, tempo médio) — já existe base em Admin/Uso, trazer para o card do agente.
+- ✅ Custo do dia no card do agente (respostas, tokens e US$ estimados, tempo médio). Falta: R$ (câmbio) e tokens reais do SDK.
 
 ## 2. Entrada e saída multimodal (P0/P1)
 - ✅ Ditado por voz em todos os navegadores (gravação + transcrição no servidor); texto ditado em *itálico* na bolha.

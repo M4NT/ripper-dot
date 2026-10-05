@@ -183,7 +183,8 @@ import {
 import { memoAsync } from './lib/ttl-cache.mjs';
 import { attachRequestId } from './lib/request-id.mjs';
 import { isShuttingDown, registerGracefulShutdown, SHUTDOWN_MESSAGE } from './lib/shutdown.mjs';
-import { closeUsageEventsStore } from './lib/usage-events.mjs';
+import { closeUsageEventsStore, listUsageEventsSince } from './lib/usage-events.mjs';
+import { agentDayStats } from './lib/agent-day-stats.mjs';
 import { closeJuliaEventsStore } from './lib/julia-events.mjs';
 import { closePersistCoordStore } from './lib/persist-coord.mjs';
 import { checkRateLimit } from './lib/rate-limit.mjs';
@@ -1389,6 +1390,7 @@ const routes = [
     chats: db.chats.map(summary), routines: db.routines.map(redactRoutine),
     files: db.files.map(({ path, ...f }) => f), memoriesCount: db.memories.length, pendingInbox: db.messages.filter(m => m.status === 'queued' || m.status === 'delivering').reduce((o, m) => (o[m.originChatId] = (o[m.originChatId] || 0) + 1, o), {}), approvals: db.approvals.filter(a => a.status === 'pending').map(approvalView), artifacts: db.artifacts.map(({ content, size, blob, ...a }) => ({ ...a, size: size ?? content?.length ?? 0, stored: blob ? 'disk' : 'inline' })),     skills: db.skills, memoriesByAgent: db.memories.reduce((o, x) => (o[x.agentId] = (o[x.agentId] || 0) + 1, o), {}), projects: db.projects,
     usage: usageSummary(db),
+    agentStats: (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return agentDayStats(listUsageEventsSince(d.getTime()), db.chats, d.getTime()); })(),
     limits: accountLimits(db, db.settings),
     usageContract: (() => {
       const b = buildUsageContract(db, db.settings);

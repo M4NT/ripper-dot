@@ -12,6 +12,7 @@ export default function AgentCard({ agent }) {
   const working = !!busy[agent.id];
   const dark = useDark();
   const paused = agent.status === 'paused';
+  const day = S.agentStats?.[agent.id];
 
   async function remove() {
     if (!(await confirm({ title: `Excluir ${agent.name}?`, body: 'As conversas continuam na sua lista. As rotinas deste agente são apagadas.', action: 'Excluir', danger: true }))) return;
@@ -27,6 +28,11 @@ export default function AgentCard({ agent }) {
         <div className="agent-card-body">
           <h3>{agent.name}</h3>
           <p>{agent.description || 'Sem descrição.'}</p>
+          {day?.turns > 0 && (
+            <small className="agent-card-stats" title="Hoje. Tokens e custo são estimativas (catálogo de preços), não a fatura.">
+              Hoje: {day.turns} {day.turns === 1 ? 'resposta' : 'respostas'} · ~{fmtTokens(day.tokens)} tokens · ~US$ {day.usd.toFixed(2).replace('.', ',')}{day.avgMs != null && ` · ${(day.avgMs / 1000).toFixed(1).replace('.', ',')}s em média`}
+            </small>
+          )}
         </div>
         <div className="agent-card-foot">
           <StatusDot status={agent.status} />
@@ -46,6 +52,8 @@ export default function AgentCard({ agent }) {
     </BorderBeam>
   );
 }
+
+const fmtTokens = n => n >= 1000 ? `${(n / 1000).toFixed(1).replace('.', ',')} mil` : String(n);
 
 export function NewAgentCard() {
   return (
