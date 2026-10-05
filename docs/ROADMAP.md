@@ -12,9 +12,9 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 ---
 
 ## Próximos passos (em ordem)
-1. Acesso remoto seguro com HTTPS (destrava notificações no celular; precisa do login) (§6/§7).
-2. Layout de tablet em duas colunas (§6).
-3. Criar agente em 1 frase (§5).
+1. Acesso remoto seguro com HTTPS (destrava notificações no celular; precisa do login — decisão do dono) (§6/§7).
+2. Busca/filtro e status ao vivo nos cards de agentes; duplicar agente (§5).
+3. Chat: editar e reenviar, buscar na conversa (§5).
 
 ---
 
@@ -95,7 +95,7 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 | Início | Mostrar "o que seus agentes fizeram hoje" no lugar do herói quando já há agentes (base: Pulse). |
 | Caixa | ✅ Filtros não estouram no celular. ✅ Avisos de gasto e do sistema. ✅ Link para Ações externas. ✅ Filtros "Gasto" e "Sistema". ✅ Resumo do dia (sem cor de alerta). Ações em lote; atalhos (A aprovar, R recusar); notificação push. |
 | Agentes | ✅ Custo e tempo do dia no card. Busca/filtro; status ao vivo no card; duplicar agente. |
-| Novo agente | Criação em 1 frase ("um agente que responde clientes no WhatsApp") → configura tudo. |
+| Novo agente | ✅ Criar em 1 frase: o modelo econômico monta nome, instruções, tom e habilidades; sugere atender o WhatsApp e rotina (dia/semana) para confirmar; correções determinísticas (sem "social" sem pedir, planilha liga computador, rotina liga "Rotinas"). |
 | Config. do agente | Testar ferramenta ali mesmo; histórico de mudanças; limite de gasto próprio do agente. |
 | Chat | ✅ Ouvir resposta; ✅ prévia de arquivos; ✅ custo por resposta paga. Editar e reenviar; ramificar; fixar; buscar na conversa. |
 | Conversas | Pastas/etiquetas; arquivar em lote. |
@@ -109,7 +109,7 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 - ✅ PWA instalável.
 - ✅ Notificações no aparelho (Web Push, sem dependência nova): aprovações pendentes, avisos do sistema e limite de gasto; Configurações → Perfil → "Notificações neste aparelho" (Ativar / Enviar teste). Celular precisa de HTTPS.
 - [ ] Testar entrega real (Chrome/FCM, Firefox, iPhone instalado na tela inicial).
-- [ ] Layout de tablet (duas colunas: lista + conversa).
+- ✅ Tablet: deitado (1024) mantém conversas ao lado do chat e Configurações em duas colunas; em pé (768) menu em gaveta; painel do chat fechado abaixo de 1200px; toques ≥ 40px em telas de toque. Sem estouro de largura nas telas principais.
 - [ ] Cabeçalho móvel e alternância Simples/Enterprise acessíveis no celular.
 - [ ] Acesso remoto seguro (túnel com login) — depende do login (§7).
 - [ ] Relógio: via push espelhado (aprovar/recusar direto no relógio).
