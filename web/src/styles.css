@@ -1236,8 +1236,15 @@ html.lightbox-open { overflow: hidden; }
 .rows.flat { border: 0; background: none; margin-bottom: 8px; }
 .set-card .keys { padding: 16px 0; }
 .settings-main .save-bar { position: sticky; bottom: 16px; }
-/* o menu do app ocupa ~250px: a quebra considera a área útil, não a janela */
-@media (max-width: 1100px) {
+/* tablet paisagem (901–1100px): a barra do app continua fixa, então menu + conteúdo ficam lado a lado com um menu mais estreito */
+@media (min-width: 901px) and (max-width: 1100px) {
+  .settings-page { grid-template-columns: 196px minmax(0, 1fr); gap: 24px; padding: 28px 24px 80px; }
+  .settings-nav a small { display: none; }
+  .settings-nav .settings-simple-hint { display: none; }
+  .mode-grid, .mode-grid.three { grid-template-columns: 1fr; }
+}
+/* abaixo de 900px a barra vira gaveta: menu de configurações em abas horizontais */
+@media (max-width: 900px) {
   .settings-page { grid-template-columns: 1fr; gap: 16px; padding: 20px 16px 80px; }
   .settings-nav { position: static; flex-direction: row; align-items: center; overflow-x: auto; gap: 4px; scrollbar-width: none; }
   .settings-nav .settings-simple-hint { display: none; }
@@ -1597,7 +1604,7 @@ code, .mono, pre { overflow-wrap: anywhere; }
 .na-name:focus { border-bottom-color: var(--ink); }
 .resize-handle:focus-visible { background: color-mix(in srgb, var(--ink) 30%, transparent); }
 /* toque: nada menor que 40px no celular */
-@media (max-width: 900px) {
+@media (max-width: 900px), (pointer: coarse) {
   .btn-sm, .icon-btn, .icon-btn.sm, .crow-more, .meta-btn, .mp-plus { min-height: 40px; min-width: 40px; }
   .side-all { min-height: 40px; display: inline-flex; align-items: center; }
   .link.approval-chat { display: inline-flex; align-items: center; min-height: 40px; }
