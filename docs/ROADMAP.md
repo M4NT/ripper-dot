@@ -23,7 +23,7 @@ Legenda: **P0** bloqueia uso/confiança · **P1** diferencial forte · **P2** po
 - ✅ Processo do SDK pré-aquecido (`prewarm`) por agente; memórias e contexto do turno no fim (`appendSystemPrompt`). 1ª palavra 2.6s → 1.3–2.0s (`scripts/bench-prewarm.mjs`).
 - [ ] Prompt de sistema enxuto: blocos só quando a ferramenta é usada. ✅ Cache de prompt: prefixo fixo primeiro, memórias saíram do meio.
 - ✅ Roteador Julia com rota Haiku para conversa curta (Julia + heurística). Opus: a cascata de custo já escolhe; teto por modelo em Configurações.
-- [ ] Multitarefa real: subtarefas em paralelo (pesquisa + planilha) com barra de progresso por subtarefa.
+- ✅ Multitarefa real: ferramenta `parallel_tasks` (2–5 subtarefas ao mesmo tempo, web + computador) com barra de progresso por subtarefa no chat.
 - ✅ Custo do dia no card do agente (respostas, tokens e US$ estimados, tempo médio). Falta: R$ (câmbio) e tokens reais do SDK.
 
 ## 2. Entrada e saída multimodal (P0/P1)

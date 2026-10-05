@@ -58,9 +58,11 @@ export default function ActionLine({ steps, live }) {
 
   const approvals = [];
   const activity = [];
+  const subtasks = [];
   for (const raw of steps || []) {
     const s = normStep(raw);
     if (s.kind === 'approval') approvals.push(s);
+    else if (s.kind === 'subtask') subtasks.push(s);
     else activity.push(s);
   }
 
@@ -68,7 +70,7 @@ export default function ActionLine({ steps, live }) {
   const running = live && last?.kind === 'tool';
   const canExpand = activity.length > 1 || activity.some(s => s.detail);
 
-  if (!activity.length && !approvals.length) return null;
+  if (!activity.length && !approvals.length && !subtasks.length) return null;
 
   const leadIcon = running ? null : stepIcon(last || { kind: 'done' });
   const barLabel = open ? 'Recolher atividades do agente' : 'Expandir atividades do agente';
@@ -78,6 +80,22 @@ export default function ActionLine({ steps, live }) {
       {approvals.map((s, i) => (
         <div key={`a-${i}`} className="step step-approval"><ApprovalCard rec={s.rec} status={s.status} /></div>
       ))}
+      {subtasks.length > 0 && (
+        <ul className="subtasks" aria-label="Subtarefas em paralelo">
+          {subtasks.map(t => {
+            // Sem saber o tamanho final: a barra avança pelo texto já escrito e fecha ao terminar.
+            const pct = t.status === 'running' ? Math.min(90, 10 + t.chars / 40) : 100;
+            const st = t.status === 'running' && !live ? 'error' : t.status;
+            return (
+              <li key={t.key} className={`subtask subtask-${st}`}>
+                <span className="subtask-title">{t.title}</span>
+                <span className="subtask-state">{st === 'done' ? 'pronto' : st === 'error' ? 'falhou' : 'trabalhando…'}</span>
+                <span className="subtask-bar" role="progressbar" aria-label={t.title} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}><i style={{ width: `${pct}%` }} /></span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
       {activity.length > 0 && (
         <div className={`action-line ${open ? 'open' : ''} ${running ? 'is-live' : ''} ${canExpand ? '' : 'action-line-static'}`}>
           <button

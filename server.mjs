@@ -1076,6 +1076,37 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
       }
     } : null
   };
+  // Subtarefas em paralelo: cada uma é um turno curto do mesmo agente (web + computador, sem delegar nem histórico).
+  const subtaskSteps = []; // estado final de cada subtarefa: fica salvo na resposta
+  ctx.parallel = {
+    run: async tasks => {
+      const subModel = enabledModels(s).includes('claude-sonnet-5-5') ? 'claude-sonnet-5-5' : enabledModels(s).find(m => MODELS[m].provider === 'claude');
+      if (!subModel) return 'Nenhum modelo Claude liberado para subtarefas.';
+      const batch = id();
+      const subCtx = { db, settings: s, computer, deliverFile: ctx.deliverFile };
+      const subAgent = { ...agent, tools: agent.tools.filter(t => ['web', 'computer'].includes(t)) };
+      const system = `${systemPrompt(subAgent, s)}\n\nVocê executa UMA subtarefa de um pedido maior, em paralelo com outras. Entregue só o resultado, completo e direto.`;
+      const results = await Promise.all(tasks.map(async (t, i) => {
+        const key = `${batch}:${i}`;
+        emit({ subtask: { key, title: t.title, status: 'running', chars: 0 } });
+        let out = '';
+        try {
+          for await (const ev of runClaude({ agent: subAgent, model: subModel, effort: 'medium', prompt: t.prompt, history: [], system, settings: s, ctx: subCtx, signal })) {
+            if (ev.text) { out += ev.text; if (out.length % 400 < ev.text.length) emit({ subtask: { key, title: t.title, status: 'running', chars: out.length } }); }
+          }
+          recordUsage(db, subModel, { charsIn: t.prompt.length, charsOut: out.length, routedBy: 'parallel', agentId: agent.id });
+          emit({ subtask: { key, title: t.title, status: 'done', chars: out.length } });
+          subtaskSteps.push({ kind: 'subtask', key, title: t.title, status: 'done', chars: out.length });
+          return `## ${t.title}\n${out.trim() || '(sem resultado)'}`;
+        } catch (e) {
+          emit({ subtask: { key, title: t.title, status: 'error', chars: out.length } });
+          subtaskSteps.push({ kind: 'subtask', key, title: t.title, status: 'error', chars: out.length });
+          return `## ${t.title}\nFalhou: ${e.message}`;
+        }
+      }));
+      return results.join('\n\n');
+    }
+  };
   const project = chat.projectId && db.projects.find(p => p.id === chat.projectId);
   const systemStable = systemPrompt(agent, s);
   const system = [
@@ -1123,7 +1154,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
     : providerAttemptOrder(pick.model, await codexInstalled).filter((m, i) => i === 0 || enabledModels(s).includes(m));
   const push = (out, steps, extra) => chat.messages.push({
     id: id(), role: 'assistant', agentId: agent.id, content: out, at: Date.now(),
-    ...(steps.length ? { steps } : {}), ...extra
+    ...(steps.length || subtaskSteps.length ? { steps: [...subtaskSteps, ...steps] } : {}), ...extra
   });
 
   const semanticCacheCfg = resolveSemanticCacheConfig(s);

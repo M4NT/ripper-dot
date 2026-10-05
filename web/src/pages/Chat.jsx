@@ -346,6 +346,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
           }
           if (e.tokenBudget?.message) building.steps.push({ kind: 'warn', label: e.tokenBudget.message });
           if (e.warn) building.steps.push({ kind: 'warn', label: e.warn });
+          if (e.subtask) { const st = building.steps.find(x => x.kind === 'subtask' && x.key === e.subtask.key); st ? Object.assign(st, e.subtask) : building.steps.push({ kind: 'subtask', ...e.subtask }); }
           if (e.memory) building.steps.push({ kind: 'done', label: 'Guardado na memória', detail: e.memory });
           if (e.approval) { building.steps.push({ kind: 'approval', rec: e.approval, status: 'pending' }); setPhase('approval'); }
           if (e.approvalDone) { const st = building.steps.find(x => x.kind === 'approval' && x.rec.id === e.approvalDone.id); if (st) st.status = e.approvalDone.status; }
