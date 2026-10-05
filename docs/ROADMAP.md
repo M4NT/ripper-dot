@@ -13,8 +13,8 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 
 ## Próximos passos (em ordem)
 1. Acesso remoto seguro com HTTPS (destrava notificações no celular; precisa do login — decisão do dono) (§6/§7).
-2. Busca/filtro e status ao vivo nos cards de agentes; duplicar agente (§5).
-3. Chat: editar e reenviar, buscar na conversa (§5).
+2. Conversas: pastas/etiquetas e arquivar em lote (§5).
+3. Projetos: quadro de tarefas (kanban) atribuídas a agentes (§5).
 
 ---
 
@@ -94,10 +94,10 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 |---|---|
 | Início | Mostrar "o que seus agentes fizeram hoje" no lugar do herói quando já há agentes (base: Pulse). |
 | Caixa | ✅ Filtros não estouram no celular. ✅ Avisos de gasto e do sistema. ✅ Link para Ações externas. ✅ Filtros "Gasto" e "Sistema". ✅ Resumo do dia (sem cor de alerta). Ações em lote; atalhos (A aprovar, R recusar); notificação push. |
-| Agentes | ✅ Custo e tempo do dia no card. Busca/filtro; status ao vivo no card; duplicar agente. |
+| Agentes | ✅ Custo e tempo do dia no card. ✅ Busca/filtro. ✅ Status ao vivo no card (o que faz agora em qualquer lugar, link para a conversa) + filtro "Trabalhando agora". ✅ Duplicar agente. |
 | Novo agente | ✅ Criar em 1 frase: o modelo econômico monta nome, instruções, tom e habilidades; sugere atender o WhatsApp e rotina (dia/semana) para confirmar; correções determinísticas (sem "social" sem pedir, planilha liga computador, rotina liga "Rotinas"). |
 | Config. do agente | Testar ferramenta ali mesmo; histórico de mudanças; limite de gasto próprio do agente. |
-| Chat | ✅ Ouvir resposta; ✅ prévia de arquivos; ✅ custo por resposta paga. Editar e reenviar; ramificar; fixar; buscar na conversa. |
+| Chat | ✅ Ouvir resposta; ✅ prévia de arquivos; ✅ custo por resposta paga. ✅ Editar e reenviar (qualquer mensagem sua). ✅ Buscar na conversa (Ctrl+F, sem acento). Ramificar; fixar. |
 | Conversas | Pastas/etiquetas; arquivar em lote. |
 | Projetos | Quadro de tarefas (kanban) atribuídas a agentes. |
 | Biblioteca | Busca em texto completo de artefatos e arquivos. |
