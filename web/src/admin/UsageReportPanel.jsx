@@ -4,7 +4,7 @@ import { api } from '../lib.js';
 const iso = d => d.toISOString().slice(0, 10);
 const daysAgo = n => iso(new Date(Date.now() - n * 86400_000));
 const PRESETS = [['7', 'Últimos 7 dias'], ['30', '30 dias'], ['90', '90 dias'], ['custom', 'Personalizado']];
-const GROUPS = [['day', 'Por dia'], ['agent', 'Por agente'], ['model', 'Por modelo']];
+const GROUPS = [['day', 'Por dia'], ['agent', 'Por agente'], ['model', 'Por modelo'], ['client', 'Por cliente']];
 const nf = new Intl.NumberFormat('pt-BR');
 const compact = new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 });
 const usd = v => `US$ ${v.toFixed(v < 1 ? 4 : 2)}`;
@@ -89,12 +89,12 @@ export default function UsageReportPanel() {
             <table className="metering-table">
               <thead><tr><th scope="col">{keyHead[0].toUpperCase() + keyHead.slice(1)}</th><th scope="col">Respostas</th><th scope="col">Tokens entrada</th><th scope="col">Tokens saída</th><th scope="col">Custo</th></tr></thead>
               <tbody>
-                {rows.map(r => <tr key={r.key}><td>{r.label}</td><td>{nf.format(r.requests)}</td><td>{nf.format(r.tokensIn)}</td><td>{nf.format(r.tokensOut)}</td><td>{usd(r.costUsd)}</td></tr>)}
+                {rows.map(r => <tr key={r.key}><td>{r.label}</td><td>{nf.format(r.requests)}</td><td>{nf.format(r.tokensIn)}</td><td>{nf.format(r.tokensOut)}</td><td>{r.costEstimated && r.requests ? '~' : ''}{usd(r.costUsd)}</td></tr>)}
               </tbody>
               <tfoot><tr><th scope="row">Total</th><td>{nf.format(data.totals.requests)}</td><td>{nf.format(data.totals.tokensIn)}</td><td>{nf.format(data.totals.tokensOut)}</td><td>{usd(data.totals.costUsd)}</td></tr></tfoot>
             </table>
           </div>
-          {data.totals.costEstimated && <p className="muted small">Tokens e custo são estimados (~4 caracteres por token, preços do catálogo). Datas em UTC.</p>}
+          <p className="muted small">Tokens estimados (~4 caracteres por token). Custo real nas respostas pagas; {data.totals.costEstimated ? 'nas demais, estimado pelos preços do catálogo (marcado com ~)' : 'todo o custo deste período é real'}. Datas em UTC.{group === 'client' && ' Uso anterior a esta versão aparece em Sem cliente quando não dá para ligar à conversa.'}</p>
         </>
       )}
     </div>

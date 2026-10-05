@@ -200,7 +200,7 @@ import { attachRequestId } from './lib/request-id.mjs';
 import { isShuttingDown, registerGracefulShutdown, SHUTDOWN_MESSAGE } from './lib/shutdown.mjs';
 import { closeUsageEventsStore, listUsageEventsSince } from './lib/usage-events.mjs';
 import { agentDayStats } from './lib/agent-day-stats.mjs';
-import { parseUsageQuery, aggregateUsage, usageCsv } from './lib/usage-report.mjs';
+import { parseUsageQuery, aggregateUsage, usageCsv, resolveClient, normalizeClient } from './lib/usage-report.mjs';
 import { loadBenchmarkCatalog } from './lib/julia-cascade.mjs';
 import { agentTimeline } from './lib/agent-timeline.mjs';
 import { closeJuliaEventsStore } from './lib/julia-events.mjs';
@@ -1537,7 +1537,10 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
         charsIn: (text?.length || 0) + (prompt?.length || 0),
         charsOut: out.length,
         routedBy,
-        agentId: agent.id
+        agentId: agent.id,
+        chatId: chat.id,
+        clientId: resolveClient(db.clients, chat)?.id,
+        costUsd: turnCost
       });
       if (canUseSemanticCache) {
         storeSemanticCacheEntry({
@@ -1808,8 +1811,8 @@ const routes = [
     let q;
     try { q = parseUsageQuery(Object.fromEntries(url.searchParams)); } catch (e) { throw new HttpError(400, e.message); }
     let catalog = null; try { catalog = loadBenchmarkCatalog(); } catch {}
-    const report = aggregateUsage(listUsageEventsSince(q.since), q, catalog);
-    const label = k => q.group === 'agent' ? db.agents.find(a => a.id === k)?.name || (/^[0-9a-f-]{36}$/.test(k) ? `Agente excluído · ${k.slice(0, 6)}` : k) : k;
+    const report = aggregateUsage(listUsageEventsSince(q.since), q, catalog, { clients: db.clients, chats: db.chats });
+    const label = k => q.group === 'client' ? db.clients?.find(c => c.id === k)?.name || 'Sem cliente' : q.group === 'agent' ? db.agents.find(a => a.id === k)?.name || (/^[0-9a-f-]{36}$/.test(k) ? `Agente excluído · ${k.slice(0, 6)}` : k) : k;
     if (!m[0]) return { ...q, rows: report.rows.map(r => ({ ...r, label: label(r.key) })), totals: report.totals };
     const name = `ripper-uso-${url.searchParams.get('from')}-${url.searchParams.get('to')}-${q.group}.csv`;
     res.writeHead(200, hdr(req, {
@@ -2367,6 +2370,25 @@ const routes = [
   }],
   ['GET', /^\/api\/agents\/working$/, () => ({ working: Object.fromEntries(working) })],
   // Fluxos: agentes em sequência, com aprovação nos passos marcados
+  ['GET', /^\/api\/admin\/clients$/, () => {
+    requireEnterpriseAdmin();
+    const tags = [...new Set(db.chats.flatMap(c => c.tags || []))].sort();
+    return { clients: db.clients || [], tags, projects: db.projects.map(p => ({ id: p.id, name: p.name })) };
+  }],
+  ['POST', /^\/api\/admin\/clients$/, async req => {
+    requireEnterpriseAdmin();
+    let c; try { c = normalizeClient(await body(req)); } catch (e) { throw new HttpError(400, e.message); }
+    const client = { id: id(), ...c, createdAt: Date.now(), updatedAt: Date.now() };
+    (db.clients ||= []).push(client); save(); return client;
+  }],
+  ['PUT', /^\/api\/admin\/clients\/([\w-]+)$/, async (req, [cid]) => {
+    requireEnterpriseAdmin();
+    const cur = (db.clients || []).find(c => c.id === cid);
+    if (!cur) throw new HttpError(404, 'Cliente não encontrado.');
+    try { Object.assign(cur, normalizeClient(await body(req)), { updatedAt: Date.now() }); } catch (e) { throw new HttpError(400, e.message); }
+    save(); return cur;
+  }],
+  ['DELETE', /^\/api\/admin\/clients\/([\w-]+)$/, (req, [cid]) => { requireEnterpriseAdmin(); db.clients = (db.clients || []).filter(c => c.id !== cid); save(); return {}; }],
   ['GET', /^\/api\/flows$/, () => ({ flows: db.flows || [] })],
   ['POST', /^\/api\/flows$/, async req => {
     let f;

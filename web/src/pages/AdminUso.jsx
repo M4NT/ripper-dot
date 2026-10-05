@@ -6,6 +6,7 @@ import UsageReportPanel from '../admin/UsageReportPanel.jsx';
 import MeteringPanel from '../admin/MeteringPanel.jsx';
 import JuliaEconomiaPanel from '../admin/JuliaEconomiaPanel.jsx';
 import TokenBudgetPanel from '../admin/TokenBudgetPanel.jsx';
+import ClientsPanel from '../admin/ClientsPanel.jsx';
 
 function Section({ id, title, desc, children }) {
   return (
@@ -54,9 +55,17 @@ export default function AdminUso() {
       <Section
         id="periodo"
         title="Uso por período"
-        desc="Respostas, tokens e custo estimados por dia, agente ou modelo."
+        desc="Respostas, tokens e custo por dia, agente, modelo ou cliente."
       >
         <UsageReportPanel />
+      </Section>
+
+      <Section
+        id="clientes"
+        title="Clientes"
+        desc="Custo por cliente (CNPJ/empresa) via tag da conversa ou projeto, com margem estimada."
+      >
+        <ClientsPanel />
       </Section>
 
       <Section
