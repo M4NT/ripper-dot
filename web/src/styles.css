@@ -354,6 +354,9 @@ a.row-main:hover b { text-decoration: underline; text-underline-offset: 3px; }
 .msg-took { font-size: 12px; color: var(--faint); font-variant-numeric: tabular-nums; }
 .meta-btn { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 7px; color: var(--muted); font-size: 12px; opacity: 0; transition: opacity .15s, background .15s; }
 .msg:hover .meta-btn, .meta-btn:focus-visible { opacity: 1; }
+.msg-meta-more { display: inline-flex; align-items: center; gap: 8px; opacity: 0; transition: opacity .15s; }
+.msg:hover .msg-meta-more, .msg:focus-within .msg-meta-more { opacity: 1; }
+@media (hover: none) { .msg-meta-more { opacity: 1; } }
 .meta-btn:hover { background: var(--surface); color: var(--ink); }
 .msg.user .msg-meta { margin-top: 4px; }
 .user-edit { display: flex; flex-direction: column; gap: 6px; width: min(560px, 100%); }
@@ -757,8 +760,10 @@ details[open]::details-content { block-size: auto; }
 .crumb-link { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
 .crumb-link:hover { color: var(--ink); }
 .speaker { font-size: 12.5px; font-weight: 500; color: var(--ink-2); margin: 0 0 6px 2px; }
-.delegation { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; margin: 6px 0 2px 2px; padding-left: 10px; border-left: 2px solid var(--line); font-size: 12.5px; color: var(--muted); }
-.delegation-task { flex: 1 1 100%; min-width: 0; overflow-wrap: anywhere; }
+.delegation { display: flex; align-items: center; gap: 6px; min-width: 0; margin: 6px 0 2px 2px; padding-left: 10px; border-left: 2px solid var(--line); font-size: 12.5px; color: var(--muted); }
+.delegation > span:not(.av-box):not(.delegation-task) { flex: none; color: var(--ink-2); }
+/* uma linha: "Donald → Quinn  tarefa…" (o texto completo fica no title) */
+.delegation-task { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-left: 4px; }
 @media (min-width: 560px) { .delegation-task { flex: 0 1 auto; } }
 .turn-plan { margin: 6px 0 0 2px; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
 .member-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }

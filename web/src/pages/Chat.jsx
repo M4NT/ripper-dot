@@ -93,10 +93,13 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, mo
         </div>
         <div className="msg-meta">
           {m.at && <time>{fmtTime(m.at)}</time>}
+          {/* detalhes (tempo, custo, modelo) só ao passar o mouse: no dia a dia é ruído em toda mensagem */}
+          <span className="msg-meta-more">
           {m.timing?.totalMs > 0 && <span className="msg-took" title={m.timing.firstMs ? `Começou a responder em ${(m.timing.firstMs / 1000).toFixed(1)}s` : undefined}>· {(m.timing.totalMs / 1000).toFixed(1)}s{m.costUsd ? ` · US$ ${m.costUsd.toFixed(3).replace('.', ',')}` : ''}{m.steps?.length ? ` · ${m.steps.length} ${m.steps.length === 1 ? 'ação' : 'ações'}` : ''}</span>}
           {m.via?.type === 'inbox' && <a className="badge via" href={`#/c/${m.via.threadChatId}`} title="Abrir a troca entre os agentes"><Icon name="chat" size={12} />Resposta por mensagem</a>}
           {/* qual modelo respondeu: só no Enterprise — para os demais é ruído em toda mensagem */}
           {m.model && showModel && <span className="badge">{m.routed ? 'Auto → ' : ''}{models[m.model]?.label || m.model}{m.effort && m.effort !== 'auto' ? ` · ${effortLabel(m.effort)}` : ''}</span>}
+          </span>
           {!live && m.content && <>
             <button className="meta-btn" onClick={() => navigator.clipboard.writeText(m.content)}><Icon name="copy" size={14} />Copiar</button>
             {canSpeak && <button className="meta-btn" onClick={() => speak(m.content)}><Icon name="volume" size={14} />Ouvir</button>}
@@ -121,7 +124,7 @@ function Delegation({ from, to, task }) {
       <AgentAvatar agent={from} size={18} paused /><span>{from?.name}</span>
       <span aria-label="delegou para">→</span>
       <AgentAvatar agent={to} size={18} paused /><span>{to.name}</span>
-      {task && <span className="delegation-task">: {task}</span>}
+      {task && <span className="delegation-task" title={task}>{task}</span>}
     </div>
   );
 }
