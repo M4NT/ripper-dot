@@ -48,6 +48,7 @@ import { recordExternal, listExternal, externalCsv, EXTERNAL_KINDS } from './lib
 import { buildPulse, pulseDue, pulseWhatsappTo } from './lib/pulse.mjs';
 import { normalizeFlow, stepPrompt, stepRuns } from './lib/flows.mjs';
 import { DRAFT_SYSTEM, sanitizeDraft, heuristicDraft } from './lib/agent-draft.mjs';
+import { applyBulk } from './lib/chat-bulk.mjs';
 import { emailReady, listEmails, readEmail, sendEmail, newEmailsSince, testEmail, getAttachment, safeName, attachmentText, readHint } from './lib/email.mjs';
 import { gh, githubReady, normalizeRepo, repoChanges, describeChange, prBranch, gitAuthArg, hideToken } from './lib/github.mjs';
 import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './lib/event-triggers.mjs';
@@ -2755,10 +2756,20 @@ const routes = [
     save();
     return { chat: summary(chat), warnings };
   }],
+  // Conversas em lote: arquivar, desarquivar, etiquetar, tirar etiqueta, apagar
+  ['POST', /^\/api\/chats\/bulk$/, async req => {
+    const b = await body(req);
+    if (!Array.isArray(b.ids) || !b.ids.length || b.ids.length > 500) throw new HttpError(400, 'Selecione as conversas.');
+    let r;
+    try { r = applyBulk(db.chats, b.ids.map(String), b.action, b.tag, isChatStreaming); } catch (e) { throw new HttpError(400, e.message); }
+    db.chats = r.chats; save();
+    return { changed: r.changed, skipped: r.skipped };
+  }],
   ['PUT', /^\/api\/chats\/([\w-]+)$/, async (req, [cid]) => {
     const c = db.chats.find(c => c.id === cid); if (!c) throw new HttpError(404, 'Conversa não encontrada.');
     const b = await body(req);
     if (typeof b.title === 'string' && b.title.trim()) c.title = b.title.trim().slice(0, 80);
+    if (typeof b.archived === 'boolean') applyBulk([c], [c.id], b.archived ? 'archive' : 'unarchive');
     if (b.projectId === null) delete c.projectId;
     else if (typeof b.projectId === 'string' && b.projectId) {
       const p = projectOr404(b.projectId);

@@ -25,6 +25,7 @@ export default function ChatRow({ c, showProject }) {
             {c.unread && <span className="unread-dot" title="Novidade" />}
             {group && <span className="group-pill"><Icon name="group" size={12} />Grupo</span>}
             {project && <span className="proj-pill"><Icon name="folder" size={11} />{project.name}</span>}
+            {(c.tags || []).map(t => <span key={t} className="tag-pill">#{t}</span>)}
           </span>
           <span className="crow-who">
             {members.map((a, i) => <span key={a.id} style={{ color: color(a) }}>{a.name}{i < members.length - 1 ? ' · ' : ''}</span>)}

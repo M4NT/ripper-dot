@@ -99,7 +99,7 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
   const chatMenu = useChatMenu();
   const section = parts[0] === 'c' ? 'chat' : parts[0] === 'new' ? 'agents' : parts[0] === 'p' ? 'projects' : parts[0] || '';
   // Avisos de agente de canal moram na Caixa, não na lista de conversas
-  const recent = [...S.chats].filter(c => !String(c.channelKey || '').startsWith('owner:')).sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt)).slice(0, 12);
+  const recent = [...S.chats].filter(c => !c.archived && !String(c.channelKey || '').startsWith('owner:')).sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt)).slice(0, 12);
   const brand = brandForChrome(S.settings);
   const logoSrc = brand ? brandLogoSrc(brand.logoUrl) : null;
   const brandName = brand ? brandTitle(S.settings) : t('shell.brand');
