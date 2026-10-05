@@ -63,3 +63,42 @@ test('catálogo: OpenAI só modelos de chat; Gemini tira o prefixo models/; Olla
     assert.match((await checkCompatKey('ollama', {})).error, /Ollama não respondeu/);
   } finally { globalThis.fetch = orig; }
 });
+
+test('plugins MCP do usuário também nos provedores compatíveis: o modelo chama a ferramenta e recebe o resultado; plugin fora do ar só avisa', async () => {
+  const { fileURLToPath } = await import('node:url');
+  const fixture = fileURLToPath(new URL('./fixtures/mcp-stdio-minimal.mjs', import.meta.url));
+  const bodies = [];
+  const orig = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    bodies.push(JSON.parse(init.body));
+    return bodies.length === 1
+      ? sse([{ choices: [{ delta: { tool_calls: [{ index: 0, id: 't1', function: { name: 'mcp__Meu_Plugin__ping', arguments: '{}' } }] } }] }])
+      : sse([{ choices: [{ delta: { content: 'feito' } }] }]);
+  };
+  const evs = [];
+  try {
+    for await (const ev of runOpenRouter({
+      agent: { tools: ['plugins'] }, model: 'ol:qwen3', effort: 'low', prompt: 'pinga', history: [], system: 's', ctx: {},
+      settings: { ollama: { models: [{ id: 'qwen3' }] }, plugins: [
+        { name: 'Meu Plugin', type: 'stdio', command: process.execPath, args: [fixture] },
+        { name: 'quebrado', type: 'stdio', command: 'comando-que-nao-existe-xyz' }
+      ] }
+    })) evs.push(ev);
+  } finally { globalThis.fetch = orig; }
+  assert.ok(bodies[0].tools.some(t => t.function.name === 'mcp__Meu_Plugin__ping'), 'ferramenta do plugin oferecida ao modelo');
+  assert.equal(bodies[1].messages.at(-1).role, 'tool');
+  assert.equal(bodies[1].messages.at(-1).content, 'ok', 'resultado real do plugin volta ao modelo');
+  assert.ok(evs.some(e => e.warn && /quebrado/.test(e.warn)), 'plugin fora do ar vira aviso');
+  assert.equal(evs.filter(e => e.text).map(e => e.text).join(''), 'feito');
+});
+
+test('sem a habilidade Plugins, nenhum plugin é conectado', async () => {
+  const bodies = [];
+  const orig = globalThis.fetch;
+  globalThis.fetch = async (url, init) => { bodies.push(JSON.parse(init.body)); return sse([{ choices: [{ delta: { content: 'oi' } }] }]); };
+  try {
+    for await (const _ of runOpenRouter({ agent: { tools: [] }, model: 'ol:qwen3', prompt: 'oi', history: [], system: 's', ctx: {},
+      settings: { ollama: { models: [{ id: 'qwen3' }] }, plugins: [{ name: 'x', type: 'stdio', command: 'nao-deveria-rodar' }] } })) {}
+  } finally { globalThis.fetch = orig; }
+  assert.equal(bodies[0].tools, undefined);
+});

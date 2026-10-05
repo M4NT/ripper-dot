@@ -33,14 +33,14 @@ export const PROVIDERS = [
   {
     id: 'openrouter', name: 'OpenRouter', kind: 'Centenas de modelos · pago por uso', logo: openrouterSvg, provider: 'openrouter',
     tagline: 'Uma chave só para GPT, Gemini, DeepSeek, Llama, Grok, Mistral e outros.',
-    can: ['Ferramentas do Ripper', 'Computador e navegador do agente', 'Pesquisa na web (do OpenRouter)', 'Lê imagens (modelos com visão)', 'Pago por uso, sem assinatura'],
-    cannot: ['Plugins MCP (em breve)', 'Escolha automática pelo Ripper Auto']
+    can: ['Ferramentas do Ripper', 'Plugins MCP', 'Computador e navegador do agente', 'Pesquisa na web (do OpenRouter)', 'Lê imagens (modelos com visão)', 'Pago por uso, sem assinatura'],
+    cannot: ['Escolha automática pelo Ripper Auto']
   },
-  { id: 'openai', name: 'OpenAI API', kind: 'Chave da API · pago por uso', logo: openaiSvg, provider: 'openai', tagline: 'GPT direto pela chave da OpenAI, sem passar pelo OpenRouter.', can: ['Ferramentas do Ripper', 'Computador e navegador do agente', 'Lê imagens', 'Esforço de raciocínio (GPT-5, o-series)'], cannot: ['Pesquisa na web do Claude', 'Plugins MCP (em breve)', 'Custo exato: estimado pelos tokens'] },
-  { id: 'gemini', name: 'Gemini', kind: 'Google AI Studio · cota grátis + pago', logo: geminiSvg, provider: 'gemini', tagline: 'Modelos Gemini pela chave do AI Studio — os mesmos do Antigravity.', can: ['Ferramentas do Ripper', 'Computador e navegador do agente', 'Contexto muito longo', 'Lê imagens'], cannot: ['Pesquisa na web do Claude', 'Plugins MCP (em breve)', 'Custo exato: estimado pelos tokens'] },
+  { id: 'openai', name: 'OpenAI API', kind: 'Chave da API · pago por uso', logo: openaiSvg, provider: 'openai', tagline: 'GPT direto pela chave da OpenAI, sem passar pelo OpenRouter.', can: ['Ferramentas do Ripper', 'Plugins MCP', 'Computador e navegador do agente', 'Lê imagens', 'Esforço de raciocínio (GPT-5, o-series)'], cannot: ['Pesquisa na web do Claude', 'Custo exato: estimado pelos tokens'] },
+  { id: 'gemini', name: 'Gemini', kind: 'Google AI Studio · cota grátis + pago', logo: geminiSvg, provider: 'gemini', tagline: 'Modelos Gemini pela chave do AI Studio — os mesmos do Antigravity.', can: ['Ferramentas do Ripper', 'Plugins MCP', 'Computador e navegador do agente', 'Contexto muito longo', 'Lê imagens'], cannot: ['Pesquisa na web do Claude', 'Custo exato: estimado pelos tokens'] },
   { id: 'antigravity', name: 'Antigravity', kind: 'Google', logo: antigravitySvg, soon: true, tagline: 'É um editor, sem API pública. Os mesmos modelos chegam pelo Gemini.', can: ['Modelos Gemini (conecte o Gemini)'], cannot: ['Conexão direta: não existe API'] },
   { id: 'cursor', name: 'Cursor', kind: 'cursor-agent', logo: cursorSvg, soon: true, tagline: 'Agente de código do Cursor pela linha de comando, como o Codex.', can: ['Escrever e rodar código'], cannot: [] },
-  { id: 'ollama', name: 'Ollama', kind: 'Modelos locais · grátis', logo: ollamaSvg, provider: 'ollama', tagline: 'Llama, Qwen, DeepSeek e outros rodando nesta máquina, de graça e offline.', can: ['Sem custo por uso', 'Nada sai da máquina', 'Ferramentas do Ripper (modelos com suporte a tools)'], cannot: ['Velocidade depende do seu computador', 'Plugins MCP (em breve)'] }
+  { id: 'ollama', name: 'Ollama', kind: 'Modelos locais · grátis', logo: ollamaSvg, provider: 'ollama', tagline: 'Llama, Qwen, DeepSeek e outros rodando nesta máquina, de graça e offline.', can: ['Sem custo por uso', 'Nada sai da máquina', 'Ferramentas do Ripper e plugins MCP (modelos com suporte a tools)'], cannot: ['Velocidade depende do seu computador'] }
 ];
 
 export function ProviderLogo({ p, dark, size = 40 }) {
