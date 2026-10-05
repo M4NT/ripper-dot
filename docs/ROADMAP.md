@@ -12,9 +12,9 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 ---
 
 ## Próximos passos (em ordem)
-1. Plugins MCP nos provedores compatíveis com OpenAI (§1b).
-2. Aviso na Caixa quando a imagem dos agentes está desatualizada (Pontes P1).
-3. Fluxos com ramificação (§3).
+1. Fluxos com ramificação (§3).
+2. Pulse também no WhatsApp do dono e na tela Início (§3).
+3. Linha do tempo do agente com custo por ação (§4).
 
 ---
 
@@ -45,7 +45,7 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 - ✅ **OpenAI direto, Gemini (AI Studio — os modelos do Antigravity) e Ollama (local, grátis)**, com as ferramentas do Ripper. Um executor só para os quatro provedores compatíveis com OpenAI (`lib/openrouter.mjs`): escolha de modelos pelo catálogo de cada um, teste de conexão, esforço só em modelos de raciocínio. OpenAI/Gemini entram no consentimento e limite de uso pago, com custo **estimado pelos tokens** (tabela de preços; modelo desconhecido = estimativa alta). Ollama sem chave e sem custo. Chaves cifradas.
 - [ ] Atualizar a tabela de preços de OpenAI/Gemini periodicamente (ou ler da API quando houver).
 - [ ] Cursor (`cursor-agent`, como o Codex).
-- [ ] Plugins MCP do usuário nos provedores novos (hoje só Claude/Codex).
+- ✅ Plugins MCP do usuário também no OpenRouter, OpenAI, Gemini e Ollama (`lib/mcp-client.mjs`: conecta stdio/HTTP/SSE no começo do turno, repassa as ferramentas, fecha no fim; plugin fora do ar vira aviso).
 - [ ] Ripper Auto escolher modelos do OpenRouter (hoje só por escolha manual) — só com uso pago ativo.
 
 ## 2. Entrada e saída multimodal (P0/P1)
@@ -142,7 +142,7 @@ Coisas encontradas durante o desenvolvimento: ligações que faltam entre partes
 - **Pré-aquecimento.** 1ª mensagem por agente ainda é fria; no máximo 3 processos parados. Aquecer ao abrir a conversa do agente (não só depois do 1º turno).
 - **Aba aberta durante uma atualização.** Abas abertas antes de um `npm run build` continuam com o JavaScript antigo, e telas carregadas sob demanda dão 404. Mostrar "Nova versão disponível — recarregar".
 - **Uso pago só configurável no modo Enterprise.** A tela Provedores de IA não aparece no modo Simples; quem é Simples não consegue nem ver o consentimento. Ok enquanto OpenRouter for recurso avançado; revisar se virar padrão.
-- **Imagem dos agentes desatualizada.** Quem não reconstruiu a `ripper-agent:3` só descobre quando uma transcrição falha. Avisar na Caixa (aviso do sistema) quando a imagem instalada for mais antiga que a esperada.
+- ✅ ~~Imagem dos agentes desatualizada~~: aviso na Caixa (só no modo Docker, 20s após ligar e a cada 6h) com "Atualizar agora"; Configurações → Computador mostra "desatualizada" e "Atualizar imagem". Antes: Quem não reconstruiu a `ripper-agent:3` só descobre quando uma transcrição falha. Avisar na Caixa (aviso do sistema) quando a imagem instalada for mais antiga que a esperada.
 
 ### P2 — qualidade e higiene
 - **Testes instáveis em máquina carregada.** Testes que sobem o servidor (vault, idempotência, openapi, cabeçalhos) estouram ~15s quando há outros servidores rodando; passam sozinhos. Aumentar o tempo de espera de subida ou rodar esses arquivos em série.

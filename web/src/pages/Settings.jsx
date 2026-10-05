@@ -551,7 +551,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
                   {(image === 'missing' || image === 'outdated') && <button className="btn btn-sm" onClick={() => api('/api/computer/image', { method: 'POST' }).then(r => setImage(r.image === 'missing' ? 'building' : r.image))}>{image === 'outdated' ? 'Atualizar imagem' : 'Construir agora'}</button>}</div>
               </Row>
               <AdvancedBlock settings={s} hint="Imagem customizada e tempo ocioso" className="in-card">
-                <Row title="Imagem usada" desc="Deixe ripper-agent:1, a não ser que você tenha uma imagem própria."><input className="input" value={['', 'node:22-bookworm'].includes(s.computer.dockerImage || '') ? 'ripper-agent:1' : s.computer.dockerImage} onChange={e => set('computer.dockerImage', e.target.value)} /></Row>
+                <Row title="Imagem usada" desc="Deixe em branco para usar a imagem do Ripper (sempre a versão atual). Só preencha se tiver uma imagem própria."><input className="input" value={/^(node:22-bookworm|ripper-agent:\d+)?$/.test(s.computer.dockerImage || '') ? '' : s.computer.dockerImage} placeholder="Imagem do Ripper (padrão)" onChange={e => set('computer.dockerImage', e.target.value)} /></Row>
                 <Row title="Parar ocioso após" desc="O contêiner para; os arquivos ficam na pasta do agente."><div className="input-unit"><input className="input" type="number" min={1} max={1440} value={s.computer.idleStopMinutes} onChange={e => set('computer.idleStopMinutes', +e.target.value)} /><span>min</span></div></Row>
               </AdvancedBlock>
             </Card>
