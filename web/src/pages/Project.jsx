@@ -6,6 +6,7 @@ import { AgentPicker } from './Projects.jsx';
 import { uploadFile } from '../composer.jsx';
 import ChatRow from '../chatRow.jsx';
 import { ArtifactList } from '../actions.jsx';
+import ProjectBoard from './ProjectBoard.jsx';
 
 export default function Project({ id }) {
   const { S, agent, refresh, toast } = useApp();
@@ -59,7 +60,7 @@ export default function Project({ id }) {
       </header>
 
       <Segmented label="Seções do projeto" value={tab} onChange={setTab} className="seg-scroll"
-        items={[['chats', 'Conversas', chats.length], ['artifacts', 'Artefatos', arts.length], ['team', 'Agentes', members.length], ['files', 'Arquivos', files.length], ['instructions', 'Instruções'], ['settings', 'Ajustes']]} />
+        items={[['chats', 'Conversas', chats.length], ['board', 'Quadro'], ['artifacts', 'Artefatos', arts.length], ['team', 'Agentes', members.length], ['files', 'Arquivos', files.length], ['instructions', 'Instruções'], ['settings', 'Ajustes']]} />
 
       <div className="project-body">
         {tab === 'chats' && <>
@@ -78,6 +79,8 @@ export default function Project({ id }) {
             ? <EmptyState title="Nenhuma conversa no projeto" body={members.length ? 'Fale com um agente sozinho ou com o time inteiro. Instruções e arquivos do projeto entram no contexto de todos.' : 'Adicione agentes ao projeto na aba Agentes.'} />
             : <ul className="crows">{chats.map(c => <ChatRow key={c.id} c={c} />)}</ul>}
         </>}
+
+        {tab === 'board' && <ProjectBoard project={p} members={members} />}
 
         {tab === 'artifacts' && <>
           <p className="muted">Entregas que os agentes salvaram neste projeto: roteiros, planos, textos finais. Todos os agentes do projeto podem ler e melhorar.</p>
