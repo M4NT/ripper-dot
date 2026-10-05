@@ -143,7 +143,7 @@ Registradas como vieram, com o estado real do código e a prioridade.
 ### P1 — negócio e governança
 - [ ] **Custo por cliente (CNPJ/empresa) — FinOps.** Etiquetar conversas/rotinas/fluxos por cliente e somar tokens e US$ por cliente e período, para medir margem por atendimento. *Base:* MeteringPanel, TokenBudgetPanel, uso por agente/modelo, etiquetas de conversa (novo). Exportar CSV.
 - [ ] **X9 Guard em tempo real.** Além da varredura (`lib/x9-scan.mjs`, `x9Auditor.jsx`): filtro na saída de WhatsApp, e-mail e logs que bloqueia/mascara senhas, tokens e dados de faturamento antes de enviar, com aviso na Caixa.
-- [ ] **Agente Radar (estilo Ro-DOU).** Modelo pronto: varredura diária em fontes (DOU, sites, e-mails) por palavras-chave, relatório consolidado na Caixa/WhatsApp do responsável, sem comando manual. *Base:* rotinas por horário, gatilhos, fluxos, Pulse.
+- [ ] **Agente Radar (estilo Ro-DOU).** Modelo pronto: varredura diária em fontes (DOU, sites, e-mails) por palavras-chave, relatório consolidado na Caixa/WhatsApp do responsável, sem comando manual. *Já existe* o modelo de agente "Radar" (`lib/templates.mjs`); falta criá-lo já com a rotina diária e o destino do relatório configurados (hoje é manual).
 - [ ] **Contrato entre modelos validado por esquema.** Toda troca estruturada entre modelos (rascunho de agente, orquestrador de times, triagem, fluxos) validada por esquema (zod) com correção/repetição automática quando o modelo variar. *Hoje:* o áudio é transcrito pelo Whisper local (não pelo Gemini); validações existem caso a caso (ex.: `sanitizeDraft`).
 
 ### P2 — UX
