@@ -52,7 +52,7 @@ import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './li
 import { isPaidModel, paidBlockReason, addSpend, spendToday, spendLimits, normalizeBilling } from './lib/paid-usage.mjs';
 import { runTestProvider } from './lib/test-provider.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
-import { memoryContext, isDuplicateMemory, canUseFile, selectSpeakers, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent, turnPlanIds } from './lib/agent-flow.mjs';
+import { memoryContext, isDuplicateMemory, canUseFile, selectSpeakers, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent, turnPlanIds, delegationTasks } from './lib/agent-flow.mjs';
 import { providerAttemptOrder, runProviderAttemptLoop } from './lib/provider-turn.mjs';
 import { normalizeProviderRetry } from './lib/provider-retry.mjs';
 import { patchSettings, settingsMeta, SettingsValidationError } from './lib/settings-patch.mjs';
@@ -1520,7 +1520,9 @@ async function chat({ chat, text, fileIds, signal, mcpSession, skipUserPush = fa
       for (const gate of deniedPeers) emit({ warn: delegationDeniedMessage(gate) });
       if (next.length) {
         const ids = next.map(a => a.id);
+        reply.delegations = delegationTasks(reply.content, next);
         emit({ delegated: ids, agentHandoff: { from: agent.id, to: ids } });
+        for (const d of reply.delegations) emit({ delegation: { from: agent.id, ...d } });
       }
     }
     emit({ turnDone: agent.id });
