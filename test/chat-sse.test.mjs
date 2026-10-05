@@ -137,7 +137,7 @@ test('POST /api/chat emite SSE com tokens e persiste a resposta', async () => {
   });
 });
 
-test('abortar o cliente interrompe o stream e marca stopped', async () => {
+test('fechar a conexão (recarregar a página) NÃO para o agente: a resposta termina e fica salva', async () => {
   await withServer({ RIPPER_TEST_PROVIDER: 'slow' }, async (base, auth) => {
     const agent = await firstAgent(base, auth);
     const ac = new AbortController();
@@ -169,11 +169,19 @@ test('abortar o cliente interrompe o stream e marca stopped', async () => {
     assert.ok(events.some(e => e.text));
     assert.ok(chatId);
 
-    await new Promise(r => setTimeout(r, 400));
+    // enquanto termina, quem reabre acompanha pela foto ao vivo
+    const mid = await (await fetch(base + `/api/chats/${chatId}/live`, { headers: auth })).json();
+    assert.equal(mid.streaming, true);
+    for (let i = 0; i < 40; i++) {
+      const l = await (await fetch(base + `/api/chats/${chatId}/live`, { headers: auth })).json();
+      if (!l.streaming) break;
+      await new Promise(r => setTimeout(r, 100));
+    }
     const chat = await (await fetch(base + `/api/chats/${chatId}`, { headers: auth })).json();
     const assistant = chat.messages.filter(m => m.role === 'assistant').at(-1);
-    assert.equal(assistant?.stopped, true);
-    assert.ok((assistant?.content || '').length > 0);
+    assert.notEqual(assistant?.stopped, true);
+    assert.equal(assistant?.content, 'parte 1... ok');
+    assert.equal(chat.interrupted, false);
   });
 });
 

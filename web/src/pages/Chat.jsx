@@ -231,6 +231,30 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
     return () => { alive = false; };
   }, [initialId, initialAgent, initialProject, (initialMembers || []).join(',')]);
   useEffect(() => () => ctrl.current?.abort(), []);
+  // Reabriu a página com o agente ainda respondendo (o turno segue no servidor): mostra a resposta chegando e,
+  // ao terminar, carrega a conversa salva.
+  const watching = !!chat?.streaming && !ctrl.current;
+  useEffect(() => {
+    if (!watching || !chatId) return;
+    let alive = true;
+    const tick = async () => {
+      const r = await api(`/api/chats/${chatId}/live`).catch(() => null);
+      if (!alive || !r) return;
+      if (r.streaming) {
+        if (r.live?.agentId) setLive({ role: 'assistant', agentId: r.live.agentId, content: r.live.content, steps: r.live.steps.map(s => s.kind === 'tool' ? { ...s, label: stepLabel(s.tool) } : s), at: r.live.at });
+        setBusyChats(b => ({ ...b, [chatId]: true }));
+        return;
+      }
+      clearInterval(t);
+      setLive(null);
+      setBusyChats(b => { const n = { ...b }; delete n[chatId]; return n; });
+      const c = await api(`/api/chats/${chatId}`).catch(() => null);
+      if (alive && c) { setChat(c); setInterrupted(!!c.interrupted); }
+    };
+    const t = setInterval(tick, 1000);
+    tick();
+    return () => { alive = false; clearInterval(t); };
+  }, [watching, chatId]);
   const waiting = chatId && S.pendingInbox?.[chatId];
   const flowLive = ['running', 'waiting'].includes(chat?.flowRun?.status); // fluxo roda no servidor: a conversa se atualiza sozinha
   useEffect(() => {

@@ -363,7 +363,8 @@ function publicBaseUrl(req) {
 }
 // Prévias em texto puro: nada de ** ou # aparecendo nas listas.
 const plain = s => String(s || '').replace(/```[\s\S]*?```/g, ' ').replace(/[*_`#>]+/g, '').replace(/\s+/g, ' ').trim();
-const summary = ({ messages, ...c }) => ({ ...c, preview: plain(messages.at(-1)?.content).slice(0, 90), count: messages.length });
+// prévia = última mensagem com texto (uma resposta interrompida e vazia no fim não apaga a prévia da conversa)
+const summary = ({ messages, ...c }) => ({ ...c, preview: plain(messages.findLast(m => String(m.content || '').trim())?.content).slice(0, 90), count: messages.length });
 
 function chatDetail(c, cid) {
   return {
@@ -373,6 +374,19 @@ function chatDetail(c, cid) {
     interrupted: c.run?.status === 'interrupted',
     ...(c.workspace?.kind === 'folder' ? { workspaceBranch: gitBranch(c.workspace.path) } : {})
   };
+}
+
+// Foto ao vivo da resposta em andamento (por conversa): quem fala, texto até agora e ações. Para quem reabre a página.
+const liveByChat = new Map();
+function trackLive(chatId, e) {
+  if (!e) return;
+  let cur = liveByChat.get(chatId);
+  if (e.speaker || !cur) { cur = { agentId: e.speaker || cur?.agentId || null, content: '', steps: [], at: Date.now() }; liveByChat.set(chatId, cur); }
+  if (e.text) cur.content += e.text;
+  if (e.tool) cur.steps.push({ kind: 'tool', tool: e.tool, detail: e.detail });
+  if (e.approval) cur.steps.push({ kind: 'approval', rec: e.approval, status: 'pending' });
+  if (e.warn) cur.steps.push({ kind: 'warn', label: e.warn });
+  if (e.passed) liveByChat.set(chatId, { agentId: null, content: '', steps: [], at: Date.now() });
 }
 
 async function streamChatResponse(req, c, { text, fileIds, mcpSession, resume = false, credentialRefs, voice }, res) {
@@ -390,13 +404,16 @@ async function streamChatResponse(req, c, { text, fileIds, mcpSession, resume = 
     });
   };
   emitRaw({ chatId: c.id, runId: c.run?.runId, eventSeq: c.run?.lastEventSeq, resume: !!resume });
-  res.on('close', () => { if (!res.writableFinished) clientAc.abort(); });
+  // Recarregar a página ou fechar a aba NÃO para o agente: o turno segue no servidor e a resposta fica salva.
+  // Só o botão Parar (/cancel) interrompe. Quem reabre a conversa acompanha por GET /api/chats/:id/live.
+  res.on('close', () => { if (!res.writableFinished) { /* só deixa de transmitir */ } });
   const { signal: streamSignal } = registerChatStream(c.id, { signal: clientAc.signal, emit: emitRaw });
   const ping = setInterval(() => res.writable && res.write(': ping\n\n'), 15_000);
   let completed = false;
   let turnMetricRecorded = false;
   const chatEmit = e => {
     if (e?.speaker) turnMetricRecorded = true;
+    trackLive(c.id, e);
     emitRaw(e);
   };
   try {
@@ -406,6 +423,7 @@ async function streamChatResponse(req, c, { text, fileIds, mcpSession, resume = 
     completed = !streamSignal.aborted;
   } finally {
     clearInterval(ping);
+    liveByChat.delete(c.id);
     unregisterChatStream(c.id);
     let status = completed ? 'done' : 'interrupted';
     if (streamSignal.aborted) {
@@ -3063,6 +3081,7 @@ const routes = [
     if (!allAccounts(db.settings).some(a => a.id === aid)) throw new HttpError(404, 'Conta não encontrada. Salve as configurações primeiro.');
     return testAccount(aid, CLAUDE_FAST_ENV);
   }],
+  ['GET', /^\/api\/chats\/([\w-]+)\/live$/, (req, [cid]) => ({ streaming: isChatStreaming(cid), live: liveByChat.get(cid) || null })],
   // Seletor de pasta de trabalho: só quem está nesta máquina navega pelas pastas dela.
   ['GET', /^\/api\/fs\/dirs$/, (req, _, url) => {
     if (!isLocalRequest(req)) throw new HttpError(403, 'Só dá para escolher pastas na própria máquina do Ripper.');

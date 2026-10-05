@@ -1122,6 +1122,9 @@ html.lightbox-open { overflow: hidden; }
 .chat-av { position: relative; display: inline-grid; place-items: center; flex: none; }
 .chat-av.group .chat-av-a { position: absolute; left: 0; top: 0; }
 .chat-av.group .chat-av-b { position: absolute; right: 0; bottom: 0; border-radius: 50%; box-shadow: 0 0 0 2px var(--side); }
+/* no trevo de grupo cada avatar fica no próprio círculo: o desenho do agente vaza da caixa (pula/pisca) e desalinhava o par */
+.chat-av.group .chat-av-a, .chat-av.group .chat-av-b { display: block; line-height: 0; border-radius: 50%; }
+.chat-av.group .av-box { overflow: hidden; border-radius: 50%; }
 .chat-av-badge { position: absolute; right: -4px; top: -4px; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 8px; background: var(--ink); color: var(--bg); font: 600 9.5px/15px var(--mono); text-align: center; box-shadow: 0 0 0 2px var(--side); }
 .chat-av.group.working .chat-av-badge { background: var(--ok); }
 .group-pill, .proj-pill { display: inline-flex; align-items: center; gap: 3px; height: 17px; padding: 0 6px; margin-right: 6px; border-radius: 6px; font-size: 10.5px; font-weight: 500; vertical-align: 1px; white-space: nowrap; }
