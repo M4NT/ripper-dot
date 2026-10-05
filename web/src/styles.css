@@ -225,6 +225,9 @@ code { font: .88em var(--mono); }
 
 /* início */
 .home { padding-top: 32px; }
+.pulse-card { margin-bottom: 28px; padding: 22px 24px; border-radius: var(--r-lg); background: var(--surface); border: 1px solid var(--line); }
+.pulse-card .section-head { margin: 0 0 10px; }
+.pulse-body { margin: 0; white-space: pre-line; line-height: 1.7; color: var(--ink-2); }
 .hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); align-items: center; gap: 24px; min-height: 440px; }
 .hero h1 { font-size: clamp(44px, 5.4vw, 76px); line-height: .98; font-weight: 400; letter-spacing: -.04em; }
 .hero h1 em { font-family: var(--serif); font-style: italic; font-weight: 400; letter-spacing: -.02em; font-size: 1.1em; line-height: .8; }
