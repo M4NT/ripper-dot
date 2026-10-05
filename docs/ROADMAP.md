@@ -12,9 +12,9 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 ---
 
 ## Próximos passos (em ordem)
-1. Ver a tela da VM ao vivo dentro do chat (§4).
-2. Grupos com linhas de delegação visíveis (§4).
-3. Notificações push no celular (§6).
+1. Acesso remoto seguro com HTTPS (destrava notificações no celular; precisa do login) (§6/§7).
+2. Layout de tablet em duas colunas (§6).
+3. Criar agente em 1 frase (§5).
 
 ---
 
@@ -83,8 +83,9 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 - ✅ Subtarefas em paralelo com barra de progresso no chat.
 - ✅ Linha do tempo do agente: aba "Atividade" (últimos 7 dias, por dia: conversa, ações, duração, arquivos, custo, falhas).
 - [ ] Linha do tempo com print da tela em cada ação do navegador; incluir as ações externas.
-- [ ] Ver a tela da VM ao vivo dentro do chat (miniatura que expande) enquanto ele age.
-- [ ] Grupos: linhas de delegação visíveis ("Ana pediu a Bruno…"), quem está falando, fila.
+- ✅ Tela do agente em miniatura na conversa: aparece sozinha quando ele usa o navegador (painel fechado/celular), só assiste; "Ampliar" abre em tela cheia com "Assumir controle". Corrigida a criação simultânea do contêiner ("nome já em uso").
+- ✅ Grupos: linha "Ana → Bruno: tarefa" depois de cada delegação por @Nome (fica salva) e "Agora: Bruno · depois: Carla" enquanto respondem.
+- [ ] Linha de delegação também para send_message / call_agent / handoff.
 - [ ] Painel lateral unificado: Detalhes / Arquivos / Tarefas / Tela.
 - [ ] Nota de desempenho por agente (taxa de sucesso, aprovações recusadas, tempo).
 
@@ -106,7 +107,8 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 
 ## 6. Qualquer aparelho (P1)
 - ✅ PWA instalável.
-- [ ] Notificações push (Web Push) para aprovações, gasto e avisos do sistema.
+- ✅ Notificações no aparelho (Web Push, sem dependência nova): aprovações pendentes, avisos do sistema e limite de gasto; Configurações → Perfil → "Notificações neste aparelho" (Ativar / Enviar teste). Celular precisa de HTTPS.
+- [ ] Testar entrega real (Chrome/FCM, Firefox, iPhone instalado na tela inicial).
 - [ ] Layout de tablet (duas colunas: lista + conversa).
 - [ ] Cabeçalho móvel e alternância Simples/Enterprise acessíveis no celular.
 - [ ] Acesso remoto seguro (túnel com login) — depende do login (§7).
