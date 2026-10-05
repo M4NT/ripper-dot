@@ -581,7 +581,14 @@ function notifyApproval(agent, command) {
   notifyOwner({ title: `${agent.name || 'Agente'} precisa de você`, body: command, url: '#/inbox' });
 }
 
-const isLocalRequest = req => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+const LOOPBACK = ['127.0.0.1', '::1', '::ffff:127.0.0.1'];
+// O Docker Desktop entrega as chamadas dos contêineres (host.docker.internal) como se viessem de 127.0.0.1.
+// O que diferencia é o endereço digitado: o navegador desta máquina usa localhost/127.0.0.1.
+// ponytail: o cabeçalho Host pode ser forjado por quem age de propósito; o login com senha (roadmap §7) fecha de vez.
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+const requestHostname = req => String(req.headers.host || '').toLowerCase().replace(/:\d+$/, '');
+const fromAgentComputer = req => LOOPBACK.includes(req.socket.remoteAddress) && !LOCAL_HOSTNAMES.has(requestHostname(req));
+const isLocalRequest = req => LOOPBACK.includes(req.socket.remoteAddress) && !fromAgentComputer(req);
 
 /** Troca a pasta de trabalho da conversa (null = área do próprio agente) e guarda nos recentes. */
 function setChatWorkspace(req, c, raw) {
@@ -3155,7 +3162,7 @@ const routes = [
   // Abre no programa padrão desta máquina (Word, Excel…) ou mostra na pasta. Só pedido vindo desta
   // própria máquina e só arquivo registrado no Ripper (o caminho nunca vem do navegador).
   ['POST', /^\/api\/files\/([\w-]+)\/(open|reveal)$/, (req, [fid, mode]) => {
-    const local = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress);
+    const local = isLocalRequest(req);
     if (!local) throw new HttpError(403, 'Só dá para abrir arquivos na própria máquina do Ripper.');
     const f = db.files.find(x => x.id === fid); if (!f) throw new HttpError(404, 'Arquivo não encontrado.');
     const full = fileURLToPath(dataUrl(f.path));
@@ -3458,6 +3465,8 @@ const server = createServer(async (req, res) => {
     }
     if (p.startsWith('/api/')) {
       if (handleApiCorsPreflight(req, res, CORS_ALLOWLIST)) return;
+      // Agente dentro do próprio computador (contêiner) não usa a API do Ripper: não aprova a si mesmo nem muda configurações.
+      if (!TOKEN && fromAgentComputer(req)) throw new HttpError(403, 'A API do Ripper não aceita chamadas de dentro do computador dos agentes.');
       if (!authed(req)) throw new HttpError(401, 'Não autorizado. Abra o Ripper com ?token=<RIPPER_TOKEN>.');
       const originErr = mutatingOriginError(req, CORS_ALLOWLIST);
       if (originErr) throw new HttpError(403, originErr);
