@@ -15,7 +15,7 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 1. **Login com senha quando o Ripper sai do localhost** (§7) — destrava acesso remoto, push e relógio (§6).
 2. **Resumo diário "Pulse"** (§3) — o recurso mais "funcionário de verdade"; usa os avisos do sistema da Caixa que já existem.
 3. **Gatilhos por evento** (§3) — e-mail chegou, palavra-chave no WhatsApp, webhook.
-4. Pontes P0 da seção "Pontes" (persistência do db.json, segredos em texto puro no backup).
+4. Ponte P0 restante: registro imutável × LGPD (decisão pendente).
 5. Provedores diretos: OpenAI, Gemini, Ollama (§1b).
 
 ---
@@ -90,7 +90,7 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 | Projetos | Quadro de tarefas (kanban) atribuídas a agentes. |
 | Biblioteca | Busca em texto completo de artefatos e arquivos. |
 | Conectores / Integrações / Marketplace | Unificar em um catálogo só (mesmo padrão da grade de Provedores). |
-| Configurações | ✅ Provedores de IA em grade. ✅ Backup visível no modo Simples. Espremido em ~800px de largura; busca de configuração; "restaurar padrão" por seção. |
+| Configurações | ✅ Provedores de IA em grade. ✅ Backup visível no modo Simples. ✅ Não espreme mais em ~800px nem no celular; busca de configuração; "restaurar padrão" por seção. |
 | Admin | Gráficos de uso por período; exportar CSV. |
 
 ## 6. Qualquer aparelho (P1)
@@ -107,7 +107,8 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 - ✅ Registro de ações externas: WhatsApp enviado e respostas automáticas, posts/webhooks, ações arriscadas no navegador, links públicos, uso pago ligado/desligado. Sempre ligado (não depende do Enterprise), imutável, filtros por tipo/agente/período e CSV. Guarda só 160 caracteres de cada conteúdo, mascarados.
 - ✅ Uso pago só com consentimento explícito (aviso + confirmação); limite diário por agente (US$ 2) e total (US$ 10) com pausa automática do gasto, aviso na Caixa e custo real por resposta. A assinatura nunca é bloqueada.
 - ✅ Backup automático: ligado por padrão (diário, 7 cópias), cópia extra opcional em outra pasta (OneDrive/Drive/disco externo), aviso na Caixa se falhar, e checkpoint do SQLite antes de empacotar (antes ficavam de fora as gravações mais recentes).
-- [ ] Backup criptografado (hoje o .tar.gz leva as chaves de API em texto — ver Pontes).
+- ✅ Chaves de API e tokens cifrados no db.json (AES-256-GCM, chave em `~/.ripper/secret.key`, fora da pasta de dados): backups, cópia extra e exportação JSON levam só texto cifrado. Restaurar em outra máquina sem a chave = redigitar as chaves.
+- [ ] Segredos internos da Evolution (`data/evolution.json`) também cifrados.
 
 ## 8. Qualidade
 - [ ] Smoke de UI estável em máquina carregada (CI já cobre).
@@ -121,8 +122,8 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 Coisas encontradas durante o desenvolvimento: ligações que faltam entre partes que já existem, ou defeitos que ainda não doem mas vão doer.
 
 ### P0 — podem perder dados ou expor segredos
-- **db.json descarta chaves que não conhece.** `mergePersistedDb` só grava o que está em `DEFAULT` (lib/store.mjs). `db.juliaCorrections` (correções ao Ripper Auto) provavelmente some a cada gravação. Toda coleção nova precisa entrar em `DEFAULT` e, se tiver `id`, em `ID_COLLECTIONS` (lib/db-merge.mjs). *Tarefa separada já sugerida.* Ideal: um teste que falha se o código usar `db.<chave>` fora de `DEFAULT`.
-- **Segredos em texto puro no db.json e nos backups.** `settings.claude.apiKey` e `settings.openrouter.apiKey` ficam abertos; o snapshot .tar.gz (e a cópia extra no OneDrive) leva tudo. Já existe o cofre (`lib/credential-vault.mjs`, refs `vlt_*`): mover essas chaves para lá, como os plugins MCP já fazem.
+- ✅ ~~db.json descartava chaves que não conhece~~: além de `juliaCorrections` (correções ao Ripper Auto), o `auditLog` também voltava ao vazio a cada gravação. Agora toda chave sem regra própria é preservada (teste `db-merge-unknown-keys`).
+- ✅ ~~Segredos em texto puro no db.json e nos backups~~: cifrados (ver §7). O cofre de credenciais não servia aqui: a chave dele vem do navegador, e rotinas/WhatsApp rodam sem aba aberta.
 - **Registro imutável × LGPD.** O registro de ações externas é WORM e guarda trechos de mensagens (160 caracteres). Pedido de exclusão (`/api/lgpd/erasure`) não apaga esses trechos. Decidir: guardar só destino/tipo (sem trecho) ou gravar os trechos fora da trilha WORM.
 
 ### P1 — funcionam, mas com teto conhecido
@@ -136,6 +137,5 @@ Coisas encontradas durante o desenvolvimento: ligações que faltam entre partes
 
 ### P2 — qualidade e higiene
 - **Testes instáveis em máquina carregada.** Testes que sobem o servidor (vault, idempotência, openapi, cabeçalhos) estouram ~15s quando há outros servidores rodando; passam sozinhos. Aumentar o tempo de espera de subida ou rodar esses arquivos em série.
-- **Configurações espremidas em ~800px** (menu de abas + conteúdo).
 - **Caixa sem filtros "Gasto" e "Sistema"** (aparecem só em "Tudo").
 - **`listExternal` lê até 5.000 linhas e filtra em memória.** Filtrar por tipo/agente no SQL se o registro crescer muito.
