@@ -781,6 +781,25 @@ async function askApproval({ agent, chat, emit, signal }, kind, command, reason,
   return done.status === 'approved';
 }
 
+/**
+ * "Preciso de você": o agente pausa e faz uma pergunta aberta na Caixa (com opções rápidas, se fizer sentido).
+ * A sua resposta volta para ele como texto e a tarefa continua de onde parou. Espera até 2h.
+ */
+async function askOwner({ agent, chat, emit, signal }, question, context, options = []) {
+  const rec = { id: id(), agentId: agent.id, chatId: chat.id, kind: 'question', command: String(question).slice(0, 1000), reason: String(context || '').slice(0, 2000),
+    options: options.map(o => String(o).slice(0, 80)).filter(Boolean).slice(0, 5), status: 'pending', createdAt: Date.now(), timeoutMs: 2 * 3600_000 };
+  db.approvals.push(rec);
+  if (db.approvals.length > 300) db.approvals.splice(0, db.approvals.length - 300);
+  emit({ approval: approvalView(rec) });
+  notifyApproval(agent, rec.command);
+  save();
+  const done = await gate.request(rec, signal);
+  emit({ approvalDone: { id: rec.id, status: done.status } });
+  save();
+  if (done.status === 'approved' && done.answer) return `Resposta do usuário: ${done.answer}`;
+  return done.status === 'expired' ? 'O usuário não respondeu em 2 horas. Não adivinhe: deixe a tarefa pausada e registre a pergunta pendente.' : 'O usuário não respondeu (pergunta cancelada). Não adivinhe.';
+}
+
 function guarded(computer, { agent, chat, emit, signal }) {
   const ask = async (kind, command, reason) => {
     const rec = { id: id(), agentId: agent.id, chatId: chat.id, kind, command, reason, status: 'pending', createdAt: Date.now() };
@@ -935,6 +954,8 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
   const ctx = {
     db,
     settings: s,
+    // "Preciso de você": pergunta aberta na Caixa (não em conversa de canal: lá o cliente está esperando)
+    askOwner: chat.channel ? null : a => askOwner({ agent, chat, emit, signal }, a.question, a.context, a.options),
     // Entrega um arquivo do computador do agente na conversa (Abrir / Baixar / Mostrar na pasta).
     deliverFile: async a => {
       const rel = vmPathToData(a.path, agent.id);
@@ -1454,7 +1475,7 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
     runModel: m => {
       const chaosErr = maybeChaosProviderFailure(resolveEffectiveChaos(db.settings));
       if (chaosErr) throw chaosErr;
-      if (testProvider) return runTestProvider({ prompt, signal });
+      if (testProvider) return runTestProvider({ prompt, signal, ctx });
       const paidWhy = isPaidModel(m, s) && paidBlockReason(db, s, agent.id);
       if (paidWhy) throw new Error(paidWhy); // a fila de tentativas cai para o próximo modelo (ex.: assinatura)
       const providerSystem = MODELS[m].provider === 'codex' && s.computer.mode !== 'local'
@@ -2450,7 +2471,8 @@ const routes = [
   ['POST', /^\/api\/approvals\/([\w-]+)$/, async (req, [aid]) => {
     const b = await body(req);
     // Pedido que já não está esperando (servidor reiniciou, expirou): fecha no histórico.
-    if (!gate.decide(aid, !!b.approve, { remember: !!b.remember })) {
+    const answer = typeof b.answer === 'string' ? b.answer.trim().slice(0, 4000) : '';
+    if (!gate.decide(aid, answer ? true : !!b.approve, answer ? { answer } : { remember: !!b.remember })) {
       const rec = db.approvals.find(a => a.id === aid);
       if (rec?.status === 'pending') { rec.status = 'expired'; rec.decidedAt = Date.now(); save(); }
       throw new HttpError(409, 'Este pedido não está mais aguardando.');

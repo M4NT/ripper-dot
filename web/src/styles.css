@@ -1829,3 +1829,13 @@ code, .mono, pre { overflow-wrap: anywhere; }
 /* biblioteca: busca em texto completo */
 .lib-search { margin-bottom: 16px; }
 .lib-snippet { display: block; margin-top: 4px; color: var(--ink-2); font-size: 13.5px; line-height: 1.5; overflow-wrap: anywhere; }
+
+/* "Preciso de você": pergunta do agente */
+.approval.question { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 10%, transparent); }
+.approval.question.approved, .approval.question.expired, .approval.question.cancelled { border-color: var(--line); box-shadow: none; }
+.question-text { margin: 4px 0 6px; font-size: 15.5px; line-height: 1.5; color: var(--ink); white-space: pre-wrap; }
+.question-context { white-space: pre-wrap; }
+.question-options { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.question-answer { display: flex; gap: 8px; align-items: flex-end; margin-top: 6px; }
+.question-answer textarea { flex: 1; min-width: 0; resize: vertical; font-size: 14px; }
+@media (max-width: 600px) { .question-answer { flex-direction: column; align-items: stretch; } }

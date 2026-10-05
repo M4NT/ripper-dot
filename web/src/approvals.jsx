@@ -7,7 +7,46 @@ import { useT } from './i18n/index.jsx';
 const KIND = { exec: 'quer rodar um comando', share: 'quer publicar um link', social: 'quer publicar em webhook', whatsapp: 'quer enviar um WhatsApp', email: 'quer enviar um e-mail', github: 'quer publicar no GitHub', flow: 'terminou um passo do fluxo' };
 
 /** Cartão de aprovação: mostra exatamente o que vai acontecer e por que precisa do seu ok. */
-export function ApprovalCard({ rec, status, compact, onDone }) {
+export function ApprovalCard(props) {
+  return props.rec.kind === 'question' ? <QuestionCard {...props} /> : <DecisionCard {...props} />;
+}
+
+/** "Preciso de você": pergunta aberta do agente, com respostas rápidas e campo livre. */
+function QuestionCard({ rec, status, compact, onDone }) {
+  const { agent, toast } = useApp();
+  const [busy, setBusy] = useState(false);
+  const [text, setText] = useState('');
+  const a = agent(rec.agentId);
+  const st = status || rec.status;
+  async function answer(value) {
+    if (!value.trim()) return;
+    setBusy(true);
+    try { await api(`/api/approvals/${rec.id}`, { method: 'POST', body: { answer: value.trim() } }); onDone?.('approved'); }
+    catch (e) { toast(e.message, 'error'); onDone?.('expired'); }
+    setBusy(false);
+  }
+  return (
+    <div className={`approval question ${st} ${compact ? 'compact' : ''}`} role="group" aria-label={`${a?.name || 'Agente'} precisa de você`}>
+      <div className="approval-head">
+        <span className="approval-ico"><Icon name="chat" size={15} /></span>
+        <span className="approval-title"><b>{a?.name || rec.agentName || 'Agente'}</b> precisa de você</span>
+        {compact && rec.chatTitle && <button className="link approval-chat" onClick={() => go(`/c/${rec.chatId}`)}>{rec.chatTitle}</button>}
+      </div>
+      <p className="question-text">{rec.command}</p>
+      {rec.reason && <p className="approval-why question-context">{rec.reason}</p>}
+      {st === 'pending' ? <>
+        {rec.options?.length > 0 && <div className="question-options">{rec.options.map(o => <button key={o} type="button" className="pill" disabled={busy} onClick={() => answer(o)}>{o}</button>)}</div>}
+        <form className="question-answer" onSubmit={e => { e.preventDefault(); answer(text); }}>
+          <textarea className="input" rows={2} value={text} onChange={e => setText(e.target.value)} placeholder="Responda com as suas palavras…" aria-label="Sua resposta"
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); answer(text); } }} />
+          <button className="btn btn-sm btn-primary" disabled={busy || !text.trim()}><Icon name="arrowR" size={14} />Responder</button>
+        </form>
+      </> : <p className={`approval-result ${st}`}><Icon name={st === 'approved' ? 'check' : 'x'} size={13} />{st === 'approved' ? `Você respondeu: ${rec.answer || ''}` : st === 'expired' ? 'Ficou sem resposta' : 'Cancelada'}</p>}
+    </div>
+  );
+}
+
+function DecisionCard({ rec, status, compact, onDone }) {
   const { agent, toast } = useApp();
   const [busy, setBusy] = useState(false);
   const a = agent(rec.agentId);

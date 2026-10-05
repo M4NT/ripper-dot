@@ -13,8 +13,8 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 
 ## Próximos passos (em ordem)
 1. Acesso remoto seguro com HTTPS (destrava notificações no celular; precisa do login — decisão do dono) (§6/§7).
-2. Biblioteca: busca em texto completo (§5) e Admin: gráficos e CSV (§5) — em andamento.
-3. Seção 9 (observações do dono): começar por "Preciso de você" e a fila de mensagens mortas.
+2. Seção 9: fila de mensagens mortas (dead-letter) com nova tentativa.
+3. Seção 9: erros em linguagem humana com ação de 1 clique; custo por cliente (FinOps).
 
 ---
 
@@ -100,10 +100,10 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 | Chat | ✅ Ouvir resposta; ✅ prévia de arquivos; ✅ custo por resposta paga. ✅ Editar e reenviar (qualquer mensagem sua). ✅ Buscar na conversa (Ctrl+F, sem acento). Ramificar; fixar. |
 | Conversas | ✅ Etiquetas (filtro e busca), arquivar (some da lista e do menu; aba Arquivadas), seleção em lote: etiquetar, arquivar, desarquivar, apagar. |
 | Projetos | ✅ Aba Quadro: A fazer / Fazendo / Feito, cartões com agente, arrastar ou "Mover" (teclado/toque), "Pedir ao agente" roda a tarefa no projeto e move para Feito com link da conversa. Card fica "rodando" se o servidor reiniciar no meio (mover à mão limpa). |
-| Biblioteca | Busca em texto completo de artefatos e arquivos. |
+| Biblioteca | ✅ Busca dentro do conteúdo de artefatos, arquivos de texto, memórias e skills (sem acento, trecho com a palavra). PDF/Word ainda não entram na busca. |
 | Conectores / Integrações / Marketplace | Unificar em um catálogo só (mesmo padrão da grade de Provedores). |
 | Configurações | ✅ Provedores de IA em grade. ✅ Backup visível no modo Simples. ✅ Não espreme mais em ~800px nem no celular; busca de configuração; "restaurar padrão" por seção. |
-| Admin | Gráficos de uso por período; exportar CSV. |
+| Admin | ✅ Uso por período (7/30/90 dias ou datas), por dia/agente/modelo, gráfico + tabela com total + CSV. Custo estimado (o registro guarda caracteres); o histórico de uso guarda os últimos 800 eventos. |
 
 ## 6. Qualquer aparelho (P1)
 - ✅ PWA instalável.
@@ -135,7 +135,7 @@ Princípio de custo: **a assinatura (Claude Code / ChatGPT) é o modelo principa
 Registradas como vieram, com o estado real do código e a prioridade.
 
 ### P0 — confiança em produção
-- [ ] **"Preciso de você" (handoff humano / PENDING_HUMAN).** Agente diante de algo ambíguo pausa a tarefa e cria na Caixa um cartão destacado com o contexto exato e a pergunta "O que faço aqui?"; a sua resposta retoma de onde parou, sem afetar outras tarefas. *Base existente:* aprovações (pausa e retomada já funcionam), notify_owner, Caixa. Falta: ferramenta `ask_owner` (pergunta aberta, não só sim/não) e retomada com a resposta.
+- ✅ **"Preciso de você" (handoff humano).** Ferramenta `ask_owner`: o agente pausa diante de algo ambíguo, a pergunta aparece destacada na Caixa (e notificação) com o contexto, respostas rápidas e campo livre; a resposta volta e ele continua de onde parou. Espera até 2h; sem resposta, não adivinha. Fora de conversas de canal (WhatsApp usa "avisar o dono").
 - [ ] **Fila de mensagens mortas (dead-letter) no SQLite WAL.** WhatsApp (Evolution), e-mail, webhooks e APIs externas: falha de rede vira item na fila com nova tentativa com espera crescente; nada se perde; tela para ver/reenviar/descartar. *Hoje:* falha é registrada em Ações externas, sem nova tentativa.
 - [ ] **Erros em linguagem humana com ação de 1 clique.** Mapear erros conhecidos (sessão expirada, site fora do ar, chave inválida, limite) para frases simples + botão ("Reconectar", "Tentar de novo"). *Base:* `humanError` no chat; estender a rotinas, fluxos, Caixa e canais.
 - [ ] **Sessões de portais nas VMs com auto-cura.** Detectar sessão expirada (Omie e outros portais) no meio de uma rotina, pausar o lote sem corromper, pedir reautenticação na Caixa ("Reconectar") e retomar. *Base:* cofre (`lib/credential-vault.mjs`), navegador da VM, noVNC para o humano logar. *Não existe integração com o Omie ainda.*
