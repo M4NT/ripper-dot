@@ -365,6 +365,8 @@ img.delivered-preview { max-height: 360px; object-fit: contain; }
 .delivered-table table { border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
 .delivered-table th, .delivered-table td { padding: 4px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
 .delivered-table th { position: sticky; top: 0; background: var(--surface); }
+.or-catalog { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.or-catalog .rows { max-height: 320px; overflow: auto; }
 .subtasks { list-style: none; margin: 0; padding: 0; width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 8px; }
 .subtask { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; font-size: 13px; color: var(--ink-2); }
 .subtask-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

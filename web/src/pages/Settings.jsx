@@ -141,6 +141,63 @@ function Row({ title, desc, children, stack, tip }) {
     </div>
   );
 }
+/** OpenRouter: uma chave dá acesso a GPT, Gemini, DeepSeek, Llama… com as ferramentas do Ripper. */
+function OpenRouterCard({ s, set }) {
+  const or = s.openrouter || { apiKey: '', models: [] };
+  const [check, setCheck] = useState(null); // null | 'testing' | { ok, error, usage }
+  const [catalog, setCatalog] = useState(null);
+  const [q, setQ] = useState('');
+  const setOr = patch => set('openrouter', { ...or, ...patch });
+  async function test() {
+    setCheck('testing');
+    try { setCheck(await api('/api/openrouter/test', { method: 'POST', body: { apiKey: or.apiKey } })); }
+    catch (e) { setCheck({ ok: false, error: e.message }); }
+  }
+  async function openCatalog() {
+    try { setCatalog(await api('/api/openrouter/models')); } catch (e) { setCheck({ ok: false, error: e.message }); }
+  }
+  const chosen = new Set(or.models.map(m => m.id));
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const found = (catalog || []).filter(m => m.tools && !chosen.has(m.id) && words.every(w => `${m.id} ${m.label}`.toLowerCase().includes(w))).slice(0, 30);
+  const price = n => (n < 1 ? n.toFixed(2) : n.toFixed(1)).replace('.', ',');
+  const status = check === 'testing' ? <span className="tag" role="status">Testando…</span>
+    : check?.ok ? <span className="tag tag-ok">conectado</span>
+    : check ? <span className="tag tag-warn">{check.error}</span>
+    : or.apiKey ? <span className="tag">chave salva</span> : <span className="tag">não conectado</span>;
+  return (
+    <Card title="OpenRouter" badge={status} desc="Uma chave só para usar GPT, Gemini, DeepSeek, Llama e centenas de outros modelos, com as ferramentas do Ripper (computador, navegador, memória). Pago por uso na sua conta do OpenRouter.">
+      <Row title="Chave da API" desc={<>Crie em <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a>.</>}>
+        <div className="row">
+          <input className="input" type="password" autoComplete="off" value={or.apiKey} onChange={e => { setOr({ apiKey: e.target.value }); setCheck(null); }} placeholder="sk-or-…" aria-label="Chave do OpenRouter" />
+          <button type="button" className="btn" disabled={!or.apiKey || check === 'testing'} onClick={test}>Testar</button>
+        </div>
+      </Row>
+      <Row title="Modelos em uso" desc="Aparecem no seletor de modelo das conversas e dos agentes depois de salvar." stack>
+        {or.models.length ? (
+          <ul className="rows flat">{or.models.map(m => (
+            <li key={m.id} className="row-item">
+              <div className="row-main"><b>{m.label}</b><small className="mono">{m.id}</small></div>
+              <button type="button" className="btn btn-sm" onClick={() => setOr({ models: or.models.filter(x => x.id !== m.id) })}>Remover</button>
+            </li>
+          ))}</ul>
+        ) : <p className="muted small">Nenhum ainda.</p>}
+        {catalog ? (
+          <div className="or-catalog">
+            <input className="input" value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar: gpt, gemini, deepseek, llama…" aria-label="Buscar modelo no OpenRouter" autoFocus />
+            <ul className="rows flat">{found.map(m => (
+              <li key={m.id} className="row-item">
+                <div className="row-main"><b>{m.label}</b><small className="mono">{m.id} · US$ {price(m.priceIn)} / {price(m.priceOut)} por milhão de tokens</small></div>
+                <button type="button" className="btn btn-sm btn-primary" onClick={() => setOr({ models: [...or.models, { id: m.id, label: m.label }] })}>Adicionar</button>
+              </li>
+            ))}</ul>
+            {!found.length && <p className="muted small">Nada encontrado. Só aparecem modelos que aceitam ferramentas.</p>}
+          </div>
+        ) : <button type="button" className="btn" disabled={!or.apiKey} onClick={openCatalog}><Icon name="plus" size={16} />Adicionar modelos</button>}
+      </Row>
+    </Card>
+  );
+}
+
 const Card = ({ title, badge, children, desc }) => (
   <section className="set-card">
     {title && <header><h3>{title}</h3>{badge}</header>}
@@ -348,6 +405,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
             {s.claude.mode === 'api' && <Row title="Anthropic API key"><input className="input" type="password" autoComplete="off" value={s.claude.apiKey} onChange={e => set('claude.apiKey', e.target.value)} placeholder="sk-ant-…" /></Row>}
             <Row title="Conectores do claude.ai" desc="Gmail, Drive e outros. Carregar custa tokens: só vale para agentes com Plugins MCP."><Switch checked={s.claude.useConnectors} onChange={v => set('claude.useConnectors', v)} label="Conectores do claude.ai" /></Row>
           </Card>
+          <OpenRouterCard s={s} set={set} />
           <Card title="Fila de entrada" desc="Mensagens seguidas no composer são agrupadas num único turno. Enter reinicia a janela; o botão Enviar manda na hora.">
             <Row title="Agrupar mensagens consecutivas"><Switch checked={s.inputQueue?.enabled !== false} onChange={v => set('inputQueue', { ...(s.inputQueue || {}), enabled: v })} label="Coalescing ativo" /></Row>
             <Row title="Janela de agrupamento" desc="Tempo de espera após Enter antes de mandar ao agente (0 desliga o atraso quando o coalescing está ativo).">

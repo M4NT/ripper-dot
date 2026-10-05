@@ -26,6 +26,12 @@ Legenda: **P0** bloqueia uso/confiança · **P1** diferencial forte · **P2** po
 - ✅ Multitarefa real: ferramenta `parallel_tasks` (2–5 subtarefas ao mesmo tempo, web + computador) com barra de progresso por subtarefa no chat.
 - ✅ Custo do dia no card do agente (respostas, tokens e US$ estimados, tempo médio). Falta: R$ (câmbio) e tokens reais do SDK.
 
+## 1b. Provedores de IA (P0)
+- ✅ Tela "Provedores de IA" (Configurações): Claude, ChatGPT/Codex, OpenRouter e a política de modelos num lugar só.
+- ✅ OpenRouter com as ferramentas do Ripper (computador, navegador, memória, delegação; web pelo plugin do OpenRouter); escolha de modelos pelo catálogo.
+- [ ] OpenAI direto (chave), Gemini (AI Studio — cobre os modelos do Antigravity), Cursor (`cursor-agent`), Ollama (local).
+- [ ] Plugins MCP do usuário nos provedores novos (hoje só Claude/Codex).
+
 ## 2. Entrada e saída multimodal (P0/P1)
 - ✅ Ditado por voz em todos os navegadores (gravação + transcrição no servidor); texto ditado em *itálico* na bolha.
 - ✅ Resposta falada: botão "Ouvir" em cada resposta e modo "mãos livres" (lê toda resposta) no composer — voz do navegador.

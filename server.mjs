@@ -42,6 +42,7 @@ import { listChatsPage } from './lib/history.mjs';
 import { tryClaimRoutine, releaseRoutineClaim } from './lib/persist-coord.mjs';
 import { browserFor, browserRisk } from './lib/browser.mjs';
 import { runClaude, runCodex, systemPrompt, describeImage } from './lib/providers.mjs';
+import { runOpenRouter, syncOpenRouterModels, checkOpenRouterKey, openRouterCatalog } from './lib/openrouter.mjs';
 import { runTestProvider } from './lib/test-provider.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
 import { memoryContext, isDuplicateMemory, canUseFile, selectSpeakers, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent, turnPlanIds } from './lib/agent-flow.mjs';
@@ -258,6 +259,7 @@ function settingsForMcp(s, mcpSession) {
 const APP_PKG = JSON.parse(await readFile(new URL('./package.json', import.meta.url), 'utf8'));
 const SERVER_STARTED_AT = Date.now();
 const db = load();
+syncOpenRouterModels(db.settings); // modelos do OpenRouter escolhidos em Configurações
 if (db.chats.some(c => c.channel)) { db.chats = db.chats.filter(c => !c.channel); save(); } // conversa de WhatsApp fica no WhatsApp (versões antigas criavam aqui)
 configureLogger({ settings: db.settings });
 
@@ -1219,6 +1221,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
       const providerSystem = MODELS[m].provider === 'codex' && s.computer.mode !== 'local'
         ? `${system}\n\nNesta execução do Codex, o computador está em modo somente leitura; não prometa executar comandos nem acessar a VM Boat.` : system;
       const args = { agent, effort: clampEffort(s, m, effort), prompt, images, history, system: providerSystem, systemStable, settings: { ...s, plugins: turnPlugins }, signal };
+      if (MODELS[m].provider === 'openrouter') return runOpenRouter({ ...args, model: m, ctx });
       return MODELS[m].provider === 'codex'
         ? runCodex({ ...args, cwd: sandboxDir(agent), ctx })
         : runClaude({ ...args, model: m, ctx });
@@ -1819,6 +1822,16 @@ const routes = [
   }],
   ['GET', /^\/api\/settings$/, () => ({ settings: redact(db.settings), meta: settingsMeta() })],
   ['GET', /^\/api\/flags$/, () => ({ flags: effectiveFeatureFlags(db.settings) })],
+  // Provedores de IA → OpenRouter: testar a chave e listar o catálogo (para escolher modelos).
+  ['POST', /^\/api\/openrouter\/test$/, async req => {
+    const b = await body(req);
+    const key = !b.apiKey || b.apiKey === '••••' ? db.settings.openrouter?.apiKey : String(b.apiKey).trim();
+    if (!key) throw new HttpError(400, 'Informe a chave do OpenRouter.');
+    try { return await checkOpenRouterKey(key); } catch (e) { return { ok: false, error: `Sem resposta do OpenRouter: ${e.message}` }; }
+  }],
+  ['GET', /^\/api\/openrouter\/models$/, async () => {
+    try { return await openRouterCatalog(); } catch (e) { throw new HttpError(502, e.message); }
+  }],
   ['PUT', /^\/api\/settings$/, async req => {
     const b = await body(req), s = db.settings;
     const before = structuredClone(s);
