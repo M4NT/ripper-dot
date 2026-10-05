@@ -19,6 +19,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # (PIP_BREAK_SYSTEM_PACKAGES acima: sem isso o pip recusava instalar e o erro vazava na resposta.)
 RUN pip install --no-cache-dir python-docx openpyxl pandas reportlab xlsxwriter
 
+# Transcrição local de áudio (ditado e áudios do WhatsApp): nada sai da máquina.
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -rf /var/lib/apt/lists/* \
+  && pip install --no-cache-dir faster-whisper
+COPY transcribe.py /opt/ripper/transcribe.py
+
 # Controle do navegador pelo agente (a mesma janela que você vê e controla pela tela).
 RUN mkdir -p /opt/ripper-browser && cd /opt/ripper-browser \
   && npm init -y >/dev/null && npm i -s puppeteer-core@23 >/dev/null

@@ -151,7 +151,7 @@ const UserMessage = memo(function UserMessage({ m, name, files }) {
     <div className="msg user">
       <div className="msg-col">
         {hasFiles && <MessageAttachments items={mine} />}
-        {m.content && <div className="bubble user-bubble">{m.content}</div>}
+        {m.content && <div className={`bubble user-bubble${m.voice ? ' voice' : ''}`} title={m.voice ? 'Mensagem ditada' : undefined}>{m.content}</div>}
         {m.at && <time className="msg-time">{fmtTime(m.at)}</time>}
       </div>
       <span className="initial">{(name || 'V')[0].toUpperCase()}</span>
@@ -278,12 +278,12 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   const onScroll = () => { const el = scroller.current; stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120; };
   useEffect(() => { if (stick.current) scroller.current?.scrollTo({ top: 1e9 }); }, [chat?.messages.length, live?.content, live?.steps?.length]);
 
-  async function send({ text, fileIds = [], previews, mcpSession, resume = false, credentialRefs = [] }, forceChoice) {
+  async function send({ text, fileIds = [], previews, mcpSession, resume = false, credentialRefs = [], voice = false }, forceChoice) {
     const use = forceChoice || choice;
     if (ctrl.current || !agent) return;
     if (resume && !chatId) return;
     if (!resume) {
-      const userMsg = { id: 'u' + Date.now(), role: 'user', content: text, files: fileIds, previews, at: Date.now() };
+      const userMsg = { id: 'u' + Date.now(), role: 'user', content: text, files: fileIds, previews, voice, at: Date.now() };
       setChat(c => ({ ...(c || { title: 'Nova conversa', agentId: agent.id, agentIds: isGroup ? memberIds : undefined, projectId }), messages: [...(c?.messages || []), userMsg] }));
     } else setInterrupted(false);
     let building = { role: 'assistant', agentId: agent.id, content: '', steps: [], at: Date.now() };
@@ -298,7 +298,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
         ? { mcpSession: mcpSession || sessionPayload() }
         : {
           agentId: agent.id, agentIds: isGroup ? memberIds : undefined, projectId, chatId: cid, text, fileIds,
-          model: use.model, effort: use.effort, mcpSession: mcpSession || sessionPayload(), credentialRefs
+          model: use.model, effort: use.effort, mcpSession: mcpSession || sessionPayload(), credentialRefs, voice
         };
       const res = await fetch(endpoint, { method: 'POST', signal: ac.signal, headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
       if (!res.ok) {

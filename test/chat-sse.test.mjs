@@ -109,7 +109,8 @@ test('POST /api/chat emite SSE com tokens e persiste a resposta', async () => {
         agentId: agent.id,
         text: 'Olá mundo',
         model: 'claude-sonnet-5-5',
-        effort: 'low'
+        effort: 'low',
+        voice: true
       })
     });
     assert.equal(res.status, 200);
@@ -131,6 +132,8 @@ test('POST /api/chat emite SSE com tokens e persiste a resposta', async () => {
     const assistant = chat.messages.filter(m => m.role === 'assistant').at(-1);
     assert.equal(assistant?.content, 'Olá mundo');
     assert.equal(assistant?.model, 'claude-sonnet-5-5');
+    assert.equal(chat.messages.find(m => m.role === 'user')?.voice, true, 'mensagem ditada fica marcada');
+    assert.ok(assistant?.timing?.totalMs >= 0, 'resposta guarda o tempo do turno');
   });
 });
 

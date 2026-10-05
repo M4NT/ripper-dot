@@ -27,13 +27,14 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
   const [credentials, setCredentials] = useState([]); // { ref, label }
   const [credOpen, setCredOpen] = useState(false);
   const [listening, setListening] = useState(false);
-  const ta = useRef(null), fileInput = useRef(null), folderInput = useRef(null), plusBtn = useRef(null), rec = useRef(null), base = useRef('');
+  const [transcribing, setTranscribing] = useState(false);
+  const ta = useRef(null), fileInput = useRef(null), folderInput = useRef(null), plusBtn = useRef(null), rec = useRef(null), base = useRef(''), spoke = useRef(false); // spoke: a mensagem teve trecho ditado
   const mic = useMicrophone();
   const resolvedTheme = useDark() ? 'dark' : 'light';
 
   useLayoutEffect(() => { const el = ta.current; if (!el) return; el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 260) + 'px'; }, [text]);
   useEffect(() => { local.set('draft.' + draftKey, text); }, [text, draftKey]);
-  useEffect(() => () => { rec.current?.abort(); mic.stop(); }, []);
+  useEffect(() => () => { const r = rec.current; r?.abort ? r.abort() : r?.state === 'recording' && r.stop(); mic.stop(); }, []);
 
   useEffect(() => {
     const onKey = e => {
@@ -77,24 +78,45 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
       fileIds: ready.map(f => f.id),
       previews: ready.map(f => ({ id: f.id, name: f.name, type: f.type, url: f.url || `/api/files/${f.id}` })),
       credentialRefs: credRefs,
-      mcpSession: sessionPayload()
+      mcpSession: sessionPayload(),
+      voice: spoke.current && !!text.trim()
     }, { immediate });
+    spoke.current = false;
     setText(''); setFiles([]); setCredentials([]); setCredOpen(false);
     if (listening) toggleVoice();
   }
 
   async function toggleVoice() {
     if (listening) { rec.current?.stop(); mic.stop(); setListening(false); return; }
-    if (!SpeechRec) return toast('Este navegador não faz ditado. Use Chrome ou Edge.', 'error');
+    if (transcribing) return;
     const stream = await mic.start();
     if (!stream) return toast('Sem acesso ao microfone. Libere nas permissões do navegador.', 'error');
+    if (!SpeechRec) {
+      // Firefox, Safari e afins: grava e transcreve no Whisper local do Ripper.
+      const chunks = [];
+      const r = new MediaRecorder(stream);
+      r.ondataavailable = e => e.data.size && chunks.push(e.data);
+      r.onstop = async () => {
+        mic.stop(); setListening(false);
+        const blob = new Blob(chunks, { type: r.mimeType || 'audio/webm' });
+        if (blob.size < 1000) return;
+        setTranscribing(true);
+        try {
+          const { text: said } = await api('/api/transcribe', { method: 'POST', raw: blob, headers: { 'content-type': blob.type } });
+          if (said) { setText(t => (t ? t.replace(/\s*$/, ' ') : '') + said); spoke.current = true; ta.current?.focus(); }
+        } catch (e) { toast(e.message, 'error'); }
+        finally { setTranscribing(false); }
+      };
+      rec.current = r; r.start(); setListening(true);
+      return;
+    }
     const r = new SpeechRec();
     r.lang = 'pt-BR'; r.interimResults = true; r.continuous = true;
     base.current = text ? text.replace(/\s*$/, ' ') : '';
     r.onresult = e => {
       let finalT = '', interim = '';
       for (let i = e.resultIndex; i < e.results.length; i++) (e.results[i].isFinal ? (finalT += e.results[i][0].transcript) : (interim += e.results[i][0].transcript));
-      if (finalT) base.current += finalT;
+      if (finalT) { base.current += finalT; spoke.current = true; }
       setText(base.current + interim);
     };
     r.onend = () => { setListening(false); mic.stop(); };
@@ -186,7 +208,7 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
                 ))}
               </div>
             )}
-            <textarea ref={ta} rows={1} value={text} autoFocus={autoFocus} placeholder={listening ? 'Ouvindo…' : placeholder}
+            <textarea ref={ta} rows={1} value={text} autoFocus={autoFocus} placeholder={listening ? 'Ouvindo…' : transcribing ? 'Transcrevendo…' : placeholder}
               aria-label="Mensagem" onChange={e => setText(e.target.value)}
               onPaste={e => { const fs = [...e.clipboardData.files]; if (fs.length) { e.preventDefault(); addFiles(fs); } }}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); sendFromComposer(false); } if (e.key === 'Escape' && streaming) onStop(); }} />
@@ -206,8 +228,8 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
                 {setChoice && <ModelPicker value={choice} onChange={setChoice} group={group} chatId={chatId} />}
               </div>
               <div className="grow" />
-              {SpeechRec && (
-                <button type="button" className={`icon-btn mic ${listening ? 'live' : ''}`} aria-pressed={listening} aria-label={listening ? 'Parar ditado' : 'Ditar mensagem'} onClick={toggleVoice}><Icon name="mic" /></button>
+              {(SpeechRec || typeof MediaRecorder !== 'undefined') && (
+                <button type="button" className={`icon-btn mic ${listening ? 'live' : ''}`} aria-pressed={listening} aria-busy={transcribing} disabled={transcribing} aria-label={listening ? 'Parar ditado' : 'Ditar mensagem'} onClick={toggleVoice}><Icon name="mic" /></button>
               )}
                 <button type="submit" className={`send ${streaming ? 'stop' : ''}`} disabled={!canSend && !streaming} aria-label={streaming ? 'Parar resposta' : 'Enviar'}
                   onPointerDown={() => { if (!streaming) intentionalRef.current = true; }}>

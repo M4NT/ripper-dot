@@ -9,7 +9,7 @@ import { authed as checkAuth } from './lib/auth.mjs';
 import { load, save, flush, id, newAgent, patchAgent, dataUrl, safeCheckStoreReady } from './lib/store.mjs';
 import { route, classifySpeaker, MODELS, EFFORTS, enabledModels, clampEffort } from './lib/router.mjs';
 import { computerFor } from './lib/boat.mjs';
-import { dockerAvailable, imageStatus, ensureImage, hostnameOf } from './lib/docker.mjs';
+import { dockerAvailable, imageStatus, ensureImage, hostnameOf, transcribeAudio } from './lib/docker.mjs';
 import { sandboxStatus } from './lib/exec-sandbox.mjs';
 import { ApprovalGate } from './lib/approvals.mjs';
 import { autoStartJulia, juliaOnline, juliaChoose, juliaStatus, measureTriagePromptChars, RISK_OPTIONS, NOTIFY_OPTIONS, MEMORY_OPTIONS, REPLY_OPTIONS } from './lib/julia.mjs';
@@ -41,7 +41,7 @@ import {
 import { listChatsPage } from './lib/history.mjs';
 import { tryClaimRoutine, releaseRoutineClaim } from './lib/persist-coord.mjs';
 import { browserFor, browserRisk } from './lib/browser.mjs';
-import { runClaude, runCodex, systemPrompt } from './lib/providers.mjs';
+import { runClaude, runCodex, systemPrompt, describeImage } from './lib/providers.mjs';
 import { runTestProvider } from './lib/test-provider.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
 import { isDuplicateMemory, canUseFile, selectSpeakers, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent, turnPlanIds } from './lib/agent-flow.mjs';
@@ -77,7 +77,7 @@ import { listClaudeConnectors } from './lib/claude-connectors.mjs';
 import { buildInbox, resolveInboxItem } from './lib/inbox-feed.mjs';
 import { vmPathToData, mimeOf, inlineType } from './lib/deliver-file.mjs';
 import { parseWhatsappMessages, whatsappPrompt, sendWhatsappText, whatsappReady } from './lib/whatsapp.mjs';
-import { evolutionSecrets, connectInstance, instanceState, disconnectInstance, sendText as sendEvolutionText, parseEvolutionAny, parseEvolutionGroup, groupName, contactMode, isAllowed, makeRateLimiter, channelSafeAgent } from './lib/evolution.mjs';
+import { evolutionSecrets, connectInstance, instanceState, disconnectInstance, sendText as sendEvolutionText, parseEvolutionAny, parseEvolutionGroup, groupName, evolutionMedia, withMediaText, downloadMedia, contactMode, isAllowed, makeRateLimiter, channelSafeAgent } from './lib/evolution.mjs';
 import { history as waHistory, recordMessage as recordWaMessage, listChats as waListChats, readChat as waReadChat, findContacts as waFindContacts, styleProfile as waStyleProfile, styleHint, stats as waStats, wipeHistory as waWipeHistory } from './lib/whatsapp-store.mjs';
 import { timingSafeEqual } from 'node:crypto';
 import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStreaming, activeChatStreamCount } from './lib/chat-stream.mjs';
@@ -344,7 +344,7 @@ function chatDetail(c, cid) {
   };
 }
 
-async function streamChatResponse(req, c, { text, fileIds, mcpSession, resume = false, credentialRefs }, res) {
+async function streamChatResponse(req, c, { text, fileIds, mcpSession, resume = false, credentialRefs, voice }, res) {
   res.writeHead(200, hdr(req, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store', 'x-accel-buffering': 'no' }));
   const clientAc = new AbortController();
   const chaosCfg = resolveEffectiveChaos(db.settings);
@@ -370,7 +370,7 @@ async function streamChatResponse(req, c, { text, fileIds, mcpSession, resume = 
   };
   try {
     await chat({
-      chat: c, text, fileIds, signal: streamSignal, mcpSession, skipUserPush: resume, credentialRefs
+      chat: c, text, fileIds, signal: streamSignal, mcpSession, skipUserPush: resume, credentialRefs, voice
     }, chatEmit);
     completed = !streamSignal.aborted;
   } finally {
@@ -502,6 +502,22 @@ async function runInboxDelivery(m, { signal } = {}) {
   m.threadChatId = c.id;
   m.deliveredAt = Date.now();
   return { ...parsed, threadChatId: c.id, reply: parsed.ok ? { content: parsed.content, model: parsed.model } : null };
+}
+
+/** Áudio → transcrição (Whisper local); imagem → descrição curta (Haiku). Volta como texto da mensagem. */
+async function mediaToText(ev, media) {
+  const { buffer, mimetype } = await downloadMedia(ev);
+  if (media.kind === 'image') {
+    const desc = await describeImage({ data: buffer.toString('base64'), mediaType: mimetype || 'image/jpeg', settings: db.settings }).catch(() => '');
+    return `[Imagem${desc ? `: ${desc}` : ''}]${media.caption ? `
+${media.caption}` : ''}`;
+  }
+  mkdirSync(dataUrl('tmp/'), { recursive: true });
+  const rel = `tmp/wa-${id()}.${/mpeg|mp3/.test(mimetype) ? 'mp3' : 'ogg'}`;
+  await writeFile(dataUrl(rel), buffer);
+  try { return `[Áudio transcrito] ${await transcribeAudio(rel)}`; }
+  catch { return '[Áudio que não consegui transcrever]'; }
+  finally { await unlink(dataUrl(rel)).catch(() => {}); }
 }
 
 /**
@@ -1215,7 +1231,7 @@ async function turn({ agent, chat, text, prompt, images, signal, group, hops = 0
   else recordChatTurn('error');
 }
 
-async function chat({ chat, text, fileIds, signal, mcpSession, skipUserPush = false, credentialRefs }, emit) {
+async function chat({ chat, text, fileIds, signal, mcpSession, skipUserPush = false, credentialRefs, voice }, emit) {
   logger.info('chat.turn.start', { chatId: chat.id, resume: skipUserPush });
   const refs = (credentialRefs || []).filter(isVaultRef);
   try {
@@ -1224,6 +1240,7 @@ async function chat({ chat, text, fileIds, signal, mcpSession, skipUserPush = fa
     chat.messages.push({
       id: uid, role: 'user', content: text, files: fileIds?.length ? fileIds : undefined,
       ...(refs.length ? { credentialRefs: refs } : {}),
+      ...(voice ? { voice: true } : {}), // ditado: aparece em itálico
       at: Date.now()
     });
     if (chat.run?.status === 'running' && !chat.run.userMessageId) chat.run.userMessageId = uid;
@@ -2365,6 +2382,17 @@ const routes = [
     return { ok: true };
   }],
   ['DELETE', /^\/api\/chats\/([\w-]+)$/, (req, [cid]) => { if (isChatStreaming(cid)) throw new HttpError(409, 'Aguarde a resposta terminar.'); db.chats = db.chats.filter(c => c.id !== cid); save(); return {}; }],
+  // Ditado em qualquer navegador (Firefox, Safari, celular): o áudio gravado vira texto no Whisper local.
+  ['POST', /^\/api\/transcribe$/, async req => {
+    const buf = await raw(req, 25 * 1024 * 1024);
+    if (buf.length < 1000) throw new HttpError(400, 'Áudio vazio.');
+    mkdirSync(dataUrl('tmp/'), { recursive: true });
+    const rel = `tmp/voice-${id()}.webm`;
+    await writeFile(dataUrl(rel), buf);
+    try { return { text: await transcribeAudio(rel) }; }
+    catch (e) { throw new HttpError(503, e.message); }
+    finally { await unlink(dataUrl(rel)).catch(() => {}); }
+  }],
   ['POST', /^\/api\/files$/, async (req, _, url) => {
     // Arquivo de um agente, ou de um projeto (visível a todos os agentes membros).
     const chatRef = db.chats.find(c => c.id === url.searchParams.get('chatId'));
@@ -2478,7 +2506,7 @@ const routes = [
       const idemCapture = idem ? captureResponseBody(res) : null;
       const credentialRefs = Array.isArray(b.credentialRefs) ? b.credentialRefs.filter(isVaultRef) : [];
       await streamChatResponse(req, c, {
-        text, fileIds, mcpSession: b.mcpSession, resume: false, credentialRefs
+        text, fileIds, mcpSession: b.mcpSession, resume: false, credentialRefs, voice: b.voice === true
       }, res);
       if (idem && idemCapture) idem.complete(idemCapture.snapshot());
     } catch (e) {
@@ -2548,17 +2576,28 @@ const server = createServer(async (req, res) => {
       if (ev?.event === 'connection.update' && ev.data?.state) {
         recordCorporateAudit(db.settings, { category: 'whatsapp', action: `whatsapp_web.${ev.data.state}`, at: Date.now() });
       }
-      // grupo: só guardar para leitura (opt-in "Ler grupos"); nunca entra no fluxo de resposta
-      const grp = parseEvolutionGroup(ev);
-      if (grp) {
-        const w = db.settings.whatsappWeb || {};
-        if (w.readAll && w.readGroups && isEnterpriseMode(db.settings)) {
-          groupName(grp.groupJid).then(name => recordWaMessage({ id: grp.id, phone: grp.key, fromMe: false, text: grp.text, name: name || 'Grupo', at: grp.at })).catch(() => {});
+      const w = db.settings.whatsappWeb || {};
+      const readGroups = w.readAll && w.readGroups && isEnterpriseMode(db.settings);
+      const handle = ev => {
+        // grupo: só guardar para leitura (opt-in "Ler grupos"); nunca entra no fluxo de resposta
+        const grp = parseEvolutionGroup(ev);
+        if (grp) {
+          if (readGroups) groupName(grp.groupJid).then(name => recordWaMessage({ id: grp.id, phone: grp.key, fromMe: false, text: grp.text, name: name || 'Grupo', at: grp.at })).catch(() => {});
+          return;
         }
+        const msg = parseEvolutionAny(ev);
+        if (msg) handleWhatsappWebMessage(msg).catch(e => console.error('whatsapp-web', ...redactForLog(db.settings, e.message)));
+      };
+      // Áudio e imagem viram texto antes de tudo (só se o Ripper vai usar: contato atendido, leitura ou grupo lido).
+      const media = evolutionMedia(ev);
+      if (media) {
+        const probe = withMediaText(ev, '.');
+        const grp = parseEvolutionGroup(probe), one = !grp && parseEvolutionAny(probe);
+        const used = grp ? readGroups : one && (w.readAll || contactMode(one.from, w) != null);
+        if (used) mediaToText(ev, media).then(text => handle(withMediaText(ev, text))).catch(e => console.error('whatsapp-web media', ...redactForLog(db.settings, e.message)));
         return json(res, { ok: true }, 200, {}, req);
       }
-      const msg = parseEvolutionAny(ev);
-      if (msg) handleWhatsappWebMessage(msg).catch(e => console.error('whatsapp-web', ...redactForLog(db.settings, e.message)));
+      handle(ev);
       return json(res, { ok: true }, 200, {}, req);
     }
     // Canal WhatsApp (Meta chama sem login): GET = verificação do webhook, POST = mensagens (assinadas).
