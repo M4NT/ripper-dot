@@ -1834,7 +1834,7 @@ const routes = [
     return restoreBackupPayload(db, payload);
   }],
   ['POST', /^\/api\/backup$/, async () => {
-    const created = createDataSnapshot({ reason: 'manual' });
+    const created = await createDataSnapshot({ reason: 'manual' });
     const cfg = normalizeBackupSettings(db.settings.backup);
     const removed = pruneOldSnapshots(cfg.keepCount);
     save();
@@ -3707,8 +3707,8 @@ const routineTimer = setInterval(() => {
 }, 30_000);
 if (typeof routineTimer.unref === 'function') routineTimer.unref();
 
-setInterval(() => {
-  const out = maybeRunScheduledBackup(db);
+setInterval(async () => {
+  const out = await maybeRunScheduledBackup(db);
   if (out?.error) raiseSystemAlert({ key: 'backup', title: 'O backup automático falhou', body: 'Seus dados de hoje ainda não têm cópia.', error: out.error, href: '/settings/backup', hrefLabel: 'Ver backup' });
   else if (out?.created) { resolveSystemAlert('backup'); save(); }
 }, 60_000);

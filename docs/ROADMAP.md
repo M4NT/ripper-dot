@@ -82,7 +82,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - 🔨 **Staging que sobrevive a reinício** (docker-compose, dados de exemplo, provedor simulado para smoke). *Engenheiro (Ripper), em andamento.*
 - ✅ Servidor como serviço do sistema: `node scripts/service.mjs install` (Windows, macOS, Linux), com vigia que reinicia se cair. [ ] Testar o `install` em máquina real.
 - [ ] Atualização sem derrubar o que está rodando (esperar turnos terminarem, aviso "nova versão — recarregar" nas abas abertas).
-- ✅ Backup automático diário, cópia extra em outra pasta, aviso de falha. [ ] **Corrigir o backup manual** (`POST /api/backup` deu erro interno em 06/10/2026). [ ] **Teste de restauração** automático (restaurar numa pasta temporária e conferir).
+- ✅ Backup automático diário, cópia extra em outra pasta, aviso de falha. ✅ Backup manual corrigido (link simbólico criado no Docker derrubava o `tar`; agora fica de fora com aviso). ✅ Teste de restauração automático após cada backup diário (extrai numa pasta temporária e confere o `db.json`; falha vira aviso).
 - ✅ Fila de envios com novas tentativas (WhatsApp, e-mail, publicações).
 - [ ] Contêineres dos agentes: um por agente e por pasta de trabalho (hoje duas conversas do mesmo agente em pastas diferentes se revezam recriando).
 - [ ] Agentes trabalhando no código do Ripper em cópia própria (`/work/repos`), nunca trocando o branch da pasta compartilhada.
@@ -234,7 +234,6 @@ Geração de imagem dentro das tarefas, depois vídeo.
 ## 6. Pontes conhecidas (defeitos que ainda não doem, mas vão doer)
 - **Agentes e pasta compartilhada:** os agentes trabalham em `/project`, que é a mesma pasta onde o servidor roda; trocar de branch lá muda o código do Ripper em uso. Usar cópia própria para trabalhar no código.
 - **Gasto entre processos:** com dois servidores no mesmo diretório o gasto do dia é subcontado (mover para SQLite).
-- **Backup trava o servidor alguns segundos por dia** (`tar` síncrono).
 - **Aba aberta durante uma atualização** continua com o código antigo; telas carregadas sob demanda dão 404.
 - **Testes instáveis** em máquina carregada (servidor demora a subir).
 - **`listExternal`** filtra em memória (até 5.000 linhas).
