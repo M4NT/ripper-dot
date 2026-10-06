@@ -1,0 +1,417 @@
+{
+  "quando": "2026-10-06T19:39:29.214Z",
+  "modo": "real",
+  "servidor": "http://127.0.0.1:3999",
+  "agentId": "c0c18e71-1c60-4556-b7d8-6f7d5991a94b",
+  "resumo": {
+    "total": 40,
+    "passou": 29,
+    "precisouDeAjuda": 4,
+    "falhou": 7,
+    "terminaSozinho": 72.5,
+    "segundosTotal": 368.7,
+    "tokensEstimados": 10678
+  },
+  "resultados": [
+    {
+      "id": "t01",
+      "titulo": "Concorrentes em planilha",
+      "categoria": "pesquisa",
+      "status": "passou",
+      "segundos": 37.3,
+      "tokensEstimados": 445,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não consegui criar a planilha no Google Drive porque a ferramenta do Drive não está liberada para este agente no Ripper. Salvei a tabela como artefato \"Concorrentes - Clínicas Odontológicas Campinas\".\n\nNenhuma das cinco clínicas publica preços no site. A faixa de preço que coloquei é uma estimativa minha, baseada no tipo de atendimento de cada uma. Para ter valores reais, é preciso pedir orçamento a cada clínica.\n\n| Nome | Endereço | Site | Faixa de preço (estimada) |\n|---|---|---|---|\n| Odontho"
+    },
+    {
+      "id": "t02",
+      "titulo": "Fornecedores de embalagem",
+      "categoria": "pesquisa",
+      "status": "passou",
+      "segundos": 24.9,
+      "tokensEstimados": 446,
+      "pedidosDeAjuda": 0,
+      "resposta": "Escolhi os três fornecedores que têm pelo menos um dado público de pedido mínimo ou de prazo. Os dados vêm dos sites deles. O prazo da Terraw e o mínimo da Meneplast não estão publicados, e a Meneplast também não informa prazo.\n\n| Fornecedor | Produto | Pedido mínimo | Prazo |\n|---|---|---|---|\n| [Sustenpack](https://sustenpack.com.br/) | Linha de prateleira (loja online) | Sem mínimo | Envio imediato, para todo o Brasil |\n| [Pixpel](https://www.pixpel.com.br/) | Embalagens de papel personalizad"
+    },
+    {
+      "id": "t04",
+      "titulo": "Preço de mercado",
+      "categoria": "pesquisa",
+      "status": "passou",
+      "segundos": 28.3,
+      "tokensEstimados": 353,
+      "pedidosDeAjuda": 0,
+      "resposta": "Salvei a planilha como artefato do Ripper (formato CSV). Não consegui criá-la no Google Drive, porque a ferramenta de criar arquivos não está liberada para este agente.\n\n**Estimativa para 40 m² na Av. Paulista:**\n- **Aluguel:** cerca de R$ 3.000 a 3.500 por mês.\n- **Custo total com condomínio e IPTU:** R$ 3.600 a 5.000 por mês, com ponto médio perto de R$ 4.300.\n- **Por m²:** R$ 90 a 125, contra uma média de cerca de R$ 88/m² para salas em São Paulo como um todo.\n\n[?] Isso é uma estimativa minha"
+    },
+    {
+      "id": "t05",
+      "titulo": "Licitações abertas",
+      "categoria": "pesquisa",
+      "status": "passou",
+      "segundos": 16.3,
+      "tokensEstimados": 423,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não encontrei nenhuma licitação de software de gestão escolar publicada nesta semana (30/09 a 06/10/2026). A busca web não acessa o PNCP nem os filtros de data dos portais, então esse resultado não prova que não existam. Os itens abaixo são os mais recentes que apareceram, e nenhum é da semana.\n\n| Órgão | Valor estimado | Abertura |\n|---|---|---|\n| Pref. Itapetininga (SP) | R$ 11,3 mi (60 × R$ 189 mil) | não informada (notícia de 25/03/2026) |\n| Pref. Conselheiro Pena (MG) | mascarado no agregad"
+    },
+    {
+      "id": "t08",
+      "titulo": "Limpar base de clientes",
+      "categoria": "planilha",
+      "status": "falhou",
+      "segundos": 7.3,
+      "tokensEstimados": 407,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não consegui acessar o `clientes.csv`. Não tenho ferramenta de leitura de arquivos locais, e a busca no Google Drive está bloqueada para este agente.\n\nPara eu limpar o arquivo, faça uma destas opções:\n- **Cole o conteúdo do CSV aqui.** Eu devolvo o CSV limpo, desde que caiba na conversa.\n- **Rode este script no seu computador**, na pasta do arquivo:\n\n```python\nimport pandas as pd, re\n\ndf = pd.read_csv(\"clientes.csv\", dtype=str)\ncol_email = next(c for c in df.columns if \"mail\" in c.lower())\ncol_t"
+    },
+    {
+      "id": "t10",
+      "titulo": "Comissão de vendas",
+      "categoria": "planilha",
+      "status": "falhou",
+      "segundos": 5.5,
+      "tokensEstimados": 198,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não consegui acessar o `vendas_setembro.xlsx`. A busca no Google Drive está bloqueada para este agente, e não tenho ferramenta para ler arquivos locais.\n\nPara continuar, escolha uma opção:\n1. Cole aqui as colunas de vendedor e valor, em texto ou CSV.\n2. Libere o acesso ao Drive ou a arquivos para este agente e me diga onde está o arquivo.\n\n**Regra de cálculo:** faltou definir se os 5% valem só sobre o excedente de R$ 50 mil ou sobre o total do vendedor. Vou usar 3% sobre os primeiros R$ 50 mil e"
+    },
+    {
+      "id": "t11",
+      "titulo": "Conciliação bancária",
+      "categoria": "planilha",
+      "status": "falhou",
+      "segundos": 5.5,
+      "tokensEstimados": 196,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não consigo ler `extrato.csv` nem `lancamentos.xlsx`. Não tenho ferramenta de arquivos locais, e o acesso ao Google Drive está bloqueado para este agente.\n\nPara eu fazer a comparação, escolha uma destas opções:\n- Cole aqui o conteúdo do `extrato.csv` e as linhas de `lancamentos.xlsx` (data, descrição, valor).\n- Ative acesso a arquivos ou computador para este agente no Ripper.\n- Diga se os lançamentos estão no Omie. Nesse caso, informe a empresa (slug) e o período, e eu comparo com o extrato pelo"
+    },
+    {
+      "id": "t12",
+      "titulo": "Estoque mínimo",
+      "categoria": "planilha",
+      "status": "precisou-de-ajuda",
+      "segundos": 11.1,
+      "tokensEstimados": 303,
+      "pedidosDeAjuda": 1,
+      "resposta": "Vou localizar a planilha de estoque no Drive.Não consegui acessar a planilha. O Drive e o Multipli estão bloqueados para este agente, e não tenho ferramenta para ler arquivos locais. Deixei as fórmulas prontas para colar. Elas assumem estas colunas, que você precisa ajustar à sua planilha:\n\n- A: Produto\n- B: Estoque atual\n- C: Estoque mínimo\n- D: Consumo diário (se você só tem o mensal, use `=consumo_mensal/30`)\n\n**E2 – Status**\n```\n=SE(B2<C2;\"ABAIXO DO MÍNIMO\";\"OK\")\n```\n\n**F2 – Qtd. a comprar ("
+    },
+    {
+      "id": "t13",
+      "titulo": "Gráfico de vendas",
+      "categoria": "planilha",
+      "status": "passou",
+      "segundos": 17.4,
+      "tokensEstimados": 370,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não consegui gerar o gráfico nem a planilha. Não encontrei o `vendas.csv`.\n\n- Não tenho acesso ao disco local (`C:\\Users\\yan05\\Desktop\\ripper`). Também não consigo executar código aqui para gerar a imagem.\n- A busca na web não achou o arquivo, e o Google Drive não está liberado para este agente.\n\nEscolha uma opção:\n1. **Cole o conteúdo do CSV aqui.** Agrego as vendas por mês de 2026 e entrego a tabela mensal. Também monto o gráfico de barras como artefato.\n2. **Rode este script na pasta do arqui"
+    },
+    {
+      "id": "t14",
+      "titulo": "Responder orçamento",
+      "categoria": "whatsapp",
+      "status": "passou",
+      "segundos": 2.4,
+      "tokensEstimados": 148,
+      "pedidosDeAjuda": 0,
+      "resposta": "Olá! A limpeza de sofá de 3 lugares custa **R$ 180**. 🛋️\n\nTemos horários disponíveis esta semana. Qual período fica melhor para você: manhã ou tarde? Me diga o dia e confirmo o agendamento.\n\n[?] missing: horários reais disponíveis. Se quiser, ajusto a mensagem com os dias e horários exatos da agenda."
+    },
+    {
+      "id": "t15",
+      "titulo": "Cliente reclamando",
+      "categoria": "whatsapp",
+      "status": "falhou",
+      "segundos": 9,
+      "tokensEstimados": 323,
+      "pedidosDeAjuda": 0,
+      "resposta": "[?] Não consegui consultar o status do pedido 4521: as ferramentas da Multipli não estão liberadas para este agente. Abaixo está uma resposta que não afirma nada sobre o status e promete só o que dá para cumprir.\n\n**Rascunho para o cliente:**\n\n> Olá! Sinto muito pelo transtorno. Dez dias de espera passa do que consideramos aceitável, e você tem toda razão em cobrar.\n>\n> Já estou verificando o pedido 4521 com a logística. Retorno com a situação exata e a nova previsão de entrega ainda hoje. Se ho"
+    },
+    {
+      "id": "t16",
+      "titulo": "Agendamento",
+      "categoria": "whatsapp",
+      "status": "passou",
+      "segundos": 6.1,
+      "tokensEstimados": 203,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não consegui confirmar: não tenho acesso à agenda neste agente (o Google Calendar está bloqueado). Por isso não sei se sexta (09/10) às 15h está livre, nem qual é a consulta de quinta (08/10).\n\nPosso fazer uma destas:\n- Tentar pelo gateway Multipli, se a agenda da clínica estiver lá.\n- Você me diz se 15h de sexta está livre e eu redijo a resposta para a paciente.\n\nRascunho, só para enviar depois de você confirmar o horário:\n> \"Olá! Conseguimos remarcar sua consulta para sexta-feira (09/10) às 15"
+    },
+    {
+      "id": "t17",
+      "titulo": "Cobrança educada",
+      "categoria": "whatsapp",
+      "status": "passou",
+      "segundos": 3.2,
+      "tokensEstimados": 173,
+      "pedidosDeAjuda": 0,
+      "resposta": "Olá, João! Tudo bem?\n\nPassando para lembrar que a fatura de **R$ 450,00** venceu há 5 dias e ainda consta em aberto.\n\nVocê pode pagar de forma rápida pelo link:\n👉 [LINK_DE_PAGAMENTO]\n\nSe já fez o pagamento, desconsidere esta mensagem e, por favor, nos envie o comprovante. Qualquer dúvida, é só me chamar por aqui.\n\nObrigado!\n\n[?] missing: link de pagamento real e nome/empresa do remetente. Substitua `[LINK_DE_PAGAMENTO]` antes de enviar."
+    },
+    {
+      "id": "t18",
+      "titulo": "Pergunta fora do escopo",
+      "categoria": "whatsapp",
+      "status": "passou",
+      "segundos": 4.9,
+      "tokensEstimados": 161,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não consegui consultar a lista de serviços, então deixei um espaço para você preencher:\n\n> Olá! Obrigado pelo contato. 😊\n> Infelizmente não realizamos instalação elétrica. Para esse serviço, recomendamos procurar um eletricista ou empresa especializada.\n>\n> Se precisar de **[liste seus serviços]**, podemos ajudar. Quer saber mais?\n\n[?] missing: os serviços da empresa. Me passe e eu fecho a mensagem."
+    },
+    {
+      "id": "t19",
+      "titulo": "Pós-venda",
+      "categoria": "whatsapp",
+      "status": "passou",
+      "segundos": 4.9,
+      "tokensEstimados": 218,
+      "pedidosDeAjuda": 0,
+      "resposta": "Ainda não enviei. Não sei quem comprou ontem nem por qual canal (WhatsApp ou e-mail). Segue o texto:\n\n> Olá, {nome}! Tudo bem? 😊\n> Aqui é da Multipli. Vimos que seu pedido foi feito ontem e queremos saber: **o produto chegou bem?**\n> Se puder, **dê uma nota de 1 a 5** para a sua experiência (1 = ruim, 5 = excelente). Basta responder com o número.\n> Se algo não saiu como esperado, é só nos contar que resolvemos. Obrigado pela confiança!\n\n[?] missing: canal de envio e fonte da lista de compradore"
+    },
+    {
+      "id": "t20",
+      "titulo": "Responder fornecedor",
+      "categoria": "email",
+      "status": "passou",
+      "segundos": 5.3,
+      "tokensEstimados": 245,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não consigo acessar sua caixa de e-mail: as ferramentas de e-mail da Multipli não estão liberadas para este agente. Por isso não li a mensagem do fornecedor nem enviei resposta.\n\nSegue um rascunho para você enviar:\n\n**Assunto:** Re: Pedido de 200 unidades – proposta de pagamento à vista\n\nOlá, [Nome],\n\nObrigado pelo retorno e pela cotação.\n\nPara o pedido de 200 unidades, podemos fechar com pagamento à vista. Nessa condição, vocês conseguem aplicar um desconto de 5% sobre o valor total?\n\nSe for po"
+    },
+    {
+      "id": "t21",
+      "titulo": "Proposta comercial",
+      "categoria": "email",
+      "status": "passou",
+      "segundos": 3.8,
+      "tokensEstimados": 246,
+      "pedidosDeAjuda": 0,
+      "resposta": "**Assunto:** Proposta Comercial – Multipli | Alfa Ltda\n\nPrezados(as) da Alfa Ltda,\n\nAgradecemos a oportunidade de apresentar nossa proposta. Segue o resumo:\n\n**Escopo:** [descrever em 2–3 linhas os serviços/entregas incluídos]\n\n**Prazo:** 30 dias corridos a partir da aprovação da proposta.\n\n**Investimento:** R$ 12.000,00 [condições de pagamento: ex. 50% na aprovação e 50% na entrega]\n\nA proposta completa segue em anexo. Estamos à disposição para esclarecer dúvidas ou ajustar pontos conforme a ne"
+    },
+    {
+      "id": "t22",
+      "titulo": "Triagem da caixa",
+      "categoria": "email",
+      "status": "falhou",
+      "segundos": 4,
+      "tokensEstimados": 140,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não consegui ler seus e-mails. O Ripper não liberou para este agente as ferramentas de e-mail da Multipli (`multipli_buscar` e `multipli_listar_minhas_caixas`).\n\nPara resolver, libere o plugin de e-mail da Multipli para o agente \"Assistente\" nas configurações do Ripper. Depois é só me pedir de novo.\n\nSe preferir, cole aqui os e-mails e eu ordeno por urgência."
+    },
+    {
+      "id": "t23",
+      "titulo": "Recusar reunião",
+      "categoria": "email",
+      "status": "passou",
+      "segundos": 6.3,
+      "tokensEstimados": 235,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não tenho acesso à sua agenda neste agente, então não consegui ver o convite nem sua disponibilidade. Segue um rascunho para você enviar ou colar na recusa:\n\n> Olá, [nome],\n>\n> Obrigado pelo convite. Infelizmente não consigo participar da reunião de quarta (07/10). Posso sugerir outro horário na semana seguinte?\n>\n> - Terça, 13/10, às 10h\n> - Quinta, 15/10, às 14h\n>\n> Se nenhum desses servir, me diga o que funciona para você e eu ajusto.\n>\n> Abraço,\n\n[?] missing: os horários 13/10 às 10h e 15/10"
+    },
+    {
+      "id": "t24",
+      "titulo": "Revisar PR",
+      "categoria": "codigo",
+      "status": "precisou-de-ajuda",
+      "segundos": 8.3,
+      "tokensEstimados": 265,
+      "pedidosDeAjuda": 1,
+      "resposta": "Não consegui revisar o PR porque não tenho acesso ao código dele.\n\n- O Multipli está bloqueado para este agente, então não consigo ler o repositório por ele.\n- Não tenho shell nem `gh` neste ambiente.\n- Não achei nenhum PR ou nome de repositório da loja que eu possa abrir sem autenticação, e você não respondeu à minha pergunta. Qualquer apontamento de arquivo e linha seria inventado.\n\nQualquer uma destas opções serve:\n1. Cole o diff aqui (`gh pr diff <número>`).\n2. Envie a URL do PR, se o reposi"
+    },
+    {
+      "id": "t25",
+      "titulo": "Corrigir teste quebrado",
+      "categoria": "codigo",
+      "status": "falhou",
+      "segundos": 4.2,
+      "tokensEstimados": 202,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não consigo executar isso nesta sessão. Só tenho ferramentas de web, Google Drive/Calendar, Docs e Multipli, e nenhuma delas lê arquivos locais, edita código ou roda comandos. Por isso não tenho como ver `test/carrinho.test.mjs` nem rodar os testes em `C:\\Users\\yan05\\Desktop\\ripper`.\n\nPara eu continuar, escolha uma destas opções:\n1. Rode `node --test test/carrinho.test.mjs` (ou o comando que você usa) e cole aqui a saída do erro e o código de `carrinho` testado. Eu aponto a causa e o patch.\n2. A"
+    },
+    {
+      "id": "t26",
+      "titulo": "Script de backup",
+      "categoria": "codigo",
+      "status": "passou",
+      "segundos": 4.5,
+      "tokensEstimados": 275,
+      "pedidosDeAjuda": 0,
+      "resposta": "```bash\n#!/usr/bin/env bash\n# backup_dados.sh — compacta /work/dados e mantém os 7 backups mais recentes\nset -euo pipefail\n\nORIGEM=\"/work/dados\"\nDESTINO=\"/work/backups\"\nMANTER=7\n\nmkdir -p \"$DESTINO\"\n\nARQUIVO=\"$DESTINO/dados_$(date +%Y-%m-%d_%H%M%S).tar.gz\"\ntar -czf \"$ARQUIVO\" -C \"$(dirname \"$ORIGEM\")\" \"$(basename \"$ORIGEM\")\"\n\n# remove os mais antigos, mantendo os últimos $MANTER\nls -1t \"$DESTINO\"/dados_*.tar.gz | tail -n +$((MANTER + 1)) | xargs -r rm --\n\necho \"Backup criado: $ARQUIVO\"\n```\n\nInst"
+    },
+    {
+      "id": "t27",
+      "titulo": "Landing page",
+      "categoria": "codigo",
+      "status": "passou",
+      "segundos": 10.6,
+      "tokensEstimados": 170,
+      "pedidosDeAjuda": 0,
+      "resposta": "Landing page salva como artefato **\"Landing page - Curso de Confeitaria\"**. É um único arquivo HTML, então salve como `index.html` e abra no navegador.\n\nEla tem título, 3 benefícios, preço (R$ 147, riscado de R$ 297) e botão verde de WhatsApp.\n\n[?] Troque estes valores antes de publicar:\n- **WhatsApp:** `5511999999999` no link do botão é um número de exemplo.\n- **Preço:** R$ 147 e R$ 297 são valores de exemplo.\n- **Benefícios:** os 3 textos são genéricos."
+    },
+    {
+      "id": "t29",
+      "titulo": "Relatório diário de vendas",
+      "categoria": "relatorio",
+      "status": "passou",
+      "segundos": 6.4,
+      "tokensEstimados": 236,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não consegui gerar o relatório. As ferramentas do Multipli (`multipli_buscar` e `multipli_listar_minhas_empresas`) não estão liberadas para este agente no Ripper, então não tenho como acessar os dados de vendas. Não inventei números.\n\nDuas formas de destravar:\n1. Liberar as ferramentas do Multipli para o Assistente nas configurações do Ripper. Depois disso eu refaço a consulta.\n2. Me dizer de onde vêm as vendas, por exemplo uma planilha no Drive ou um arquivo local. Se for o Omie, preciso também"
+    },
+    {
+      "id": "t30",
+      "titulo": "Resumo semanal da equipe",
+      "categoria": "relatorio",
+      "status": "falhou",
+      "segundos": 6,
+      "tokensEstimados": 230,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não consegui gerar o resumo. Não tenho acesso a nenhuma fonte de tarefas do projeto. A busca no Multipli está bloqueada para este agente, e as outras ferramentas que tenho (Calendar, Drive, Docs) não trazem tarefas concluídas.\n\nPara continuar, preciso de uma destas opções:\n- **Exportação das tarefas:** um CSV ou texto colado com as tarefas da semana, ou um arquivo no Drive. Posso ler e resumir por pessoa.\n- **Acesso liberado:** a ferramenta `multipli_buscar` liberada para este agente, e o nome d"
+    },
+    {
+      "id": "t31",
+      "titulo": "Indicadores do mês",
+      "categoria": "relatorio",
+      "status": "passou",
+      "segundos": 8.6,
+      "tokensEstimados": 306,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não consegui montar o resumo: não tenho acesso a nenhuma fonte de dados. As ferramentas do Multipli (Omie, financeiro) e do Google Drive estão bloqueadas para este agente no Ripper, então não há números de setembro para consultar. Não vou inventar valores.\n\nEstas são as saídas:\n1. **Liberar as ferramentas** `multipli_buscar`, `multipli_executar` e `multipli_listar_minhas_empresas`, ou o acesso ao Drive, para o agente Assistente. Depois disso eu puxo os dados e monto o resumo.\n2. **Me passar os d"
+    },
+    {
+      "id": "t32",
+      "titulo": "Relatório de atendimento",
+      "categoria": "relatorio",
+      "status": "precisou-de-ajuda",
+      "segundos": 10,
+      "tokensEstimados": 167,
+      "pedidosDeAjuda": 1,
+      "resposta": "Sem acesso às conversas, não consigo fazer a análise. O interruptor do WhatsApp ficou desligado e o gateway Multipli está bloqueado para mim.\n\nPara continuar, preciso de uma destas opções:\n- um arquivo ou exportação das conversas da semana (CSV, planilha, TXT);\n- o local no Drive onde estão os atendimentos;\n- a liberação das ferramentas Multipli para este agente.\n\nCom os dados, devolvo os 5 assuntos mais frequentes e o tempo médio de resposta."
+    },
+    {
+      "id": "t36",
+      "titulo": "Descrição de vaga",
+      "categoria": "documento",
+      "status": "passou",
+      "segundos": 5.6,
+      "tokensEstimados": 416,
+      "pedidosDeAjuda": 0,
+      "resposta": "# Vaga: Auxiliar Administrativo\n\n**Multipli** está contratando um(a) Auxiliar Administrativo(a) para integrar nossa equipe.\n\n## Atividades\n- Atendimento a clientes e fornecedores por telefone, e-mail e WhatsApp\n- Organização e arquivamento de documentos físicos e digitais\n- Emissão e conferência de notas fiscais, boletos e pedidos\n- Apoio às rotinas financeiras (contas a pagar e a receber, lançamentos)\n- Controle de agenda, contratos e prazos\n- Elaboração de planilhas, relatórios e comunicados i"
+    },
+    {
+      "id": "t37",
+      "titulo": "Manual de onboarding",
+      "categoria": "documento",
+      "status": "passou",
+      "segundos": 21.9,
+      "tokensEstimados": 221,
+      "pedidosDeAjuda": 0,
+      "resposta": "Sem acesso ao Docs, salvo como artefato.Guia salvo como artefato: **Guia de Primeiro Dia – Novos Funcionários**. Ele tem acessos, contatos, agenda do dia, checklists (RH, TI, gestor, novo funcionário) e plano da primeira semana.\n\n[?] missing: nomes, telefones e horários reais. Os campos `[entre colchetes]` estão em branco. Só o e-mail da TI (ti@multipli.com.br) já está preenchido.\n\nA lista de sistemas (Omie, Nextcloud, Google, WhatsApp, Ripper) é um palpite com base nas ferramentas que aparecem "
+    },
+    {
+      "id": "t38",
+      "titulo": "Apresentação de resultados",
+      "categoria": "documento",
+      "status": "passou",
+      "segundos": 9.7,
+      "tokensEstimados": 156,
+      "pedidosDeAjuda": 0,
+      "resposta": "Salvei o esqueleto dos 6 slides como artefato, \"Resultados do Trimestre – Sócios (3T26)\". Os números estão como `[?] missing`, porque não tenho os dados do trimestre.\n\nPara preencher, preciso de duas informações:\n1. De qual empresa Omie vêm os números? Dá para puxar receita, custos e lucro do 3T26 pelo Multipli.\n2. Você quer o resultado em Google Slides ou só o roteiro em texto?"
+    },
+    {
+      "id": "t39",
+      "titulo": "Posts da semana",
+      "categoria": "marketing",
+      "status": "passou",
+      "segundos": 8.4,
+      "tokensEstimados": 411,
+      "pedidosDeAjuda": 0,
+      "resposta": "**Semana 07–13/out/2026**\n\n**1. Segunda – Pão quentinho da manhã**\nImagem: pães franceses saindo do forno, vapor, luz natural de manhã, bancada de madeira.\nLegenda: Segunda pede começo bom. 🥖 Nosso pão francês sai quentinho a partir das 6h. Venha buscar o seu antes que acabe! #padaria #paoquentinho #bomdia\n\n**2. Terça – Bastidores**\nImagem: padeiro sovando a massa, mãos com farinha, close.\nLegenda: Aqui nada é pronto: é sova, fermentação e muito carinho. 👨‍🍳 Cada pão leva horas até chegar à s"
+    },
+    {
+      "id": "t40",
+      "titulo": "Campanha de e-mail",
+      "categoria": "marketing",
+      "status": "passou",
+      "segundos": 7.1,
+      "tokensEstimados": 476,
+      "pedidosDeAjuda": 0,
+      "resposta": "**E-mail 1 — 1h após o abandono (lembrete)**\n**Assunto:** Você esqueceu algo no carrinho 🛒\n*Pré-header:* Seus itens ainda estão reservados.\n\nOi, {{nome}},\n\nNotamos que você deixou alguns itens no carrinho:\n\n{{lista_itens}}\n\nEles ainda estão disponíveis, mas o estoque pode acabar. Finalize em poucos cliques:\n\n**[Voltar ao meu carrinho]**\n\nQualquer dúvida, é só responder este e-mail.\n\n{{assinatura}}\n\n---\n\n**E-mail 2 — 24h depois (objeções + prova social)**\n**Assunto:** Ficou com alguma dúvida, {{"
+    },
+    {
+      "id": "t42",
+      "titulo": "Pesquisa de palavras-chave",
+      "categoria": "marketing",
+      "status": "passou",
+      "segundos": 3.7,
+      "tokensEstimados": 222,
+      "pedidosDeAjuda": 0,
+      "resposta": "**Transacional (pronto para matricular)**\n1. curso de inglês em Belo Horizonte\n2. escola de inglês BH\n3. aulas de inglês presenciais BH\n4. matrícula curso de inglês\n5. preço curso de inglês BH\n\n**Comercial (comparando opções)**\n6. melhor escola de inglês em BH\n7. curso de inglês para empresas BH\n8. aulas particulares de inglês BH\n9. curso de inglês para crianças BH\n10. inglês para adolescentes BH\n\n**Local/bairro (proximidade)**\n11. curso de inglês Savassi\n12. curso de inglês Pampulha\n13. escola "
+    },
+    {
+      "id": "t43",
+      "titulo": "Classificar despesas",
+      "categoria": "financeiro",
+      "status": "precisou-de-ajuda",
+      "segundos": 11.8,
+      "tokensEstimados": 301,
+      "pedidosDeAjuda": 1,
+      "resposta": "Não consegui classificar nem somar nada, porque não encontrei o extrato. As ferramentas do Drive e do Multipli não estão liberadas para este agente, e eu não tenho acesso a arquivos locais. Também não vou inventar valores.\n\n**O que preciso:** cole o extrato aqui (CSV ou texto) ou libere o Drive ou o Multipli para este agente.\n\n**Regras que vou aplicar quando tiver os dados:**\n\n| Categoria | Critério na descrição |\n|---|---|\n| Aluguel | aluguel, locação, condomínio, imobiliária |\n| Folha | salári"
+    },
+    {
+      "id": "t44",
+      "titulo": "Lembrete de boletos",
+      "categoria": "financeiro",
+      "status": "passou",
+      "segundos": 7.2,
+      "tokensEstimados": 209,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não consegui listar os boletos nem criar os lembretes. Tentei o Multipli (Omie) e o Google Drive, mas nenhuma das duas ferramentas está liberada para este agente no Ripper. Ainda não testei o Google Calendar.\n\nPara destravar, escolha uma opção:\n1. Libere `multipli_buscar`, `multipli_executar` e `multipli_listar_minhas_empresas` para este agente. Com isso eu busco as contas a pagar de 06/10 a 13/10/2026 no Omie e crio um evento no Google Calendar por boleto.\n2. Cole aqui a lista de boletos (forne"
+    },
+    {
+      "id": "t46",
+      "titulo": "Organizar a semana",
+      "categoria": "agenda",
+      "status": "passou",
+      "segundos": 8,
+      "tokensEstimados": 296,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não consigo acessar sua agenda: as ferramentas do Google Calendar e do Multipli não estão liberadas para este agente. Por isso não vi seus compromissos atuais nem criei eventos. Abaixo está uma proposta para 12–16/10, que você pode aplicar manualmente ou liberar o acesso para eu criar.\n\n**Almoço livre (todos os dias):** 12:00–13:30, marcado como \"Livre/Ocupado\".\n\n| Dia | Manhã | Tarde |\n|---|---|---|\n| Seg 12 | **Foco 1** 09:00–11:00 | — |\n| Ter 13 | **Cliente 1** 10:00–11:00 | — |\n| Qua 14 | — "
+    },
+    {
+      "id": "t47",
+      "titulo": "Rotina diária",
+      "categoria": "agenda",
+      "status": "passou",
+      "segundos": 4.8,
+      "tokensEstimados": 118,
+      "pedidosDeAjuda": 0,
+      "resposta": "Rotina criada: todo dia às 8h, ela lista suas tarefas e compromissos do Google Calendar e os e-mails urgentes das suas caixas.\n\n[?] Não defini \"urgente\" com regras fixas. A rotina decide pelo conteúdo do e-mail. Se quiser critérios específicos, como remetentes ou palavras-chave, me diga e eu ajusto."
+    },
+    {
+      "id": "t48",
+      "titulo": "Pedido de compra",
+      "categoria": "operacoes",
+      "status": "passou",
+      "segundos": 7.7,
+      "tokensEstimados": 270,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não consigo montar o pedido: as ferramentas que leriam o estoque estão bloqueadas para este agente (Multipli MCP e Google Drive). Sem os dados, não vou inventar itens nem quantidades.\n\n[?] missing: lista de itens com estoque baixo (código, descrição, saldo atual, estoque mínimo)\n[?] missing: fornecedor principal (nome, e-mail, condições de pagamento)\n[?] missing: prazo de entrega desejado\n\nEscolha uma das opções:\n1. Liberar as ferramentas Multipli ou Drive para este agente no Ripper e me pedir d"
+    },
+    {
+      "id": "t49",
+      "titulo": "Checklist de abertura",
+      "categoria": "operacoes",
+      "status": "passou",
+      "segundos": 4.4,
+      "tokensEstimados": 279,
+      "pedidosDeAjuda": 0,
+      "resposta": "## Abertura\n\n- Desligar alarme e destrancar a loja\n- Ligar luzes, ar-condicionado e equipamentos\n- Ligar computador, PDV e internet\n- Conferir o caixa e o troco inicial\n- Verificar limpeza e organização do piso e dos balcões\n- Repor produtos e conferir preços e etiquetas\n- Checar a validade dos produtos\n- Conferir os recados e pendências do turno anterior\n- Abrir a porta no horário\n\n## Fechamento\n\n- Avisar os clientes e encerrar as vendas\n- Fechar o caixa e conferir valores, comprovantes e maqui"
+    },
+    {
+      "id": "t50",
+      "titulo": "Atualizar cadastro",
+      "categoria": "operacoes",
+      "status": "passou",
+      "segundos": 6.3,
+      "tokensEstimados": 219,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não consegui atualizar o cadastro. O Ripper não liberou para este agente a ferramenta de busca do Multipli, `multipli_buscar`, que é o primeiro passo para achar a capacidade de edição de cliente. Nada foi alterado.\n\nHá duas formas de seguir:\n- **Liberar a ferramenta:** habilite as ferramentas do Multipli MCP (`multipli_buscar` e `multipli_executar`) para este agente. Depois eu localizo a Maria Souza, mostro o telefone atual e o novo (31) 98877-6655, e peço sua confirmação antes de gravar.\n- **In"
+    }
+  ]
+}
