@@ -153,7 +153,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - [ ] **Fora de casa:** um **servidor de retransmissão** (relay) que liga celular e computador — o computador abre uma conexão de saída até ele, então não precisa abrir portas no roteador. É o que o Orca faz (relay próprio em `relay.onorca.dev`). Para o Ripper: **nós hospedamos um relay** (custo baixo: só repassa bytes cifrados) ou o usuário usa Tailscale como alternativa. *Decisão pendente: hospedar o relay.*
 - [ ] Referência no código do Orca: `src/shared/pairing.ts`, `src/shared/mobile-relay-pairing-offer.ts`, `src/main/runtime/relay/`, `src/shared/e2ee-crypto.ts`, `src/main/ipc/mobile.ts`.
 - [ ] Testar notificações de verdade (Android, iPhone instalado na tela inicial).
-- [ ] Aprovar e recusar direto pela notificação.
+- ✅ Aprovar e recusar direto pela notificação (botões na notificação; perguntas abertas e configurações continuam abrindo o app). [ ] Testar num celular de verdade.
 
 ### J. Documentação (P1)
 - 🔨 Guia de instalação e primeiro uso, em português: passo a passo em [instalacao.md](instalacao.md). [ ] Imagens.
