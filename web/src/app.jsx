@@ -29,6 +29,7 @@ const Projects = lazy(() => import('./pages/Projects.jsx'));
 const Project = lazy(() => import('./pages/Project.jsx'));
 const Chats = lazy(() => import('./pages/Chats.jsx'));
 const Explore = lazy(() => import('./pages/Explore.jsx'));
+const Help = lazy(() => import('./pages/Help.jsx'));
 const Library = lazy(() => import('./pages/Library.jsx'));
 const Integrations = lazy(() => import('./pages/Integrations.jsx'));
 const Marketplace = lazy(() => import('./pages/Marketplace.jsx'));
@@ -43,7 +44,7 @@ const Flows = lazy(() => import('./pages/Flows.jsx'));
 const Outbox = lazy(() => import('./pages/Outbox.jsx'));
 const Health = lazy(() => import('./pages/Health.jsx'));
 
-const HUB_ROUTES = new Set(['marketplace', 'connectors', 'skills', 'integrations', 'explore', 'settings', 'saude']);
+const HUB_ROUTES = new Set(['marketplace', 'connectors', 'skills', 'integrations', 'explore', 'settings', 'saude', 'ajuda']);
 const Ctx = createContext(null);
 export const useApp = () => useContext(Ctx);
 
@@ -242,6 +243,7 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
           <MenuItem icon="flow" onClick={() => nav('/flows')}>{t('nav.flows')}</MenuItem>
           {enterprise && <MenuItem icon="folder" onClick={() => nav('/projects')}>{t('nav.projects')}</MenuItem>}
           {enterprise && <MenuItem icon="book" onClick={() => nav('/library')}>{t('nav.library')}</MenuItem>}
+          <MenuItem icon="bulb" onClick={() => nav('/ajuda')}>Ajuda<kbd className="menu-kbd">?</kbd></MenuItem>
           <MenuItem icon="gear" onClick={() => nav('/settings')}>{t('nav.settings')}<kbd className="menu-kbd">Ctrl ,</kbd></MenuItem>
           <MenuItem icon="data" onClick={() => nav('/saude')}>Saúde do Ripper</MenuItem>
           {enterprise && <MenuItem icon="grid" onClick={() => nav('/admin')}>{t('nav.adminCenter')}</MenuItem>}
@@ -335,6 +337,8 @@ function Shell() {
   useEffect(() => {
     const f = e => {
       const mod = e.ctrlKey || e.metaKey;
+      const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName) || e.target?.isContentEditable;
+      if (e.key === '?' && !mod && !typing) { e.preventDefault(); go('/ajuda'); return; }
       if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); setPalette(p => !p); }
       else if (mod && e.key === ',') { e.preventDefault(); go('/settings'); }
       else if (mod && e.key.toLowerCase() === 'b') { e.preventDefault(); toggleCollapsed(); }
@@ -417,6 +421,7 @@ function Shell() {
     parts[0] === 'connectors' ? <Connectors /> :
     parts[0] === 'skills' ? <SkillsHub /> :
     parts[0] === 'explore' ? <Explore /> :
+    parts[0] === 'ajuda' ? <Help /> :
     parts[0] === 'saude' ? <Health onClose={closeHub} /> :
     parts[0] === 'settings' ? <div className="hub-settings"><button className="icon-btn hub-close" aria-label="Fechar" onClick={closeHub}><Icon name="x" /></button><Settings theme={theme} toggleTheme={toggleTheme} tab={parts[1]} /></div> : <Integrations />;
 
