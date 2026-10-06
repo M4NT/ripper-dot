@@ -1999,3 +1999,24 @@ code, .mono, pre { overflow-wrap: anywhere; }
 .panel-profile h2 { margin-top: 12px; font-size: 20px; font-weight: 600; letter-spacing: -.01em; }
 .panel-role { font-size: 13.5px; color: var(--ink-2); max-width: 30ch; }
 .panel-tabs { align-self: center; }
+
+/* ============ Marketplace como janela por cima (Conectar aplicativos) ============ */
+.hub-overlay { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: rgb(0 0 0 / .6); animation: fade .2s var(--out); }
+.hub-modal { width: min(1000px, 100%); height: min(860px, 100%); overflow-y: auto; background: var(--surface); border: 1px solid var(--line-2); border-radius: 20px; box-shadow: var(--shadow-3); animation: rise .28s var(--out); }
+.hub-modal .mp-page { max-width: none; padding: 24px 32px 40px; animation: none; }
+.hub-modal .mp-head { grid-template-columns: minmax(0, 1fr) auto; margin-bottom: 20px; }
+.hub-modal .mp-head-center { grid-column: 1 / -1; grid-row: 2; }
+.hub-modal .mp-head h1 { font-size: 22px; font-weight: 600; letter-spacing: -.01em; }
+.hub-modal .mp-search { height: 42px; background: var(--surface-2); border-color: var(--line-2); }
+.hub-modal .mp-row { border: 0; background: transparent; border-radius: 14px; padding: 10px 12px; transition: background .15s; }
+.hub-modal .mp-row:hover { background: var(--surface-2); }
+.hub-modal .btn-sm { border-radius: 999px; background: var(--surface-2); border: 0; padding: 6px 14px; }
+@media (max-width: 760px) { .hub-overlay { padding: 0; } .hub-modal { height: 100%; border-radius: 0; } .hub-modal .mp-page { padding: 16px; } }
+.hub-settings { position: relative; }
+.hub-close { position: absolute; top: 18px; right: 18px; z-index: 2; }
+.hub-modal .settings-page { max-width: none; padding: 28px 28px 48px; gap: 28px; grid-template-columns: 220px minmax(0, 1fr); animation: none; }
+.hub-modal .settings-nav { top: 0; }
+.hub-modal .settings-nav h1 { font-size: 22px; font-weight: 600; letter-spacing: -.01em; }
+.hub-modal .settings-nav a.on { background: var(--surface-2); box-shadow: none; }
+.account-menu .menu, .new-menu .menu { border-radius: 16px; }
+@media (max-width: 760px) { .hub-modal .settings-page { grid-template-columns: 1fr; padding: 56px 16px 32px; } }

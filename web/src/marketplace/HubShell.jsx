@@ -1,5 +1,4 @@
 import { Icon } from '../ui.jsx';
-import { go } from '../lib.js';
 
 /** Layout fullscreen estilo Marketplace / Conectores / Habilidades. */
 export default function HubShell({ title, tabs, tab, onTab, search, onSearch, searchPlaceholder, actions, onClose, children }) {
@@ -26,7 +25,7 @@ export default function HubShell({ title, tabs, tab, onTab, search, onSearch, se
         </div>
         <div className="mp-head-right">
           {actions}
-          <button type="button" className="icon-btn" aria-label="Fechar" onClick={onClose || (() => go('/'))}><Icon name="x" /></button>
+          <button type="button" className="icon-btn" aria-label="Fechar" onClick={onClose || (() => dispatchEvent(new Event('ripper:close-hub')))}><Icon name="x" /></button>
         </div>
       </header>
       <div className="mp-body">{children}</div>

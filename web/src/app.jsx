@@ -40,6 +40,7 @@ const AgentConfig = lazy(() => import('./pages/AgentConfig.jsx'));
 const Flows = lazy(() => import('./pages/Flows.jsx'));
 const Outbox = lazy(() => import('./pages/Outbox.jsx'));
 
+const HUB_ROUTES = new Set(['marketplace', 'connectors', 'skills', 'integrations', 'explore', 'settings']);
 const Ctx = createContext(null);
 export const useApp = () => useContext(Ctx);
 
@@ -288,7 +289,22 @@ function Shell() {
     }
   }, [parts.join('/'), S?.settings?.ui?.mode, S?.settings?.enterprise?.enabled]);
 
-  const [p0, p1, p2] = parts;
+  // Marketplace/Conectores/Habilidades abrem como janela por cima da tela atual
+  const bgRef = useRef(['']);
+  const overlayOpen = HUB_ROUTES.has(parts[0]);
+  if (!overlayOpen) bgRef.current = parts;
+  const closeHub = useCallback(() => go('/' + bgRef.current.join('/')), []);
+  useEffect(() => {
+    const open = () => go('/marketplace');
+    addEventListener('ripper:open-marketplace', open); addEventListener('ripper:close-hub', closeHub);
+    return () => { removeEventListener('ripper:open-marketplace', open); removeEventListener('ripper:close-hub', closeHub); };
+  }, [closeHub]);
+  useEffect(() => {
+    if (!overlayOpen) return;
+    const f = e => e.key === 'Escape' && !document.querySelector('dialog[open]') && closeHub();
+    addEventListener('keydown', f); return () => removeEventListener('keydown', f);
+  }, [overlayOpen, closeHub]);
+  const [p0, p1, p2] = overlayOpen ? bgRef.current : parts;
   const homeAgent = useMemo(() => {
     const live = S.agents.filter(a => !a.archived);
     const last = [...S.chats].sort((x, y) => (y.updatedAt || 0) - (x.updatedAt || 0)).find(c => live.some(a => a.id === c.agentId));
@@ -322,6 +338,13 @@ function Shell() {
     // Início = conversa nova com o agente mais recente; sem agentes, a tela de boas-vindas
     (homeAgent ? <Chat key="chat" agentId={homeAgent.id} /> : <Home />);
 
+  const hubPage = !overlayOpen ? null :
+    parts[0] === 'marketplace' ? <Marketplace /> :
+    parts[0] === 'connectors' ? <Connectors /> :
+    parts[0] === 'skills' ? <SkillsHub /> :
+    parts[0] === 'explore' ? <Explore /> :
+    parts[0] === 'settings' ? <div className="hub-settings"><button className="icon-btn hub-close" aria-label="Fechar" onClick={closeHub}><Icon name="x" /></button><Settings theme={theme} toggleTheme={toggleTheme} tab={parts[1]} /></div> : <Integrations />;
+
   return (
     <div className={`shell ${drawer ? 'drawer-open' : ''} ${collapsed && !mobile ? 'side-collapsed' : ''}`}>
       <Sidebar onNavigate={() => setDrawer(false)} onSearch={() => setPalette(true)} theme={theme} toggleTheme={toggleTheme}
@@ -340,6 +363,13 @@ function Shell() {
         )}
         <Suspense fallback={<div className="page-loading"><ThinkingOrb state="breathing" size={20} /></div>}>{page}</Suspense>
       </main>
+      {hubPage && (
+        <div className="hub-overlay" onMouseDown={e => e.target === e.currentTarget && closeHub()}>
+          <div className="hub-modal" role="dialog" aria-modal="true" aria-label={parts[0] === 'settings' ? t('nav.settings') : 'Marketplace'}>
+            <Suspense fallback={<div className="page-loading"><ThinkingOrb state="breathing" size={20} /></div>}>{hubPage}</Suspense>
+          </div>
+        </div>
+      )}
       <ApprovalTray />
       <Palette open={palette} onClose={() => setPalette(false)} toggleTheme={toggleTheme} />
     </div>
