@@ -27,7 +27,7 @@ export default function AgentCard({ agent, live }) {
         <a href={`#/a/${agent.id}`} className="agent-card-link" aria-label={`Conversar com ${agent.name}`} />
         <div className="agent-card-av"><AgentAvatar agent={agent} size={64} state={working ? 'working' : undefined} /></div>
         <div className="agent-card-body">
-          <h3>{agent.name}</h3>
+          <h3>{agent.name}{agent.nickname && <small className="agent-nick">@{agent.nickname}</small>}</h3>
           <p>{agent.description || 'Sem descrição.'}</p>
           {day?.turns > 0 && (
             <small className="agent-card-stats" title="Hoje. Tokens e custo são estimativas (catálogo de preços), não a fatura.">

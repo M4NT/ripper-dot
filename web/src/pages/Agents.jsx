@@ -20,7 +20,10 @@ export default function Agents() {
     const t = setInterval(load, 4000);
     return () => clearInterval(t);
   }, []);
-  const list = S.agents
+  // ativos primeiro, depois quem conversou mais recentemente (mesma ordem do Início)
+  const lastUsed = id => Math.max(0, ...S.chats.filter(c => (c.agentIds || [c.agentId]).includes(id)).map(c => c.updatedAt || c.createdAt || 0));
+  const list = [...S.agents]
+    .sort((a, b) => (a.status === 'paused') - (b.status === 'paused') || lastUsed(b.id) - lastUsed(a.id))
     .filter(a => filter === 'all' || (filter === 'working' ? !!working[a.id] : a.status === filter))
     .filter(a => !q || (a.name + a.description + a.category).toLowerCase().includes(q.toLowerCase()));
   const count = s => S.agents.filter(a => s === 'all' || (s === 'working' ? !!working[a.id] : a.status === s)).length;
