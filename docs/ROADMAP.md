@@ -96,7 +96,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - ✅ Funcionar sem Docker (modo "sem computador" claro, com o que o agente perde).
 - ✅ Assistente de primeiro uso pergunta "Você tem conta de IA?" → Claude / ChatGPT / chave de API / "não tenho" (modelo local), explicando o que muda em qualidade. *("Não tenho" aponta para o modelo recomendado em Configurações → Ollama.)*
 - ✅ Atualização pela interface com notas da versão: confere a cada 6 h, avisa na Caixa, Configurações › Backup mostra as novidades e "Atualizar agora" (só avança; recusa se houver mudança local; como serviço, reinicia sozinho). [ ] Testar uma atualização de verdade numa instalação.
-- [ ] Desinstalar limpo (opção de manter os dados).
+- ✅ Desinstalar limpo: `scripts/desinstalar-windows.cmd` (ou `node scripts/desinstalar.mjs`) tira o serviço e os computadores dos agentes e mantém os dados; `--apagar-dados` apaga após digitar APAGAR. [ ] Testar numa máquina real.
 - [ ] Imagem dos agentes baixada pronta (registro de imagens), sem reconstruir na máquina.
 
 ### D. Dados, LGPD e termos (P0)
@@ -153,7 +153,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - [ ] **Fora de casa:** um **servidor de retransmissão** (relay) que liga celular e computador — o computador abre uma conexão de saída até ele, então não precisa abrir portas no roteador. É o que o Orca faz (relay próprio em `relay.onorca.dev`). Para o Ripper: **nós hospedamos um relay** (custo baixo: só repassa bytes cifrados) ou o usuário usa Tailscale como alternativa. *Decisão pendente: hospedar o relay.*
 - [ ] Referência no código do Orca: `src/shared/pairing.ts`, `src/shared/mobile-relay-pairing-offer.ts`, `src/main/runtime/relay/`, `src/shared/e2ee-crypto.ts`, `src/main/ipc/mobile.ts`.
 - [ ] Testar notificações de verdade (Android, iPhone instalado na tela inicial).
-- [ ] Aprovar e recusar direto pela notificação.
+- ✅ Aprovar e recusar direto pela notificação (botões na notificação; perguntas abertas e configurações continuam abrindo o app). [ ] Testar num celular de verdade.
 
 ### J. Documentação (P1)
 - 🔨 Guia de instalação e primeiro uso, em português: passo a passo em [instalacao.md](instalacao.md). [ ] Imagens.
