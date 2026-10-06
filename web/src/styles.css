@@ -20,7 +20,7 @@
 :root:not([data-theme="light"]) {
   --bg: #070707; --side: #111111; --surface: #1a1a1a; --surface-2: #262626;
   --line: rgb(255 255 255 / .08); --line-2: rgb(255 255 255 / .14);
-  --ink: #f5f5f5; --ink-2: #e2e2e2; --muted: #9a9a9a; --faint: #8c8c8c;
+  --ink: #f5f5f5; --ink-2: #e2e2e2; --muted: #a8a8a8; --faint: #a0a0a0;
   --chip: #2f2f2f; --seg-thumb: #333333; --ok: #3ccf8e; --warn: #f0b04a; --err: #f2555a; --sel: #3a3a3a;
   --shadow-1: 0 1px 2px rgb(0 0 0 / .5);
   --shadow-2: 0 1px 2px rgb(0 0 0 / .5), 0 10px 30px -12px rgb(0 0 0 / .8);

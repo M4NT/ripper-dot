@@ -391,6 +391,30 @@ function Shell() {
     // Início = conversa nova com o agente mais recente; sem agentes, a tela de boas-vindas
     (!homeAgent ? <Home /> : soloFor(homeAgent.id) ? <Chat key="chat" chatId={soloFor(homeAgent.id).id} /> : <Chat key="chat" agentId={homeAgent.id} />);
 
+  // Janela por cima: o foco entra nela, o Tab não escapa para trás e, ao fechar, volta para onde estava
+  const hubRef = useRef(null);
+  useEffect(() => {
+    if (!overlayOpen) return;
+    const before = document.activeElement;
+    const focusables = () => [...(hubRef.current?.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])') || [])].filter(el => el.offsetParent !== null);
+    // o conteúdo carrega sob demanda: tenta até aparecer algo focável (até ~2 s)
+    let tries = 0;
+    const t0 = setInterval(() => {
+      if (hubRef.current?.contains(document.activeElement) || ++tries > 40) return clearInterval(t0);
+      const el = hubRef.current?.querySelector('input:not([type=hidden]), [autofocus]') || focusables()[0];
+      if (el) { el.focus(); clearInterval(t0); }
+    }, 50);
+    const trap = e => {
+      if (e.key !== 'Tab' || !hubRef.current) return;
+      const f = focusables(); if (!f.length) return;
+      const [first, last] = [f[0], f.at(-1)];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      else if (!hubRef.current.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+    };
+    addEventListener('keydown', trap);
+    return () => { clearInterval(t0); removeEventListener('keydown', trap); before?.focus?.(); };
+  }, [overlayOpen]);
   const hubPage = !overlayOpen ? null :
     parts[0] === 'marketplace' ? <Marketplace /> :
     parts[0] === 'connectors' ? <Connectors /> :
@@ -420,7 +444,7 @@ function Shell() {
       </main>
       {hubPage && (
         <div className="hub-overlay" onMouseDown={e => e.target === e.currentTarget && closeHub()}>
-          <div className="hub-modal" role="dialog" aria-modal="true" aria-label={parts[0] === 'settings' ? t('nav.settings') : parts[0] === 'saude' ? 'Saúde do Ripper' : 'Marketplace'}>
+          <div ref={hubRef} className="hub-modal" role="dialog" aria-modal="true" aria-label={parts[0] === 'settings' ? t('nav.settings') : parts[0] === 'saude' ? 'Saúde do Ripper' : parts[0] === 'ajuda' ? 'Ajuda' : 'Marketplace'}>
             <Suspense fallback={<div className="page-loading"><ThinkingOrb state="breathing" size={20} /></div>}>{hubPage}</Suspense>
           </div>
         </div>
