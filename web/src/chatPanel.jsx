@@ -212,17 +212,16 @@ export default function ChatPanel({ members, project, chatId, messages, files, o
   return (
     <aside className="agent-panel v2" data-resizable aria-label={group ? 'Conversa em grupo' : `Sobre ${a.name}`}>
       <ResizeHandle side="right" cssVar="panel-w" min={280} max={620} label="Largura do painel" onCollapse={onCollapse} />
-      <div className="panel-head">
-        <div className="panel-id">
-          {group ? <span className="avatar-stack lg">{members.slice(0, 3).map(x => <AgentAvatar key={x.id} agent={x} size={40} state={busy[x.id] ? 'working' : undefined} />)}</span>
-            : <AgentAvatar agent={a} size={56} state={working ? 'working' : undefined} />}
-          <div>
-            <h2>{group ? 'Grupo' : a.name}</h2>
-            {working ? <span className="status status-online"><i />respondendo…</span> : group ? <small className="muted">{members.length} agentes</small> : <StatusDot status={a.status} />}
-          </div>
-        </div>
+      <div className="panel-tools">
         <ToolsMenu members={members} />
         <button className="icon-btn" onClick={onCollapse} aria-label="Recolher painel" title="Recolher painel"><Icon name="sidebar" /></button>
+      </div>
+      <div className="panel-profile">
+        {group ? <span className="avatar-stack lg">{members.slice(0, 3).map(x => <AgentAvatar key={x.id} agent={x} size={56} state={busy[x.id] ? 'working' : undefined} />)}</span>
+          : <AgentAvatar agent={a} size={88} state={working ? 'working' : undefined} />}
+        <h2>{group ? 'Grupo' : a.name}</h2>
+        {!group && a.description && <p className="panel-role">{a.description}</p>}
+        {working ? <span className="status status-online"><i />respondendo…</span> : group ? <small className="muted">{members.length} agentes</small> : <StatusDot status={a.status} />}
       </div>
       <Segmented label="Seções do painel" value={tab} onChange={setTab} size="sm" className="panel-tabs"
         items={[['details', 'Detalhes'], ['artifacts', 'Artefatos', arts.length || null], ['files', 'Arquivos', files.length || null], ['computer', 'Computador', pcUses || null]]} />

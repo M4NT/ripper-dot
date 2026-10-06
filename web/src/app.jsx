@@ -75,119 +75,112 @@ function Boot({ error, retry }) {
   );
 }
 
-function navForMode(settings, t) {
-  const NAV_ALL = [
-    ['', t('nav.home'), 'home'],
-    ['inbox', t('nav.inbox'), 'inbox'],
-    ['projects', t('nav.projects'), 'folder'],
-    ['agents', t('nav.agents'), 'agents'],
-    ['flows', t('nav.flows'), 'flow'],
-    ['explore', t('nav.explore'), 'compass'],
-    ['library', t('nav.library'), 'book']
-  ];
-  if (!isEnterpriseMode(settings)) {
-    return NAV_ALL.filter(([k]) => k === '' || k === 'inbox' || k === 'agents' || k === 'flows');
-  }
-  return NAV_ALL;
-}
+// Etiqueta curta do agente na lista (função)
+const agentTag = a => a?.description || a?.category || '';
 
 function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollapse }) {
   const { S, agent, busy } = useApp();
   const t = useT();
   const enterprise = isEnterpriseMode(S.settings);
-  const NAV = navForMode(S.settings, t);
   const { parts } = useRoute();
   const chatMenu = useChatMenu();
-  const section = parts[0] === 'c' ? 'chat' : parts[0] === 'new' ? 'agents' : parts[0] === 'p' ? 'projects' : parts[0] || '';
+  const section = parts[0] === 'c' ? 'chat' : parts[0] || '';
   // Avisos de agente de canal moram na Caixa, não na lista de conversas
-  const recent = [...S.chats].filter(c => !c.archived && !String(c.channelKey || '').startsWith('owner:')).sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt)).slice(0, 12);
-  // Menu: o dia a dia fica fixo (Início, Caixa, Agentes); o resto em "Mais" para sobrar espaço para as conversas.
-  const PRIMARY = new Set(['', 'inbox', 'agents']);
-  const primary = NAV.filter(n => n && PRIMARY.has(n[0]));
-  const secondary = NAV.filter(n => n && !PRIMARY.has(n[0]));
-  const [moreSaved, setMoreSaved] = useState(() => local.get('nav.more', false));
-  const setMore = v => { setMoreSaved(v); local.set('nav.more', v); };
-  const moreOpen = moreSaved || secondary.some(n => n[0] === section); // abre sozinho quando a tela atual está lá
-  const navLink = n => (
-    <a key={n[0]} href={'#/' + n[0]} className={section === n[0] ? 'on' : ''} aria-current={section === n[0] ? 'page' : undefined} onClick={onNavigate} title={collapsed ? n[1] : undefined} aria-label={n[1]}>
-      <Icon name={n[2]} /><span className="nav-label">{n[1]}</span>
-      {n[0] === 'projects' && S.projects.length > 0 && <span className="count">{S.projects.length}</span>}
-      {n[0] === 'inbox' && S.inboxCount > 0 && <span className="count attn" aria-label={`${S.inboxCount} pendentes`}>{S.inboxCount}</span>}
-    </a>
-  );
+  const visible = [...S.chats].filter(c => !c.archived && !String(c.channelKey || '').startsWith('owner:')).sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
+  const recent = visible.slice(0, 30);
+  // Fixados: os agentes com conversa mais recente (até 3), como atalhos grandes no topo
+  const lastTalk = id => visible.find(c => (c.agentIds || [c.agentId]).includes(id))?.updatedAt || 0;
+  const pins = [...S.agents].filter(a => !a.archived).sort((a, b) => lastTalk(b.id) - lastTalk(a.id)).slice(0, 3);
+  const nav = to => { onNavigate(); go(to); };
   const brand = brandForChrome(S.settings);
   const logoSrc = brand ? brandLogoSrc(brand.logoUrl) : null;
   const brandName = brand ? brandTitle(S.settings) : t('shell.brand');
   const brandStyle = brand?.accentColor ? { '--brand-accent': brand.accentColor } : undefined;
   return (
     <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`} style={brandStyle}>
-      {onCollapse && <ResizeHandle side="left" cssVar="side-w" min={220} max={440} collapsed={collapsed} label="Largura da barra lateral"
+      {onCollapse && <ResizeHandle side="left" cssVar="side-w" min={260} max={460} collapsed={collapsed} label="Largura da barra lateral"
         onCollapse={() => !collapsed && onCollapse()} onExpand={() => collapsed && onCollapse()} />}
-      <div className="brand-row">
+      <div className="side-top">
         <a href="#/" className="brand" onClick={onNavigate} aria-label={brand ? `${brandName}, início` : t('nav.brand')}>
           {logoSrc
-            ? <img className="brand-logo" src={logoSrc} width="30" height="30" alt="" />
-            : <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><rect width="32" height="32" rx="8" className="brand-bg" /><path d="M11 23V9h6.2a4.3 4.3 0 0 1 .9 8.5L22 23" className="brand-r" /></svg>}
+            ? <img className="brand-logo" src={logoSrc} width="28" height="28" alt="" />
+            : <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true"><rect width="32" height="32" rx="9" className="brand-bg" /><path d="M11 23V9h6.2a4.3 4.3 0 0 1 .9 8.5L22 23" className="brand-r" /></svg>}
           <span>{brandName}</span>
         </a>
-        {onCollapse && <button className="icon-btn sm collapse-btn" onClick={onCollapse} aria-label={collapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')} title={collapsed ? `${t('nav.expandBar')} (Ctrl B)` : `${t('nav.collapseBar')} (Ctrl B)`}><Icon name="sidebar" size={17} /></button>}
+        <div className="side-actions">
+          <button className="round-btn" onClick={onSearch} aria-label={t('common.search')} title={`${t('common.search')} (Ctrl K)`}><Icon name="search" size={18} /></button>
+          <Menu align="right" className="new-menu" trigger={({ toggle, open }) => (
+            <button className="round-btn" onClick={toggle} aria-expanded={open} aria-haspopup="menu" aria-label="Novo"><Icon name="plus" size={18} /></button>
+          )}>
+            <MenuItem icon="chat" onClick={() => nav('/')}>Nova conversa</MenuItem>
+            <MenuItem icon="agents" onClick={() => nav('/new')}>Novo agente</MenuItem>
+            {enterprise && <MenuItem icon="group" onClick={() => nav('/projects')}>Novo grupo ou projeto</MenuItem>}
+          </Menu>
+        </div>
       </div>
-      <button className="side-search" onClick={onSearch} aria-label={t('common.search')}><Icon name="search" size={16} /><span>{t('common.search')}</span><kbd>Ctrl K</kbd></button>
-      <nav className="nav" aria-label={t('nav.main')}>
-        {(collapsed ? NAV : primary).map(navLink)}
-        {!collapsed && secondary.length === 1 && navLink(secondary[0])}
-        {!collapsed && secondary.length > 1 && <>
-          <button type="button" className={`nav-more ${moreOpen ? 'open' : ''}`} aria-expanded={moreOpen} onClick={() => setMore(!moreOpen)}>
-            <Icon name="down" size={14} /><span className="nav-label">Mais</span>
-          </button>
-          {moreOpen && <div className="nav-more-items">{secondary.map(navLink)}</div>}
-        </>}
-        {collapsed && <a href="#/chats" className={section === 'chats' ? 'on' : ''} onClick={onNavigate} title={t('nav.chats')} aria-label={t('nav.chats')}><Icon name="chat" /></a>}
-      </nav>
-      {!collapsed && recent.length > 0 && (
-        <div className="recent">
-          <div className="side-label-row"><p className="side-label">{t('nav.chats')}</p><a href="#/chats" className={`side-all ${section === 'chats' ? 'on' : ''}`} onClick={onNavigate}>{t('nav.viewAll')}<span>{S.chats.length}</span></a></div>
-          {recent.map(c => {
-            const group = isGroupChat(c);
+
+      {pins.length > 0 && (
+        <div className="pins" aria-label="Agentes fixados">
+          {pins.map(a => {
+            const on = parts[0] === 'a' && parts[1] === a.id;
             return (
-              <a key={c.id} href={`#/c/${c.id}`} className={`recent-item ${parts[1] === c.id ? 'on' : ''} ${group ? 'is-group' : ''} ${c.unread && parts[1] !== c.id ? 'unread' : ''} ${c.urgent && c.unread ? 'urgent' : ''}`} onClick={onNavigate}
-                onContextMenu={e => chatMenu(e, c)}>
-                <span className="recent-av"><ChatAvatar chat={c} size={24} /></span>
-                <span className="recent-text">
-                  <b>{c.title}</b>
-                  <small>{group && <span className="recent-group">{t('nav.group')}</span>}{c.preview || t('nav.noMessages')}</small>
-                </span>
-                {c.unread && parts[1] !== c.id ? <span className="unread-dot" title={t('nav.routineUnread')} /> : <time>{fmtAgo(c.updatedAt || c.createdAt)}</time>}
+              <a key={a.id} href={`#/a/${a.id}`} className={`pin ${on ? 'on' : ''}`} onClick={onNavigate} title={a.name}>
+                <span className="pin-av"><AgentAvatar agent={a} size={collapsed ? 30 : 56} state={busy[a.id] ? 'working' : undefined} />{busy[a.id] && <i className="pin-dot" aria-label="trabalhando" />}</span>
+                <b>{a.name}</b>
+                {agentTag(a) && <small>{agentTag(a)}</small>}
               </a>
             );
           })}
         </div>
       )}
+
+      <nav className="side-list" aria-label={t('nav.chats')}>
+        <a href="#/inbox" className={`row inbox-row ${section === 'inbox' ? 'on' : ''}`} onClick={onNavigate} aria-current={section === 'inbox' ? 'page' : undefined}>
+          <span className="row-icon"><Icon name="inbox" size={19} /></span>
+          <span className="row-text"><b>{t('nav.inbox')}</b><small>{S.inboxCount > 0 ? `${S.inboxCount} esperando você` : 'Nada pendente'}</small></span>
+          {S.inboxCount > 0 && <span className="count attn" aria-label={`${S.inboxCount} pendentes`}>{S.inboxCount}</span>}
+        </a>
+        {recent.map(c => {
+          const group = isGroupChat(c);
+          const a = agent(c.agentId);
+          const unread = c.unread && parts[1] !== c.id;
+          return (
+            <a key={c.id} href={`#/c/${c.id}`} className={`row ${parts[1] === c.id ? 'on' : ''} ${unread ? 'unread' : ''} ${c.urgent && c.unread ? 'urgent' : ''}`} onClick={onNavigate}
+              onContextMenu={e => chatMenu(e, c)} title={collapsed ? c.title : undefined}>
+              <span className="row-av"><ChatAvatar chat={c} size={40} /></span>
+              <span className="row-text">
+                <span className="row-top"><b>{c.title || a?.name}</b>{group ? <em className="row-tag">{t('nav.group')}</em> : a && <em className="row-tag">{a.name}</em>}</span>
+                <small>{c.preview || t('nav.noMessages')}</small>
+              </span>
+              {unread ? <span className="unread-dot" title={t('nav.routineUnread')} /> : <time>{fmtAgo(c.updatedAt || c.createdAt)}</time>}
+            </a>
+          );
+        })}
+        {visible.length > recent.length && <a href="#/chats" className="row more-row" onClick={onNavigate}>{t('nav.viewAll')} ({visible.length})</a>}
+      </nav>
+
       <div className="side-foot">
-        {!collapsed && <UiModeToggle compact className="side-mode" />}
         <Menu align="up" className="account-menu" trigger={({ toggle, open }) => (
-          <button className={`account ${['settings', 'integrations', 'marketplace', 'connectors', 'skills', 'admin'].includes(section) ? 'on' : ''}`} onClick={toggle} aria-expanded={open} aria-haspopup="menu" title={collapsed ? t('nav.account') : undefined}>
-            <span className="initial">{(S.settings.name || 'V')[0].toUpperCase()}</span>
-            <span className="account-name"><b>{S.settings.name || t('common.you')}</b><small>{t('nav.account')}</small></span>
-            <Icon name="more" size={16} className="account-more" />
+          <button className={`me ${['settings', 'admin'].includes(section) ? 'on' : ''}`} onClick={toggle} aria-expanded={open} aria-haspopup="menu" aria-label={t('nav.account')} title={S.settings.name || t('common.you')}>
+            {(S.settings.name || 'V')[0].toUpperCase()}
           </button>
         )}>
           <div className="account-head"><span className="initial">{(S.settings.name || 'V')[0].toUpperCase()}</span><span><b>{S.settings.name || t('common.you')}</b><small>{t('nav.agentsProjects', { agents: S.agents.length, projects: S.projects.length })}</small></span></div>
-          <MenuItem icon="gear" onClick={() => { onNavigate(); go('/settings'); }}>{t('nav.settings')}</MenuItem>
-          <MenuItem icon="store" onClick={() => { onNavigate(); go('/marketplace'); }}>{t('nav.marketplace')}</MenuItem>
-          {enterprise ? <>
-            <MenuItem icon="plug" onClick={() => { onNavigate(); go('/connectors'); }}>{t('nav.connectors')}</MenuItem>
-            <MenuItem icon="bolt" onClick={() => { onNavigate(); go('/skills'); }}>{t('nav.skills')}</MenuItem>
-            <MenuItem icon="cube" onClick={() => { onNavigate(); go('/settings/models'); }}>{t('nav.modelsComputer')}<small className="menu-hint">{t('nav.modelsComputerHint')}</small></MenuItem>
-            <MenuItem icon="grid" onClick={() => { onNavigate(); go('/admin'); }}>{t('nav.adminCenter')}<small className="menu-hint">{t('nav.adminCenterHint')}</small></MenuItem>
-          </> : (
-            <MenuItem icon="grid" onClick={() => { onNavigate(); go('/settings/appearance'); }}>{t('nav.enableEnterprise')}<small className="menu-hint">{t('nav.enableEnterpriseHint')}</small></MenuItem>
-          )}
-          <MenuItem icon={theme === 'dark' ? 'sun' : 'moon'} onClick={toggleTheme}>{t('nav.themeUse', { theme: theme === 'dark' ? t('nav.themeLight') : t('nav.themeDark') })}</MenuItem>
+          <MenuItem icon="data" onClick={() => nav('/settings/models')}>Uso das assinaturas</MenuItem>
+          <MenuItem icon="agents" onClick={() => nav('/agents')}>{t('nav.agents')}</MenuItem>
+          <MenuItem icon="flow" onClick={() => nav('/flows')}>{t('nav.flows')}</MenuItem>
+          {enterprise && <MenuItem icon="folder" onClick={() => nav('/projects')}>{t('nav.projects')}</MenuItem>}
+          {enterprise && <MenuItem icon="book" onClick={() => nav('/library')}>{t('nav.library')}</MenuItem>}
+          <MenuItem icon="gear" onClick={() => nav('/settings')}>{t('nav.settings')}<kbd className="menu-kbd">Ctrl ,</kbd></MenuItem>
+          {enterprise && <MenuItem icon="grid" onClick={() => nav('/admin')}>{t('nav.adminCenter')}</MenuItem>}
           <hr className="menu-sep" />
-          <MenuItem icon="search" onClick={onSearch}>{t('common.search')}<kbd className="menu-kbd">Ctrl K</kbd></MenuItem>
-          <MenuItem icon="sidebar" onClick={onCollapse || undefined} disabled={!onCollapse}>{collapsed ? t('nav.expandBar') : t('nav.collapseBar')}<kbd className="menu-kbd">Ctrl B</kbd></MenuItem>
+          <div className="menu-mode"><UiModeToggle compact /></div>
+          <MenuItem icon={theme === 'dark' ? 'sun' : 'moon'} onClick={toggleTheme}>{t('nav.themeUse', { theme: theme === 'dark' ? t('nav.themeLight') : t('nav.themeDark') })}</MenuItem>
+          {onCollapse && <MenuItem icon="sidebar" onClick={onCollapse}>{collapsed ? t('nav.expandBar') : t('nav.collapseBar')}<kbd className="menu-kbd">Ctrl B</kbd></MenuItem>}
         </Menu>
+        <button className="connect-btn" onClick={() => { onNavigate(); dispatchEvent(new CustomEvent('ripper:open-marketplace')); }}>
+          <Icon name="plug" size={16} /><span>Conectar aplicativos</span>
+        </button>
       </div>
     </aside>
   );
@@ -296,6 +289,12 @@ function Shell() {
   }, [parts.join('/'), S?.settings?.ui?.mode, S?.settings?.enterprise?.enabled]);
 
   const [p0, p1, p2] = parts;
+  const homeAgent = useMemo(() => {
+    const live = S.agents.filter(a => !a.archived);
+    const last = [...S.chats].sort((x, y) => (y.updatedAt || 0) - (x.updatedAt || 0)).find(c => live.some(a => a.id === c.agentId));
+    return live.find(a => a.id === last?.agentId) || live[0];
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- escolhido ao entrar no Início; não troca no meio da digitação
+  }, [S.agents.length, parts.join('/')]);
   const page =
     p0 === 'c' ? <Chat key="chat" chatId={p1} /> :
     p0 === 'a' ? <Chat key="chat" agentId={p1} /> :
@@ -320,7 +319,8 @@ function Shell() {
     p0 === 'admin' ? <AdminCenter /> :
     p0 === 'enterprise' ? null :
     p0 === 'settings' ? <Settings theme={theme} toggleTheme={toggleTheme} tab={p1} /> :
-    <Home />;
+    // Início = conversa nova com o agente mais recente; sem agentes, a tela de boas-vindas
+    (homeAgent ? <Chat key="chat" agentId={homeAgent.id} /> : <Home />);
 
   return (
     <div className={`shell ${drawer ? 'drawer-open' : ''} ${collapsed && !mobile ? 'side-collapsed' : ''}`}>
