@@ -109,7 +109,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 ### E. Qualidade e testes (P0)
 - ✅ ~620 testes automáticos rodando.
 - [ ] Testes que sobem o servidor estáveis em máquina carregada (hoje alguns estouram o tempo).
-- [ ] **Smoke diário automático** (Quinn no staging): checklist de 10 fluxos, relatório na Caixa.
+- ✅ **Smoke diário automático** (06/10/2026): `npm run smoke` roda 10 fluxos (login, saúde, criar agente, mensagem, aprovar, grupo, rotina, backup, exportar, convite de pareamento) num servidor temporário com o provedor de teste, ou contra um rodando (`RIPPER_URL`). Opt-in `settings.checks.smoke`: roda toda noite (3h) e falha vira aviso na Caixa. [ ] Interruptor na tela de Configurações.
 - [ ] Testes de interface ponta a ponta (enviar mensagem, aprovar, criar agente, grupo, rotina).
 - ✅ CI no GitHub a cada push e PR (testes, build, teste das telas). [ ] Bloqueio de merge com teste falhando. [ ] Achar o teste que falha às vezes (instável).
 - [ ] `.gitattributes` (fins de linha) num commit isolado.
@@ -142,7 +142,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - ✅ Logs estruturados, métricas, erros em linguagem humana, avisos do sistema na Caixa.
 - ✅ Painel de saúde: servidor, Docker, contas do Claude, WhatsApp, e-mail, fila, backup — tudo numa tela (menu da conta › Saúde do Ripper, `GET /api/health/detalhado`).
 - ✅ Relatório de erro com 1 clique (sem dados pessoais) para suporte (`GET /api/health/relatorio`; erros só em memória desde o último início).
-- [ ] Auditoria de capacidades toda noite, com alerta na Caixa se algo quebrar.
+- ✅ Auditoria de capacidades toda noite (06/10/2026), sem tokens: confere se as ferramentas usadas pelas áreas de `docs/capacidades.json` ainda existem e se alguma área falhou na última auditoria real; aviso na Caixa. Opt-in `settings.checks.audit`. [ ] Rodar a auditoria real (paga) periodicamente para manter o .json fresco.
 
 ### I. Acesso de qualquer lugar (P1 → Fase 2)
 - ✅ PWA, notificações no aparelho, layout de tablet.

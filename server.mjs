@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { readFile, stat, writeFile, unlink, copyFile } from 'node:fs/promises';
-import { mkdirSync, existsSync, writeFileSync, statSync, unlinkSync } from 'node:fs';
+import { mkdirSync, existsSync, writeFileSync, statSync, unlinkSync, readFileSync } from 'node:fs';
 import { generateVapidKeys, sendPushAll } from './lib/web-push.mjs';
 import { gzipSync } from 'node:zlib';
 import { extname, basename, dirname } from 'node:path';
@@ -51,6 +51,7 @@ import { allAccounts, isLoggedIn, exhaustedUntil, loginCommand, openLoginTermina
 import { normalizeWorkspace, listDirs, gitBranch, workspaceFor, workspaceForAgent } from './lib/workspace.mjs';
 import { recordExternal, listExternal, externalCsv, EXTERNAL_KINDS } from './lib/external-actions.mjs';
 import { buildPulse, pulseDue, pulseWhatsappTo } from './lib/pulse.mjs';
+import { checkDue, capabilityGaps } from './lib/self-check.mjs';
 import { normalizeFlow, stepPrompt, stepRuns } from './lib/flows.mjs';
 import { DRAFT_SYSTEM, DRAFT_SCHEMA, sanitizeDraft, heuristicDraft } from './lib/agent-draft.mjs';
 import { askWithContract } from './lib/model-contract.mjs';
@@ -3945,6 +3946,34 @@ setInterval(() => {
   const p = currentPulse();
   raiseSystemAlert({ key: 'pulse', title: p.title, body: p.body, href: '/agents', hrefLabel: 'Ver agentes', quiet: true });
   sendPulseWhatsapp(p).catch(e => console.error('pulse.whatsapp', ...redactForLog(db.settings, e.message)));
+}, 60_000).unref?.();
+
+// Checagens noturnas (opt-in em Configurações › checks): smoke de 10 fluxos num servidor temporário e
+// auditoria de capacidades sem tokens. Falhou → aviso na Caixa; passou → o aviso some.
+setInterval(() => {
+  const smokeDay = checkDue(db.settings, 'smoke', db.smokeLastDay);
+  if (smokeDay) {
+    db.smokeLastDay = smokeDay; save();
+    const child = spawn(process.execPath, [fileURLToPath(new URL('./scripts/smoke.mjs', import.meta.url)), '--json'], { stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, RIPPER_URL: '' } });
+    let out = '';
+    child.stdout.on('data', d => { out += d; });
+    child.on('close', () => {
+      let rep; try { rep = JSON.parse(out.trim().split('\n').at(-1)); } catch { rep = { ok: false, results: [{ name: 'smoke', ok: false, error: 'não terminou' }] }; }
+      if (rep.ok) { resolveSystemAlert('smoke'); save(); return; }
+      const bad = rep.results.filter(r => !r.ok);
+      raiseSystemAlert({ key: 'smoke', title: `Smoke diário: ${bad.length} fluxo${bad.length > 1 ? 's' : ''} quebrado${bad.length > 1 ? 's' : ''}`, body: bad.map(r => `${r.name}: ${r.error}`).join('\n').slice(0, 1500), href: '/saude', hrefLabel: 'Ver saúde' });
+    });
+  }
+  const auditDay = checkDue(db.settings, 'audit', db.auditLastDay);
+  if (auditDay) {
+    db.auditLastDay = auditDay;
+    let gaps;
+    try { gaps = capabilityGaps(JSON.parse(readFileSync(fileURLToPath(new URL('./docs/capacidades.json', import.meta.url)), 'utf8'))); }
+    catch (e) { gaps = [`não li docs/capacidades.json: ${e.message}`]; }
+    if (gaps.length) raiseSystemAlert({ key: 'cap-audit', title: 'Auditoria noturna: capacidade quebrada', body: gaps.join('\n').slice(0, 1500) });
+    else resolveSystemAlert('cap-audit');
+    save();
+  }
 }, 60_000).unref?.();
 
 // Relatório da rotina (ex.: Radar) só para o próprio dono: número do Pulso e e-mail da conta; nunca terceiros.
