@@ -383,6 +383,7 @@ function OpenRouterCard({ s, set, prov = 'openrouter' }) {
           </div>
         </Row>
       )}
+      {ui.local && <LocalModelPick onDone={m => !or.models.some(x => x.id === m.id) && setOr({ models: [...or.models, { id: m.id, label: m.label }] })} />}
       <Row title="Modelos em uso" desc="Aparecem no seletor de modelo das conversas e dos agentes depois de salvar." stack>
         {or.models.length ? (
           <ul className="rows flat">{or.models.map(m => (
@@ -406,6 +407,35 @@ function OpenRouterCard({ s, set, prov = 'openrouter' }) {
         ) : <button type="button" className="btn" disabled={!connected} onClick={openCatalog}><Icon name="plus" size={16} />Adicionar modelos</button>}
       </Row>
     </Card>
+  );
+}
+
+// Recomenda o melhor modelo local para este computador e baixa pelo Ollama com 1 clique.
+function LocalModelPick({ onDone }) {
+  const [info, setInfo] = useState(null);
+  const [err, setErr] = useState('');
+  const load = () => api('/api/local-models').then(setInfo, e => setErr(e.message));
+  useEffect(() => { load(); }, []);
+  const pull = info?.pull;
+  useEffect(() => {
+    if (!pull?.running) { if (pull?.status === 'pronto') onDone(info.models.find(m => m.id === pull.model)); return; }
+    const t = setTimeout(load, 1000); return () => clearTimeout(t);
+  }, [pull?.running, pull?.pct, pull?.status]);
+  if (!info) return err ? <p className="muted small">{err}</p> : null;
+  const { hardware: hw, pick } = info;
+  const desc = `${hw.ramGb} GB de RAM${hw.gpu ? ` · ${hw.gpu} (${hw.vramGb} GB)` : hw.appleSilicon ? ' · Apple Silicon' : ''}`;
+  async function start() {
+    setErr('');
+    try { await api('/api/local-models/pull', { method: 'POST', body: { model: pick.id } }); load(); } catch (e) { setErr(e.message); }
+  }
+  return (
+    <Row title="Modelo recomendado para este computador" desc={desc}>
+      {!pick ? <p className="muted small">Este computador não tem memória para um modelo local útil.</p>
+        : !info.ollama ? <p className="muted small">Instale o Ollama em <a href="https://ollama.com" target="_blank" rel="noopener">ollama.com</a> e abra-o; depois volte aqui.</p>
+        : pull?.running ? <span className="tag" role="status">Baixando {pull.model}… {pull.pct ?? 0}%</span>
+        : <div className="row"><b>{pick.label}</b><button type="button" className="btn btn-primary" onClick={start}>Baixar e usar</button></div>}
+      {(err || pull?.error) && <p className="muted small">{err || pull.error}</p>}
+    </Row>
   );
 }
 
