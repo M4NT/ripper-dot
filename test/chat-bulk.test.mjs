@@ -1,3 +1,4 @@
+import './helpers/signed-in.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { applyBulk, normalizeTag } from '../lib/chat-bulk.mjs';

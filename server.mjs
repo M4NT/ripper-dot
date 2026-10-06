@@ -6,7 +6,7 @@ import { generateVapidKeys, sendPushAll } from './lib/web-push.mjs';
 import { gzipSync } from 'node:zlib';
 import { extname, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { authed as checkAuth } from './lib/auth.mjs';
+import { authed as checkAuth, hashPassword, verifyPassword, passwordProblem, passwordFile, sessionStore, sessionCookie, loginLimiter } from './lib/auth.mjs';
 import { load, save, flush, id, newAgent, patchAgent, dataUrl, safeCheckStoreReady, TOOLS } from './lib/store.mjs';
 import { route, classifySpeaker, MODELS, EFFORTS, enabledModels, clampEffort } from './lib/router.mjs';
 import { computerFor } from './lib/boat.mjs';
@@ -456,6 +456,54 @@ function authed(req) {
   return checkAuth(req, TOKEN);
 }
 
+// Login com senha única: hash scrypt em data/auth.json, sessão em cookie HttpOnly/SameSite=Strict.
+const passwordStore = passwordFile(fileURLToPath(dataUrl('./data/auth.json')));
+const sessions = sessionStore();
+const loginTries = loginLimiter();
+const viaToken = req => !!TOKEN && authed(req);
+function signedIn(req) {
+  if (viaToken(req)) return true;
+  const hash = passwordStore.get();
+  return !!hash && sessions.valid(sessionCookie(req), hash);
+}
+function startSession(req, res, hash) {
+  const secure = req.socket.encrypted || req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : '';
+  json(res, { ok: true }, 200, { 'set-cookie': `ripper_session=${sessions.create(hash)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${sessions.ttlMs / 1000 | 0}${secure}` }, req);
+}
+async function authRoute(req, res, p) {
+  const hash = passwordStore.get();
+  if (req.method === 'GET' && p === '/api/auth/status') return json(res, { configured: !!hash, authed: signedIn(req), canSetup: !hash && isLocalRequest(req) }, 200, {}, req);
+  if (req.method !== 'POST') throw new HttpError(404, 'Rota não encontrada.');
+  if (p === '/api/auth/logout') {
+    sessions.drop(sessionCookie(req));
+    return json(res, { ok: true }, 200, { 'set-cookie': 'ripper_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0' }, req);
+  }
+  const { password } = await body(req);
+  if (p === '/api/auth/setup') {
+    if (hash) throw new HttpError(409, 'A senha já foi criada. Para trocar, use: node scripts/senha.mjs');
+    // ponytail: antes da primeira senha, só o próprio computador cria (Host forjável); depois disso só a senha vale.
+    if (!isLocalRequest(req) && !viaToken(req)) throw new HttpError(403, 'Crie a senha no computador onde o Ripper roda.');
+    const err = passwordProblem(password);
+    if (err) throw new HttpError(400, err);
+    const h = await hashPassword(password);
+    passwordStore.set(h);
+    return startSession(req, res, h);
+  }
+  if (p === '/api/auth/login') {
+    if (!hash) throw new HttpError(409, 'Nenhuma senha criada ainda.');
+    const key = req.socket.remoteAddress || '?';
+    const wait = loginTries.retryAfter(key);
+    if (wait) return json(res, { error: `Muitas tentativas. Tente de novo em ${Math.ceil(wait / 60)} min.` }, 429, { 'retry-after': String(wait) }, req);
+    if (typeof password !== 'string' || !(await verifyPassword(password, hash))) {
+      loginTries.fail(key);
+      throw new HttpError(401, 'Senha incorreta.');
+    }
+    loginTries.ok(key);
+    return startSession(req, res, hash);
+  }
+  throw new HttpError(404, 'Rota não encontrada.');
+}
+
 function patchProject(p, b) {
   if (typeof b.name === 'string' && b.name.trim()) p.name = b.name.trim().slice(0, 80);
   if (typeof b.description === 'string') p.description = b.description.slice(0, 300);
@@ -609,7 +657,7 @@ function notifyApproval(agent, command) {
 const LOOPBACK = ['127.0.0.1', '::1', '::ffff:127.0.0.1'];
 // O Docker Desktop entrega as chamadas dos contêineres (host.docker.internal) como se viessem de 127.0.0.1.
 // O que diferencia é o endereço digitado: o navegador desta máquina usa localhost/127.0.0.1.
-// ponytail: o cabeçalho Host pode ser forjado por quem age de propósito; o login com senha (roadmap §7) fecha de vez.
+// Serve só para o que exige estar na própria máquina (pastas, terminal); quem entra na API é decidido pela senha.
 const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 const requestHostname = req => String(req.headers.host || '').toLowerCase().replace(/:\d+$/, '');
 const fromAgentComputer = req => LOOPBACK.includes(req.socket.remoteAddress) && !LOCAL_HOSTNAMES.has(requestHostname(req));
@@ -3505,11 +3553,11 @@ const server = createServer(async (req, res) => {
     }
     if (p.startsWith('/api/')) {
       if (handleApiCorsPreflight(req, res, CORS_ALLOWLIST)) return;
-      // Agente dentro do próprio computador (contêiner) não usa a API do Ripper: não aprova a si mesmo nem muda configurações.
-      if (!TOKEN && fromAgentComputer(req)) throw new HttpError(403, 'A API do Ripper não aceita chamadas de dentro do computador dos agentes.');
-      if (!authed(req)) throw new HttpError(401, 'Não autorizado. Abra o Ripper com ?token=<RIPPER_TOKEN>.');
       const originErr = mutatingOriginError(req, CORS_ALLOWLIST);
       if (originErr) throw new HttpError(403, originErr);
+      // Senha única: sem sessão (ou RIPPER_TOKEN), nada passa — inclusive agentes de dentro dos contêineres.
+      if (p.startsWith('/api/auth/')) return await authRoute(req, res, p);
+      if (!(p === '/api/health' && req.method === 'GET') && !signedIn(req)) throw new HttpError(401, 'Entre com a senha do Ripper.');
       const rl = checkRateLimit({ req, settings: db.settings, ripperToken: TOKEN, method: req.method, path: p });
       if (!rl.ok) {
         json(res, { error: rl.message }, 429, { 'retry-after': String(rl.retryAfterSec) }, req);

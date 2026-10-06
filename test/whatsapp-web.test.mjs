@@ -1,3 +1,4 @@
+import './helpers/signed-in.mjs';
 // WhatsApp por QR (Evolution): filtros, lista de números, limite e o webhook interno com token.
 import test from 'node:test';
 import assert from 'node:assert/strict';

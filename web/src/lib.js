@@ -29,6 +29,7 @@ export async function api(path, { method = 'GET', body, raw, headers, signal } =
     body: raw ?? (body === undefined ? undefined : JSON.stringify(body))
   });
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && data.error === 'Entre com a senha do Ripper.' && !path.startsWith('/api/auth/')) location.reload(); // sessão caiu: volta à tela de entrar
   if (!res.ok) throw new ApiError(translateApiError(data.error || `Erro ${res.status}`, getCachedUiLocale()));
   return data;
 }

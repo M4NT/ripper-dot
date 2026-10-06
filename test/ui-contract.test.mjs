@@ -1,3 +1,4 @@
+import './helpers/signed-in.mjs';
 // Contrato estático da interface: pega, sem abrir navegador, os erros que já derrubaram telas.
 import test from 'node:test';
 import assert from 'node:assert/strict';

@@ -66,11 +66,11 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 "Produção" aqui = outra pessoa instala e usa o Ripper no dia a dia sem você do lado.
 
 ### A. Segurança (P0)
-- 🔨 **Login com senha única** (decidido em 06/10/2026; um Ripper por pessoa, então não há login por usuário). Pede a senha ao abrir; sessão por cookie seguro; chamadas de dentro dos contêineres dos agentes nunca entram sem a senha; tela de login e "esqueci a senha" (redefinir pelo terminal). *Responsável: Engenheiro (Ripper), depois do staging.*
-- ✅ Agentes não usam a API do Ripper de dentro do próprio computador (403). [ ] Fechar de vez com o login (o cabeçalho Host pode ser forjado).
+- ✅ **Login com senha única** (decidido em 06/10/2026; um Ripper por pessoa, então não há login por usuário). Pede a senha ao abrir; sessão por cookie seguro; chamadas de dentro dos contêineres dos agentes nunca entram sem a senha; tela de login e "esqueci a senha" (redefinir pelo terminal). Senha criada na primeira abertura (só no próprio computador) ou por `node scripts/senha.mjs`; hash scrypt em `data/auth.json`; cookie HttpOnly + SameSite=Strict (Secure em HTTPS). Sessões em memória: reiniciar o servidor pede a senha de novo.
+- ✅ Agentes não usam a API do Ripper de dentro do próprio computador: sem sessão, 401 (o cabeçalho Host não decide mais quem entra; só a criação da primeira senha ainda depende de estar na máquina).
 - [ ] HTTPS para acesso fora de casa (túnel com login: Cloudflare Tunnel ou Tailscale), com passo a passo dentro do app.
-- [ ] Proteção contra CSRF nas rotas que mudam algo (hoje: verificação de origem).
-- [ ] Limite de tentativas no login e bloqueio temporário.
+- ✅ Proteção contra CSRF nas rotas que mudam algo: cookie SameSite=Strict + verificação de Origin + recusa de Sec-Fetch-Site cross-site.
+- ✅ Limite de tentativas no login: 5 erros bloqueiam por 15 min (por endereço, em memória).
 - ✅ Chaves e tokens cifrados no disco e nos backups. [ ] Cifrar também os segredos da Evolution (`data/evolution.json`).
 - ✅ Aprovações, autonomia por agente, registro imutável de ações externas, X9 Guard nos envios.
 - [ ] Revisão de segurança completa antes do lançamento (rotas sem autenticação, uploads, caminhos de arquivo, execução de comandos, MCP de terceiros).

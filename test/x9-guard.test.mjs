@@ -1,3 +1,4 @@
+import './helpers/signed-in.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { guardOutbound } from '../lib/x9-guard.mjs';
