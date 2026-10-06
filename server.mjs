@@ -153,7 +153,7 @@ import {
   artifactDownloadName
 } from './lib/artifacts.mjs';
 import { resolveSkillContent, formatSkillsList, listSkillsCatalog } from './lib/skills-runtime.mjs';
-import { buildMessageAttachments, attachmentWarnings, MAX_FOLDER_FILES } from './lib/attachments.mjs';
+import { buildMessageAttachments, attachmentWarnings, MAX_FOLDER_FILES, fileText } from './lib/attachments.mjs';
 import {
   startupStorageCleanup,
   cleanupAgentResources,
@@ -1337,6 +1337,9 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
       },
       read: async title => {
         const art = visibleArtifacts(chat).find(x => x.title.toLowerCase() === String(title).trim().toLowerCase());
+        // Sem Docker o agente lê anexos e arquivos da biblioteca (csv, xlsx, docx, texto) por aqui também.
+        const file = !art && db.files.find(f => canUseFile(f, agent, chat) && f.name.toLowerCase() === String(title).trim().toLowerCase());
+        if (file) return fileText(file.name, await readFile(dataUrl(file.path)).catch(() => Buffer.alloc(0))) ?? `"${file.name}" é binário; não dá para ler como texto.`;
         if (!art) return `Não há artefato "${title}". Existentes: ${visibleArtifacts(chat).map(x => x.title).join(', ') || 'nenhum'}.`;
         try { return await readArtifactContent(art); }
         catch (e) { return e.message; }
@@ -1648,6 +1651,10 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
     agent.tools.includes('computer') && !computer && NO_COMPUTER_HINT,
     await projectContext(project),
     visibleArtifacts(chat).length && `Artefatos do time (leia com read_artifact; salve entregas com save_artifact): ${visibleArtifacts(chat).slice(-20).map(x => `"${x.title}" (${x.kind}, v${x.version})`).join('; ')}`,
+    (() => {
+      const files = db.files.filter(f => canUseFile(f, agent, chat)).slice(-20);
+      return files.length ? `Arquivos seus (leia pelo nome com read_artifact, inclusive planilhas xlsx/csv e docx): ${files.map(f => `"${f.name}"`).join('; ')}. Para entregar planilha, use save_artifact com kind "tabela" (conteúdo CSV, baixa como .csv).` : '';
+    })(),
     (() => {
       const others = db.agents.filter(a => a.id !== agent.id && a.status !== 'paused' && peerAllowed(agent, a));
       if (!others.length) return '';
