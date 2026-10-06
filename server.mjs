@@ -1198,6 +1198,8 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
     settings: s,
     // "Preciso de você": pergunta aberta na Caixa (não em conversa de canal: lá o cliente está esperando)
     askOwner: chat.channel ? null : a => askOwner({ agent, chat, emit, signal }, a.question, a.context, a.options),
+    // Só o provedor de teste usa: pede aprovação de um comando como o computador faria.
+    askApproval: (command, reason) => askApproval({ agent, chat, emit, signal }, 'command', command, reason),
     offerSetting: chat.channel ? null : a => offerSetting({ agent, chat, emit, signal }, a),
     // Entrega um arquivo do computador do agente na conversa (Abrir / Baixar / Mostrar na pasta).
     deliverFile: async a => {

@@ -110,11 +110,11 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - ✅ ~620 testes automáticos rodando.
 - ✅ Testes que sobem o servidor estáveis em máquina carregada (espera pelo /api/health até 60 s, porta livre do sistema).
 - ✅ **Smoke diário automático** (06/10/2026): `npm run smoke` roda 10 fluxos (login, saúde, criar agente, mensagem, aprovar, grupo, rotina, backup, exportar, convite de pareamento) num servidor temporário com o provedor de teste, ou contra um rodando (`RIPPER_URL`). Opt-in `settings.checks.smoke`: roda toda noite (3h) e falha vira aviso na Caixa. [ ] Interruptor na tela de Configurações.
-- [ ] Testes de interface ponta a ponta (enviar mensagem, aprovar, criar agente, grupo, rotina).
+- ✅ Testes de interface ponta a ponta (enviar mensagem, aprovar, criar agente, grupo, rotina) no `npm run test:ui` (Playwright + provedor de teste + RIPPER_TOKEN), no CI.
 - ✅ CI no GitHub a cada push e PR (testes, build, teste das telas). ✅ Bloqueio de merge com teste falhando (regra da main exige `test-and-build` nos PRs; administradores ainda podem enviar direto) (o CI já falha; o dono marcou o check `test-and-build` como obrigatório em Settings → Branches). ✅ Teste instável achado: uso por conta dependia do login do Claude na máquina (passava no PC, falhava no CI).
 - ✅ `.gitattributes` (fins de linha) num commit isolado.
 - 🔨 Testes que sobem o servidor disputavam a mesma porta em paralelo (falha aleatória, ex.: `chat-sse` com 401). Correção pronta: `test/helpers/free-port.mjs` reserva cada porta de forma atômica (PR #88).
-- [ ] Conjunto fixo de 50 tarefas reais para medir "termina sozinho" (critério 1 do norte).
+- ✅ Conjunto fixo de 50 tarefas reais (`docs/tarefas-referencia.json`) e `scripts/benchmark.mjs` (passou / precisou de ajuda / falhou + tempo + tokens; dry-run no CI). [ ] Primeira rodada com agente real e meta de "termina sozinho".
 
 ### F. Desempenho e custo (P1)
 - ✅ Processo pré-aquecido (1ª palavra 1,3–2 s), cache de prompt, rota rápida para conversa curta, envio instantâneo no chat.

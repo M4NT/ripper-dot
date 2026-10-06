@@ -38,3 +38,7 @@ jobs:
 
       - name: UI smoke
         run: npm run test:ui
+
+      # As tarefas de referência no provedor de teste (não gasta nada): garante que o benchmark roda.
+      - name: Benchmark (dry-run)
+        run: node scripts/benchmark.mjs --limit 5 --out "$RUNNER_TEMP/benchmark.json"

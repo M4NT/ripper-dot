@@ -1,0 +1,708 @@
+{
+  "versao": 1,
+  "descricao": "Conjunto fixo de 50 tarefas reais de negócio para medir se o agente termina sozinho (critério 1 do norte). 'criterios' é para quem avalia; 'verificar' são expressões regulares (sem diferença de maiúsculas) que a resposta final precisa conter para o benchmark automático contar como concluída.",
+  "tarefas": [
+    {
+      "id": "t01",
+      "categoria": "pesquisa",
+      "titulo": "Concorrentes em planilha",
+      "prompt": "Pesquise 5 concorrentes de uma clínica odontológica em Campinas e monte uma planilha com nome, endereço, site e faixa de preço.",
+      "criterios": [
+        "Planilha com 5 linhas e as 4 colunas pedidas",
+        "Fontes citadas"
+      ],
+      "verificar": [
+        "planilha|xlsx|csv",
+        "campinas"
+      ]
+    },
+    {
+      "id": "t02",
+      "categoria": "pesquisa",
+      "titulo": "Fornecedores de embalagem",
+      "prompt": "Encontre 3 fornecedores de embalagens biodegradáveis no Brasil e compare pedido mínimo e prazo de entrega numa tabela.",
+      "criterios": [
+        "Tabela com 3 fornecedores",
+        "Pedido mínimo e prazo para cada um"
+      ],
+      "verificar": [
+        "prazo",
+        "pedido m[ií]nimo"
+      ]
+    },
+    {
+      "id": "t03",
+      "categoria": "pesquisa",
+      "titulo": "Resumo de lei",
+      "prompt": "Resuma em linguagem simples o que muda para um MEI com a última atualização do limite de faturamento, com o link da fonte oficial.",
+      "criterios": [
+        "Resumo em até 10 linhas",
+        "Link de fonte .gov.br"
+      ],
+      "verificar": [
+        "mei",
+        "gov\\.br"
+      ]
+    },
+    {
+      "id": "t04",
+      "categoria": "pesquisa",
+      "titulo": "Preço de mercado",
+      "prompt": "Levante o preço médio de aluguel de sala comercial de 40 m² na Av. Paulista e salve numa planilha com as fontes.",
+      "criterios": [
+        "Média calculada",
+        "Ao menos 3 anúncios com link"
+      ],
+      "verificar": [
+        "m[eé]dia",
+        "paulista"
+      ]
+    },
+    {
+      "id": "t05",
+      "categoria": "pesquisa",
+      "titulo": "Licitações abertas",
+      "prompt": "Procure licitações abertas de software de gestão escolar publicadas nesta semana e liste órgão, valor estimado e data de abertura.",
+      "criterios": [
+        "Lista com órgão, valor e data",
+        "Links para os editais"
+      ],
+      "verificar": [
+        "licita",
+        "valor"
+      ]
+    },
+    {
+      "id": "t06",
+      "categoria": "pesquisa",
+      "titulo": "Tendências do setor",
+      "prompt": "Faça um resumo de uma página das 5 principais tendências de e-commerce de moda para o próximo ano, com fontes.",
+      "criterios": [
+        "5 tendências numeradas",
+        "Fontes no fim"
+      ],
+      "verificar": [
+        "tend[eê]ncia",
+        "fonte"
+      ]
+    },
+    {
+      "id": "t07",
+      "categoria": "pesquisa",
+      "titulo": "Comparar ferramentas",
+      "prompt": "Compare Pipedrive, RD Station CRM e HubSpot Free para uma equipe de 4 vendedores: preço, limites e integração com WhatsApp.",
+      "criterios": [
+        "Tabela comparativa dos 3",
+        "Recomendação final justificada"
+      ],
+      "verificar": [
+        "pipedrive",
+        "hubspot",
+        "recomend"
+      ]
+    },
+    {
+      "id": "t08",
+      "categoria": "planilha",
+      "titulo": "Limpar base de clientes",
+      "prompt": "Na planilha clientes.csv, remova duplicados por e-mail, padronize telefones no formato (11) 91234-5678 e me devolva o arquivo limpo.",
+      "criterios": [
+        "Arquivo novo entregue",
+        "Quantidade de duplicados removidos informada"
+      ],
+      "verificar": [
+        "duplicad",
+        "telefone"
+      ]
+    },
+    {
+      "id": "t09",
+      "categoria": "planilha",
+      "titulo": "Fluxo de caixa",
+      "prompt": "Monte uma planilha de fluxo de caixa mensal para os próximos 6 meses com entradas, saídas e saldo acumulado, já com fórmulas.",
+      "criterios": [
+        "6 meses",
+        "Saldo acumulado com fórmula"
+      ],
+      "verificar": [
+        "saldo",
+        "fluxo de caixa"
+      ]
+    },
+    {
+      "id": "t10",
+      "categoria": "planilha",
+      "titulo": "Comissão de vendas",
+      "prompt": "Com base em vendas_setembro.xlsx, calcule a comissão de cada vendedor (3% até R$ 50 mil, 5% acima) e gere um resumo.",
+      "criterios": [
+        "Comissão por vendedor",
+        "Regra de faixas aplicada"
+      ],
+      "verificar": [
+        "comiss",
+        "vendedor"
+      ]
+    },
+    {
+      "id": "t11",
+      "categoria": "planilha",
+      "titulo": "Conciliação bancária",
+      "prompt": "Compare o extrato.csv com lancamentos.xlsx e liste o que está no extrato mas não foi lançado.",
+      "criterios": [
+        "Lista de divergências",
+        "Valores e datas"
+      ],
+      "verificar": [
+        "diverg|n[aã]o (foi )?lan[cç]ad",
+        "extrato"
+      ]
+    },
+    {
+      "id": "t12",
+      "categoria": "planilha",
+      "titulo": "Estoque mínimo",
+      "prompt": "Na planilha de estoque, marque os produtos abaixo do estoque mínimo e calcule quanto comprar para cobrir 30 dias.",
+      "criterios": [
+        "Itens marcados",
+        "Quantidade de compra por item"
+      ],
+      "verificar": [
+        "estoque m[ií]nimo|abaixo",
+        "comprar"
+      ]
+    },
+    {
+      "id": "t13",
+      "categoria": "planilha",
+      "titulo": "Gráfico de vendas",
+      "prompt": "Crie um gráfico de barras com as vendas por mês de 2026 a partir de vendas.csv e entregue a imagem e a planilha.",
+      "criterios": [
+        "Gráfico entregue",
+        "Meses em ordem"
+      ],
+      "verificar": [
+        "gr[aá]fico",
+        "vendas"
+      ]
+    },
+    {
+      "id": "t14",
+      "categoria": "whatsapp",
+      "titulo": "Responder orçamento",
+      "prompt": "Um cliente mandou no WhatsApp: 'Quanto custa a limpeza de sofá de 3 lugares?'. Responda com o preço da nossa tabela (R$ 180) e ofereça horários.",
+      "criterios": [
+        "Preço correto",
+        "Oferece horários",
+        "Tom cordial"
+      ],
+      "verificar": [
+        "180",
+        "hor[aá]rio"
+      ]
+    },
+    {
+      "id": "t15",
+      "categoria": "whatsapp",
+      "titulo": "Cliente reclamando",
+      "prompt": "Cliente no WhatsApp: 'Meu pedido 4521 não chegou e já passou 10 dias'. Responda pedindo desculpas, consulte o status e diga o próximo passo.",
+      "criterios": [
+        "Pede desculpas",
+        "Cita o pedido 4521",
+        "Próximo passo claro"
+      ],
+      "verificar": [
+        "4521",
+        "desculp"
+      ]
+    },
+    {
+      "id": "t16",
+      "categoria": "whatsapp",
+      "titulo": "Agendamento",
+      "prompt": "Uma paciente pediu no WhatsApp para remarcar a consulta de quinta para sexta à tarde. Confirme o novo horário disponível às 15h.",
+      "criterios": [
+        "Confirma sexta 15h",
+        "Mensagem curta"
+      ],
+      "verificar": [
+        "sexta",
+        "15"
+      ]
+    },
+    {
+      "id": "t17",
+      "categoria": "whatsapp",
+      "titulo": "Cobrança educada",
+      "prompt": "Escreva uma mensagem de WhatsApp para o cliente João lembrando a fatura de R$ 450 vencida há 5 dias, com o link de pagamento.",
+      "criterios": [
+        "Valor e atraso corretos",
+        "Tom educado",
+        "Inclui link"
+      ],
+      "verificar": [
+        "450",
+        "link|pagamento"
+      ]
+    },
+    {
+      "id": "t18",
+      "categoria": "whatsapp",
+      "titulo": "Pergunta fora do escopo",
+      "prompt": "Cliente pergunta no WhatsApp se fazemos instalação elétrica (não fazemos). Responda com educação e indique o que fazemos.",
+      "criterios": [
+        "Diz que não faz",
+        "Oferece os serviços reais"
+      ],
+      "verificar": [
+        "n[aã]o (fazemos|trabalhamos)|infelizmente"
+      ]
+    },
+    {
+      "id": "t19",
+      "categoria": "whatsapp",
+      "titulo": "Pós-venda",
+      "prompt": "Mande uma mensagem de pós-venda para quem comprou ontem perguntando se o produto chegou bem e pedindo uma avaliação de 1 a 5.",
+      "criterios": [
+        "Pergunta da entrega",
+        "Pede nota de 1 a 5"
+      ],
+      "verificar": [
+        "avalia|nota",
+        "1 a 5"
+      ]
+    },
+    {
+      "id": "t20",
+      "categoria": "email",
+      "titulo": "Responder fornecedor",
+      "prompt": "Responda o e-mail do fornecedor pedindo 5% de desconto para pagamento à vista no pedido de 200 unidades.",
+      "criterios": [
+        "Pede 5% à vista",
+        "Cita 200 unidades"
+      ],
+      "verificar": [
+        "5 ?%",
+        "[aà] vista"
+      ]
+    },
+    {
+      "id": "t21",
+      "categoria": "email",
+      "titulo": "Proposta comercial",
+      "prompt": "Escreva o e-mail de envio de proposta para a empresa Alfa Ltda, resumindo escopo, prazo de 30 dias e valor de R$ 12.000.",
+      "criterios": [
+        "Escopo, prazo e valor",
+        "Chamada para próximo passo"
+      ],
+      "verificar": [
+        "alfa",
+        "30 dias",
+        "12"
+      ]
+    },
+    {
+      "id": "t22",
+      "categoria": "email",
+      "titulo": "Triagem da caixa",
+      "prompt": "Leia os e-mails não lidos de hoje e me diga quais precisam de resposta minha, em ordem de urgência.",
+      "criterios": [
+        "Lista priorizada",
+        "Motivo de cada um"
+      ],
+      "verificar": [
+        "urgen|priorid"
+      ]
+    },
+    {
+      "id": "t23",
+      "categoria": "email",
+      "titulo": "Recusar reunião",
+      "prompt": "Recuse com educação o convite para reunião de quarta e proponha dois horários alternativos na semana seguinte.",
+      "criterios": [
+        "Recusa educada",
+        "2 horários alternativos"
+      ],
+      "verificar": [
+        "hor[aá]rio"
+      ]
+    },
+    {
+      "id": "t24",
+      "categoria": "codigo",
+      "titulo": "Revisar PR",
+      "prompt": "Revise o PR aberto no repositório da loja: aponte bugs, riscos de segurança e sugestões, com o arquivo e a linha.",
+      "criterios": [
+        "Comentários com arquivo e linha",
+        "Separa bug de sugestão"
+      ],
+      "verificar": [
+        "bug|risco",
+        "linha"
+      ]
+    },
+    {
+      "id": "t25",
+      "categoria": "codigo",
+      "titulo": "Corrigir teste quebrado",
+      "prompt": "O teste test/carrinho.test.mjs está falhando. Descubra a causa, corrija e rode os testes de novo.",
+      "criterios": [
+        "Causa explicada",
+        "Testes passando no fim"
+      ],
+      "verificar": [
+        "passa|pass(ed|ou)|ok"
+      ]
+    },
+    {
+      "id": "t26",
+      "categoria": "codigo",
+      "titulo": "Script de backup",
+      "prompt": "Escreva um script que compacta a pasta /work/dados todo dia e mantém só os últimos 7 arquivos.",
+      "criterios": [
+        "Script entregue",
+        "Retenção de 7 cópias"
+      ],
+      "verificar": [
+        "7",
+        "backup|compact"
+      ]
+    },
+    {
+      "id": "t27",
+      "categoria": "codigo",
+      "titulo": "Landing page",
+      "prompt": "Crie uma landing page simples para um curso de confeitaria com título, 3 benefícios, preço e botão de WhatsApp.",
+      "criterios": [
+        "Arquivo HTML entregue",
+        "Botão de WhatsApp funcional"
+      ],
+      "verificar": [
+        "html",
+        "whatsapp"
+      ]
+    },
+    {
+      "id": "t28",
+      "categoria": "codigo",
+      "titulo": "Explicar erro",
+      "prompt": "Explique em português simples o que significa o erro 'ECONNREFUSED 127.0.0.1:5432' e como resolver.",
+      "criterios": [
+        "Diz que o Postgres não está acessível",
+        "Passos de solução"
+      ],
+      "verificar": [
+        "postgres|banco",
+        "porta|5432"
+      ]
+    },
+    {
+      "id": "t29",
+      "categoria": "relatorio",
+      "titulo": "Relatório diário de vendas",
+      "prompt": "Gere o relatório diário: vendas de ontem, comparação com a média da semana e os 3 produtos mais vendidos.",
+      "criterios": [
+        "Total de ontem",
+        "Comparação com média",
+        "Top 3"
+      ],
+      "verificar": [
+        "ontem",
+        "m[eé]dia"
+      ]
+    },
+    {
+      "id": "t30",
+      "categoria": "relatorio",
+      "titulo": "Resumo semanal da equipe",
+      "prompt": "Resuma o que cada pessoa da equipe fez esta semana com base nas tarefas concluídas do projeto.",
+      "criterios": [
+        "Uma seção por pessoa",
+        "Pendências no fim"
+      ],
+      "verificar": [
+        "semana",
+        "pend[eê]ncia|pr[oó]xim"
+      ]
+    },
+    {
+      "id": "t31",
+      "categoria": "relatorio",
+      "titulo": "Indicadores do mês",
+      "prompt": "Monte um resumo dos indicadores de setembro: faturamento, ticket médio, novos clientes e cancelamentos.",
+      "criterios": [
+        "Os 4 indicadores",
+        "Variação vs. agosto"
+      ],
+      "verificar": [
+        "ticket m[eé]dio",
+        "faturamento"
+      ]
+    },
+    {
+      "id": "t32",
+      "categoria": "relatorio",
+      "titulo": "Relatório de atendimento",
+      "prompt": "Analise as conversas de atendimento da semana e diga os 5 assuntos mais frequentes e o tempo médio de resposta.",
+      "criterios": [
+        "5 assuntos",
+        "Tempo médio"
+      ],
+      "verificar": [
+        "tempo m[eé]dio",
+        "assunto"
+      ]
+    },
+    {
+      "id": "t33",
+      "categoria": "relatorio",
+      "titulo": "Resumo de reunião",
+      "prompt": "Transforme estas anotações de reunião em ata com decisões, responsáveis e prazos: 'Ana fecha o fornecedor até sexta; Pedro revisa o site até dia 20; decidimos subir o preço em 8%'.",
+      "criterios": [
+        "Decisões listadas",
+        "Responsável e prazo por item"
+      ],
+      "verificar": [
+        "decis",
+        "respons[aá]vel",
+        "prazo"
+      ]
+    },
+    {
+      "id": "t34",
+      "categoria": "documento",
+      "titulo": "Contrato de prestação",
+      "prompt": "Redija um contrato simples de prestação de serviços de design por R$ 3.000 em 2 parcelas, com cláusula de revisões.",
+      "criterios": [
+        "Valor e parcelas",
+        "Cláusula de revisões"
+      ],
+      "verificar": [
+        "3\\.?000",
+        "revis"
+      ]
+    },
+    {
+      "id": "t35",
+      "categoria": "documento",
+      "titulo": "Política de trocas",
+      "prompt": "Escreva a política de trocas e devoluções de uma loja online seguindo o Código de Defesa do Consumidor (7 dias).",
+      "criterios": [
+        "Prazo de 7 dias",
+        "Cita o CDC"
+      ],
+      "verificar": [
+        "7 dias",
+        "consumidor"
+      ]
+    },
+    {
+      "id": "t36",
+      "categoria": "documento",
+      "titulo": "Descrição de vaga",
+      "prompt": "Escreva o anúncio de vaga para auxiliar administrativo: requisitos, atividades, salário de R$ 2.200 e como se candidatar.",
+      "criterios": [
+        "4 seções",
+        "Salário correto"
+      ],
+      "verificar": [
+        "2\\.?200",
+        "requisito"
+      ]
+    },
+    {
+      "id": "t37",
+      "categoria": "documento",
+      "titulo": "Manual de onboarding",
+      "prompt": "Crie um guia de primeiro dia para novos funcionários com acessos, contatos e checklist.",
+      "criterios": [
+        "Checklist",
+        "Lista de acessos"
+      ],
+      "verificar": [
+        "checklist|lista",
+        "acesso"
+      ]
+    },
+    {
+      "id": "t38",
+      "categoria": "documento",
+      "titulo": "Apresentação de resultados",
+      "prompt": "Monte 6 slides com os resultados do trimestre para os sócios: receita, custos, lucro, destaques, riscos e próximos passos.",
+      "criterios": [
+        "6 slides",
+        "Cada tema em um slide"
+      ],
+      "verificar": [
+        "slide|apresenta",
+        "lucro"
+      ]
+    },
+    {
+      "id": "t39",
+      "categoria": "marketing",
+      "titulo": "Posts da semana",
+      "prompt": "Crie 5 posts para o Instagram da padaria para a próxima semana, com legenda e sugestão de imagem.",
+      "criterios": [
+        "5 posts",
+        "Legenda e imagem em cada"
+      ],
+      "verificar": [
+        "legenda",
+        "imagem"
+      ]
+    },
+    {
+      "id": "t40",
+      "categoria": "marketing",
+      "titulo": "Campanha de e-mail",
+      "prompt": "Escreva uma sequência de 3 e-mails para recuperar carrinho abandonado, com assunto de cada um.",
+      "criterios": [
+        "3 e-mails",
+        "Assunto em cada"
+      ],
+      "verificar": [
+        "assunto",
+        "carrinho"
+      ]
+    },
+    {
+      "id": "t41",
+      "categoria": "marketing",
+      "titulo": "Responder avaliação",
+      "prompt": "Responda a avaliação de 2 estrelas no Google que reclama da demora na entrega, sem ser defensivo.",
+      "criterios": [
+        "Reconhece o problema",
+        "Oferece solução"
+      ],
+      "verificar": [
+        "desculp|lament",
+        "entrega"
+      ]
+    },
+    {
+      "id": "t42",
+      "categoria": "marketing",
+      "titulo": "Pesquisa de palavras-chave",
+      "prompt": "Liste 15 palavras-chave para o site de uma escola de inglês em Belo Horizonte, agrupadas por intenção.",
+      "criterios": [
+        "15 palavras",
+        "Agrupamento por intenção"
+      ],
+      "verificar": [
+        "ingl[eê]s",
+        "belo horizonte|bh"
+      ]
+    },
+    {
+      "id": "t43",
+      "categoria": "financeiro",
+      "titulo": "Classificar despesas",
+      "prompt": "Classifique as despesas do extrato de setembro em categorias (aluguel, folha, impostos, marketing, outros) e some cada uma.",
+      "criterios": [
+        "Todas classificadas",
+        "Total por categoria"
+      ],
+      "verificar": [
+        "aluguel",
+        "impost"
+      ]
+    },
+    {
+      "id": "t44",
+      "categoria": "financeiro",
+      "titulo": "Lembrete de boletos",
+      "prompt": "Liste os boletos que vencem nos próximos 7 dias com valor e fornecedor e crie um lembrete para cada um.",
+      "criterios": [
+        "Lista com valor e fornecedor",
+        "Lembretes criados"
+      ],
+      "verificar": [
+        "venc",
+        "lembrete"
+      ]
+    },
+    {
+      "id": "t45",
+      "categoria": "financeiro",
+      "titulo": "Precificação",
+      "prompt": "Calcule o preço de venda de um bolo com custo de R$ 42, impostos de 6% e margem desejada de 35%.",
+      "criterios": [
+        "Fórmula explicada",
+        "Preço final correto (cerca de R$ 71)"
+      ],
+      "verificar": [
+        "7[01]"
+      ]
+    },
+    {
+      "id": "t46",
+      "categoria": "agenda",
+      "titulo": "Organizar a semana",
+      "prompt": "Organize minha agenda da próxima semana: 3 reuniões de cliente, 2 blocos de foco de 2h e almoço livre todo dia.",
+      "criterios": [
+        "Todos os compromissos encaixados",
+        "Sem conflitos"
+      ],
+      "verificar": [
+        "foco",
+        "almo[cç]o"
+      ]
+    },
+    {
+      "id": "t47",
+      "categoria": "agenda",
+      "titulo": "Rotina diária",
+      "prompt": "Crie uma rotina para todo dia às 8h me mandar as tarefas do dia e os e-mails urgentes.",
+      "criterios": [
+        "Rotina criada às 8h",
+        "Conteúdo definido"
+      ],
+      "verificar": [
+        "8h|08:00",
+        "rotina"
+      ]
+    },
+    {
+      "id": "t48",
+      "categoria": "operacoes",
+      "titulo": "Pedido de compra",
+      "prompt": "Com base no estoque baixo, prepare o pedido de compra para o fornecedor principal com itens, quantidades e prazo.",
+      "criterios": [
+        "Itens e quantidades",
+        "Prazo pedido"
+      ],
+      "verificar": [
+        "pedido",
+        "quantidade"
+      ]
+    },
+    {
+      "id": "t49",
+      "categoria": "operacoes",
+      "titulo": "Checklist de abertura",
+      "prompt": "Crie um checklist de abertura e fechamento da loja para os funcionários, em tópicos curtos.",
+      "criterios": [
+        "Duas seções: abertura e fechamento",
+        "Itens curtos"
+      ],
+      "verificar": [
+        "abertura",
+        "fechamento"
+      ]
+    },
+    {
+      "id": "t50",
+      "categoria": "operacoes",
+      "titulo": "Atualizar cadastro",
+      "prompt": "Atualize o cadastro da cliente Maria Souza com o novo telefone (31) 98877-6655 e confirme o que mudou.",
+      "criterios": [
+        "Cadastro atualizado",
+        "Confirma o campo alterado"
+      ],
+      "verificar": [
+        "98877-6655",
+        "maria"
+      ]
+    }
+  ]
+}
