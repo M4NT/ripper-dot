@@ -203,8 +203,10 @@ import {
   restoreDataSnapshot,
   maybeRunScheduledBackup,
   pruneOldSnapshots,
-  normalizeBackupSettings
+  normalizeBackupSettings,
+  tarGzDir
 } from './lib/backup.mjs';
+import { exportAllEntries, writeEntries, removeDir } from './lib/export-all.mjs';
 import { memoAsync } from './lib/ttl-cache.mjs';
 import { attachRequestId } from './lib/request-id.mjs';
 import { isShuttingDown, registerGracefulShutdown, SHUTDOWN_MESSAGE } from './lib/shutdown.mjs';
@@ -1922,6 +1924,19 @@ const routes = [
   }],
   ['GET', /^\/api\/data\/backup$/, () => buildBackupPayload(db)],
   ['GET', /^\/api\/data\/backups$/, () => ({ auto: listAutoBackups(), snapshots: listDataSnapshots() })],
+  // "Exportar tudo": .tar.gz legível (conversas em Markdown, agentes, rotinas, arquivos, artefatos), sem segredos.
+  ['GET', /^\/api\/data\/export-all$/, async (req, _, url, res) => {
+    const entries = await exportAllEntries(db, { dataPath: rel => fileURLToPath(dataUrl(rel)), readArtifact: readArtifactContent });
+    const dir = writeEntries(entries);
+    const out = dir + '.tar.gz';
+    try {
+      await tarGzDir(dir, out);
+      const buf = await readFile(out);
+      const name = `ripper-exportacao-${new Date().toISOString().slice(0, 10)}.tar.gz`;
+      res.writeHead(200, hdr(req, { 'content-type': 'application/gzip', 'content-disposition': `attachment; filename="${name}"`, 'cache-control': 'no-store' }));
+      res.end(buf);
+    } finally { removeDir(dir); removeDir(out); }
+  }],
   ['POST', /^\/api\/data\/restore$/, async req => {
     const b = await body(req);
     if (!b.confirm) throw new HttpError(400, 'Envie confirm: true para substituir o estado local.');

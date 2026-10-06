@@ -102,9 +102,9 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 ### D. Dados, LGPD e termos (P0)
 - ✅ Exclusão de dados pessoais, mascaramento antes do modelo, retenção automática.
 - 🔨 Termos de uso e política de privacidade (o que fica na máquina, o que vai para os provedores): **rascunho** em [termos-de-uso.md](termos-de-uso.md) e [politica-de-privacidade.md](politica-de-privacidade.md). [ ] Revisão jurídica.
-- 🔨 Aviso de uso de contas de terceiros (assinatura pessoal × Teams da empresa): **rascunho** nos termos de uso. [ ] Revisão jurídica. [ ] Mostrar o aviso no app ao adicionar conta.
-- [ ] Exportar tudo (conversas, agentes, arquivos) num pacote legível.
-- [ ] Registro de consentimento para WhatsApp de clientes (quem pode ser atendido por agente). Regras já descritas no **rascunho** dos termos; falta o registro no app.
+- 🔨 Aviso de uso de contas de terceiros (assinatura pessoal × Teams da empresa): **rascunho** nos termos de uso. [ ] Revisão jurídica. ✅ Aviso mostrado no app ao adicionar conta (Configurações → Conta do Claude).
+- ✅ Exportar tudo: `GET /api/data/export-all` (.tar.gz com conversas em Markdown, agentes + instruções, rotinas, arquivos, artefatos; sem segredos) e botão em Segurança → LGPD.
+- ✅ Registro de consentimento para WhatsApp de clientes (número, data, como foi obtido) no Canal WhatsApp; "Exigir consentimento" (opt-in) rebaixa resposta automática a rascunho para quem não tem registro.
 
 ### E. Qualidade e testes (P0)
 - ✅ ~620 testes automáticos rodando.
