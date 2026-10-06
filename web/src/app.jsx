@@ -119,13 +119,37 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
   const pinKeys = (pinIds || entries.filter(e => e.kind === 'agent').slice(0, 3).map(e => e.key)).filter(k => byKey.get(k)?.kind === 'agent');
   const rest = entries.map(e => e.key).filter(k => !pinKeys.includes(k));
   const listKeys = [...rest.filter(k => !order.includes(k)), ...order.filter(k => rest.includes(k))];
+  const saveOrder = (P, Lk) => {
+    setPinIds(P); local.set('pins', P); setOrder(Lk); local.set('sideOrder', Lk);
+    api('/api/settings', { method: 'PUT', body: { ui: { sidebar: { pins: P, order: Lk.slice(0, 1000) } } } }).catch(() => {});
+  };
+  // Mesmo que arrastar, pelo teclado: Alt+setas move, Alt+P fixa/desafixa (o leitor de tela ouve o resultado)
+  const [said, setSaid] = useState('');
+  const keyMove = (e, k) => {
+    if (!e.altKey) return;
+    const P = [...pinKeys], Lk = [...listKeys], inPins = P.includes(k), arr = inPins ? P : Lk, i = arr.indexOf(k);
+    const name = byKey.get(k)?.a?.name || byKey.get(k)?.c?.title || '';
+    let d = 0;
+    if (e.key === (inPins ? 'ArrowLeft' : 'ArrowUp')) d = -1;
+    else if (e.key === (inPins ? 'ArrowRight' : 'ArrowDown')) d = 1;
+    else if (e.key.toLowerCase() === 'p') {
+      e.preventDefault();
+      if (inPins) { P.splice(i, 1); Lk.unshift(k); setSaid(`${name} saiu dos fixados`); }
+      else if (byKey.get(k)?.kind === 'agent') { Lk.splice(i, 1); P.push(k); if (P.length > 4) Lk.unshift(P.shift()); setSaid(`${name} fixado`); }
+      else return;
+      saveOrder(P, Lk); setTimeout(() => document.querySelector(`[data-flip="${k}"]`)?.focus(), 50); return;
+    } else return;
+    e.preventDefault();
+    const j = i + d;
+    if (j < 0 || j >= arr.length) return;
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+    saveOrder(P, Lk); setSaid(`${name} na posição ${j + 1}`);
+    setTimeout(() => document.querySelector(`[data-flip="${k}"]`)?.focus(), 50);
+  };
   const drag = useSidebarDrag({
     pins: pinKeys, list: listKeys, canPin: k => byKey.get(k)?.kind === 'agent',
     idsOf: k => { const e = byKey.get(k); return e?.kind === 'agent' ? [e.a.id] : (e?.c?.agentIds || []); },
-    onCommit: ({ pins: P, list: Lk }) => {
-      setPinIds(P); local.set('pins', P); setOrder(Lk); local.set('sideOrder', Lk);
-      api('/api/settings', { method: 'PUT', body: { ui: { sidebar: { pins: P, order: Lk.slice(0, 1000) } } } }).catch(() => {});
-    },
+    onCommit: ({ pins: P, list: Lk }) => saveOrder(P, Lk),
     renderGhost: (k, kind) => {
       const e = byKey.get(k);
       if (!e) return null;
@@ -168,7 +192,7 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
       <div ref={pinsRef} className={`pins ${drag.drag ? 'drop-ready' : ''} ${drag.drag?.over?.zone === 'pins' ? 'over' : ''}`} aria-label="Agentes fixados" onClickCapture={drag.onClickCapture}>
         {drag.pins.map(k => byKey.get(k)?.a).filter(Boolean).map(a => (
           <a key={a.id} data-flip={a.id} data-pin={a.id} href={`#/a/${a.id}`} className={`pin ${activeAgent === a.id ? 'on' : ''} ${dragKey === a.id ? 'lifted' : ''}`} onClick={onNavigate}
-            title={a.name} draggable={false} onPointerDown={e => drag.onPointerDown(e, a.id)}>
+            title={`${a.name} · Alt+setas move, Alt+P desafixa`} draggable={false} onPointerDown={e => drag.onPointerDown(e, a.id)} onKeyDown={e => keyMove(e, a.id)}>
             <span className="pin-av"><AgentAvatar agent={a} size={collapsed ? 30 : 52} state={busy[a.id] ? 'working' : undefined} />{busy[a.id] && <i className="pin-dot" aria-label="trabalhando" />}</span>
             <b>{a.name}</b>
           </a>
@@ -176,6 +200,7 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
         {drag.pins.length === 0 && <p className="pins-empty">Arraste um agente para cá para fixar</p>}
       </div>
       {drag.ghost}
+      <p className="sr-only" aria-live="polite">{said}</p>
 
       <nav ref={listRef} className="side-list" aria-label={t('nav.agents')} onClickCapture={drag.onClickCapture}>
         <a href="#/inbox" className={`row inbox-row ${section === 'inbox' ? 'on' : ''}`} onClick={onNavigate} aria-current={section === 'inbox' ? 'page' : undefined}>
@@ -186,7 +211,7 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
         {drag.list.map(k => byKey.get(k)).filter(Boolean).map(e => {
           const c = e.c;
           const unread = c?.unread && parts[1] !== c.id;
-          const common = { key: e.key, 'data-flip': e.key, 'data-item': e.key, draggable: false, onClick: onNavigate, onPointerDown: ev => drag.onPointerDown(ev, e.key) };
+          const common = { key: e.key, 'data-flip': e.key, 'data-item': e.key, draggable: false, onClick: onNavigate, onPointerDown: ev => drag.onPointerDown(ev, e.key), onKeyDown: ev => keyMove(ev, e.key) };
           if (e.kind === 'group') return (
             <a {...common} href={`#/c/${c.id}`} className={`row ${parts[1] === c.id ? 'on' : ''} ${unread ? 'unread' : ''} ${dragKey === e.key ? 'lifted' : ''}`} onContextMenu={ev => chatMenu(ev, c)} title={collapsed ? c.title : undefined}>
               <span className="row-av"><ChatAvatar chat={c} size={40} /></span>
