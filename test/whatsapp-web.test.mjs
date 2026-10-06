@@ -59,7 +59,7 @@ test('webhook interno: recusa sem token, guarda só quem está na lista e respon
 
     // o primeiro acesso aos segredos cria data/evolution.json; o token não aparece em lugar nenhum da API
     await fetch(base + '/api/channels/whatsapp-web/' + 'f'.repeat(48), { method: 'POST', body: '{}' });
-    const { hookToken, apiKey } = JSON.parse(readFileSync(join(dataDir, 'evolution.json'), 'utf8'));
+    const { hookToken, apiKey } = (await import('./helpers/evolution-secrets.mjs')).readEvolutionSecrets(dataDir);
     const stateTxt = await (await fetch(base + '/api/state')).text();
     assert.ok(!stateTxt.includes(hookToken) && !stateTxt.includes(apiKey));
 
@@ -140,7 +140,7 @@ test('com leitura ligada: rascunho só sai com aprovação; "só lê" e mensagem
     await put({ ui: { mode: 'enterprise' } });
     await put({ whatsappWeb: { enabled: true, readAll: true, agentId: st.agents[0].id, allowlist: [], contactModes: { '5521977776666': 'read' } } });
     await fetch(base + '/api/channels/whatsapp-web/' + 'f'.repeat(48), { method: 'POST', body: '{}' }); // cria os segredos
-    const { hookToken } = JSON.parse(readFileSync(join(dataDir, 'evolution.json'), 'utf8'));
+    const { hookToken } = (await import('./helpers/evolution-secrets.mjs')).readEvolutionSecrets(dataDir);
     const send = ev => fetch(base + '/api/channels/whatsapp-web/' + hookToken, { method: 'POST', body: JSON.stringify(ev), headers: { 'content-type': 'application/json', 'x-ripper-token': hookToken } });
 
     await send(msg({ remoteJid: '5521977776666@s.whatsapp.net', id: 'so-le' }, 'oi, tudo bem?'));        // modo só lê
@@ -192,7 +192,7 @@ test('grupo: parser lê quem falou; só guarda com "Ler grupos" e nunca responde
     await put({ ui: { mode: 'enterprise' } });
     await put({ whatsappWeb: { enabled: true, readAll: true, readGroups: false, agentId: st.agents[0].id, allowlist: ['5511988887777'] } });
     await fetch(base + '/api/channels/whatsapp-web/' + 'f'.repeat(48), { method: 'POST', body: '{}' });
-    const { hookToken } = JSON.parse(readFileSync(join(dataDir, 'evolution.json'), 'utf8'));
+    const { hookToken } = (await import('./helpers/evolution-secrets.mjs')).readEvolutionSecrets(dataDir);
     const send = ev => fetch(base + '/api/channels/whatsapp-web/' + hookToken, { method: 'POST', body: JSON.stringify(ev), headers: { 'content-type': 'application/json', 'x-ripper-token': hookToken } });
     const hist = async () => (await (await fetch(base + '/api/whatsapp-web/status')).json()).history;
 
@@ -231,7 +231,7 @@ test('gatilho por evento: palavra-chave no WhatsApp dispara a rotina (mensagem s
     const r = await (await post('/api/routines', { agentId: st.agents[0].id, name: 'Urgências', prompt: 'Me avise.', trigger: 'whatsapp', keywords: 'urgente, orçamento', scope: 'contacts', quiet: false })).json();
     assert.deepEqual(r.keywords, ['urgente', 'orçamento']);
     await fetch(base + '/api/channels/whatsapp-web/' + 'f'.repeat(48), { method: 'POST', body: '{}' });
-    const { hookToken } = JSON.parse(readFileSync(join(dataDir, 'evolution.json'), 'utf8'));
+    const { hookToken } = (await import('./helpers/evolution-secrets.mjs')).readEvolutionSecrets(dataDir);
     const send = ev => fetch(base + '/api/channels/whatsapp-web/' + hookToken, { method: 'POST', body: JSON.stringify(ev), headers: { 'content-type': 'application/json', 'x-ripper-token': hookToken } });
 
     await send(msg({ remoteJid: '5511988887777@s.whatsapp.net', id: 'eu', fromMe: true }, 'isso é urgente'));
