@@ -49,7 +49,7 @@ function Browse({ settings, refresh, onOpenDetail, claudeList }) {
   const forYou = PLUGIN_CATALOG.filter(p => p.forYou).filter(filter);
   const featured = PLUGIN_CATALOG.filter(p => p.featured).filter(filter);
   const presets = AGENT_PRESETS.filter(filter);
-  const count = installedCount(settings);
+  const count = installedCount(settings, claudeList);
   const enterprise = isEnterpriseMode(settings);
 
   return (
@@ -61,7 +61,7 @@ function Browse({ settings, refresh, onOpenDetail, claudeList }) {
       actions={
         <button type="button" className="mp-installed" onClick={() => go('/marketplace/manage')}>
           <span className="mp-installed-icons">
-            {listInstalledPlugins(settings).slice(0, 4).map(p => <MpIcon key={p.id} id={p.icon} size={22} />)}
+            {listInstalledPlugins(settings, claudeList).slice(0, 4).map(p => <MpIcon key={p.id} id={p.icon} size={22} />)}
           </span>
           Instalados: {count} <Icon name="arrowR" size={14} />
         </button>
@@ -108,7 +108,7 @@ function Browse({ settings, refresh, onOpenDetail, claudeList }) {
 }
 
 function Manage({ settings, refresh, onOpenDetail, claudeList }) {
-  const installed = listInstalledPlugins(settings);
+  const installed = listInstalledPlugins(settings, claudeList);
   const [showAll, setShowAll] = useState(false);
   const visible = showAll ? installed : installed.slice(0, 6);
 

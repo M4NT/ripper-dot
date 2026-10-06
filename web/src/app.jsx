@@ -9,6 +9,7 @@ import { useChatMenu } from './actions.jsx';
 import { ApprovalTray } from './approvals.jsx';
 import { ResizeHandle } from './resize.jsx';
 import Chat from './pages/Chat.jsx';
+import { useAgentDrag, useFlip } from './agentDrag.jsx';
 import UiModeToggle from './uiModeToggle.jsx';
 import { getUiMode, isEnterpriseMode, isRouteAllowed, brandForChrome } from './uiMode.js';
 import { I18nProvider, useT } from './i18n/index.jsx';
@@ -100,21 +101,11 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
   const [pinIds, setPinIds] = useState(() => local.get('pins', null));
   const savePins = ids => { const v = [...new Set(ids)].filter(id => live.some(a => a.id === id)).slice(0, 4); setPinIds(v); local.set('pins', v); };
   const pins = (pinIds || entries.filter(e => e.kind === 'agent').slice(0, 3).map(e => e.a.id)).map(id => live.find(a => a.id === id)).filter(Boolean);
-  const pinSet = new Set(pins.map(a => a.id));
-  const [drag, setDrag] = useState(null); // { id, from: 'pin' | 'list' }
-  const [dropOn, setDropOn] = useState(false);
-  const startDrag = (e, id, from) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', id); setDrag({ id, from }); };
-  const endDrag = () => { setDrag(null); setDropOn(false); };
-  const dropOnPin = (e, targetId) => {
-    e.preventDefault(); e.stopPropagation();
-    if (!drag) return;
-    const ids = pins.map(a => a.id).filter(id => id !== drag.id);
-    const at = targetId ? ids.indexOf(targetId) : -1;
-    if (drag.from === 'list' && at >= 0 && ids.length >= 4) ids.splice(at, 1, drag.id); // cheio: troca pelo alvo
-    else ids.splice(at < 0 ? ids.length : at, 0, drag.id);
-    savePins(ids); endDrag();
-  };
-  const dropOnList = e => { e.preventDefault(); if (drag?.from === 'pin') savePins(pins.map(a => a.id).filter(id => id !== drag.id)); endDrag(); };
+  const drag = useAgentDrag({ pins: pins.map(a => a.id), onPins: savePins, agentById: agent });
+  const shown = drag.shownPins.map(id => live.find(a => a.id === id)).filter(Boolean);
+  const pinsRef = useRef(null), listRef = useRef(null);
+  useFlip(pinsRef); useFlip(listRef);
+  const dragId = drag.drag?.id;
   const activeAgent = parts[0] === 'a' ? parts[1] : parts[0] === 'c' ? S.chats.find(c => c.id === parts[1] && !isGroupChat(c))?.agentId : null;
   const nav = to => { onNavigate(); go(to); };
   const brand = brandForChrome(S.settings);
@@ -143,30 +134,29 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
         </div>
       </div>
 
-      <div className={`pins ${drag ? 'dropzone' : ''} ${dropOn ? 'over' : ''}`} aria-label="Agentes fixados"
-        onDragOver={e => { if (drag) { e.preventDefault(); setDropOn(true); } }} onDragLeave={() => setDropOn(false)} onDrop={e => dropOnPin(e, null)}>
-        {pins.map(a => (
-          <a key={a.id} href={`#/a/${a.id}`} className={`pin ${activeAgent === a.id ? 'on' : ''} ${drag?.id === a.id ? 'dragging' : ''}`} onClick={onNavigate} title={`${a.name} · arraste para trocar ou tirar dos fixados`}
-            draggable onDragStart={e => startDrag(e, a.id, 'pin')} onDragEnd={endDrag} onDragOver={e => drag && e.preventDefault()} onDrop={e => dropOnPin(e, a.id)}>
+      <div ref={pinsRef} className={`pins ${drag.drag ? 'drop-ready' : ''} ${drag.drag?.over?.zone === 'pins' ? 'over' : ''}`} aria-label="Agentes fixados" onClickCapture={drag.onClickCapture}>
+        {shown.map(a => (
+          <a key={a.id} data-flip={a.id} data-pin={a.id} href={`#/a/${a.id}`} className={`pin ${activeAgent === a.id ? 'on' : ''} ${dragId === a.id ? 'lifted' : ''}`} onClick={onNavigate}
+            title={a.name} draggable={false} onPointerDown={e => drag.onPointerDown(e, a.id, 'pin')}>
             <span className="pin-av"><AgentAvatar agent={a} size={collapsed ? 30 : 52} state={busy[a.id] ? 'working' : undefined} />{busy[a.id] && <i className="pin-dot" aria-label="trabalhando" />}</span>
             <b>{a.name}</b>
-            {agentTag(a) && <small>{agentTag(a)}</small>}
           </a>
         ))}
-        {pins.length === 0 && <p className="pins-empty">Arraste um agente para cá para fixar</p>}
+        {shown.length === 0 && <p className="pins-empty">Arraste um agente para cá para fixar</p>}
       </div>
+      {drag.ghost}
 
-      <nav className={`side-list ${drag?.from === 'pin' ? 'dropzone' : ''}`} aria-label={t('nav.agents')} onDragOver={e => drag?.from === 'pin' && e.preventDefault()} onDrop={dropOnList}>
+      <nav ref={listRef} className={`side-list ${drag.drag?.from === 'pin' && drag.drag?.over?.zone === 'list' ? 'drop-ready' : ''}`} aria-label={t('nav.agents')} onClickCapture={drag.onClickCapture}>
         <a href="#/inbox" className={`row inbox-row ${section === 'inbox' ? 'on' : ''}`} onClick={onNavigate} aria-current={section === 'inbox' ? 'page' : undefined}>
           <span className="row-icon"><Icon name="inbox" size={19} /></span>
           <span className="row-text"><b>{t('nav.inbox')}</b><small>{S.inboxCount > 0 ? `${S.inboxCount} esperando você` : 'Nada pendente'}</small></span>
           {S.inboxCount > 0 && <span className="count attn" aria-label={`${S.inboxCount} pendentes`}>{S.inboxCount}</span>}
         </a>
-        {entries.filter(e => e.kind === 'group' || !pinSet.has(e.a.id)).map(e => {
+        {entries.filter(e => e.kind === 'group' || !drag.shownPins.includes(e.a.id)).map(e => {
           const c = e.c;
           const unread = c?.unread && parts[1] !== c.id;
           if (e.kind === 'group') return (
-            <a key={c.id} href={`#/c/${c.id}`} className={`row ${parts[1] === c.id ? 'on' : ''} ${unread ? 'unread' : ''}`} onClick={onNavigate} onContextMenu={ev => chatMenu(ev, c)} title={collapsed ? c.title : undefined}>
+            <a key={c.id} data-flip={c.id} href={`#/c/${c.id}`} className={`row ${parts[1] === c.id ? 'on' : ''} ${unread ? 'unread' : ''}`} onClick={onNavigate} onContextMenu={ev => chatMenu(ev, c)} title={collapsed ? c.title : undefined}>
               <span className="row-av"><ChatAvatar chat={c} size={40} /></span>
               <span className="row-text"><span className="row-top"><b>{c.title}</b><em className="row-tag">{t('nav.group')}</em></span><small>{c.preview || t('nav.noMessages')}</small></span>
               {unread ? <span className="unread-dot" /> : <time>{fmtAgo(e.at)}</time>}
@@ -174,10 +164,10 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
           );
           const a = e.a;
           return (
-            <a key={a.id} href={`#/a/${a.id}`} className={`row ${activeAgent === a.id ? 'on' : ''} ${unread ? 'unread' : ''} ${drag?.id === a.id ? 'dragging' : ''}`} onClick={onNavigate}
-              onContextMenu={ev => c && chatMenu(ev, c)} title={collapsed ? a.name : undefined} draggable onDragStart={ev => startDrag(ev, a.id, 'list')} onDragEnd={endDrag}>
+            <a key={a.id} data-flip={a.id} href={`#/a/${a.id}`} className={`row ${activeAgent === a.id ? 'on' : ''} ${unread ? 'unread' : ''} ${dragId === a.id ? 'lifted' : ''}`} onClick={onNavigate}
+              onContextMenu={ev => c && chatMenu(ev, c)} title={collapsed ? a.name : undefined} draggable={false} onPointerDown={ev => drag.onPointerDown(ev, a.id, 'list')}>
               <span className="row-av"><AgentAvatar agent={a} size={40} state={busy[a.id] ? 'working' : undefined} /></span>
-              <span className="row-text"><span className="row-top"><b>{a.name}</b>{agentTag(a) && <em className="row-tag">{agentTag(a)}</em>}</span><small>{busy[a.id] ? 'trabalhando…' : c?.preview || 'Diga oi'}</small></span>
+              <span className="row-text"><span className="row-top"><b>{a.name}</b></span><small className={busy[a.id] ? 'is-working' : ''}>{busy[a.id] ? 'trabalhando…' : c?.preview || agentTag(a) || 'Diga oi'}</small></span>
               {unread ? <span className="unread-dot" /> : c && <time>{fmtAgo(e.at)}</time>}
             </a>
           );

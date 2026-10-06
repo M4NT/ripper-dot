@@ -101,6 +101,7 @@ import { history as waHistory, recordMessage as recordWaMessage, listChats as wa
 import { timingSafeEqual } from 'node:crypto';
 import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStreaming, activeChatStreamCount } from './lib/chat-stream.mjs';
 import { truncateChatFrom } from './lib/chat-edit.mjs';
+import { mergeAgentChats } from './lib/merge-agent-chats.mjs';
 import { beginChatRun,bumpChatRunSeq, finishChatRun, chatRunPublic, canResumeChatRun, trimPartialRepliesAfterLastUser, noteChatRunTool, canAutoResume } from './lib/chat-run.mjs';
 import { exportChatPayload, importChatPayload } from './lib/chat-transfer.mjs';
 import { listAgentTemplates, createSavedTemplate, patchSavedTemplate, agentFromSavedTemplate } from './lib/agent-templates.mjs';
@@ -288,6 +289,8 @@ if (!process.env.RIPPER_TEST_PROVIDER) setTimeout(() => allAccounts(db.settings)
 if (db.settings.claude?.mode === 'api' && db.settings.claude.apiKey && !db.settings.billing) { db.settings.billing = normalizeBilling({ paidConsent: true }); save(); }
 if (db.chats.some(c => c.channel)) { db.chats = db.chats.filter(c => !c.channel); save(); } // conversa de WhatsApp fica no WhatsApp (versões antigas criavam aqui)
 configureLogger({ settings: db.settings });
+// Um agente = uma conversa: junta as 1:1 antigas (as outras ficam arquivadas, nada é apagado)
+if (mergeAgentChats(db)) save();
 
 function googleTokenRefreshHook(tokens) {
   db.settings = applyGoogleTokensToSettings(db.settings, tokens);

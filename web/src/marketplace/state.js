@@ -27,15 +27,28 @@ export function uninstallPlugin(id, settings) {
 }
 
 /** Para a tela "Gerenciar": catálogo instalado + conectores personalizados. */
-export function listInstalledPlugins(settings) {
-  return (settings.plugins || []).map(p => {
+export function listInstalledPlugins(settings, claudeList = []) {
+  const mine = (settings.plugins || []).map(p => {
     const cat = CONNECTORS.find(c => c.id === p.name);
     return cat || { id: p.name, name: p.name, icon: 'plug', desc: `${p.type === 'http' ? 'HTTP' : 'stdio'} MCP personalizado`, custom: true };
   });
+  // Conectados pela conta claude.ai também contam como instalados
+  const fromClaude = claudeList.filter(c => c.status !== 'failed').map(c => {
+    const cat = CONNECTORS.find(x => [x.name, ...(x.claudeNames || [])].some(n => n.toLowerCase() === String(c.name).toLowerCase()));
+    return cat || { id: `claude-${c.name}`, name: c.name, icon: 'plug', desc: 'Conectado pela conta claude.ai' };
+  });
+  // Canais já ligados nas Configurações
+  const channels = [
+    (settings.whatsappWeb?.enabled || settings.whatsapp?.enabled) && { id: 'channel-whatsapp', name: 'WhatsApp', icon: 'plug', desc: 'Canal ligado' },
+    settings.email?.enabled && { id: 'channel-email', name: 'E-mail', icon: 'gmail', desc: settings.email.user || 'Canal ligado' },
+    settings.github?.token && { id: 'channel-github', name: 'GitHub', icon: 'github', desc: 'Conectado' }
+  ].filter(Boolean);
+  const seen = new Set();
+  return [...mine, ...fromClaude, ...channels].filter(x => !seen.has(x.id) && seen.add(x.id));
 }
 
-export function installedCount(settings) {
-  return (settings.plugins || []).length;
+export function installedCount(settings, claudeList = []) {
+  return listInstalledPlugins(settings, claudeList).length;
 }
 
 /** "Meus conectores": os instalados no Ripper + os da conta claude.ai. */
