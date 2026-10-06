@@ -51,7 +51,7 @@ function DataBackup({ s, set }) {
       a.download = `ripper-backup-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(a.href);
-      toast('Backup JSON baixado (sensível — só db.json)');
+      toast('Arquivo baixado. Guarde em lugar seguro: tem suas conversas.');
     } catch (e) { toast(e.message, 'error'); }
     finally { setBusy(''); }
   };
@@ -60,18 +60,18 @@ function DataBackup({ s, set }) {
     try {
       await api('/api/backup', { method: 'POST' });
       await reloadList();
-      toast('Snapshot completo gravado em RIPPER_DATA/backups');
+      toast('Cópia completa feita');
     } catch (e) { toast(e.message, 'error'); }
     finally { setBusy(''); }
   };
   const restoreSnapshot = async id => {
-    if (!(await ov.confirm({ title: 'Restaurar este snapshot?', body: 'Isso sobrescreve os dados vivos em RIPPER_DATA (db.json, SQLite, sandbox, etc.).', action: 'Restaurar', danger: true }))) return;
+    if (!(await ov.confirm({ title: 'Restaurar esta cópia?', body: 'Seus agentes, conversas e configurações atuais serão trocados pelos desta cópia.', action: 'Restaurar', danger: true }))) return;
     setBusy(`restore-${id}`);
     try {
       await api('/api/backup/restore', { method: 'POST', body: { confirm: true, id } });
       await refresh();
       await reloadList();
-      toast('Dados restaurados a partir do snapshot');
+      toast('Dados restaurados');
     } catch (e) { toast(e.message, 'error'); }
     finally { setBusy(''); }
   };
@@ -83,30 +83,30 @@ function DataBackup({ s, set }) {
       const backup = JSON.parse(text);
       await api('/api/data/restore', { method: 'POST', body: { confirm: true, backup } });
       await refresh();
-      toast('db.json restaurado (SQLite e pastas não mudam)');
+      toast('Agentes e conversas restaurados');
     } catch (e) { toast(e.message, 'error'); }
     finally { setBusy(''); if (fileRef.current) fileRef.current.value = ''; }
   };
   const backup = s.backup || { enabled: true, intervalHours: 24, keepCount: 7 };
   return (
     <>
-      <Card title="Snapshot completo (RIPPER_DATA)" desc="Arquivo .tar.gz em RIPPER_DATA/backups com db.json, usage/julia SQLite, sandbox e anexos. Restaurar substitui os dados vivos — pare outros processos Ripper no mesmo diretório.">
+      <Card title="Cópia completa dos dados" desc="Guarda tudo: agentes, conversas, configurações, arquivos e histórico de uso. Restaurar uma cópia troca os dados atuais pelos dela.">
         <Row title="Backup manual">
-          <button type="button" className="btn btn-primary" disabled={!!busy} onClick={createSnapshot} aria-busy={busy === 'snapshot'}>{busy === 'snapshot' ? 'Criando…' : 'Criar snapshot agora'}</button>
+          <button type="button" className="btn btn-primary" disabled={!!busy} onClick={createSnapshot} aria-busy={busy === 'snapshot'}>{busy === 'snapshot' ? 'Criando…' : 'Fazer uma cópia agora'}</button>
         </Row>
-        <Row title="Agendamento" desc="Snapshots automáticos na pasta backups/; os mais antigos são removidos conforme manter abaixo.">
+        <Row title="Cópia automática" desc="O Ripper faz cópias sozinho; as mais antigas são apagadas para não encher o disco.">
           <Switch checked={!!backup.enabled} onChange={v => set('backup', { ...backup, enabled: v })} label="Backup automático" />
         </Row>
         {backup.enabled && <>
           <Row title="Intervalo"><div className="input-unit"><input className="input" type="number" min={1} max={168} value={backup.intervalHours ?? 24} onChange={e => set('backup', { ...backup, intervalHours: +e.target.value })} /><span>horas</span></div></Row>
-          <Row title="Manter no disco"><div className="input-unit"><input className="input" type="number" min={1} max={50} value={backup.keepCount ?? 7} onChange={e => set('backup', { ...backup, keepCount: +e.target.value })} /><span>snapshots</span></div></Row>
+          <Row title="Manter no disco"><div className="input-unit"><input className="input" type="number" min={1} max={50} value={backup.keepCount ?? 7} onChange={e => set('backup', { ...backup, keepCount: +e.target.value })} /><span>cópias</span></div></Row>
           <Row title="Cópia extra em outra pasta" desc="Recomendado: uma pasta sincronizada (OneDrive, Google Drive, Dropbox) ou um disco externo. Assim, se este disco falhar, o backup não vai junto. Caminho completo; deixe vazio para não copiar." stack>
             <input className="input" value={backup.copyTo || ''} onChange={e => set('backup', { ...backup, copyTo: e.target.value })} placeholder="Ex.: C:\Users\voce\OneDrive\Ripper-backups" aria-label="Pasta da cópia extra" />
           </Row>
         </>}
         <Row title="Último backup">{snapshots[0] ? <span>{new Date(snapshots[0].createdAt).toLocaleString('pt-BR')} · {(snapshots[0].bytes / 1048576).toFixed(1).replace('.', ',')} MB</span> : <span className="tag tag-warn">nenhum ainda</span>}</Row>
         {snapshots.length > 0 && (
-          <Row title="Snapshots no servidor" stack>
+          <Row title="Cópias guardadas" stack>
             <ul className="rows flat">
               {snapshots.map(row => (
                 <li key={row.id} className="row-item">
@@ -118,18 +118,18 @@ function DataBackup({ s, set }) {
           </Row>
         )}
       </Card>
-      <Card title="Exportar só db.json" desc="JSON leve (agentes, chats, configurações). Não inclui usage.sqlite nem arquivos em sandbox/.">
-        <Row title="Download JSON">
-          <button type="button" className="btn" disabled={!!busy} onClick={download} aria-busy={busy === 'export'}>{busy === 'export' ? 'Gerando…' : 'Baixar JSON'}</button>
+      <Card title="Arquivo leve de agentes e conversas" desc="Um arquivo pequeno com agentes, conversas e configurações, sem os arquivos anexados. Bom para levar para outro computador.">
+        <Row title="Baixar">
+          <button type="button" className="btn" disabled={!!busy} onClick={download} aria-busy={busy === 'export'}>{busy === 'export' ? 'Gerando…' : 'Baixar arquivo'}</button>
         </Row>
-        <Row title="Restaurar JSON" desc="Grava db.pre-restore.*.backup.json antes de substituir só o db.json." tip="Substitui conversas e configurações atuais. Guarde o JSON em lugar seguro.">
+        <Row title="Restaurar de um arquivo" desc="Antes de trocar, o Ripper guarda uma cópia do que você tem hoje." tip="Substitui conversas e configurações atuais. Guarde o arquivo em lugar seguro.">
           <div className="row">
             <input ref={fileRef} type="file" hidden accept="application/json,.json" onChange={e => restoreJson(e.target.files?.[0])} />
             <button type="button" className="btn" disabled={!!busy} onClick={() => fileRef.current?.click()} aria-busy={busy === 'import'}><Icon name="upload" size={16} />{busy === 'import' ? 'Restaurando…' : 'Escolher arquivo…'}</button>
           </div>
         </Row>
         {auto?.length > 0 && (
-          <Row title="Backups automáticos de db.json" desc="Migração de schema ou antes de restaurar." stack>
+          <Row title="Cópias de segurança automáticas" desc="Feitas antes de atualizações e restaurações." stack>
             <ul className="rows flat">{auto.map(n => <li key={n} className="row-item"><div className="row-main"><b className="mono small">{n}</b></div></li>)}</ul>
           </Row>
         )}
@@ -688,11 +688,11 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
         {tab === 'profile' && <>
           <Card>
             <Row title="Seu nome" desc="Os agentes usam isso quando falam com você."><input className="input" value={s.name} maxLength={80} onChange={e => set('name', e.target.value)} placeholder="Ex.: Rafael" /></Row>
-            <Row stack title="Instruções gerais" desc="Entram em toda conversa, junto das instruções de cada agente e da skill token-the-ripper.">
+            <Row stack title="Instruções gerais" desc="Valem para todos os agentes, em toda conversa, junto com as instruções de cada um.">
               <textarea className="input" rows={6} value={s.customInstructions} maxLength={8000} onChange={e => set('customInstructions', e.target.value)} placeholder="Ex.: Sou dev frontend em SP. Respostas curtas, TypeScript no código." />
             </Row>
           </Card>
-          <Card title="Voz padrão dos agentes" desc="Agentes sem perfil de voz próprio herdam estes valores no prompt do modelo.">
+          <Card title="Voz padrão dos agentes" desc="Jeito de falar dos agentes que não têm um estilo próprio.">
             <Row title="Tom">
               <div className="pills">
                 {TONES.map(([k, l]) => <button key={k} type="button" className={`pill ${(s.defaults?.agentStyle?.tone || 'direto') === k ? 'on' : ''}`} onClick={() => set('defaults', { ...s.defaults, agentStyle: { ...(s.defaults?.agentStyle || {}), tone: k } })}>{l}</button>)}
@@ -709,7 +709,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
           </Card>
           <PushCard />
           <DevicesCard />
-          <Card title="Resumo do dia" desc="Todo dia, na Caixa: o que cada agente fez, o que espera você e quanto gastou. Montado sem gastar tokens.">
+          <Card title="Resumo do dia" desc="Todo dia, na Caixa: o que cada agente fez, o que espera você e quanto gastou. Não gasta nada da sua assinatura.">
             <Row title="Receber o resumo"><Switch checked={s.pulse?.enabled !== false} onChange={v => set('pulse', { ...(s.pulse || {}), enabled: v })} label="Resumo do dia" /></Row>
             {s.pulse?.enabled !== false && <Row title="Horário">
               <select className="select" value={s.pulse?.hour ?? 8} onChange={e => set('pulse', { ...(s.pulse || {}), hour: +e.target.value })}>
@@ -909,11 +909,11 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
               ))}
             </div>
           </Card>
-          <Card title="LGPD — dados pessoais" desc="Opt-in: antes de enviar texto a Claude, Codex ou Julia 1, o Ripper pode substituir CPF, contas, documentos e contatos por [PII]. Conversas locais continuam com o texto original.">
-            <Row title="Exportar tudo" desc="Pacote legível (.tar.gz): conversas em Markdown, agentes, rotinas, arquivos e artefatos. Senhas e chaves ficam de fora.">
+          <Card title="LGPD — dados pessoais" desc="Se você ligar, antes de mandar qualquer texto para a IA o Ripper troca CPF, contas, documentos e contatos por marcadores. Aqui no seu computador, as conversas continuam com o texto original.">
+            <Row title="Exportar tudo" desc="Um pacote com tudo em formato fácil de abrir: conversas, agentes, rotinas e arquivos. Senhas e chaves ficam de fora.">
               <a className="btn" href="/api/data/export-all" download><Icon name="download" size={16} />Baixar pacote</a>
             </Row>
-            <Row title="Mascaramento antes do modelo" desc="Recomendado se você cola dados de clientes no chat."><Switch checked={!!s.lgpd?.enabled} onChange={v => set('lgpd', { ...(s.lgpd || {}), enabled: v })} label="Ativar mascaramento LGPD" /></Row>
+            <Row title="Esconder dados pessoais da IA" desc="Recomendado se você cola dados de clientes no chat."><Switch checked={!!s.lgpd?.enabled} onChange={v => set('lgpd', { ...(s.lgpd || {}), enabled: v })} label="Esconder dados pessoais da IA" /></Row>
             {s.lgpd?.enabled && <>
               <Row title="Também em avisos do servidor" desc="SSE warn/erro e logs do Node quando ligado."><Switch checked={!!s.lgpd?.redactInLogs} onChange={v => set('lgpd', { ...(s.lgpd || {}), redactInLogs: v })} label="Mascarar PII em logs" /></Row>
               <Row title="Eliminar meus dados" desc="Direito de eliminação (art. 18): apaga conversas, memórias, anexos e telemetria local. Agentes e plugins permanecem.">
