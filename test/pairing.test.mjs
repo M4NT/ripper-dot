@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -57,7 +57,7 @@ test('HTTP: rede desligada por padrão, convite só com rede, /pair cria sessão
   const pathOf = u => { const x = new URL(u); return x.pathname + x.search; };
   try {
     for (let i = 0; i < 100; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 150)); }
-    const cookie = (await call('/api/auth/setup', 'POST', { password: 'minha-senha-123' })).headers.get('set-cookie').split(';')[0];
+    const cookie = (await call('/api/auth/setup', 'POST', { password: 'minha-senha-123', code: readFileSync(join(dataDir, 'setup-code.txt'), 'utf8').trim() })).headers.get('set-cookie').split(';')[0];
     const st = await (await call('/api/pair', 'GET', null, cookie)).json();
     assert.equal(st.lan.on, false, 'padrão: só localhost');
     assert.equal((await call('/api/pair/invite', 'POST', {}, cookie)).status, 409, 'sem rede ligada, sem convite');
