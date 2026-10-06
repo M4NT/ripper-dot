@@ -9,6 +9,9 @@
 **O Ripper é uma equipe de funcionários de IA que trabalha pelo dono, de verdade, o dia inteiro.**
 Cada agente tem computador próprio, memória, rotinas, canais (WhatsApp, e-mail, GitHub) e responde por um pedaço do negócio. O dono conversa com um ou com o time todo, aprova o que é arriscado e vê tudo o que foi feito em seu nome.
 
+**Para quem:** empresas (B2B) e pessoas (B2C). **Onde roda:** na máquina do cliente — os dados ficam com ele.
+*(Decisões do dono, 06/10/2026.)*
+
 O objetivo final é **ser melhor que o Grok** naquilo que importa para quem usa IA para trabalhar: **fazer o trabalho, não só responder**.
 
 Princípios que não mudam:
@@ -148,27 +151,34 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 
 ## 4. Plano em fases
 
-**Fase 0 — Estabilizar (agora, outubro de 2026)**
-Staging, login com senha única, servidor como serviço, retomar turnos após reinício, smoke diário, CI. *Saída:* o Ripper roda uma semana inteira na sua máquina sem você precisar reiniciar nada nem perder resposta.
+Ordem decidida pelo dono (06/10/2026): **confiabilidade → instalação fácil → celular fora de casa**. Imagem/vídeo e Omie vêm depois.
 
-**Fase 1 — Lançamento privado (você + 3 a 5 pessoas de confiança)**
-Instalador Windows/Mac, assistente de primeiro uso, acesso remoto com HTTPS, painel de saúde, termos e privacidade, guia de instalação. *Saída:* uma pessoa não técnica instala e usa sem sua ajuda.
+**Fase 0 — Confiabilidade (agora, outubro de 2026)**
+Staging, servidor como serviço do sistema, retomar turnos após reinício, login com senha única, smoke diário, CI, teste de restauração do backup.
+*Pronto quando:* o Ripper roda uma semana inteira na sua máquina sem reiniciar à mão nem perder resposta.
 
-**Fase 2 — Lançamento público**
-Atualização automática, testes de interface, revisão de segurança, documentação completa, custo em R$. *Saída:* produto que dá para recomendar.
+**Fase 1 — Instalação fácil (lançamento privado: você + 3 a 5 pessoas)**
+Instalador Windows/Mac sem terminal, assistente de primeiro uso, funcionar sem Docker (modo reduzido), imagem dos agentes baixada pronta, atualização automática, termos e privacidade, guia de instalação.
+*Pronto quando:* uma pessoa não técnica instala e usa sem a sua ajuda, em menos de 5 minutos.
+
+**Fase 2 — Celular fora de casa (lançamento público)**
+Acesso remoto seguro (login + HTTPS), notificações reais no Android/iPhone, aprovar pela notificação, telas revisadas no celular, painel de saúde, revisão de segurança.
+*Pronto quando:* você conversa, acompanha e aprova pelo celular, fora de casa, com segurança.
 
 **Fase 3 — Superar o Grok**
-1ª palavra < 1 s, geração de imagem (depois vídeo), app de celular mais completo, 50 tarefas reais com ≥ 80% concluídas sozinhas, mais canais (Telegram, Instagram, Slack). *Saída:* os 6 critérios do norte cumpridos e medidos.
+1ª palavra < 1 s, 50 tarefas reais com ≥ 80% concluídas sozinhas, Omie com sessões que se recuperam sozinhas, mais canais (Telegram, Instagram, Slack).
+*Pronto quando:* os critérios do norte estão cumpridos e medidos.
 
----
+**Fase 4 — Mídia**
+Geração de imagem dentro das tarefas, depois vídeo.
 
 ## 5. Pendências de produto (não bloqueiam o lançamento)
-- Geração de imagem (escolher provedor: OpenAI/Gemini pela API ou modelo local), depois vídeo.
+- Geração de imagem e vídeo (Fase 4; escolher provedor: OpenAI/Gemini pela API ou modelo local).
 - Cursor como provedor; Ripper Auto escolhendo modelos do OpenRouter (com uso pago ativo); tabela de preços atualizada.
 - Prévia de .xlsx; busca dentro de PDF/Word na Biblioteca.
 - Gatilho "planilha mudou"; passo de ação direta nos fluxos; resposta automática por remetente no e-mail.
 - Guardião do GitHub aprovar/mesclar PR com aprovação do dono.
-- Sessões de portais com auto-cura (depende de decidir a integração com o Omie).
+- Omie (Fase 3): agentes operando o Omie com sessões de portal que se recuperam sozinhas (detectar expiração, pausar o lote, pedir reautenticação na Caixa, retomar).
 - Linha do tempo com print da tela por ação; delegação visível também para mensagens diretas.
 - Catálogo único de Conectores / Integrações / Marketplace.
 
