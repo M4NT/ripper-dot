@@ -137,6 +137,7 @@ import {
   getOAuthFlow,
   mergePluginAuth,
   oauthRedirectUri,
+  escapeHtml,
   pluginOAuthStatus,
   startMcpOAuthFlow
 } from './lib/mcp-oauth.mjs';
@@ -3467,7 +3468,7 @@ const server = createServer(async (req, res) => {
       return res.end();
     }
     if (req.method === 'GET' && p === '/metrics') {
-      if (!metricsAccessAllowed(req, TOKEN)) throw new HttpError(401, 'Não autorizado.');
+      if (!metricsAccessAllowed(signedIn(req))) throw new HttpError(401, 'Entre com a senha do Ripper.');
       const metricsBody = formatPrometheusExposition();
       res.writeHead(200, hdr(req, { 'content-type': prometheusContentType(), 'cache-control': 'no-store' }));
       res.end(metricsBody);
@@ -3581,7 +3582,7 @@ const server = createServer(async (req, res) => {
         flow.status = 'error';
         flow.error = url.searchParams.get('error_description') || err;
         res.writeHead(400, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
-        res.end(`<!doctype html><meta charset=utf-8><title>Ripper · Google Tasks</title><p>Login negado: ${flow.error}</p><script>setTimeout(()=>window.close(),1200)</script>`);
+        res.end(`<!doctype html><meta charset=utf-8><title>Ripper · Google Tasks</title><p>Login negado: ${escapeHtml(flow.error)}</p><script>setTimeout(()=>window.close(),1200)</script>`);
         return;
       }
       if (!code) {
@@ -3627,7 +3628,7 @@ const server = createServer(async (req, res) => {
         flow.status = 'error';
         flow.error = url.searchParams.get('error_description') || err;
         res.writeHead(400, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
-        res.end(`<!doctype html><meta charset=utf-8><title>Ripper OAuth</title><p>Login negado: ${flow.error}</p><script>setTimeout(()=>window.close(),1200)</script>`);
+        res.end(`<!doctype html><meta charset=utf-8><title>Ripper OAuth</title><p>Login negado: ${escapeHtml(flow.error)}</p><script>setTimeout(()=>window.close(),1200)</script>`);
         return;
       }
       if (!code) {

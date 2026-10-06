@@ -217,3 +217,9 @@ test('callback OAuth via servidor Ripper', async () => {
   idp.close();
   _clearOAuthFlows();
 });
+
+test('callback OAuth: error_description vindo da URL é escapado antes de ir para o HTML', async () => {
+  const { escapeHtml } = await import('../lib/mcp-oauth.mjs');
+  assert.equal(escapeHtml('<script>alert("x")</script>&\''), '&#60;script&#62;alert(&#34;x&#34;)&#60;/script&#62;&#38;&#39;');
+  assert.equal(escapeHtml(undefined), '');
+});
