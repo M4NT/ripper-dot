@@ -44,6 +44,7 @@ import { listChatsPage } from './lib/history.mjs';
 import { tryClaimRoutine, releaseRoutineClaim } from './lib/persist-coord.mjs';
 import { browserFor, browserRisk } from './lib/browser.mjs';
 import { runClaude, runCodex, systemPrompt, describeImage, CLAUDE_FAST_ENV } from './lib/providers.mjs';
+import { detectHardware, pickModel, LOCAL_MODELS, ollamaUp, pullModel } from './lib/local-models.mjs';
 import { runOpenRouter, syncOpenRouterModels, checkCompatKey, compatCatalog, COMPAT } from './lib/openrouter.mjs';
 import { allAccounts, isLoggedIn, exhaustedUntil, loginCommand, openLoginTerminal, testAccount, configDirOf } from './lib/claude-accounts.mjs';
 import { normalizeWorkspace, listDirs, gitBranch, workspaceFor, workspaceForAgent } from './lib/workspace.mjs';
@@ -282,6 +283,7 @@ function settingsForMcp(s, mcpSession) {
 const APP_PKG = JSON.parse(await readFile(new URL('./package.json', import.meta.url), 'utf8'));
 const SERVER_STARTED_AT = Date.now();
 const db = load();
+let localPull = null; // download de modelo local em andamento (um por vez)
 syncOpenRouterModels(db.settings); // modelos do OpenRouter escolhidos em Configurações
 // e-mail e plano de cada conta do Claude (pessoal, Teams…) para o painel de uso; ~1 s cada, sem gastar mensagem
 if (!process.env.RIPPER_TEST_PROVIDER) setTimeout(() => allAccounts(db.settings).filter(a => isLoggedIn(a.id)).forEach(a => testAccount(a.id, CLAUDE_FAST_ENV).catch(() => {})), 3000);
@@ -2284,6 +2286,25 @@ const routes = [
   }],
   ['GET', /^\/api\/(?:providers\/)?(openrouter|openai|gemini|ollama)\/models$/, async (req, [prov]) => {
     try { return await compatCatalog(prov, db.settings); } catch (e) { throw new HttpError(502, e.message); }
+  }],
+  // Modelos locais: hardware + modelo recomendado + Ollama no ar + andamento do download.
+  ['GET', /^\/api\/local-models$/, async () => {
+    const hw = await detectHardware();
+    return { hardware: hw, pick: pickModel(hw), models: LOCAL_MODELS, ollama: await ollamaUp(db.settings), pull: localPull };
+  }],
+  ['POST', /^\/api\/local-models\/pull$/, async req => {
+    const { model } = await body(req);
+    const m = LOCAL_MODELS.find(x => x.id === model);
+    if (!m) throw new HttpError(400, 'Modelo fora da lista.');
+    if (localPull?.running) throw new HttpError(409, 'Já há um download em andamento.');
+    localPull = { model: m.id, running: true, status: 'iniciando', pct: 0 };
+    pullModel(db.settings, m.id, p => Object.assign(localPull, p)).then(() => {
+      const o = db.settings.ollama ||= { apiKey: '', models: [] };
+      if (!o.models.some(x => x.id === m.id)) o.models.push({ id: m.id, label: m.label, tools: true });
+      syncOpenRouterModels(db.settings); save();
+      Object.assign(localPull, { running: false, status: 'pronto', pct: 100 });
+    }, e => Object.assign(localPull, { running: false, error: e.message }));
+    return { ok: true };
   }],
   ['PUT', /^\/api\/settings$/, async req => {
     const b = await body(req), s = db.settings;

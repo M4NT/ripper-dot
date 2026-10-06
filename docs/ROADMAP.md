@@ -93,7 +93,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - [ ] **Instalador para Windows e Mac** que traz Node, cria o serviço e abre o app — sem terminal.
 - [ ] Assistente de primeiro uso: conta do Claude (login), Docker (detecta e orienta), primeiro agente em 1 frase, WhatsApp opcional.
 - [ ] Funcionar sem Docker (modo "sem computador" claro, com o que o agente perde).
-- [ ] **Modelos locais para quem não tem conta de IA**: o Ripper detecta o hardware (memória, placa de vídeo, Apple Silicon) e escolhe o melhor modelo que cabe nele, baixa pelo Ollama com 1 clique e já liga nos agentes. Partir de um projeto aberto que já faz isso em vez de reinventar: **llmfit** (Alex Jones; ordena por caber, velocidade e qualidade; fala com Ollama, llama.cpp, LM Studio) ou **whichllm** (Andyyyy64; usa notas de benchmark reais do Hugging Face). Avaliar licença e escolher um.
+- ✅ **Modelos locais para quem não tem conta de IA** (base): detecta RAM, GPU NVIDIA (nvidia-smi) e Apple Silicon, recomenda o maior Qwen3 que cabe (tabela curta em `lib/local-models.mjs`), detecta o Ollama e baixa com 1 clique mostrando o progresso (Configurações → Ollama); o modelo entra direto nos agentes pelo provedor Ollama já existente. Avaliados llmfit (MIT, binário Rust, `llmfit recommend --json`) e whichllm (MIT, Python, notas de benchmark do HF): ficou a ideia do llmfit sem embutir código. Falta: instalar o Ollama pelo Ripper, AMD/Intel GPU, chamar o llmfit se instalado.
 - [ ] Assistente de primeiro uso pergunta "Você tem conta de IA?" → Claude / ChatGPT / chave de API / "não tenho" (modelo local), explicando o que muda em qualidade.
 - [ ] Atualização automática com notas da versão.
 - [ ] Desinstalar limpo (opção de manter os dados).
