@@ -17,10 +17,10 @@ test('backup agendado grava e copia para a pasta extra, mantendo só as mais nov
   const data = mkdtempSync(join(tmpdir(), 'ripper-bk-')), extra = mkdtempSync(join(tmpdir(), 'ripper-bk-extra-'));
   process.env.RIPPER_DATA = data;
   (await import('../lib/store.mjs'))._resetStoreForTests();
-  writeFileSync(join(data, 'db.json'), '{}');
+  writeFileSync(join(data, 'db.json'), '{"settings":{},"agents":[]}');
   try {
     const { maybeRunScheduledBackup, copySnapshotTo } = await import('../lib/backup.mjs');
-    const out = maybeRunScheduledBackup({ settings: { backup: { copyTo: extra, keepCount: 2 } } });
+    const out = await maybeRunScheduledBackup({ settings: { backup: { copyTo: extra, keepCount: 2 } } });
     assert.ok(out.created, out.error);
     assert.ok(out.copiedTo?.startsWith(extra));
     copySnapshotTo(out.created, extra, 2); // de novo: continua 1 arquivo (mesmo nome)
@@ -47,7 +47,7 @@ test('snapshot inclui o que ainda estava no WAL do SQLite (conexão aberta, como
   live.exec("PRAGMA journal_mode = WAL; PRAGMA wal_autocheckpoint = 0; CREATE TABLE t (v TEXT); INSERT INTO t VALUES ('recente');");
   try {
     const { createDataSnapshot, backupsDirPath } = await import('../lib/backup.mjs');
-    const snap = createDataSnapshot({ reason: 'test' });
+    const snap = await createDataSnapshot({ reason: 'test' });
     const out = mkdtempSync(join(tmpdir(), 'ripper-wal-out-'));
     // mesmo tar do backup: no Windows o tar do Git trata "C:" como host remoto
     const tar = process.platform === 'win32' && process.env.SystemRoot ? join(process.env.SystemRoot, 'System32', 'tar.exe') : 'tar';
