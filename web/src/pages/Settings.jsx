@@ -3,12 +3,13 @@ import { MetalBadge } from 'metal-fx';
 import { useApp } from '../app.jsx';
 import { useOv } from '../overlay.jsx';
 import { WhatsappWebPanel } from '../whatsappWeb.jsx';
-import { api, apiUpload, go, useDark, brandLogoSrc, TONES, FORMALITIES } from '../lib.js';
+import { api, apiUpload, go, useDark, brandLogoSrc, TONES, FORMALITIES, useRoute } from '../lib.js';
 import { Icon, Switch, Select, EmptyState, Segmented, useConfirm } from '../ui.jsx';
 import { AdvancedBlock, HelpTip } from '../disclosure.jsx';
 import { ApprovalHistory } from '../approvals.jsx';
 import { MODEL_DESC, EffortScale, EFFORTS } from '../modelPicker.jsx';
 import { PROVIDERS, ProviderGrid, ProviderHeader } from '../providersCatalog.jsx';
+import SettingsSearch from '../settingsSearch.jsx';
 
 const EFFORT_CAPS = EFFORTS.filter(([k]) => k !== 'auto');
 import { useSettingsDraft } from '../settingsForm.js';
@@ -531,6 +532,8 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
   const [image, setImage] = useState(null);
   const [julia, setJulia] = useState(null);
   const [prov, setProv] = useState(null); // provedor aberto em Provedores de IA
+  const provQuery = useRoute().query.get('prov'); // #/settings/models?prov=claude abre direto (busca de configurações)
+  useEffect(() => { if (provQuery) setProv(provQuery); }, [provQuery]);
   const P = PROVIDERS.find(p => p.id === prov);
   const provCounts = Object.values(S.models).reduce((o, m) => (m.provider && (o[m.provider] = (o[m.provider] || 0) + 1), o), {});
   const provStatus = {
@@ -554,13 +557,14 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
     <div className="settings-page">
       <nav className="settings-nav" aria-label={tr('settings.navLabel')}>
         <h1>{tr('settings.title')}</h1>
+        <SettingsSearch allowed={new Set(allowedTabs.map(([k]) => k))} />
         {allowedTabs.map(([k, l, ic, hint]) => (
           <a key={k} href={`#/settings/${k}`} className={k === tab ? 'on' : ''} aria-current={k === tab ? 'page' : undefined}>
             <Icon name={ic} size={17} /><span><b>{l}</b><small>{hint}</small></span>
           </a>
         ))}
         {!enterprise && (
-          <p className="settings-simple-hint muted small">Modelos, Docker, plugins e backup ficam no <a href="#/settings/appearance">modo Enterprise</a>.</p>
+          <p className="settings-simple-hint muted small">Computador, conectores e opções técnicas ficam no <a href="#/settings/appearance">modo Enterprise</a>.</p>
         )}
       </nav>
 

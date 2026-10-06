@@ -79,7 +79,7 @@ export default {
   'settings.tab.computerHint': 'Onde os agentes executam',
   'settings.tab.channels': 'Canais',
   'settings.tab.channelsHint': 'E-mail, WhatsApp e onde os agentes atendem',
-  'settings.tab.plugins': 'Conectores avançados',
+  'settings.tab.plugins': 'Conectores',
   'settings.tab.pluginsHint': 'Servidores MCP personalizados',
   'settings.tab.security': 'Segurança',
   'settings.tab.securityHint': 'Aprovações e limites',
