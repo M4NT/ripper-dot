@@ -15,6 +15,7 @@ const EFFORT_CAPS = EFFORTS.filter(([k]) => k !== 'auto');
 import { useSettingsDraft } from '../settingsForm.js';
 import UiModeToggle from '../uiModeToggle.jsx';
 import { isEnterpriseMode, isSettingsTabAllowed } from '../uiMode.js';
+import { EnterpriseHint } from '../uiModeToggle.jsx';
 import { useT, settingsTabs } from '../i18n/index.jsx';
 
 export function SaveBar({ dirty, saving, save, reset }) {
@@ -714,7 +715,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
           </a>
         ))}
         {!enterprise && (
-          <p className="settings-simple-hint muted small">Computador, conectores e opções técnicas ficam no <a href="#/settings/appearance">modo Enterprise</a>.</p>
+          <p className="settings-simple-hint muted small"><EnterpriseHint>Computador, conectores e opções técnicas ficam no modo Enterprise.</EnterpriseHint></p>
         )}
       </nav>
 
@@ -886,7 +887,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
         {tab === 'plugins' && <Plugins s={s} set={set} />}
         {tab === 'channels' && <EmailCard s={s} set={set} toast={toast} />}
         {tab === 'channels' && <GithubCard s={s} toast={toast} refresh={refresh} />}
-        {tab === 'channels' && !enterprise && <p className="muted small">WhatsApp fica no <a href="#/settings/appearance">modo Enterprise</a>.</p>}
+        {tab === 'channels' && !enterprise && <p className="muted small"><EnterpriseHint>O WhatsApp (atender clientes, receber recados e o resumo diário) fica no modo Enterprise.</EnterpriseHint></p>}
         {tab === 'channels' && enterprise && (() => {
           const w = s.whatsapp || {};
           const setW = (k, v) => set('whatsapp', { ...w, [k]: v });

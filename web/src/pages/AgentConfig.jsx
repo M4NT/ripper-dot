@@ -6,6 +6,7 @@ import { Basics, Behavior, Tools, Appearance, ModelPick, VoiceStyle, Instruction
 import { AutonomySemaphore } from '../autonomy.jsx';
 import { uploadFile } from '../composer.jsx';
 import { isEnterpriseMode } from '../uiMode.js';
+import { EnterpriseHint } from '../uiModeToggle.jsx';
 import { useOv } from '../overlay.jsx';
 import { RoutineList, RoutineForm } from '../routines.jsx';
 
@@ -36,7 +37,7 @@ function Channels({ agent }) {
       <li><label><span className="toggle-ico"><Icon name="chat" /></span><span className="toggle-text"><b>Chat do Ripper</b><small>Você conversa com {agent.name} aqui.</small></span><span className="tag">sempre</span></label></li>
       <li><label><span className="toggle-ico"><Icon name="inbox" /></span>
         <span className="toggle-text"><b>WhatsApp</b>
-          <small>{!enterprise ? 'Disponível no modo Enterprise (Configurações → Aparência).'
+          <small>{!enterprise ? <EnterpriseHint>O WhatsApp fica no modo Enterprise.</EnterpriseHint>
             : mine ? `${agent.name} responde os contatos liberados e deixa recados na Caixa.`
             : other ? `Hoje quem atende é ${other.name}.`
             : 'Ninguém atende o WhatsApp agora.'}{enterprise && <> <a className="inline-link" href="#/settings/channels">Contatos, conexão e segurança</a></>}</small>

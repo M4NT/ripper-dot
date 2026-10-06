@@ -242,7 +242,7 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
           <MenuItem icon="agents" onClick={() => nav('/agents')}>{t('nav.agents')}</MenuItem>
           <MenuItem icon="flow" onClick={() => nav('/flows')}>{t('nav.flows')}</MenuItem>
           {enterprise && <MenuItem icon="folder" onClick={() => nav('/projects')}>{t('nav.projects')}</MenuItem>}
-          {enterprise && <MenuItem icon="book" onClick={() => nav('/library')}>{t('nav.library')}</MenuItem>}
+          <MenuItem icon="book" onClick={() => nav('/library')}>{t('nav.library')}</MenuItem>
           <MenuItem icon="bulb" onClick={() => nav('/ajuda')}>Ajuda<kbd className="menu-kbd">?</kbd></MenuItem>
           <MenuItem icon="gear" onClick={() => nav('/settings')}>{t('nav.settings')}<kbd className="menu-kbd">Ctrl ,</kbd></MenuItem>
           <MenuItem icon="data" onClick={() => nav('/saude')}>Saúde do Ripper</MenuItem>

@@ -136,7 +136,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - ✅ Ordem dos fixados e da lista salva nas configurações: igual em todos os aparelhos.
 - ✅ Zero tela parada: a barra lateral mostra quem está trabalhando segundo o servidor (rotinas, WhatsApp, outra aba), com o passo atual ("Pesquisando na web…", "Enviando WhatsApp…"). [ ] Progresso detalhado das rotinas na Caixa.
 - ✅ Ações em lote e atalhos na Caixa (06/10/2026): marcar várias aprovações (ou todas) e aprovar/recusar de uma vez; teclado J/K navega, X marca, A aprova, R recusa (a seleção ou o item em foco). Perguntas abertas ("precisa de você") ficam fora do lote porque pedem texto. "Negar" virou "Recusar".
-- [ ] Modo Simples × Enterprise revisado (nada importante escondido).
+- 🔨 Modo Simples × Enterprise revisado: ✅ Biblioteca (entregas dos agentes) e Atualização também no Simples; onde algo é do Enterprise, botão "Ativar modo Enterprise" em vez de texto solto. [ ] Decidir: WhatsApp e conversas em grupo no modo Simples.
 - 🔨 Linguagem revisada (sem termos técnicos no modo Simples): ✅ Backup, Perfil, LGPD, formulário do agente e escolha de modelo. [ ] Telas do modo Enterprise e mensagens de erro do servidor.
 - 🔨 Acessibilidade: ✅ fixados e lista reorganizáveis pelo teclado (Alt+setas, Alt+P), com aviso para leitor de tela. [ ] Revisão completa de teclado nas outras telas, rótulos de leitor de tela e contraste.
 

@@ -2193,6 +2193,7 @@ body.agent-dragging .side-list { overflow: hidden; }
 .help-example { display: flex; align-items: flex-start; gap: 6px; text-align: left; font-size: 13px; color: var(--ink); padding: 7px 10px; border-radius: 10px; border: 1px solid var(--line-2); transition: background .15s; }
 .help-example:hover { background: var(--chip); }
 .help-example .icon { margin-top: 3px; color: var(--muted); }
+.enterprise-hint-btn { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; font-size: inherit; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 /* ============ Conversa entre agentes (fio separado, como no Grok) ============ */
