@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseWhatsappMessages, normalizeWhatsapp, redactWhatsapp } from '../lib/whatsapp.mjs';
+import { freePort } from './helpers/free-port.mjs';
 
 const listen = srv => new Promise(r => srv.listen(0, '127.0.0.1', () => r(srv.address().port)));
 
@@ -33,7 +34,7 @@ test('webhook WhatsApp: verifica, recusa sem assinatura e responde pela Graph AP
     let b = ''; req.on('data', c => (b += c)); req.on('end', () => { sent.push({ url: req.url, auth: req.headers.authorization, body: JSON.parse(b) }); res.end('{"messages":[{"id":"out1"}]}'); });
   });
   const graphPort = await listen(graph);
-  const probe = http.createServer(); const port = await listen(probe); await new Promise(r => probe.close(r)); // porta livre
+  const port = await freePort(); // porta livre
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-wa-'));
   const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
     env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'stream', HOME: dataDir, USERPROFILE: dataDir, JULIA_AUTOSTART: '0', WHATSAPP_GRAPH_URL: `http://127.0.0.1:${graphPort}` },

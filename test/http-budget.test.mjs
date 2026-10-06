@@ -1,3 +1,4 @@
+import { freePort } from './helpers/free-port.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
@@ -74,16 +75,6 @@ test('attachHttpTimeout envia 408 quando o orçamento expira', async () => {
   assert.match(body, /Tempo esgotado/);
 });
 
-function freePort() {
-  return new Promise((resolve, reject) => {
-    const s = createServer();
-    s.listen(0, '127.0.0.1', () => {
-      const { port } = s.address();
-      s.close(() => resolve(port));
-    });
-    s.on('error', reject);
-  });
-}
 
 async function waitFor(url, token, ms) {
   const deadline = Date.now() + ms;

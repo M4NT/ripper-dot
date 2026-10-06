@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { emailConfig, emailReady } from '../lib/email.mjs';
+import { freePort } from './helpers/free-port.mjs';
 
 test('servidores conhecidos se preenchem sozinhos; empresa usa imap./smtp. do domínio', () => {
   assert.equal(emailConfig({ user: 'a@gmail.com' }).imapHost, 'imap.gmail.com');
@@ -18,7 +19,7 @@ test('servidores conhecidos se preenchem sozinhos; empresa usa imap./smtp. do do
 });
 
 test('senha mascarada na API, cifrada no disco; teste de conexão falha com mensagem; gatilho de e-mail', async () => {
-  const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r)); const port = probe.address().port; await new Promise(r => probe.close(r));
+  const port = await freePort();
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-email-'));
   const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
     env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'stream', HOME: dataDir, USERPROFILE: dataDir, RIPPER_SECRET_KEY_FILE: join(dataDir, 'k'), JULIA_AUTOSTART: '0' },

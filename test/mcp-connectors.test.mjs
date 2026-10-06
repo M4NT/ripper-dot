@@ -14,19 +14,10 @@ import {
 } from '../lib/mcp-connectors.mjs';
 import { pluginOAuthStatus, refreshPluginOAuthToken, mergePluginAuth } from '../lib/mcp-oauth.mjs';
 import { verifyMcpServer } from '../lib/mcp-probe.mjs';
+import { freePort } from './helpers/free-port.mjs';
 
 const serverPath = fileURLToPath(new URL('../server.mjs', import.meta.url));
 
-function freePort() {
-  return new Promise((resolve, reject) => {
-    const s = createServer();
-    s.listen(0, '127.0.0.1', () => {
-      const { port } = s.address();
-      s.close(() => resolve(port));
-    });
-    s.on('error', reject);
-  });
-}
 
 test('redactSettingsSecrets mascara headers e tokens de plugin', () => {
   const s = redactSettingsSecrets({

@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseEvolutionMessage, isAllowed, makeRateLimiter, channelSafeAgent } from '../lib/evolution.mjs';
+import { freePort } from './helpers/free-port.mjs';
 
 const msg = (key, text = 'oi', extra = {}) => ({ event: 'messages.upsert', data: { key: { id: 'm1', ...key }, pushName: 'Ana', message: { conversation: text }, ...extra } });
 
@@ -42,7 +43,7 @@ test('webhook interno: recusa sem token, guarda só quem está na lista e respon
     let b = ''; req.on('data', c => (b += c)); req.on('end', () => { sent.push({ url: req.url, apikey: req.headers.apikey, body: JSON.parse(b || '{}') }); res.setHeader('content-type', 'application/json'); res.end('{}'); });
   });
   await new Promise(r => evo.listen(0, '127.0.0.1', r));
-  const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r)); const port = probe.address().port; await new Promise(r => probe.close(r));
+  const port = await freePort();
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-waweb-'));
   const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
     env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'stream', HOME: dataDir, USERPROFILE: dataDir, JULIA_AUTOSTART: '0', EVOLUTION_URL: `http://127.0.0.1:${evo.address().port}` },
@@ -126,7 +127,7 @@ test('com leitura ligada: rascunho só sai com aprovação; "só lê" e mensagem
   const sent = [];
   const evo = http.createServer((req, res) => { let b = ''; req.on('data', c => (b += c)); req.on('end', () => { sent.push({ url: req.url, body: JSON.parse(b || '{}') }); res.end('{}'); }); });
   await new Promise(r => evo.listen(0, '127.0.0.1', r));
-  const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r)); const port = probe.address().port; await new Promise(r => probe.close(r));
+  const port = await freePort();
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-waread-'));
   const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
     env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'stream', HOME: dataDir, USERPROFILE: dataDir, JULIA_AUTOSTART: '0', EVOLUTION_URL: `http://127.0.0.1:${evo.address().port}` },
@@ -180,7 +181,7 @@ test('grupo: parser lê quem falou; só guarda com "Ler grupos" e nunca responde
   const sent = [];
   const evo = http.createServer((req, res) => { let b = ''; req.on('data', c => (b += c)); req.on('end', () => { sent.push(req.url); res.setHeader('content-type', 'application/json'); res.end(req.url.startsWith('/group/') ? '{"subject":"Familia mil grau"}' : '{}'); }); });
   await new Promise(r => evo.listen(0, '127.0.0.1', r));
-  const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r)); const port = probe.address().port; await new Promise(r => probe.close(r));
+  const port = await freePort();
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-wagrp-'));
   const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
     env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'stream', HOME: dataDir, USERPROFILE: dataDir, JULIA_AUTOSTART: '0', EVOLUTION_URL: `http://127.0.0.1:${evo.address().port}` },
@@ -216,7 +217,7 @@ test('grupo: parser lê quem falou; só guarda com "Ler grupos" e nunca responde
 test('gatilho por evento: palavra-chave no WhatsApp dispara a rotina (mensagem sua não)', async () => {
   const evo = http.createServer((req, res) => { req.resume(); req.on('end', () => res.end('{}')); });
   await new Promise(r => evo.listen(0, '127.0.0.1', r));
-  const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r)); const port = probe.address().port; await new Promise(r => probe.close(r));
+  const port = await freePort();
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-watrig-'));
   const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
     env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'stream', HOME: dataDir, USERPROFILE: dataDir, JULIA_AUTOSTART: '0', EVOLUTION_URL: `http://127.0.0.1:${evo.address().port}` },

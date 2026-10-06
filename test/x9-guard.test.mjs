@@ -2,6 +2,7 @@ import './helpers/signed-in.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { guardOutbound } from '../lib/x9-guard.mjs';
+import { freePort } from './helpers/free-port.mjs';
 
 test('mascara segredos e dados sensíveis, sem devolver o valor', () => {
   const r = guardOutbound('Use a chave sk-ant-api03-ABCDEFGHIJKLMNOPQRSTUV e o token ghp_ABCDEFGHIJKLMNOPQRSTUVWX12. Senha: Omie@2026!', []);
@@ -34,7 +35,7 @@ test('de ponta a ponta: a resposta automática no WhatsApp sai com a senha masca
   const sent = [];
   const evo = http.createServer((req, res) => { let b = ''; req.on('data', c => (b += c)); req.on('end', () => { if (req.url.startsWith('/message/sendText')) sent.push(JSON.parse(b)); res.end('{}'); }); });
   await new Promise(r => evo.listen(0, '127.0.0.1', r));
-  const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r)); const port = probe.address().port; await new Promise(r => probe.close(r));
+  const port = await freePort();
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-x9-'));
   const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
     env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'stream', HOME: dataDir, USERPROFILE: dataDir, JULIA_AUTOSTART: '0', EVOLUTION_URL: `http://127.0.0.1:${evo.address().port}` }, stdio: 'ignore'

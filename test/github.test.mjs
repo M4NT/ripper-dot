@@ -2,6 +2,7 @@ import './helpers/signed-in.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import { freePort } from './helpers/free-port.mjs';
 
 test('repositório em qualquer formato', async () => {
   const { normalizeRepo } = await import('../lib/github.mjs');
@@ -48,7 +49,7 @@ test('criar o Guardião: confere token e acesso, cria agente + rotina uma vez s�
     res.end(JSON.stringify(ok ? (req.url === '/user' ? { login: 'yan' } : { default_branch: 'main' }) : { message: 'Bad credentials' }));
   });
   await new Promise(r => api.listen(0, '127.0.0.1', r));
-  const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r)); const port = probe.address().port; await new Promise(r => probe.close(r));
+  const port = await freePort();
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-gh-'));
   const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
     env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'stream', HOME: dataDir, USERPROFILE: dataDir, RIPPER_SECRET_KEY_FILE: join(dataDir, 'k'), JULIA_AUTOSTART: '0', GITHUB_API_URL: `http://127.0.0.1:${api.address().port}` },
