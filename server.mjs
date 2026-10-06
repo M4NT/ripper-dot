@@ -101,7 +101,7 @@ import { history as waHistory, recordMessage as recordWaMessage, listChats as wa
 import { timingSafeEqual } from 'node:crypto';
 import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStreaming, activeChatStreamCount } from './lib/chat-stream.mjs';
 import { truncateChatFrom } from './lib/chat-edit.mjs';
-import { beginChatRun,bumpChatRunSeq, finishChatRun, chatRunPublic, canResumeChatRun, trimPartialRepliesAfterLastUser } from './lib/chat-run.mjs';
+import { beginChatRun,bumpChatRunSeq, finishChatRun, chatRunPublic, canResumeChatRun, trimPartialRepliesAfterLastUser, noteChatRunTool, canAutoResume } from './lib/chat-run.mjs';
 import { exportChatPayload, importChatPayload } from './lib/chat-transfer.mjs';
 import { listAgentTemplates, createSavedTemplate, patchSavedTemplate, agentFromSavedTemplate } from './lib/agent-templates.mjs';
 import { architectSuggest } from './lib/architect-suggest.mjs';
@@ -413,6 +413,7 @@ async function streamChatResponse(req, c, { text, fileIds, mcpSession, resume = 
   let turnMetricRecorded = false;
   const chatEmit = e => {
     if (e?.speaker) turnMetricRecorded = true;
+    if (e?.tool && noteChatRunTool(c, e.tool)) save(); // diário do turno: decide a retomada automática após reinício
     trackLive(c.id, e);
     emitRaw(e);
   };
@@ -3545,6 +3546,38 @@ server.on('connection', socket => {
 });
 
 server.listen(PORT, HOST, () => console.log(`Ripper em http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`));
+setTimeout(() => autoResumeAfterRestart().catch(e => console.error('retomada', e.message)), 5000);
+
+/**
+ * Turnos cortados pelo reinício: retoma sozinho os que só tinham lido/pesquisado; os que já tinham feito algo
+ * com efeito fora do Ripper (enviar, publicar, executar) ficam parados com aviso na Caixa — retomar repetiria a ação.
+ * Roda em segundo plano, um por vez; quem abrir a conversa acompanha pela resposta ao vivo.
+ */
+async function autoResumeAfterRestart() {
+  const agentName = c => db.agents.find(a => a.id === c.agentId)?.name || 'O agente';
+  for (const c of db.chats) {
+    if (c.run?.interruptedBy !== 'restart' || c.run.autoResume) continue;
+    const verdict = canAutoResume(c);
+    c.run.autoResume = verdict.auto ? 'resumed' : 'skipped';
+    if (!verdict.auto) {
+      if (verdict.unsafe) raiseSystemAlert({
+        key: `resume-${c.id}`, title: 'Um turno parou no meio de ações',
+        body: `${agentName(c)} estava respondendo em "${c.title}" quando o Ripper reiniciou e ${verdict.reason}. Para não repetir nada, ele não continuou sozinho: confira a conversa e clique em Retomar se fizer sentido.`,
+        href: `/c/${c.id}`, hrefLabel: 'Abrir conversa'
+      });
+      save();
+      continue;
+    }
+    trimPartialRepliesAfterLastUser(c);
+    beginChatRun(c, { runId: id(), userMessageId: c.messages[verdict.at]?.id });
+    save();
+    logger.info('chat.auto_resume', { chatId: c.id });
+    // sem navegador do outro lado: req/res mínimos, os eventos só alimentam a resposta ao vivo
+    const req = { headers: {}, socket: {}, requestId: `auto-${c.id}` };
+    const res = { writable: false, writableFinished: false, writeHead() {}, write() {}, end() {}, on() {} };
+    await streamChatResponse(req, c, { text: verdict.text, fileIds: verdict.fileIds, resume: true }, res);
+  }
+}
 // Julia instalada = Julia no ar; sem pesos em julia/Julia-1, segue nas regras de reserva.
 if (!process.env.RIPPER_TEST_PROVIDER) autoStartJulia(db.settings).catch(e => console.warn('[julia]', e.message));
 
