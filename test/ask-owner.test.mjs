@@ -16,7 +16,7 @@ test('"Preciso de você": o agente pausa, a pergunta vai para a Caixa, a respost
   });
   const base = `http://127.0.0.1:${port}`;
   const post = (path, b) => fetch(base + path, { method: 'POST', headers: { 'content-type': 'application/json', origin: base }, body: JSON.stringify(b) });
-  const wait = async (fn, ms = 15_000) => { let v; for (let i = 0; i < ms / 150 && !(v = await fn()); i++) await new Promise(r => setTimeout(r, 150)); return v; };
+  const wait = async (fn, ms = 60_000) => { let v; for (let i = 0; i < ms / 150 && !(v = await fn()); i++) await new Promise(r => setTimeout(r, 150)); return v; };
   try {
     await wait(async () => { try { return (await fetch(base + '/api/health')).ok; } catch { return false; } });
     const [a] = (await (await fetch(base + '/api/state')).json()).agents;

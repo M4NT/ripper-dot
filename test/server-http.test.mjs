@@ -38,7 +38,7 @@ async function withServer(envExtra, fn) {
   const child = spawn(process.execPath, [serverPath], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   const base = `http://127.0.0.1:${port}`;
   try {
-    await waitFor(base + '/api/health', env.RIPPER_TOKEN, 15_000);
+    await waitFor(base + '/api/health', env.RIPPER_TOKEN, 60_000);
     await fn(base, env.RIPPER_TOKEN, dataDir);
   } finally {
     child.kill('SIGTERM');
@@ -525,7 +525,7 @@ test('RIPPER_LOG_JSON: requisição API emite linhas JSON sem token', async () =
   child.stdout.on('data', c => stdout.push(c.toString()));
   const base = `http://127.0.0.1:${port}`;
   try {
-    await waitFor(base + '/api/health', env.RIPPER_TOKEN, 15_000);
+    await waitFor(base + '/api/health', env.RIPPER_TOKEN, 60_000);
     const parsed = stdout.join('').split('\n').filter(Boolean).map(line => {
       try { return JSON.parse(line); } catch { return null; }
     }).filter(Boolean);

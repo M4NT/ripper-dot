@@ -108,10 +108,10 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 
 ### E. Qualidade e testes (P0)
 - ✅ ~620 testes automáticos rodando.
-- [ ] Testes que sobem o servidor estáveis em máquina carregada (hoje alguns estouram o tempo).
+- ✅ Testes que sobem o servidor estáveis em máquina carregada (espera pelo /api/health até 60 s, porta livre do sistema).
 - [ ] **Smoke diário automático** (Quinn no staging): checklist de 10 fluxos, relatório na Caixa.
 - [ ] Testes de interface ponta a ponta (enviar mensagem, aprovar, criar agente, grupo, rotina).
-- ✅ CI no GitHub a cada push e PR (testes, build, teste das telas). [ ] Bloqueio de merge com teste falhando. [ ] Achar o teste que falha às vezes (instável).
+- ✅ CI no GitHub a cada push e PR (testes, build, teste das telas). [ ] Bloqueio de merge com teste falhando (o CI já falha; falta o dono marcar o check `test-and-build` como obrigatório em Settings → Branches). ✅ Teste instável achado: uso por conta dependia do login do Claude na máquina (passava no PC, falhava no CI).
 - [ ] `.gitattributes` (fins de linha) num commit isolado.
 - [ ] Conjunto fixo de 50 tarefas reais para medir "termina sozinho" (critério 1 do norte).
 

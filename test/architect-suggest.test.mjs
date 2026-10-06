@@ -55,7 +55,7 @@ async function withServer(fn) {
   const child = spawn(process.execPath, [serverPath], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   const base = `http://127.0.0.1:${port}`;
   try {
-    const deadline = Date.now() + 15_000;
+    const deadline = Date.now() + 60_000;
     while (Date.now() < deadline) {
       try {
         const r = await fetch(base + '/api/health', { headers: { authorization: 'Bearer architect-test-token' } });

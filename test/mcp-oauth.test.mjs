@@ -156,7 +156,7 @@ test('callback OAuth via servidor Ripper', async () => {
   });
   const base = `http://127.0.0.1:${ripperListen}`;
   const auth = { authorization: 'Bearer oauth-test' };
-  const deadline = Date.now() + 15_000;
+  const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
     try {
       const h = await fetch(`${base}/api/health`, { headers: auth });

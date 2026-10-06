@@ -59,7 +59,7 @@ test('SIGTERM faz novas requisições /api/* retornarem 503', { skip: process.pl
   const base = `http://127.0.0.1:${port}`;
   let holdSocket;
   try {
-    await waitForHealth(base, token, 15_000);
+    await waitForHealth(base, token, 60_000);
     holdSocket = connect(port, '127.0.0.1');
     await new Promise((resolve, reject) => {
       holdSocket.once('connect', resolve);

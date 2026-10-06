@@ -164,7 +164,7 @@ async function withHttpServer(fn) {
   const base = `http://127.0.0.1:${port}`;
   const auth = { authorization: 'Bearer vault-http-token' };
   try {
-    const deadline = Date.now() + 15_000;
+    const deadline = Date.now() + 60_000;
     while (Date.now() < deadline) {
       try {
         const r = await fetch(base + '/api/health', { headers: auth });

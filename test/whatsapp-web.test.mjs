@@ -50,7 +50,7 @@ test('webhook interno: recusa sem token, guarda só quem está na lista e respon
   });
   const base = `http://127.0.0.1:${port}`;
   try {
-    for (let i = 0; i < 60; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 250)); }
+    for (let i = 0; i < 240; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 250)); }
     const st = await (await fetch(base + '/api/state')).json();
     const put = b => fetch(base + '/api/settings', { method: 'PUT', headers: { 'content-type': 'application/json', origin: base }, body: JSON.stringify(b) });
     assert.equal((await put({ ui: { mode: 'enterprise' } })).status, 200);
@@ -133,7 +133,7 @@ test('com leitura ligada: rascunho só sai com aprovação; "só lê" e mensagem
     stdio: 'ignore'
   });
   const base = `http://127.0.0.1:${port}`;
-  const wait = async (fn, ms = 10_000) => { for (let i = 0; i < ms / 200 && !(await fn()); i++) await new Promise(r => setTimeout(r, 200)); };
+  const wait = async (fn, ms = 60_000) => { for (let i = 0; i < ms / 200 && !(await fn()); i++) await new Promise(r => setTimeout(r, 200)); };
   try {
     await wait(async () => { try { return (await fetch(base + '/api/health')).ok; } catch { return false; } });
     const st = await (await fetch(base + '/api/state')).json();
@@ -187,7 +187,7 @@ test('grupo: parser lê quem falou; só guarda com "Ler grupos" e nunca responde
   });
   const base = `http://127.0.0.1:${port}`;
   try {
-    for (let i = 0; i < 60; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 250)); }
+    for (let i = 0; i < 240; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 250)); }
     const st = await (await fetch(base + '/api/state')).json();
     const put = b => fetch(base + '/api/settings', { method: 'PUT', headers: { 'content-type': 'application/json', origin: base }, body: JSON.stringify(b) });
     await put({ ui: { mode: 'enterprise' } });
@@ -222,7 +222,7 @@ test('gatilho por evento: palavra-chave no WhatsApp dispara a rotina (mensagem s
     stdio: 'ignore'
   });
   const base = `http://127.0.0.1:${port}`;
-  const wait = async (fn, ms = 10_000) => { for (let i = 0; i < ms / 200 && !(await fn()); i++) await new Promise(r => setTimeout(r, 200)); };
+  const wait = async (fn, ms = 60_000) => { for (let i = 0; i < ms / 200 && !(await fn()); i++) await new Promise(r => setTimeout(r, 200)); };
   try {
     await wait(async () => { try { return (await fetch(base + '/api/health')).ok; } catch { return false; } });
     const st = await (await fetch(base + '/api/state')).json();

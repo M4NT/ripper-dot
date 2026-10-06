@@ -27,13 +27,13 @@ test('senha mascarada na API, cifrada no disco; teste de conexão falha com mens
   const base = `http://127.0.0.1:${port}`;
   const send = (path, b, method = 'POST') => fetch(base + path, { method, headers: { 'content-type': 'application/json', origin: base }, body: JSON.stringify(b) });
   try {
-    for (let i = 0; i < 50; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 200)); }
+    for (let i = 0; i < 300; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 200)); }
     await send('/api/settings', { email: { enabled: true, user: 'eu@empresa.test', pass: 'senha-secreta-123', imapHost: '127.0.0.1', imapPort: 1, smtpHost: '127.0.0.1', smtpPort: 1 } }, 'PUT');
     const st = await (await fetch(base + '/api/state')).json();
     assert.equal(st.settings.email.pass, '••••');
     await send('/api/settings', { email: { pass: '••••' } }, 'PUT'); // salvar de novo com a máscara não apaga a senha
-    await new Promise(r => setTimeout(r, 400));
-    const disk = readFileSync(join(dataDir, 'db.json'), 'utf8');
+    let disk = ''; // espera o db.json ser gravado (máquina carregada pode demorar mais que 400 ms)
+    for (let i = 0; i < 100 && !/"pass":"enc:v1:/.test(disk); i++) { await new Promise(r => setTimeout(r, 100)); try { disk = readFileSync(join(dataDir, 'db.json'), 'utf8'); } catch {} }
     assert.ok(!disk.includes('senha-secreta-123'), 'senha não fica em texto puro');
     assert.match(disk, /"pass":"enc:v1:/);
     const t = await send('/api/email/test', {});

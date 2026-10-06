@@ -88,7 +88,7 @@ test('API CRUD /api/mcp/connectors', async () => {
   const base = `http://127.0.0.1:${port}`;
   const auth = { authorization: 'Bearer crud-token', 'content-type': 'application/json' };
   try {
-    const deadline = Date.now() + 12_000;
+    const deadline = Date.now() + 60_000;
     while (Date.now() < deadline) {
       try {
         if ((await fetch(base + '/api/health', { headers: auth })).ok) break;

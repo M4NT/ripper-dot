@@ -41,7 +41,7 @@ test('webhook WhatsApp: verifica, recusa sem assinatura e responde pela Graph AP
   });
   const base = `http://127.0.0.1:${port}`;
   try {
-    for (let i = 0; i < 60; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 250)); }
+    for (let i = 0; i < 240; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 250)); }
     const st = await (await fetch(base + '/api/state')).json();
     const put = body => fetch(base + '/api/settings', { method: 'PUT', headers: { 'content-type': 'application/json', origin: base }, body: JSON.stringify(body) });
     assert.equal((await put({ ui: { mode: 'enterprise' } })).status, 200);

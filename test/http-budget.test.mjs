@@ -111,7 +111,7 @@ async function withServer(envExtra, fn) {
   const child = spawn(process.execPath, [serverPath], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   const base = `http://127.0.0.1:${port}`;
   try {
-    await waitFor(base + '/api/health', env.RIPPER_TOKEN, 15_000);
+    await waitFor(base + '/api/health', env.RIPPER_TOKEN, 60_000);
     await fn(base, env.RIPPER_TOKEN);
   } finally {
     child.kill('SIGTERM');

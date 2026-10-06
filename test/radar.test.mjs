@@ -37,7 +37,7 @@ test('Radar: rotina em dias úteis, rodar agora e relatório vai para o e-mail d
   const base = `http://127.0.0.1:${port}`;
   const send = (path, b, method = 'POST') => fetch(base + path, { method, headers: { 'content-type': 'application/json', origin: base }, body: JSON.stringify(b) });
   try {
-    for (let i = 0; i < 50; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 200)); }
+    for (let i = 0; i < 300; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 200)); }
     await send('/api/settings', { email: { enabled: true, user: 'dono@empresa.test', pass: 'x', imapHost: '127.0.0.1', imapPort: 1, smtpHost: '127.0.0.1', smtpPort: smtp.address().port } }, 'PUT');
     const st = await (await fetch(base + '/api/state')).json();
     const r = await (await send('/api/routines', { agentId: st.agents[0].id, name: 'Radar', prompt: 'Vigie licitação.', dailyAt: '07:00', weekdays: true, quiet: true, deliver: { email: true, whatsapp: true } })).json();
