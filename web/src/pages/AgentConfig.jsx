@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../app.jsx';
 import { api, go, useRoute, fmtSize, fmtAgo, fmtTime, stepLabel } from '../lib.js';
 import { AgentAvatar, Icon, Segmented, StatusDot, EmptyState, useConfirm, Select, Switch } from '../ui.jsx';
-import { Basics, Behavior, Tools, Appearance, ModelPick, VoiceStyle, agentStyleDraft } from '../agentForm.jsx';
+import { Basics, Behavior, Tools, Appearance, ModelPick, VoiceStyle, InstructionsField, agentStyleDraft } from '../agentForm.jsx';
 import { AutonomySemaphore } from '../autonomy.jsx';
 import { uploadFile } from '../composer.jsx';
 import { isEnterpriseMode } from '../uiMode.js';
@@ -169,6 +169,7 @@ export default function AgentConfig({ id }) {
         {tab === 'identity' && <>
           {/* o que se edita no dia a dia vem primeiro; a aparência fica recolhida */}
           <Basics v={v} set={set} categories={S.categories} />
+          <InstructionsField v={v} set={set} />
           <div className="field"><span>Status</span>
             <Select label="Status" value={v.status} onChange={status => set({ status })} options={[
               { value: 'online', label: 'Ativo', hint: 'Responde e roda rotinas', icon: <i className="dot dot-ok" /> },
@@ -207,7 +208,7 @@ export default function AgentConfig({ id }) {
           <Knowledge agent={agent} />
         </>}
         {tab === 'autonomy' && <>
-          <Behavior v={v} set={set} settings={S.settings} />
+          <Behavior v={v} set={set} settings={S.settings} instructions={false} />
           <details className="adv-model" open={enterprise}>
             <summary><Icon name="down" size={14} className="adv-chev" />Modelo e esforço <small>Avançado · o Ripper Auto escolhe sozinho</small></summary>
             <ModelPick v={v} set={set} />

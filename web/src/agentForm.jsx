@@ -74,12 +74,16 @@ export function VoiceStyle({ v, set }) {
   </>;
 }
 
-export function Behavior({ v, set, settings }) {
+export function InstructionsField({ v, set }) {
+  return <label className="field">Instruções<textarea rows={8} value={v.instructions} maxLength={8000} onChange={e => set({ instructions: e.target.value })} placeholder="Defina o comportamento, as regras e o que ele nunca deve fazer." /><small>Entram em toda conversa, junto das suas instruções gerais.</small></label>;
+}
+
+/** instructions=false: a tela já mostra as instruções em outro lugar (ex.: Identidade do agente). */
+export function Behavior({ v, set, settings, instructions = true }) {
   const allowFully = isEnterpriseMode(settings);
   return <>
     <AutonomyPick value={v.autonomyLevel} onChange={autonomyLevel => set({ autonomyLevel })} allowFullyAutonomous={allowFully} />
-    <label className="field">Instruções<textarea rows={8} value={v.instructions} maxLength={8000} onChange={e => set({ instructions: e.target.value })} placeholder="Defina o comportamento, as regras e o que ele nunca deve fazer." /><small>Entram em toda conversa, junto das suas instruções gerais.</small></label>
-    <p className="muted">Tom e voz ficam em «Identidade».</p>
+    {instructions && <InstructionsField v={v} set={set} />}
   </>;
 }
 
