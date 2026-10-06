@@ -78,11 +78,11 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 
 ### B. Confiabilidade (P0)
 - ✅ Recarregar a página não para o agente; a resposta continua no servidor e fica salva.
-- [ ] **Reiniciar o servidor não perde turnos**: retomar sozinho os turnos interrompidos (hoje: "Retomar resposta" manual).
+- ✅ **Reiniciar o servidor não perde turnos**: retoma sozinho os que só leram/pesquisaram; os que já fizeram algo com efeito fora (enviar, publicar) param com aviso na Caixa.
 - 🔨 **Staging que sobrevive a reinício** (docker-compose, dados de exemplo, provedor simulado para smoke). *Engenheiro (Ripper), em andamento.*
-- [ ] Servidor como serviço do sistema (sobe com o computador, reinicia se cair) — hoje é um processo solto.
+- ✅ Servidor como serviço do sistema: `node scripts/service.mjs install` (Windows, macOS, Linux), com vigia que reinicia se cair. [ ] Testar o `install` em máquina real.
 - [ ] Atualização sem derrubar o que está rodando (esperar turnos terminarem, aviso "nova versão — recarregar" nas abas abertas).
-- ✅ Backup automático diário, cópia extra em outra pasta, aviso de falha. [ ] **Teste de restauração** automático (restaurar numa pasta temporária e conferir).
+- ✅ Backup automático diário, cópia extra em outra pasta, aviso de falha. [ ] **Corrigir o backup manual** (`POST /api/backup` deu erro interno em 06/10/2026). [ ] **Teste de restauração** automático (restaurar numa pasta temporária e conferir).
 - ✅ Fila de envios com novas tentativas (WhatsApp, e-mail, publicações).
 - [ ] Contêineres dos agentes: um por agente e por pasta de trabalho (hoje duas conversas do mesmo agente em pastas diferentes se revezam recriando).
 - [ ] Agentes trabalhando no código do Ripper em cópia própria (`/work/repos`), nunca trocando o branch da pasta compartilhada.
@@ -110,7 +110,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - [ ] Testes que sobem o servidor estáveis em máquina carregada (hoje alguns estouram o tempo).
 - [ ] **Smoke diário automático** (Quinn no staging): checklist de 10 fluxos, relatório na Caixa.
 - [ ] Testes de interface ponta a ponta (enviar mensagem, aprovar, criar agente, grupo, rotina).
-- [ ] CI no GitHub a cada push (testes + build) e bloqueio de merge com teste falhando.
+- ✅ CI no GitHub a cada push e PR (testes, build, teste das telas). [ ] Bloqueio de merge com teste falhando. [ ] Achar o teste que falha às vezes (instável).
 - [ ] `.gitattributes` (fins de linha) num commit isolado.
 - [ ] Conjunto fixo de 50 tarefas reais para medir "termina sozinho" (critério 1 do norte).
 
@@ -124,6 +124,9 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 ### G. Experiência de uso (P1)
 - ✅ Revisão de todas as telas (06/10/2026): navegação enxuta, chat limpo, busca de configurações, páginas sem rolagem dupla.
 - 🔨 "Conversa em grupo" no modo Simples e quem está trabalhando com autocompletar do @. *Donald.*
+- ✅ **Interface nova estilo mensageiro** (06/10/2026, referência: Grok Bot): tema escuro neutro como padrão; barra lateral de agentes com fixados no topo; **um agente = uma conversa** (as antigas juntadas, arquivadas, nada apagado); arrastar na mão para fixar e reordenar, com a grade se reorganizando; soltar um agente na conversa marca ele (botão com o mascote); Início vira a conversa; Marketplace ("Conectar aplicativos") e Configurações como janelas por cima.
+- [ ] Repaginar no padrão novo as telas que só herdaram as cores: Caixa, Agentes, Fluxos, Projetos, Biblioteca.
+- [ ] Celular: barra de botões da caixa de mensagem apertada; ordem dos fixados/lista sincronizada entre aparelhos (hoje fica no navegador).
 - [ ] Zero tela parada: progresso visível em rotinas de segundo plano e canais.
 - [ ] Ações em lote e atalhos na Caixa (A aprovar, R recusar).
 - [ ] Modo Simples × Enterprise revisado (nada importante escondido).
