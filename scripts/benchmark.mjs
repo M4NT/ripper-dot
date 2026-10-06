@@ -11,7 +11,7 @@
 import { spawn } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -23,6 +23,7 @@ const { values: opt } = parseArgs({ options: {
 if (opt.real && !opt.url) { console.error('--real exige --url do servidor (e RIPPER_TOKEN no ambiente).'); process.exit(2); }
 
 const root = fileURLToPath(new URL('..', import.meta.url));
+const fixtures = join(root, 'test/fixtures/benchmark');
 const { tarefas } = JSON.parse(readFileSync(join(root, 'docs/tarefas-referencia.json'), 'utf8'));
 const only = opt.ids?.split(',').map(s => s.trim());
 const list = only ? tarefas.filter(t => only.includes(t.id)) : opt.limit ? tarefas.slice(0, +opt.limit) : tarefas;
@@ -54,7 +55,15 @@ async function runTask(t, agentId) {
   const ctl = AbortSignal.timeout(+opt.timeout * 1000);
   let text = '', error = null, helped = 0;
   try {
-    const res = await api('/api/chat', { method: 'POST', body: JSON.stringify({ agentId, text: t.prompt }), signal: ctl });
+    // Anexos: mesmo caminho da interface (POST /api/files com o conteúdo cru, depois fileIds no chat).
+    const fileIds = [];
+    for (const a of t.anexos || []) {
+      const up = await api(`/api/files?agentId=${encodeURIComponent(agentId)}&name=${encodeURIComponent(basename(a))}`,
+        { method: 'POST', body: readFileSync(join(fixtures, a)), headers: { 'content-type': 'application/octet-stream' }, signal: ctl });
+      if (!up.ok) throw new Error(`anexo ${a}: HTTP ${up.status}: ${(await up.text()).slice(0, 200)}`);
+      fileIds.push((await up.json()).id);
+    }
+    const res = await api('/api/chat', { method: 'POST', body: JSON.stringify({ agentId, text: t.prompt, fileIds }), signal: ctl });
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
     const dec = new TextDecoder(); let buf = '';
     for await (const chunk of res.body) {

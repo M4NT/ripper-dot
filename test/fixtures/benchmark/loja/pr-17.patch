@@ -1,0 +1,37 @@
+From: Rafael <rafael@minhaloja.com.br>
+Subject: [PATCH] feat(pedidos): busca de pedidos por cliente e cancelamento
+
+---
+ src/pedidos.mjs | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+diff --git a/src/pedidos.mjs b/src/pedidos.mjs
+--- a/src/pedidos.mjs
++++ b/src/pedidos.mjs
+@@ -10,3 +10,27 @@ export async function listarPedidos(db) {
+   return db.query('SELECT * FROM pedidos ORDER BY criado_em DESC');
+ }
++
++export async function buscarPorCliente(db, email) {
++  return db.query(`SELECT * FROM pedidos WHERE email = '${email}'`);
++}
++
++export async function cancelarPedido(db, pedidoId, usuario) {
++  const pedido = await db.get('SELECT * FROM pedidos WHERE id = ?', [pedidoId]);
++  if (pedido.status = 'entregue') throw new Error('Pedido já entregue');
++  db.run('UPDATE pedidos SET status = ? WHERE id = ?', ['cancelado', pedidoId]);
++  return { ok: true };
++}
++
++export function paginar(pedidos, pagina, porPagina = 20) {
++  const inicio = pagina * porPagina;
++  return pedidos.slice(inicio, inicio + porPagina + 1);
++}
++
++export const STRIPE_KEY = 'sk_live_FAKE_EXEMPLO';
++
++export function totalPedido(itens) {
++  let total = 0;
++  for (const i of itens) total += i.preco * i.qtd;
++  return total;
++}

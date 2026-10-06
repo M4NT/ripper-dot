@@ -328,7 +328,7 @@ const DIST = new URL('./dist/', import.meta.url);
 const HTTP_BUDGET = resolveHttpBudget();
 const MAX_JSON = HTTP_BUDGET.maxBodyBytes;
 const MAX_FILE = 25 << 20;
-const TEXT_EXT = /\.(txt|md|csv|tsv|json|jsonl|xml|html|css|js|mjs|ts|tsx|jsx|py|rb|go|rs|java|c|cpp|h|sql|yaml|yml|toml|ini|log|sh)$/i;
+const TEXT_EXT = /\.(txt|md|csv|tsv|json|jsonl|xml|html|css|js|mjs|ts|tsx|jsx|py|rb|go|rs|java|c|cpp|h|sql|yaml|yml|toml|ini|log|sh|patch|diff|eml)$/i;
 
 if (HOST !== '127.0.0.1' && HOST !== 'localhost' && !TOKEN) {
   console.error('Recusado: HOST expõe o Ripper na rede sem RIPPER_TOKEN. Defina RIPPER_TOKEN=<segredo longo>.');

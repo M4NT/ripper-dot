@@ -1,0 +1,17 @@
+[
+ {"id":1,"cliente":"Marina","mensagens":[{"de":"cliente","em":"2026-09-29T09:00","texto":"Meu pedido ainda não chegou, já faz 10 dias"},{"de":"atendente","em":"2026-09-29T09:05","texto":"Vou verificar com a transportadora"}]},
+ {"id":2,"cliente":"Paulo","mensagens":[{"de":"cliente","em":"2026-09-29T10:00","texto":"Quero trocar o tênis por um número maior"},{"de":"atendente","em":"2026-09-29T10:12","texto":"Claro, vou gerar a etiqueta de troca"}]},
+ {"id":3,"cliente":"Lucas","mensagens":[{"de":"cliente","em":"2026-09-29T11:00","texto":"Preciso da segunda via do boleto"},{"de":"atendente","em":"2026-09-29T11:08","texto":"Segue o link da segunda via"}]},
+ {"id":4,"cliente":"Fernanda","mensagens":[{"de":"cliente","em":"2026-09-30T08:30","texto":"A entrega está atrasada, cadê meu pedido?"},{"de":"atendente","em":"2026-09-30T08:50","texto":"Desculpe, já abri chamado com a transportadora"}]},
+ {"id":5,"cliente":"Rogério","mensagens":[{"de":"cliente","em":"2026-09-30T09:10","texto":"O cupom OUTUBRO10 não funciona"},{"de":"atendente","em":"2026-09-30T09:13","texto":"Ele só vale a partir de 01/10"}]},
+ {"id":6,"cliente":"Beatriz","mensagens":[{"de":"cliente","em":"2026-09-30T14:00","texto":"Quero devolver, a peça veio com defeito"},{"de":"atendente","em":"2026-09-30T14:15","texto":"Sinto muito, vou iniciar a devolução"}]},
+ {"id":7,"cliente":"Caio","mensagens":[{"de":"cliente","em":"2026-10-01T09:00","texto":"Meu pedido não foi entregue ainda"},{"de":"atendente","em":"2026-10-01T09:07","texto":"Está em rota, chega amanhã"}]},
+ {"id":8,"cliente":"Débora","mensagens":[{"de":"cliente","em":"2026-10-01T10:00","texto":"Não recebi o boleto por e-mail, pode mandar segunda via?"},{"de":"atendente","em":"2026-10-01T10:10","texto":"Reenviei agora"}]},
+ {"id":9,"cliente":"Elisa","mensagens":[{"de":"cliente","em":"2026-10-01T15:00","texto":"Comprei tamanho errado, como faço a troca?"},{"de":"atendente","em":"2026-10-01T15:25","texto":"Basta solicitar pelo site em Meus Pedidos"}]},
+ {"id":10,"cliente":"Gustavo","mensagens":[{"de":"cliente","em":"2026-10-02T08:00","texto":"Rastreio parado há 5 dias, cadê a entrega?"},{"de":"atendente","em":"2026-10-02T08:06","texto":"Vou cobrar a transportadora"}]},
+ {"id":11,"cliente":"Helena","mensagens":[{"de":"cliente","em":"2026-10-02T11:00","texto":"Cupom de primeira compra dá erro"},{"de":"atendente","em":"2026-10-02T11:09","texto":"Corrigido, pode tentar de novo"}]},
+ {"id":12,"cliente":"Igor","mensagens":[{"de":"cliente","em":"2026-10-02T16:00","texto":"Quero trocar a cor da camiseta"},{"de":"atendente","em":"2026-10-02T16:14","texto":"Troca liberada"}]},
+ {"id":13,"cliente":"Joana","mensagens":[{"de":"cliente","em":"2026-10-03T09:00","texto":"Que horas a loja física abre no sábado?"},{"de":"atendente","em":"2026-10-03T09:04","texto":"Das 9h às 14h"}]},
+ {"id":14,"cliente":"Kleber","mensagens":[{"de":"cliente","em":"2026-10-03T10:00","texto":"Entrega atrasada de novo, pedido 4530"},{"de":"atendente","em":"2026-10-03T10:11","texto":"Desculpe, reenviamos hoje"}]},
+ {"id":15,"cliente":"Larissa","mensagens":[{"de":"cliente","em":"2026-10-03T13:00","texto":"Segunda via do boleto vencido, por favor"},{"de":"atendente","em":"2026-10-03T13:16","texto":"Boleto atualizado enviado"}]}
+]

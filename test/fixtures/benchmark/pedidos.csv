@@ -1,0 +1,4 @@
+pedido,cliente,data_compra,transportadora,rastreio,status,observacao
+4519,Paulo Ramos,22/09/2026,Jadlog,JD4519BR,entregue,Entregue em 26/09
+4521,Marina Costa,24/09/2026,Correios,QB123456789BR,atrasado,Retido no centro de distribuição de Cajamar desde 28/09; chamado 77881 aberto com a transportadora
+4523,Lucas Prado,25/09/2026,Jadlog,JD4523BR,em trânsito,Previsão 07/10

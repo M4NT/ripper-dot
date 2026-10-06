@@ -105,14 +105,17 @@
       "id": "t08",
       "categoria": "planilha",
       "titulo": "Limpar base de clientes",
-      "prompt": "Na planilha clientes.csv, remova duplicados por e-mail, padronize telefones no formato (11) 91234-5678 e me devolva o arquivo limpo.",
+      "prompt": "Na planilha clientes.csv (anexa), remova duplicados por e-mail, padronize telefones no formato (11) 91234-5678 e me devolva o arquivo limpo.",
+      "anexos": [
+        "clientes.csv"
+      ],
       "criterios": [
         "Arquivo novo entregue",
         "Quantidade de duplicados removidos informada"
       ],
       "verificar": [
-        "duplicad",
-        "telefone"
+        "\\b3\\b[^.\\n]{0,40}duplicad|duplicad[^.\\n]{0,40}\\b3\\b",
+        "\\(11\\) 9\\d{4}-\\d{4}"
       ]
     },
     {
@@ -133,49 +136,70 @@
       "id": "t10",
       "categoria": "planilha",
       "titulo": "Comissão de vendas",
-      "prompt": "Com base em vendas_setembro.xlsx, calcule a comissão de cada vendedor (3% até R$ 50 mil, 5% acima) e gere um resumo.",
+      "prompt": "Com base em vendas_setembro.xlsx (anexa), calcule a comissão de cada vendedor (3% sobre os primeiros R$ 50 mil vendidos, 5% sobre o que passar disso) e gere um resumo.",
+      "anexos": [
+        "vendas_setembro.xlsx"
+      ],
       "criterios": [
         "Comissão por vendedor",
         "Regra de faixas aplicada"
       ],
       "verificar": [
         "comiss",
-        "vendedor"
+        "2\\.?100",
+        "1\\.?245",
+        "1\\.?500",
+        "2\\.?790"
       ]
     },
     {
       "id": "t11",
       "categoria": "planilha",
       "titulo": "Conciliação bancária",
-      "prompt": "Compare o extrato.csv com lancamentos.xlsx e liste o que está no extrato mas não foi lançado.",
+      "prompt": "Compare o extrato.csv com lancamentos.xlsx (ambos anexos) e liste o que está no extrato mas não foi lançado.",
+      "anexos": [
+        "extrato.csv",
+        "lancamentos.xlsx"
+      ],
       "criterios": [
         "Lista de divergências",
         "Valores e datas"
       ],
       "verificar": [
-        "diverg|n[aã]o (foi )?lan[cç]ad",
-        "extrato"
+        "45,90",
+        "1\\.?280",
+        "padaria"
       ]
     },
     {
       "id": "t12",
       "categoria": "planilha",
       "titulo": "Estoque mínimo",
-      "prompt": "Na planilha de estoque, marque os produtos abaixo do estoque mínimo e calcule quanto comprar para cobrir 30 dias.",
+      "prompt": "Na planilha de estoque (estoque.csv, anexa), marque os produtos abaixo do estoque mínimo e calcule quanto comprar para cobrir 30 dias.",
+      "anexos": [
+        "estoque.csv"
+      ],
       "criterios": [
         "Itens marcados",
         "Quantidade de compra por item"
       ],
       "verificar": [
-        "estoque m[ií]nimo|abaixo",
-        "comprar"
+        "caf[eé]",
+        "a[cç][uú]car",
+        "filtro",
+        "\\b52\\b",
+        "\\b40\\b",
+        "\\b80\\b"
       ]
     },
     {
       "id": "t13",
       "categoria": "planilha",
       "titulo": "Gráfico de vendas",
-      "prompt": "Crie um gráfico de barras com as vendas por mês de 2026 a partir de vendas.csv e entregue a imagem e a planilha.",
+      "prompt": "Crie um gráfico de barras com as vendas por mês de 2026 a partir de vendas.csv (anexo) e entregue a imagem e a planilha.",
+      "anexos": [
+        "vendas.csv"
+      ],
       "criterios": [
         "Gráfico entregue",
         "Meses em ordem"
@@ -204,7 +228,10 @@
       "id": "t15",
       "categoria": "whatsapp",
       "titulo": "Cliente reclamando",
-      "prompt": "Cliente no WhatsApp: 'Meu pedido 4521 não chegou e já passou 10 dias'. Responda pedindo desculpas, consulte o status e diga o próximo passo.",
+      "prompt": "Cliente no WhatsApp: 'Meu pedido 4521 não chegou e já passou 10 dias'. Responda pedindo desculpas, consulte o status no pedidos.csv (anexo) e diga o próximo passo.",
+      "anexos": [
+        "pedidos.csv"
+      ],
       "criterios": [
         "Pede desculpas",
         "Cita o pedido 4521",
@@ -212,7 +239,8 @@
       ],
       "verificar": [
         "4521",
-        "desculp"
+        "desculp",
+        "cajamar|centro de distribui"
       ]
     },
     {
@@ -304,13 +332,18 @@
       "id": "t22",
       "categoria": "email",
       "titulo": "Triagem da caixa",
-      "prompt": "Leia os e-mails não lidos de hoje e me diga quais precisam de resposta minha, em ordem de urgência.",
+      "prompt": "Leia os e-mails não lidos de hoje (exportados em emails-nao-lidos.json, anexo) e me diga quais precisam de resposta minha, em ordem de urgência.",
+      "anexos": [
+        "emails-nao-lidos.json"
+      ],
       "criterios": [
         "Lista priorizada",
         "Motivo de cada um"
       ],
       "verificar": [
-        "urgen|priorid"
+        "urgen|priorid",
+        "v[eé]rtice",
+        "8812|distribuidora alfa"
       ]
     },
     {
@@ -330,27 +363,37 @@
       "id": "t24",
       "categoria": "codigo",
       "titulo": "Revisar PR",
-      "prompt": "Revise o PR aberto no repositório da loja: aponte bugs, riscos de segurança e sugestões, com o arquivo e a linha.",
+      "prompt": "Revise o PR aberto no repositório da loja (o diff está em pr-17.patch, anexo): aponte bugs, riscos de segurança e sugestões, com o arquivo e a linha.",
+      "anexos": [
+        "loja/pr-17.patch"
+      ],
       "criterios": [
         "Comentários com arquivo e linha",
         "Separa bug de sugestão"
       ],
       "verificar": [
         "bug|risco",
-        "linha"
+        "linha",
+        "inje[cç]|sql",
+        "sk_live|chave|segredo"
       ]
     },
     {
       "id": "t25",
       "categoria": "codigo",
       "titulo": "Corrigir teste quebrado",
-      "prompt": "O teste test/carrinho.test.mjs está falhando. Descubra a causa, corrija e rode os testes de novo.",
+      "prompt": "O teste carrinho.test.mjs (anexo, junto com carrinho.mjs) está falhando. Descubra a causa, corrija e rode os testes de novo.",
+      "anexos": [
+        "loja/carrinho.mjs",
+        "loja/carrinho.test.mjs"
+      ],
       "criterios": [
         "Causa explicada",
         "Testes passando no fim"
       ],
       "verificar": [
-        "passa|pass(ed|ou)|ok"
+        "passa|pass(ed|ou)|ok",
+        "/ ?100|por 100"
       ]
     },
     {
@@ -414,14 +457,20 @@
       "id": "t30",
       "categoria": "relatorio",
       "titulo": "Resumo semanal da equipe",
-      "prompt": "Resuma o que cada pessoa da equipe fez esta semana com base nas tarefas concluídas do projeto.",
+      "prompt": "Resuma o que cada pessoa da equipe fez esta semana com base nas tarefas concluídas do projeto (tarefas-semana.csv, anexo).",
+      "anexos": [
+        "tarefas-semana.csv"
+      ],
       "criterios": [
         "Uma seção por pessoa",
         "Pendências no fim"
       ],
       "verificar": [
         "semana",
-        "pend[eê]ncia|pr[oó]xim"
+        "pend[eê]ncia|pr[oó]xim",
+        "rafael",
+        "juliana",
+        "tiago"
       ]
     },
     {
@@ -442,14 +491,19 @@
       "id": "t32",
       "categoria": "relatorio",
       "titulo": "Relatório de atendimento",
-      "prompt": "Analise as conversas de atendimento da semana e diga os 5 assuntos mais frequentes e o tempo médio de resposta.",
+      "prompt": "Analise as conversas de atendimento da semana (conversas-atendimento.json, anexo) e diga os 5 assuntos mais frequentes e o tempo médio de resposta.",
+      "anexos": [
+        "conversas-atendimento.json"
+      ],
       "criterios": [
         "5 assuntos",
         "Tempo médio"
       ],
       "verificar": [
         "tempo m[eé]dio",
-        "assunto"
+        "assunto",
+        "\\b11 ?min",
+        "entrega"
       ]
     },
     {
@@ -597,14 +651,21 @@
       "id": "t43",
       "categoria": "financeiro",
       "titulo": "Classificar despesas",
-      "prompt": "Classifique as despesas do extrato de setembro em categorias (aluguel, folha, impostos, marketing, outros) e some cada uma.",
+      "prompt": "Classifique as despesas do extrato de setembro (extrato-setembro.csv, anexo) em categorias (aluguel, folha, impostos, marketing, outros) e some cada uma.",
+      "anexos": [
+        "extrato-setembro.csv"
+      ],
       "criterios": [
         "Todas classificadas",
         "Total por categoria"
       ],
       "verificar": [
         "aluguel",
-        "impost"
+        "impost",
+        "4\\.?500",
+        "2\\.?720,50",
+        "2\\.?050",
+        "18\\.?750"
       ]
     },
     {
