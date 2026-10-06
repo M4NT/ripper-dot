@@ -1895,3 +1895,11 @@ code, .mono, pre { overflow-wrap: anywhere; }
   .sidebar .nav a { padding: 5px 10px; }
   .side-foot { padding-top: 8px; margin-top: 4px; }
 }
+
+/* menu: "Mais" agrupa as telas de uso eventual */
+.nav-more { display: flex; align-items: center; gap: 12px; padding: 7px 10px; border-radius: 10px; color: var(--faint); font-size: 13px; background: none; border: 0; cursor: pointer; text-align: left; }
+.nav-more:hover { color: var(--ink-2); background: color-mix(in srgb, var(--surface) 70%, transparent); }
+.nav-more .icon { transform: rotate(-90deg); transition: transform .15s; }
+.nav-more.open .icon { transform: none; }
+.nav-more-items { display: flex; flex-direction: column; gap: 1px; }
+@media (prefers-reduced-motion: reduce) { .nav-more .icon { transition: none; } }

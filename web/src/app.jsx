@@ -101,6 +101,20 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
   const section = parts[0] === 'c' ? 'chat' : parts[0] === 'new' ? 'agents' : parts[0] === 'p' ? 'projects' : parts[0] || '';
   // Avisos de agente de canal moram na Caixa, não na lista de conversas
   const recent = [...S.chats].filter(c => !c.archived && !String(c.channelKey || '').startsWith('owner:')).sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt)).slice(0, 12);
+  // Menu: o dia a dia fica fixo (Início, Caixa, Agentes); o resto em "Mais" para sobrar espaço para as conversas.
+  const PRIMARY = new Set(['', 'inbox', 'agents']);
+  const primary = NAV.filter(n => n && PRIMARY.has(n[0]));
+  const secondary = NAV.filter(n => n && !PRIMARY.has(n[0]));
+  const [moreSaved, setMoreSaved] = useState(() => local.get('nav.more', false));
+  const setMore = v => { setMoreSaved(v); local.set('nav.more', v); };
+  const moreOpen = moreSaved || secondary.some(n => n[0] === section); // abre sozinho quando a tela atual está lá
+  const navLink = n => (
+    <a key={n[0]} href={'#/' + n[0]} className={section === n[0] ? 'on' : ''} aria-current={section === n[0] ? 'page' : undefined} onClick={onNavigate} title={collapsed ? n[1] : undefined} aria-label={n[1]}>
+      <Icon name={n[2]} /><span className="nav-label">{n[1]}</span>
+      {n[0] === 'projects' && S.projects.length > 0 && <span className="count">{S.projects.length}</span>}
+      {n[0] === 'inbox' && S.inboxCount > 0 && <span className="count attn" aria-label={`${S.inboxCount} pendentes`}>{S.inboxCount}</span>}
+    </a>
+  );
   const brand = brandForChrome(S.settings);
   const logoSrc = brand ? brandLogoSrc(brand.logoUrl) : null;
   const brandName = brand ? brandTitle(S.settings) : t('shell.brand');
@@ -120,13 +134,14 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
       </div>
       <button className="side-search" onClick={onSearch} aria-label={t('common.search')}><Icon name="search" size={16} /><span>{t('common.search')}</span><kbd>Ctrl K</kbd></button>
       <nav className="nav" aria-label={t('nav.main')}>
-        {NAV.map((n, i) => n ? (
-          <a key={n[0]} href={'#/' + n[0]} className={section === n[0] ? 'on' : ''} aria-current={section === n[0] ? 'page' : undefined} onClick={onNavigate} title={collapsed ? n[1] : undefined} aria-label={n[1]}>
-            <Icon name={n[2]} /><span className="nav-label">{n[1]}</span>
-            {n[0] === 'projects' && S.projects.length > 0 && <span className="count">{S.projects.length}</span>}
-            {n[0] === 'inbox' && S.inboxCount > 0 && <span className="count attn" aria-label={`${S.inboxCount} pendentes`}>{S.inboxCount}</span>}
-          </a>
-        ) : <hr key={i} />)}
+        {(collapsed ? NAV : primary).map(navLink)}
+        {!collapsed && secondary.length === 1 && navLink(secondary[0])}
+        {!collapsed && secondary.length > 1 && <>
+          <button type="button" className={`nav-more ${moreOpen ? 'open' : ''}`} aria-expanded={moreOpen} onClick={() => setMore(!moreOpen)}>
+            <Icon name="down" size={14} /><span className="nav-label">Mais</span>
+          </button>
+          {moreOpen && <div className="nav-more-items">{secondary.map(navLink)}</div>}
+        </>}
         {collapsed && <a href="#/chats" className={section === 'chats' ? 'on' : ''} onClick={onNavigate} title={t('nav.chats')} aria-label={t('nav.chats')}><Icon name="chat" /></a>}
       </nav>
       {!collapsed && recent.length > 0 && (
