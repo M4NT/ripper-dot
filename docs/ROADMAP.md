@@ -111,9 +111,9 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - ✅ Testes que sobem o servidor estáveis em máquina carregada (espera pelo /api/health até 60 s, porta livre do sistema).
 - [ ] **Smoke diário automático** (Quinn no staging): checklist de 10 fluxos, relatório na Caixa.
 - [ ] Testes de interface ponta a ponta (enviar mensagem, aprovar, criar agente, grupo, rotina).
-- ✅ CI no GitHub a cada push e PR (testes, build, teste das telas). [ ] Bloqueio de merge com teste falhando (o CI já falha; falta o dono marcar o check `test-and-build` como obrigatório em Settings → Branches). ✅ Teste instável achado: uso por conta dependia do login do Claude na máquina (passava no PC, falhava no CI).
-- [ ] `.gitattributes` (fins de linha) num commit isolado.
-- [ ] Testes que sobem o servidor sorteiam uma porta livre e a soltam antes de usar: em paralelo, outro teste pode pegar a mesma porta (visto em `chat-sse`, 401 por cair no servidor errado). Correção: servidor aceitar PORT=0 e informar a porta escolhida.
+- ✅ CI no GitHub a cada push e PR (testes, build, teste das telas). ✅ Bloqueio de merge com teste falhando (regra da main exige `test-and-build` nos PRs; administradores ainda podem enviar direto) (o CI já falha; o dono marcou o check `test-and-build` como obrigatório em Settings → Branches). ✅ Teste instável achado: uso por conta dependia do login do Claude na máquina (passava no PC, falhava no CI).
+- ✅ `.gitattributes` (fins de linha) num commit isolado.
+- 🔨 Testes que sobem o servidor disputavam a mesma porta em paralelo (falha aleatória, ex.: `chat-sse` com 401). Correção pronta: `test/helpers/free-port.mjs` reserva cada porta de forma atômica (PR #88).
 - [ ] Conjunto fixo de 50 tarefas reais para medir "termina sozinho" (critério 1 do norte).
 
 ### F. Desempenho e custo (P1)
@@ -148,7 +148,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 
 ### I. Acesso de qualquer lugar (P1 → Fase 2)
 - ✅ PWA, notificações no aparelho, layout de tablet.
-- [ ] **Pareamento por QR Code (modelo do Orca ADE).** O QR leva um link com: endereço do Ripper, um token do aparelho e a chave pública do computador. O celular conecta e toda a conversa vai **cifrada de ponta a ponta** (X25519 + NaCl), então quem repassa os dados não consegue ler. Aparelhos pareados ficam listados, com "Desconectar este aparelho"; gerar um QR novo invalida o anterior; o convite expira em até 10 minutos.
+- ✅ **Pareamento por QR Code** em casa (Wi-Fi) e fora (Tailscale): convite de 10 min, aparelho pareado sem senha, lista com "Desconectar este aparelho". [ ] Cifra de ponta a ponta no modelo do Orca (só necessária se houver relay).
 - ✅ **Em casa (mesma rede):** conexão direta pelo Wi-Fi, sem servidor nenhum. Configurações → "Celular na mesma rede": liga o acesso pela rede (padrão continua só 127.0.0.1; ligado, abre um segundo ouvinte só no IP do Wi-Fi, e exige senha criada), mostra o QR (link `http://<ip>:<porta>/pair?t=<token>`, uso único, 10 min, gerar outro invalida o anterior). Abrir o link cria uma sessão do aparelho (cookie `ripper_device`, separada da senha, guardada só com hash em `db.pairedDevices`, sobrevive a reinício); lista de aparelhos com "Desconectar este aparelho". `lib/pairing.mjs`, `test/pairing.test.mjs`.
   - Ainda falta nesta entrega: a chave pública no QR e a cifra de ponta a ponta (fica para a fase do relay). Hoje, na rede local, o tráfego vai em http puro: quem está no mesmo Wi-Fi pode ler. Trocar a senha não desconecta aparelhos (desconecte pela lista).
 - [ ] **Fora de casa:** um **servidor de retransmissão** (relay) que liga celular e computador — o computador abre uma conexão de saída até ele, então não precisa abrir portas no roteador. É o que o Orca faz (relay próprio em `relay.onorca.dev`). Para o Ripper: **nós hospedamos um relay** (custo baixo: só repassa bytes cifrados) ou o usuário usa Tailscale como alternativa. *Decisão pendente: hospedar o relay.*
