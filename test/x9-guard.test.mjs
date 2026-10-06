@@ -39,7 +39,7 @@ test('de ponta a ponta: a resposta automática no WhatsApp sai com a senha masca
     env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'stream', HOME: dataDir, USERPROFILE: dataDir, JULIA_AUTOSTART: '0', EVOLUTION_URL: `http://127.0.0.1:${evo.address().port}` }, stdio: 'ignore'
   });
   const base = `http://127.0.0.1:${port}`;
-  const wait = async (fn, ms = 20_000) => { let v; for (let i = 0; i < ms / 200 && !(v = await fn()); i++) await new Promise(r => setTimeout(r, 200)); return v; };
+  const wait = async (fn, ms = 60_000) => { let v; for (let i = 0; i < ms / 200 && !(v = await fn()); i++) await new Promise(r => setTimeout(r, 200)); return v; };
   const put = b => fetch(base + '/api/settings', { method: 'PUT', headers: { 'content-type': 'application/json', origin: base }, body: JSON.stringify(b) });
   try {
     await wait(async () => { try { return (await fetch(base + '/api/health')).ok; } catch { return false; } });

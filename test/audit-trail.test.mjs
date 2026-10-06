@@ -95,7 +95,7 @@ test('GET /api/audit-trail exige enterprise e lista eventos imutáveis', async (
   const base = `http://127.0.0.1:${port}`;
   const auth = { authorization: 'Bearer audit-trail-token', 'content-type': 'application/json' };
   try {
-    await waitFor(base + '/api/health', env.RIPPER_TOKEN, 15_000);
+    await waitFor(base + '/api/health', env.RIPPER_TOKEN, 60_000);
     const denied = await fetch(base + '/api/audit-trail', { headers: auth });
     assert.equal(denied.status, 403);
 

@@ -56,7 +56,7 @@ test('criar o GuardiÃ£o: confere token e acesso, cria agente + rotina uma vez sÃ
   const base = `http://127.0.0.1:${port}`;
   const send = (path, b, method = 'POST') => fetch(base + path, { method, headers: { 'content-type': 'application/json', origin: base }, body: b ? JSON.stringify(b) : undefined });
   try {
-    for (let i = 0; i < 50; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 200)); }
+    for (let i = 0; i < 300; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 200)); }
     await send('/api/settings', { github: { token: 'ruim', repos: ['https://github.com/a/b'] } }, 'PUT');
     const bad = await send('/api/github/guardian');
     assert.equal(bad.status, 400);

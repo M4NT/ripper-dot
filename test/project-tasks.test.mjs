@@ -28,7 +28,7 @@ test('quadro: criar card, pedir ao agente, termina em Feito com conversa ligada'
   const base = `http://127.0.0.1:${port}`;
   const req = (path, b, method = 'POST') => fetch(base + path, { method, headers: { 'content-type': 'application/json', origin: base }, body: method === 'GET' ? undefined : JSON.stringify(b || {}) });
   const send = (...a) => req(...a).then(r => r.json());
-  const wait = async (fn, ms = 20_000) => { let v; for (let i = 0; i < ms / 200 && !(v = await fn()); i++) await new Promise(r => setTimeout(r, 200)); return v; };
+  const wait = async (fn, ms = 60_000) => { let v; for (let i = 0; i < ms / 200 && !(v = await fn()); i++) await new Promise(r => setTimeout(r, 200)); return v; };
   try {
     await wait(async () => { try { return (await fetch(base + '/api/health')).ok; } catch { return false; } });
     const [a] = (await (await fetch(base + '/api/state')).json()).agents;

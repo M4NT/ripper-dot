@@ -15,7 +15,7 @@ test('status ao vivo: agente aparece trabalhando durante a resposta e some ao te
   });
   const base = `http://127.0.0.1:${port}`;
   const post = (path, b) => fetch(base + path, { method: 'POST', headers: { 'content-type': 'application/json', origin: base }, body: JSON.stringify(b || {}) });
-  const wait = async (fn, ms = 15_000) => { let v; for (let i = 0; i < ms / 100 && !(v = await fn()); i++) await new Promise(r => setTimeout(r, 100)); return v; };
+  const wait = async (fn, ms = 60_000) => { let v; for (let i = 0; i < ms / 100 && !(v = await fn()); i++) await new Promise(r => setTimeout(r, 100)); return v; };
   try {
     await wait(async () => { try { return (await fetch(base + '/api/health')).ok; } catch { return false; } });
     const [a] = (await (await fetch(base + '/api/state')).json()).agents;

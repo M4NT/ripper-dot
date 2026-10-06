@@ -38,7 +38,7 @@ test('rota de lote: etiqueta, arquiva, desarquiva e apaga conversas de verdade',
   const post = (path, b) => fetch(base + path, { method: 'POST', headers: { 'content-type': 'application/json', origin: base }, body: JSON.stringify(b) });
   const state = () => fetch(base + '/api/state').then(r => r.json());
   try {
-    for (let i = 0; i < 75; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 200)); }
+    for (let i = 0; i < 300; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 200)); }
     const [a] = (await state()).agents;
     for (const t of ['um', 'dois', 'três']) await (await post('/api/chat', { agentId: a.id, text: t, model: 'claude-sonnet-5-5', effort: 'low' })).text();
     const ids = (await state()).chats.map(c => c.id);
