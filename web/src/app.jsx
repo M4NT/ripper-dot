@@ -40,8 +40,9 @@ const NewAgent = lazy(() => import('./pages/NewAgent.jsx'));
 const AgentConfig = lazy(() => import('./pages/AgentConfig.jsx'));
 const Flows = lazy(() => import('./pages/Flows.jsx'));
 const Outbox = lazy(() => import('./pages/Outbox.jsx'));
+const Health = lazy(() => import('./pages/Health.jsx'));
 
-const HUB_ROUTES = new Set(['marketplace', 'connectors', 'skills', 'integrations', 'explore', 'settings']);
+const HUB_ROUTES = new Set(['marketplace', 'connectors', 'skills', 'integrations', 'explore', 'settings', 'saude']);
 const Ctx = createContext(null);
 export const useApp = () => useContext(Ctx);
 
@@ -201,6 +202,7 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
           {enterprise && <MenuItem icon="folder" onClick={() => nav('/projects')}>{t('nav.projects')}</MenuItem>}
           {enterprise && <MenuItem icon="book" onClick={() => nav('/library')}>{t('nav.library')}</MenuItem>}
           <MenuItem icon="gear" onClick={() => nav('/settings')}>{t('nav.settings')}<kbd className="menu-kbd">Ctrl ,</kbd></MenuItem>
+          <MenuItem icon="data" onClick={() => nav('/saude')}>Saúde do Ripper</MenuItem>
           {enterprise && <MenuItem icon="grid" onClick={() => nav('/admin')}>{t('nav.adminCenter')}</MenuItem>}
           <hr className="menu-sep" />
           <div className="menu-mode"><UiModeToggle compact /></div>
@@ -374,6 +376,7 @@ function Shell() {
     parts[0] === 'connectors' ? <Connectors /> :
     parts[0] === 'skills' ? <SkillsHub /> :
     parts[0] === 'explore' ? <Explore /> :
+    parts[0] === 'saude' ? <Health onClose={closeHub} /> :
     parts[0] === 'settings' ? <div className="hub-settings"><button className="icon-btn hub-close" aria-label="Fechar" onClick={closeHub}><Icon name="x" /></button><Settings theme={theme} toggleTheme={toggleTheme} tab={parts[1]} /></div> : <Integrations />;
 
   return (
@@ -396,7 +399,7 @@ function Shell() {
       </main>
       {hubPage && (
         <div className="hub-overlay" onMouseDown={e => e.target === e.currentTarget && closeHub()}>
-          <div className="hub-modal" role="dialog" aria-modal="true" aria-label={parts[0] === 'settings' ? t('nav.settings') : 'Marketplace'}>
+          <div className="hub-modal" role="dialog" aria-modal="true" aria-label={parts[0] === 'settings' ? t('nav.settings') : parts[0] === 'saude' ? 'Saúde do Ripper' : 'Marketplace'}>
             <Suspense fallback={<div className="page-loading"><ThinkingOrb state="breathing" size={20} /></div>}>{hubPage}</Suspense>
           </div>
         </div>
