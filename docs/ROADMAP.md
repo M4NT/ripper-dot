@@ -136,7 +136,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - [ ] Zero tela parada: progresso visível em rotinas de segundo plano e canais.
 - ✅ Ações em lote e atalhos na Caixa (06/10/2026): marcar várias aprovações (ou todas) e aprovar/recusar de uma vez; teclado J/K navega, X marca, A aprova, R recusa (a seleção ou o item em foco). Perguntas abertas ("precisa de você") ficam fora do lote porque pedem texto. "Negar" virou "Recusar".
 - [ ] Modo Simples × Enterprise revisado (nada importante escondido).
-- [ ] Linguagem revisada em todas as telas (sem termos técnicos no modo Simples).
+- 🔨 Linguagem revisada (sem termos técnicos no modo Simples): ✅ Backup, Perfil, LGPD, formulário do agente e escolha de modelo. [ ] Telas do modo Enterprise e mensagens de erro do servidor.
 - [ ] Acessibilidade: navegação por teclado completa, leitores de tela, contraste.
 
 ### H. Observabilidade e suporte (P1)

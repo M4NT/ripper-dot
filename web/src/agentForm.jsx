@@ -49,7 +49,7 @@ export function VoiceStyle({ v, set }) {
   const st = agentStyleDraft(v);
   const up = patch => set(patchStyle(v, patch));
   return <>
-    <p className="muted">Define como o agente fala nas respostas. Entra no prompt do modelo em toda conversa.</p>
+    <p className="muted">Define como o agente fala nas respostas, em toda conversa.</p>
     <div className="field"><span>Tom</span>
       <div className="pills" role="radiogroup" aria-label="Tom">
         {TONES.map(([k, l]) => <button key={k} type="button" role="radio" aria-checked={st.tone === k} className={`pill ${st.tone === k ? 'on' : ''}`} onClick={() => up({ tone: k })}>{l}</button>)}
@@ -89,7 +89,7 @@ export function Behavior({ v, set, settings, instructions = true }) {
 
 export function ModelPick({ v, set }) {
   const { S } = useApp();
-  const desc = { auto: 'Julia 1 decide a cada pedido: Sonnet para o simples, Opus para o difícil, Codex para código. Se um falhar, troca sozinho.', 'claude-sonnet-5-5': 'Rápido e barato para o dia a dia.', 'claude-opus-5-5': 'O mais capaz para raciocínio longo.', 'claude-fable-5-1': 'Voltado para escrita criativa.', codex: 'Código e terminal, pela sua assinatura do ChatGPT.' };
+  const desc = { auto: 'O Ripper decide a cada pedido: Sonnet para o simples, Opus para o difícil, Codex para código. Se um falhar, troca sozinho.', 'claude-sonnet-5-5': 'Rápido e barato para o dia a dia.', 'claude-opus-5-5': 'O mais capaz para raciocínio longo.', 'claude-fable-5-1': 'Voltado para escrita criativa.', codex: 'Código e terminal, pela sua assinatura do ChatGPT.' };
   return (<>
     <div className="choice-list" role="radiogroup" aria-label="Modelo">
       {Object.entries(S.models).map(([k, m]) => (
