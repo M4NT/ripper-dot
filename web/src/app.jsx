@@ -99,9 +99,9 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
   const doing = id => { const w = working[id]; return w ? `${w.tool ? stepLabel(w.tool) : 'trabalhando'}${w.chatTitle === 'WhatsApp' ? ' no WhatsApp' : ''}…` : 'trabalhando…'; };
   const chatMenu = useChatMenu();
   const section = parts[0] === 'c' ? 'chat' : parts[0] || '';
-  // Avisos de agente de canal moram na Caixa, não na lista de conversas
+  // Avisos de agente de canal moram na Caixa; conversa entre agentes abre dentro da conversa de quem pediu de conversas
   // Avisos de agente de canal moram na Caixa, não na lista
-  const visible = [...S.chats].filter(c => !c.archived && !String(c.channelKey || '').startsWith('owner:')).sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
+  const visible = [...S.chats].filter(c => !c.archived && !c.inboxKey && !String(c.channelKey || '').startsWith('owner:')).sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
   // Um agente = uma conversa (como num mensageiro); grupos aparecem como entradas próprias
   const soloOf = id => visible.find(c => !isGroupChat(c) && c.agentId === id);
   const live = S.agents.filter(a => !a.archived);
