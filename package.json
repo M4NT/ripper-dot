@@ -28,6 +28,7 @@
     "mailparser": "^3.9.36",
     "metal-fx": "^2.0.11",
     "nodemailer": "^10.0.15",
+    "qrcode-generator": "^2.0.4",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "thinking-orbs": "^0.3.2",

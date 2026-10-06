@@ -183,6 +183,57 @@ function PushCard() {
   );
 }
 
+/** Celular na mesma rede: liga o acesso pelo Wi-Fi, mostra o QR de pareamento e lista os aparelhos. */
+function DevicesCard() {
+  const [st, setSt] = useState(null);
+  const [qr, setQr] = useState(null);
+  const [err, setErr] = useState('');
+  const load = () => api('/api/pair').then(setSt, e => setErr(e.message));
+  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    if (!qr) return;
+    const t = setTimeout(() => setQr(null), qr.expiresAt - Date.now());
+    return () => clearTimeout(t);
+  }, [qr]);
+  const run = p => p.then(() => setErr(''), e => setErr(e.message));
+  const toggleLan = on => run(api('/api/pair/lan', { method: 'POST', body: { on } }).then(() => { if (!on) setQr(null); return load(); }));
+  const newQr = () => run(api('/api/pair/invite', { method: 'POST' }).then(setQr));
+  const drop = id => run(api(`/api/pair/devices/${id}`, { method: 'DELETE' }).then(load));
+  if (!st) return null;
+  const { lan, devices, local } = st;
+  return (
+    <Card title="Celular na mesma rede" desc="Abra o Ripper no celular pelo Wi-Fi de casa, sem digitar senha: gere o QR Code aqui e aponte a câmera.">
+      {local && (
+        <Row title="Acesso pela rede Wi-Fi" desc={lan.fixed ? 'Aberto pela variável HOST.' : lan.error || (lan.on ? `Aberto em ${lan.address}.` : 'Desligado: só este computador acessa.')}>
+          {!lan.fixed && <button className={`btn btn-sm ${lan.on ? '' : 'btn-primary'}`} onClick={() => toggleLan(!lan.on)}>{lan.on ? 'Desligar' : 'Ligar'}</button>}
+        </Row>
+      )}
+      {local && lan.on && (
+        <Row title="Parear um celular" desc={qr ? `Vale por 10 minutos e uma só vez. Gerar outro cancela este.` : 'O convite expira em 10 minutos.'} stack={!!qr}>
+          {qr
+            ? <div style={{ display: 'grid', gap: 8, justifyItems: 'start' }}>
+                <div style={{ width: 220, background: '#fff', borderRadius: 8 }} role="img" aria-label="QR Code de pareamento" dangerouslySetInnerHTML={{ __html: qr.svg }} />
+                <button className="btn btn-sm" onClick={newQr}>Gerar outro</button>
+              </div>
+            : <button className="btn btn-sm btn-primary" onClick={newQr}>Mostrar QR Code</button>}
+        </Row>
+      )}
+      <Row title="Aparelhos pareados" desc={devices.length ? null : 'Nenhum ainda.'} stack={devices.length > 0}>
+        {devices.length > 0 && (
+          <ul className="rows flat">{devices.map(d => (
+            <li key={d.id} className="row-item">
+              <div className="row-main"><b>{d.name}</b><small className="muted"> · pareado em {new Date(d.createdAt).toLocaleDateString()}</small></div>
+              <button className="btn btn-sm" onClick={() => drop(d.id)}>Desconectar este aparelho</button>
+            </li>
+          ))}</ul>
+        )}
+      </Row>
+      {err && <small className="error">{err}</small>}
+      <small style={{ opacity: 0.7 }}>Na mesma rede a conexão é direta, por http. Fora de casa e cifrado de ponta a ponta vem numa próxima versão.</small>
+    </Card>
+  );
+}
+
 /** Linha de configuração: rótulo e explicação à esquerda, controle à direita. */
 function Row({ title, desc, children, stack, tip }) {
   return (
@@ -624,6 +675,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
             </Row>
           </Card>
           <PushCard />
+          <DevicesCard />
           <Card title="Resumo do dia" desc="Todo dia, na Caixa: o que cada agente fez, o que espera você e quanto gastou. Montado sem gastar tokens.">
             <Row title="Receber o resumo"><Switch checked={s.pulse?.enabled !== false} onChange={v => set('pulse', { ...(s.pulse || {}), enabled: v })} label="Resumo do dia" /></Row>
             {s.pulse?.enabled !== false && <Row title="Horário">

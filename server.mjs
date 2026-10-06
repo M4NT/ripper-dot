@@ -7,6 +7,7 @@ import { gzipSync } from 'node:zlib';
 import { extname, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { authed as checkAuth, hashPassword, verifyPassword, passwordProblem, passwordFile, sessionStore, sessionCookie, loginLimiter } from './lib/auth.mjs';
+import { pairingInvite, deviceStore, deviceCookie, lanAddress, qrSvg, deviceName } from './lib/pairing.mjs';
 import { load, save, flush, id, newAgent, patchAgent, dataUrl, safeCheckStoreReady, TOOLS } from './lib/store.mjs';
 import { route, classifySpeaker, MODELS, EFFORTS, enabledModels, clampEffort } from './lib/router.mjs';
 import { computerFor } from './lib/boat.mjs';
@@ -286,6 +287,7 @@ const APP_PKG = JSON.parse(await readFile(new URL('./package.json', import.meta.
 const SERVER_STARTED_AT = Date.now();
 const db = load();
 let localPull = null; // download de modelo local em andamento (um por vez)
+db.pairedDevices ||= [];
 syncOpenRouterModels(db.settings); // modelos do OpenRouter escolhidos em Configurações
 // e-mail e plano de cada conta do Claude (pessoal, Teams…) para o painel de uso; ~1 s cada, sem gastar mensagem
 if (!process.env.RIPPER_TEST_PROVIDER) setTimeout(() => allAccounts(db.settings).filter(a => isLoggedIn(a.id)).forEach(a => testAccount(a.id, CLAUDE_FAST_ENV).catch(() => {})), 3000);
@@ -481,8 +483,13 @@ ensureSetupCode();
 // Id da build do front: muda a cada `npm run build`; abas abertas comparam e oferecem recarregar.
 const buildId = () => { try { return String(statSync(new URL('./index.html', DIST)).mtimeMs | 0); } catch { return ''; } };
 const viaToken = req => !!TOKEN && authed(req);
+// Celular pareado por QR: sessão própria, longa, guardada com hash em db.pairedDevices (sobrevive a reinício).
+const devices = deviceStore(() => db.pairedDevices, save);
+const invite = pairingInvite();
+const DEVICE_MAX_AGE = 400 * 86400; // teto dos navegadores para cookie
 function signedIn(req) {
   if (viaToken(req)) return true;
+  if (devices.valid(deviceCookie(req))) return true;
   const hash = passwordStore.get();
   return !!hash && sessions.valid(sessionCookie(req), hash);
 }
@@ -496,7 +503,9 @@ async function authRoute(req, res, p) {
   if (req.method !== 'POST') throw new HttpError(404, 'Rota não encontrada.');
   if (p === '/api/auth/logout') {
     sessions.drop(sessionCookie(req));
-    return json(res, { ok: true }, 200, { 'set-cookie': 'ripper_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0' }, req);
+    const d = devices.valid(deviceCookie(req));
+    if (d) devices.revoke(d.id);
+    return json(res, { ok: true }, 200, { 'set-cookie': ['ripper_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0', 'ripper_device=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'] }, req);
   }
   const { password, code } = await body(req);
   if (p === '/api/auth/setup') {
@@ -2652,6 +2661,28 @@ const routes = [
     const { input = '' } = await body(req);
     return { chatId: runFlow(flow, String(input).slice(0, 8000)) };
   }],
+  // Pareamento do celular por QR (mesma rede). Ligar a rede e gerar convite só no próprio computador.
+  ['GET', /^\/api\/pair$/, req => ({ lan: lanState(), devices: devices.list(), local: isLocalRequest(req) })],
+  ['POST', /^\/api\/pair\/lan$/, async req => {
+    if (!isLocalRequest(req)) throw new HttpError(403, 'Ligue o acesso pela rede no computador onde o Ripper roda.');
+    const { on } = await body(req);
+    if (on && !passwordStore.get()) throw new HttpError(409, 'Crie a senha do Ripper antes de abrir para a rede.');
+    db.lanAccess = !!on; save();
+    await setLan(!!on);
+    return { lan: lanState() };
+  }],
+  ['POST', /^\/api\/pair\/invite$/, req => {
+    if (!isLocalRequest(req)) throw new HttpError(403, 'Gere o QR no computador onde o Ripper roda.');
+    const lan = lanState();
+    if (!lan.on || !lan.address) throw new HttpError(409, 'Ligue o acesso pela rede Wi-Fi primeiro.');
+    const { token, expiresAt } = invite.create();
+    const link = `http://${lan.address}:${PORT}/pair?t=${token}`;
+    return { url: link, svg: qrSvg(link), expiresAt };
+  }],
+  ['DELETE', /^\/api\/pair\/devices\/([\w-]+)$/, (req, [did]) => {
+    if (!devices.revoke(did)) throw new HttpError(404, 'Aparelho não encontrado.');
+    return { ok: true, devices: devices.list() };
+  }],
   // Notificações no celular (Web Push)
   ['GET', /^\/api\/push\/key$/, () => ({ publicKey: vapidKeys().publicKey })],
   ['POST', /^\/api\/push\/subscribe$/, async req => {
@@ -3573,6 +3604,15 @@ const server = createServer(async (req, res) => {
       }
       return;
     }
+    if (req.method === 'GET' && p === '/pair') {
+      if (!invite.consume(url.searchParams.get('t'))) {
+        res.writeHead(410, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
+        return res.end('<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width"><title>Ripper</title><p>Este QR Code expirou ou já foi usado. Gere outro no computador, em Configurações.</p>');
+      }
+      const { token } = devices.create(deviceName(req.headers['user-agent']));
+      res.writeHead(302, hdr(req, { location: '/', 'set-cookie': `ripper_device=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${DEVICE_MAX_AGE}` }));
+      return res.end();
+    }
     if (req.method === 'GET' && p === '/api/mcp/oauth/callback') {
       const code = url.searchParams.get('code');
       const state = url.searchParams.get('state') || '';
@@ -3660,6 +3700,25 @@ server.on('connection', socket => {
 });
 
 server.listen(PORT, HOST, () => console.log(`Ripper em http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`));
+
+// Acesso pela rede Wi-Fi: desligado por padrão. Ligado, abre um segundo ouvinte só no IP da rede local,
+// repassando para o mesmo servidor (o principal continua em 127.0.0.1).
+let lanServer = null, lanError = null;
+const hostOpen = !['127.0.0.1', 'localhost', '::1'].includes(HOST);
+function lanState() {
+  return { on: hostOpen || !!lanServer, address: lanAddress(), fixed: hostOpen, error: lanError };
+}
+async function setLan(on) {
+  lanError = null;
+  if (hostOpen) return;
+  if (lanServer) { const s = lanServer; lanServer = null; await new Promise(r => s.close(r)); s.closeAllConnections?.(); }
+  if (!on) return;
+  const ip = lanAddress();
+  if (!ip) { lanError = 'Nenhuma rede local encontrada.'; return; }
+  const s = createServer((req, res) => server.emit('request', req, res));
+  await new Promise(r => { s.once('error', e => { lanError = e.message; r(); }); s.listen(PORT, ip, () => { lanServer = s; console.log(`Ripper na rede: http://${ip}:${PORT}`); r(); }); });
+}
+if (db.lanAccess) setLan(true).catch(e => console.error('[rede]', e.message));
 setTimeout(() => autoResumeAfterRestart().catch(e => console.error('retomada', e.message)), 5000);
 
 /**
