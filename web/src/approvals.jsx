@@ -5,6 +5,8 @@ import { useApp } from './app.jsx';
 import { useT } from './i18n/index.jsx';
 
 const KIND = { exec: 'quer rodar um comando', share: 'quer publicar um link', social: 'quer publicar em webhook', whatsapp: 'quer enviar um WhatsApp', email: 'quer enviar um e-mail', github: 'quer publicar no GitHub', agent: 'quer criar um agente', flow: 'terminou um passo do fluxo' };
+/** O que o agente está pedindo, em uma frase (a Caixa mostra isso na linha do mascote). */
+export const approvalAsk = rec => rec.kind === 'question' ? 'precisa de você' : KIND[rec.kind] || 'pede aprovação';
 
 /** Cartão de aprovação: mostra exatamente o que vai acontecer e por que precisa do seu ok. */
 export function ApprovalCard(props) {
@@ -57,7 +59,7 @@ function DecisionCard({ rec, status, compact, onDone }) {
     catch (e) { toast(e.message, 'error'); onDone?.('expired'); }
     setBusy(false);
   }
-  const label = { approved: 'Aprovado', denied: 'Negado', expired: 'Expirou sem resposta', cancelled: 'Cancelado' }[st];
+  const label = { approved: 'Aprovado', denied: 'Recusado', expired: 'Expirou sem resposta', cancelled: 'Cancelado' }[st];
   return (
     <div className={`approval ${st} ${compact ? 'compact' : ''}`} role="group" aria-label="Pedido de aprovação">
       <div className="approval-head">
@@ -72,7 +74,7 @@ function DecisionCard({ rec, status, compact, onDone }) {
           <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => decide(true)}><Icon name="check" size={14} />Aprovar</button>
           <button className="btn btn-sm" disabled={busy} onClick={() => decide(true, true)} title="Não pergunta de novo por este mesmo comando nesta conversa">Aprovar sempre aqui</button>
           <div className="grow" />
-          <button className="btn btn-sm btn-danger" disabled={busy} onClick={() => decide(false)}>Negar</button>
+          <button className="btn btn-sm btn-danger" disabled={busy} onClick={() => decide(false)}>Recusar</button>
         </div>
       ) : <p className={`approval-result ${st}`}><Icon name={st === 'approved' ? 'check' : 'x'} size={13} />{label}</p>}
     </div>
@@ -119,7 +121,8 @@ export function ApprovalTray() {
     return () => { alive = false; clearTimeout(t); };
   }, []);
   const here = parts[0] === 'c' ? parts[1] : null;
-  const list = pending.filter(p => p.chatId !== here); // os da conversa aberta aparecem dentro dela
+  // os da conversa aberta aparecem dentro dela; na Caixa, todos já estão na tela
+  const list = parts[0] === 'inbox' ? [] : pending.filter(p => p.chatId !== here);
   useEffect(() => { if (list.length) setOpen(true); }, [list.length]);
   if (!list.length) return null;
   return (

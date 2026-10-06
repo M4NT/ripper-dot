@@ -79,7 +79,7 @@ export default function Library() {
   const when = r => r.everyMinutes ? `A cada ${r.everyMinutes} min` : `${r.weekday != null ? ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][r.weekday] + ', ' : 'Todo dia, '}${r.dailyAt}`;
 
   return (
-    <div className="page narrow">
+    <div className="page narrow v2">
       <header className="page-head"><div><h1>Biblioteca</h1><p className="lede">Tudo o que seus agentes guardam e compartilham: artefatos, skills, arquivos, memórias e rotinas.</p></div></header>
       <label className="search-field lib-search"><Icon name="search" size={16} /><input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar dentro de artefatos, arquivos, memórias e skills" aria-label="Buscar na biblioteca" /></label>
       {found ? <LibraryResults results={found} q={q} /> : <>

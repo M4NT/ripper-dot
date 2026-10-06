@@ -126,14 +126,15 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - ✅ Revisão de todas as telas (06/10/2026): navegação enxuta, chat limpo, busca de configurações, páginas sem rolagem dupla.
 - 🔨 "Conversa em grupo" no modo Simples e quem está trabalhando com autocompletar do @. *Donald.*
 - ✅ **Interface nova estilo mensageiro** (06/10/2026, referência: Grok Bot): tema escuro neutro como padrão; barra lateral de agentes com fixados no topo; **um agente = uma conversa** (as antigas juntadas, arquivadas, nada apagado); arrastar na mão para fixar e reordenar, com a grade se reorganizando; soltar um agente na conversa marca ele (botão com o mascote); Início vira a conversa; Marketplace ("Conectar aplicativos") e Configurações como janelas por cima.
-- [ ] Repaginar no padrão novo as telas que só herdaram as cores: Caixa, Agentes, Fluxos, Projetos, Biblioteca.
+- ✅ Repaginar no padrão novo as telas que só herdaram as cores (06/10/2026): Caixa, Agentes, Fluxos, Projetos e Biblioteca com a linguagem da conversa (cartões cinza sem contorno, cantos 22, pílulas, listas como as da lateral, título menor; cor só para estado). Classe `.page.v2` em `styles.css`. A bandeja flutuante de aprovações some na Caixa (tudo já está na tela).
 - ✅ **Marcar um agente numa conversa 1:1 traz ele para a conversa** (06/10/2026): o @Nome chama o agente naquela rodada e ele responde ali, sem virar grupo; o @ autocompleta todos os agentes.
 - ✅ Desfazer a junção de conversas pela interface (06/10/2026): Histórico → Arquivadas → menu "…" → Desfazer junção (não junta de novo ao reiniciar; arquivos e artefatos movidos ficam na conversa de destino).
 - ✅ Revisão do tema claro (06/10/2026): tons quentes/creme trocados por cinzas neutros (terminal, aprovação, VNC, fundos de janela, cor do navegador e do app instalado).
 - ✅ Ícones que faltam no Marketplace (06/10/2026): WhatsApp com ícone próprio; Atlassian, Zapier, Granola, Stripe, Supabase e Sentry com selo na cor da marca (trocar pelos logos oficiais quando possível).
-- [ ] Celular: barra de botões da caixa de mensagem apertada; ordem dos fixados/lista sincronizada entre aparelhos (hoje fica no navegador).
+- ✅ Celular: barra de botões da caixa de mensagem apertada (06/10/2026): em 375px o botão de enviar não é mais espremido, o esforço sai da pílula do modelo (continua no seletor) e o nome do modelo encolhe primeiro.
+- [ ] Celular: ordem dos fixados/lista sincronizada entre aparelhos (hoje fica no navegador).
 - [ ] Zero tela parada: progresso visível em rotinas de segundo plano e canais.
-- [ ] Ações em lote e atalhos na Caixa (A aprovar, R recusar).
+- ✅ Ações em lote e atalhos na Caixa (06/10/2026): marcar várias aprovações (ou todas) e aprovar/recusar de uma vez; teclado J/K navega, X marca, A aprova, R recusa (a seleção ou o item em foco). Perguntas abertas ("precisa de você") ficam fora do lote porque pedem texto. "Negar" virou "Recusar".
 - [ ] Modo Simples × Enterprise revisado (nada importante escondido).
 - [ ] Linguagem revisada em todas as telas (sem termos técnicos no modo Simples).
 - [ ] Acessibilidade: navegação por teclado completa, leitores de tela, contraste.

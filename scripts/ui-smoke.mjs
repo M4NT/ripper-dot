@@ -1,7 +1,7 @@
 // Smoke da interface no navegador (roda no CI): servidor isolado + provedor de teste,
 // um prompt que usa ferramentas e uma volta por todas as telas. Falha em erro de JS ou tela "Algo quebrou".
 import { spawn } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:net';
@@ -20,7 +20,12 @@ let browser;
 try {
   for (let i = 0; i < 60; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 250)); }
   browser = await firefox.launch();
-  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  // primeira senha exige o código de configuração (data/setup-code.txt); o cookie fica no contexto
+  const code = readFileSync([join(dataDir, 'setup-code.txt'), join(dataDir, 'data', 'setup-code.txt')].find(existsSync), 'utf8').trim();
+  const setup = await ctx.request.post(base + '/api/auth/setup', { headers: { origin: base }, data: { password: 'senha-do-smoke-123', code } });
+  if (!setup.ok()) throw new Error(`criar senha: ${setup.status()}`);
+  const page = await ctx.newPage();
   let where = 'início';
   page.on('pageerror', e => fail.push(`${where}: ${e.message}`));
   const broken = async () => (await page.locator('text=Algo quebrou').count()) > 0 && fail.push(`${where}: tela "Algo quebrou"`);
@@ -39,13 +44,13 @@ try {
   await broken();
 
   // 2) Todas as telas, nos dois modos de interface
-  const st = await (await fetch(base + '/api/state')).json();
+  const st = await (await ctx.request.get(base + '/api/state')).json();
   const chat = st.chats[0], agent = st.agents[0];
   const routes = ['/', '/inbox', '/agents', '/new', '/chats', '/marketplace', '/settings', '/settings/models', '/settings/computer', '/settings/security',
     '/settings/backup', '/settings/memory', '/settings/appearance', '/settings/advanced', '/explore', '/library', '/projects', '/connectors',
     '/skills', '/admin', '/admin/uso', chat && `/c/${chat.id}`, agent && `/agents/${agent.id}/settings`].filter(Boolean);
   for (const mode of ['simple', 'enterprise']) {
-    await fetch(base + '/api/settings', { method: 'PUT', headers: { 'content-type': 'application/json', origin: base }, body: JSON.stringify({ ui: { mode } }) });
+    await ctx.request.put(base + '/api/settings', { headers: { origin: base }, data: { ui: { mode } } });
     for (const r of routes) {
       where = `${mode} ${r}`;
       await page.goto(base + '/#' + r, { waitUntil: 'domcontentloaded', timeout: 60_000 });
