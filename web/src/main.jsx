@@ -1,6 +1,7 @@
 import { StrictMode, Component } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './app.jsx';
+import Login from './login.jsx';
 import './styles.css';
 import { restoreWidths } from './resize.jsx';
 restoreWidths();
@@ -25,4 +26,8 @@ class Guard extends Component {
   }
 }
 
-createRoot(document.getElementById('root')).render(<StrictMode><Guard><App /></Guard></StrictMode>);
+// Senha única: sem sessão, mostra a tela de entrar (ou de criar a senha) em vez do app.
+const root = createRoot(document.getElementById('root'));
+const boot = () => fetch('/api/auth/status').then(r => r.json()).catch(() => ({ authed: true })).then(s =>
+  root.render(<StrictMode><Guard>{s.authed ? <App /> : <Login status={s} onDone={boot} />}</Guard></StrictMode>));
+boot();

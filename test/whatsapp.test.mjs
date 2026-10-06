@@ -1,3 +1,4 @@
+import './helpers/signed-in.mjs';
 // Canal WhatsApp ponta a ponta: verificação do webhook, assinatura, resposta do agente pela "Graph API" falsa.
 import test from 'node:test';
 import assert from 'node:assert/strict';

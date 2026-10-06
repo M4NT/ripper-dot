@@ -152,13 +152,14 @@ test('GET /metrics com RIPPER_METRICS_PUBLIC=1 sem Bearer', async () => {
   });
 });
 
-test('GET /api/health exige RIPPER_TOKEN', async () => {
+test('/api/state exige login; /api/health fica aberto (só versão e uptime)', async () => {
   await withServer({}, async base => {
-    const denied = await fetch(base + '/api/health');
+    const denied = await fetch(base + '/api/state');
     assert.equal(denied.status, 401);
     const body = await denied.json();
-    assert.match(body.error, /Não autorizado/);
+    assert.match(body.error, /Entre com a senha/);
 
+    assert.equal((await fetch(base + '/api/health')).status, 200);
     const ok = await fetch(base + '/api/health', { headers: { authorization: 'Bearer test-http-token' } });
     assert.equal(ok.status, 200);
     const health = await ok.json();
@@ -222,12 +223,12 @@ test('X-Request-Id é gerado quando o cliente não envia', async () => {
 
 test('corpo JSON de erro inclui requestId', async () => {
   await withServer({}, async base => {
-    const r = await fetch(base + '/api/health', { headers: { 'X-Request-Id': 'err-body-id' } });
+    const r = await fetch(base + '/api/state', { headers: { 'X-Request-Id': 'err-body-id' } });
     assert.equal(r.status, 401);
     assert.equal(r.headers.get('x-request-id'), 'err-body-id');
     const body = await r.json();
     assert.equal(body.requestId, 'err-body-id');
-    assert.match(body.error, /Não autorizado/);
+    assert.match(body.error, /Entre com a senha/);
   });
 });
 
