@@ -105,6 +105,7 @@ import { timingSafeEqual, randomBytes } from 'node:crypto';
 import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStreaming, activeChatStreamCount } from './lib/chat-stream.mjs';
 import { truncateChatFrom } from './lib/chat-edit.mjs';
 import { mergeAgentChats, unmergeChat } from './lib/merge-agent-chats.mjs';
+import { settingCardView, settingPatch } from './lib/setting-cards.mjs';
 import { beginChatRun,bumpChatRunSeq, finishChatRun, chatRunPublic, canResumeChatRun, trimPartialRepliesAfterLastUser, noteChatRunTool, canAutoResume } from './lib/chat-run.mjs';
 import { exportChatPayload, importChatPayload } from './lib/chat-transfer.mjs';
 import { listAgentTemplates, createSavedTemplate, patchSavedTemplate, agentFromSavedTemplate } from './lib/agent-templates.mjs';
@@ -1010,6 +1011,28 @@ async function askOwner({ agent, chat, emit, signal }, question, context, option
   return done.status === 'expired' ? 'O usuário não respondeu em 2 horas. Não adivinhe: deixe a tarefa pausada e registre a pergunta pendente.' : 'O usuário não respondeu (pergunta cancelada). Não adivinhe.';
 }
 
+/** Interruptor de configuração no balão: o agente oferece, a pessoa liga/desliga; só então muda. */
+async function offerSetting({ agent, chat, emit, signal }, { key, on, reason }) {
+  const view = settingCardView(db.settings, key, on);
+  if (!view) return `Configuração desconhecida: ${key}.`;
+  if (view.current === view.proposed) return `"${view.label}" já está ${view.current ? 'ligado' : 'desligado'}. Avise o usuário; não precisa oferecer.`;
+  const rec = { id: id(), agentId: agent.id, chatId: chat.id, kind: 'setting', command: view.label, reason: String(reason || view.desc).slice(0, 300),
+    setting: view, status: 'pending', createdAt: Date.now(), timeoutMs: 2 * 3600_000 };
+  db.approvals.push(rec);
+  if (db.approvals.length > 300) db.approvals.splice(0, db.approvals.length - 300);
+  emit({ approval: approvalView(rec) });
+  save();
+  const done = await gate.request(rec, signal);
+  emit({ approvalDone: { id: rec.id, status: done.status } });
+  if (done.status !== 'approved') { save(); return `O usuário não ${on ? 'ligou' : 'desligou'} "${view.label}". Não insista.`; }
+  const before = structuredClone(db.settings);
+  const patch = settingPatch(key, on);
+  patchSettings(db.settings, patch, { mergePluginAuth });
+  recordCorporateAudit(db.settings, auditSettingsPatch(before, db.settings, patch));
+  save();
+  return `Pronto: "${view.label}" ${on ? 'ligado' : 'desligado'} pelo usuário.`;
+}
+
 function guarded(computer, { agent, chat, emit, signal }) {
   const ask = async (kind, command, reason) => {
     const rec = { id: id(), agentId: agent.id, chatId: chat.id, kind, command, reason, status: 'pending', createdAt: Date.now() };
@@ -1171,6 +1194,7 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
     settings: s,
     // "Preciso de você": pergunta aberta na Caixa (não em conversa de canal: lá o cliente está esperando)
     askOwner: chat.channel ? null : a => askOwner({ agent, chat, emit, signal }, a.question, a.context, a.options),
+    offerSetting: chat.channel ? null : a => offerSetting({ agent, chat, emit, signal }, a),
     // Entrega um arquivo do computador do agente na conversa (Abrir / Baixar / Mostrar na pasta).
     deliverFile: async a => {
       const rel = vmPathToData(a.path, agent.id);
