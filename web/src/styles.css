@@ -2014,6 +2014,13 @@ code, .mono, pre { overflow-wrap: anywhere; }
 @media (max-width: 760px) { .hub-overlay { padding: 0; } .hub-modal { height: 100%; border-radius: 0; } .hub-modal .mp-page { padding: 16px; } }
 .hub-settings { position: relative; }
 .hub-close { position: absolute; top: 18px; right: 18px; z-index: 2; }
+.health-page { padding: 28px; display: grid; gap: 14px; align-content: start; justify-items: start; }
+.health-page h1 { font-size: 22px; font-weight: 600; margin: 0; }
+.health-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; width: 100%; }
+.health-list li { display: grid; grid-template-columns: 8px minmax(0, 1fr); column-gap: 12px; align-items: center; padding: 10px 12px; border-radius: 14px; background: var(--surface-2); }
+.health-list small { grid-column: 2; color: var(--muted); overflow-wrap: anywhere; }
+.health-ok { background: var(--ok); } .health-error { background: var(--err); }
+@media (max-width: 760px) { .health-page { padding: 16px; } }
 .hub-modal .settings-page { max-width: none; padding: 28px 28px 48px; gap: 28px; grid-template-columns: 220px minmax(0, 1fr); animation: none; }
 .hub-modal .settings-nav { top: 0; }
 .hub-modal .settings-nav h1 { font-size: 22px; font-weight: 600; letter-spacing: -.01em; }

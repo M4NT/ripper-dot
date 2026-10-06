@@ -140,8 +140,8 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 
 ### H. Observabilidade e suporte (P1)
 - ✅ Logs estruturados, métricas, erros em linguagem humana, avisos do sistema na Caixa.
-- [ ] Painel de saúde: servidor, Docker, contas do Claude, WhatsApp, e-mail, fila, backup — tudo numa tela.
-- [ ] Relatório de erro com 1 clique (sem dados pessoais) para suporte.
+- ✅ Painel de saúde: servidor, Docker, contas do Claude, WhatsApp, e-mail, fila, backup — tudo numa tela (menu da conta › Saúde do Ripper, `GET /api/health/detalhado`).
+- ✅ Relatório de erro com 1 clique (sem dados pessoais) para suporte (`GET /api/health/relatorio`; erros só em memória desde o último início).
 - [ ] Auditoria de capacidades toda noite, com alerta na Caixa se algo quebrar.
 
 ### I. Acesso de qualquer lugar (P1 → Fase 2)

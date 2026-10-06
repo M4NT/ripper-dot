@@ -178,6 +178,8 @@ import {
   resolvePluginsVaultSecrets
 } from './lib/credential-vault.mjs';
 import { collectDiagnostics } from './lib/diagnostics.mjs';
+import { captureConsoleErrors, recentErrors, buildHealth, buildErrorReport } from './lib/health.mjs';
+captureConsoleErrors();
 import { runBootLint } from './lib/boot-lint.mjs';
 import {
   metricsAccessAllowed,
@@ -1800,21 +1802,38 @@ async function serveStatic(req, res, file) {
   res.end(gz ? e.gz : e.buf);
 }
 
+const diagnostics = () => collectDiagnostics({
+  db,
+  settings: db.settings,
+  host: HOST,
+  port: PORT,
+  tokenConfigured: !!TOKEN,
+  frontendBuilt: existsSync(DIST),
+  codexInstalled: () => codexInstalled,
+  juliaStatus: async () => ({ online: await juliaOnline(db.settings), reason: juliaStatus.reason }),
+  dockerProbe: () => dockerStatusCached(),
+  activeChatCount: activeChatStreamCount(),
+  pendingApprovals: db.approvals.filter(a => a.status === 'pending').length
+});
+async function healthDetail() {
+  const s = db.settings, wa = !!s.whatsappWeb?.enabled;
+  return buildHealth({
+    uptimeSec: process.uptime(),
+    docker: await dockerStatusCached().catch(() => null),
+    claudeAccounts: allAccounts(s).map(a => ({ label: a.label, loggedIn: isLoggedIn(a.id), exhaustedUntil: exhaustedUntil(a.id) })),
+    whatsapp: { enabled: wa, state: wa ? await instanceState().catch(() => 'unknown') : null },
+    email: { enabled: !!s.email?.enabled, ready: emailReady(s.email) },
+    outboxCounts: outbox.counts(),
+    lastBackupAt: listDataSnapshots()[0]?.createdAt || null,
+    backupEnabled: normalizeBackupSettings(s.backup).enabled
+  });
+}
+
 const routes = [
   ['GET', /^\/api\/health$/, () => probePayload()],
-  ['GET', /^\/api\/diagnostics$/, async () => collectDiagnostics({
-    db,
-    settings: db.settings,
-    host: HOST,
-    port: PORT,
-    tokenConfigured: !!TOKEN,
-    frontendBuilt: existsSync(DIST),
-    codexInstalled: () => codexInstalled,
-    juliaStatus: async () => ({ online: await juliaOnline(db.settings), reason: juliaStatus.reason }),
-    dockerProbe: () => dockerStatusCached(),
-    activeChatCount: activeChatStreamCount(),
-    pendingApprovals: db.approvals.filter(a => a.status === 'pending').length
-  })],
+  ['GET', /^\/api\/diagnostics$/, () => diagnostics()],
+  ['GET', /^\/api\/health\/detalhado$/, () => healthDetail()],
+  ['GET', /^\/api\/health\/relatorio$/, async () => ({ text: buildErrorReport({ health: await healthDetail(), diagnostics: await diagnostics(), errors: recentErrors(), alerts: db.systemAlerts || [], version: process.env.npm_package_version }) })],
   ['GET', /^\/api\/catalog$/, (req, m, url, res) => {
     const templates = isEnterpriseMode(db.settings) ? TEMPLATES : TEMPLATES.filter(t => t.id !== 'x9-auditor');
     json(res, { models: MODELS, templates, categories: CATEGORIES }, 200, { 'cache-control': 'public, max-age=3600' }, req);
