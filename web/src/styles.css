@@ -2180,3 +2180,6 @@ body.agent-dragging .side-list { overflow: hidden; }
 .update-notes { margin: 6px 0 10px; padding-left: 20px; display: grid; gap: 4px; font-size: 13.5px; color: var(--ink-2); max-height: 220px; overflow-y: auto; }
 .row-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
 .warn-text { color: var(--warn); }
+.steps-list { margin: 0 0 6px; padding-left: 20px; display: grid; gap: 6px; font-size: 13.5px; color: var(--ink-2); }
+.steps-list li.done::marker { color: var(--ok); }
+.steps-list a { text-decoration: underline; text-underline-offset: 2px; }

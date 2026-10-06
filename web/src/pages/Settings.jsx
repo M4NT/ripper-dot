@@ -184,6 +184,42 @@ function PushCard() {
 }
 
 /** Celular na mesma rede: liga o acesso pelo Wi-Fi, mostra o QR de pareamento e lista os aparelhos. */
+/** Celular fora de casa pelo Tailscale: rede privada entre os seus aparelhos, sem abrir portas no roteador. */
+function AwayCard() {
+  const [st, setSt] = useState(null);
+  const [qr, setQr] = useState(null);
+  const [err, setErr] = useState('');
+  const load = () => api('/api/pair').then(setSt, e => setErr(e.message));
+  useEffect(() => { load(); }, []);
+  if (!st?.local) return null;
+  const t = st.tail || {};
+  const run = p => p.then(() => setErr(''), e => setErr(e.message));
+  const toggle = on => run(api('/api/pair/tailscale', { method: 'POST', body: { on } }).then(() => { if (!on) setQr(null); return load(); }));
+  return (
+    <Card title="Celular fora de casa" desc="Use o Ripper no 4G ou em outro Wi-Fi, com segurança, pelo Tailscale (grátis para uso pessoal). Só os seus aparelhos enxergam o Ripper.">
+      <ol className="steps-list">
+        <li className={t.address ? 'done' : ''}>Instale o <a href="https://tailscale.com/download" target="_blank" rel="noreferrer">Tailscale</a> neste computador e entre com a sua conta. {t.address ? <b>Encontrado ({t.address}).</b> : <span className="muted">Ainda não encontrado.</span>}</li>
+        <li>Instale o Tailscale no celular e entre com a <b>mesma conta</b>.</li>
+        <li>Ligue o acesso abaixo e leia o QR Code com o celular.</li>
+      </ol>
+      <Row title="Acesso fora de casa" desc={t.error || (t.on ? `Aberto no Tailscale em ${t.address}.` : 'Desligado.')}>
+        <button className={`btn btn-sm ${t.on ? '' : 'btn-primary'}`} disabled={!t.address && !t.on} onClick={() => toggle(!t.on)}>{t.on ? 'Desligar' : 'Ligar'}</button>
+      </Row>
+      {t.on && (
+        <Row title="Parear o celular" desc={qr ? 'Vale por 10 minutos e uma só vez.' : 'Funciona de qualquer lugar com o Tailscale ligado no celular.'} stack={!!qr}>
+          {qr
+            ? <div style={{ display: 'grid', gap: 8, justifyItems: 'start' }}>
+                <div style={{ width: 220, background: '#fff', borderRadius: 8 }} role="img" aria-label="QR Code para fora de casa" dangerouslySetInnerHTML={{ __html: qr.svg }} />
+                <button className="btn btn-sm" onClick={() => run(api('/api/pair/invite?via=tailscale', { method: 'POST' }).then(setQr))}>Gerar outro</button>
+              </div>
+            : <button className="btn btn-sm btn-primary" onClick={() => run(api('/api/pair/invite?via=tailscale', { method: 'POST' }).then(setQr))}>Mostrar QR Code</button>}
+        </Row>
+      )}
+      {err && <p className="small warn-text">{err}</p>}
+    </Card>
+  );
+}
+
 function DevicesCard() {
   const [st, setSt] = useState(null);
   const [qr, setQr] = useState(null);
@@ -709,6 +745,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
           </Card>
           <PushCard />
           <DevicesCard />
+          <AwayCard />
           <Card title="Resumo do dia" desc="Todo dia, na Caixa: o que cada agente fez, o que espera você e quanto gastou. Não gasta nada da sua assinatura.">
             <Row title="Receber o resumo"><Switch checked={s.pulse?.enabled !== false} onChange={v => set('pulse', { ...(s.pulse || {}), enabled: v })} label="Resumo do dia" /></Row>
             {s.pulse?.enabled !== false && <Row title="Horário">

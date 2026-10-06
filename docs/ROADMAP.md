@@ -68,7 +68,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 ### A. Segurança (P0)
 - ✅ **Login com senha única** (decidido em 06/10/2026; um Ripper por pessoa, então não há login por usuário). Pede a senha ao abrir; sessão por cookie seguro; chamadas de dentro dos contêineres dos agentes nunca entram sem a senha; tela de login e "esqueci a senha" (redefinir pelo terminal). Senha criada na primeira abertura (só no próprio computador) ou por `node scripts/senha.mjs`; hash scrypt em `data/auth.json`; cookie HttpOnly + SameSite=Strict (Secure em HTTPS). Sessões em memória: reiniciar o servidor pede a senha de novo.
 - ✅ Agentes não usam a API do Ripper de dentro do próprio computador: sem sessão, 401 (o cabeçalho Host não decide mais quem entra; a criação da primeira senha exige o código de configuração impresso no terminal e gravado em `data/setup-code.txt`, apagado após o uso).
-- [ ] HTTPS para acesso fora de casa (túnel com login: Cloudflare Tunnel ou Tailscale), com passo a passo dentro do app.
+- ✅ Acesso fora de casa pelo Tailscale, com passo a passo dentro do app (Configurações › Perfil › Celular fora de casa): o Ripper acha o IP do Tailscale, abre um ouvinte só nele e gera o QR. [ ] Testar com Tailscale de verdade. [ ] HTTPS (Tailscale Serve) para notificações no iPhone fora de casa.
 - ✅ Proteção contra CSRF nas rotas que mudam algo: cookie SameSite=Strict + verificação de Origin + recusa de Sec-Fetch-Site cross-site.
 - ✅ Limite de tentativas no login: 5 erros bloqueiam por 15 min (por endereço, em memória).
 - ✅ Chaves e tokens cifrados no disco e nos backups. ✅ Segredos da Evolution também cifrados (`data/evolution.json`).
