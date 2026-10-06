@@ -3,7 +3,7 @@ import { VoiceBeam, useMicrophone } from 'voice-glow';
 import { api, fmtSize, go, local, useDark, canSpeak } from './lib.js';
 import { AgentAvatar, Icon, useToast } from './ui.jsx';
 import { useApp } from './app.jsx';
-import { MentionChip, mentionedAgents } from './mentions.jsx';
+import { MentionChip } from './mentions.jsx';
 import { isEnterpriseMode } from './uiMode.js';
 import ModelPicker from './modelPicker.jsx';
 import ComposerPlusMenu from './composerPlusMenu.jsx';
@@ -23,6 +23,13 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
   const { S } = useApp();
   const toast = useToast();
   const [text, setText] = useState(() => local.get('draft.' + draftKey, ''));
+  // Agentes marcados arrastando para a conversa: viram botões acima do campo, não texto
+  const [tagged, setTagged] = useState([]);
+  useEffect(() => {
+    const f = e => { setTagged(t => [...new Set([...t, ...e.detail.ids])]); ta.current?.focus(); };
+    addEventListener('ripper:tag-agents', f); return () => removeEventListener('ripper:tag-agents', f);
+  }, []);
+  const taggedAgents = tagged.map(id => S.agents.find(a => a.id === id)).filter(Boolean);
   const [files, setFiles] = useState([]); // { key, name, size, file?, id?, status }
   const [plus, setPlus] = useState(false);
   const [credentials, setCredentials] = useState([]); // { ref, label }
@@ -76,7 +83,7 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
       ? `\n\n[${credentials.map(c => `${c.label} (${c.ref})`).join('; ')}]`
       : '';
     onSend({
-      text: (text.trim() + credNote).trim() || (credentials.length ? 'Use as credenciais guardadas no cofre conforme necessário.' : ''),
+      text: ([...taggedAgents.filter(a => !text.includes('@' + a.name)).map(a => '@' + a.name), text.trim()].filter(Boolean).join(' ') + credNote).trim() || (credentials.length ? 'Use as credenciais guardadas no cofre conforme necessário.' : ''),
       fileIds: ready.map(f => f.id),
       previews: ready.map(f => ({ id: f.id, name: f.name, type: f.type, url: f.url || `/api/files/${f.id}` })),
       credentialRefs: credRefs,
@@ -84,7 +91,7 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
       voice: spoke.current && !!text.trim()
     }, { immediate });
     spoke.current = false;
-    setText(''); setFiles([]); setCredentials([]); setCredOpen(false);
+    setText(''); setFiles([]); setCredentials([]); setCredOpen(false); setTagged([]);
     if (listening) toggleVoice();
   }
 
@@ -210,7 +217,9 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
                 ))}
               </div>
             )}
-            {mentionedAgents(text, S.agents).length > 0 && <div className="composer-mentions" aria-label="Agentes marcados">{mentionedAgents(text, S.agents).map(a => <MentionChip key={a.id} agent={a} />)}</div>}
+            {taggedAgents.length > 0 && <div className="composer-mentions" aria-label="Agentes marcados">{taggedAgents.map(a => (
+              <span key={a.id} className="mention-chip removable"><MentionChip agent={a} bare /><button type="button" aria-label={`Desmarcar ${a.name}`} onClick={() => setTagged(t => t.filter(x => x !== a.id))}><Icon name="x" size={12} /></button></span>
+            ))}</div>}
             <textarea ref={ta} rows={1} value={text} autoFocus={autoFocus} placeholder={listening ? 'Ouvindo…' : transcribing ? 'Transcrevendo…' : placeholder}
               aria-label="Mensagem" onChange={e => setText(e.target.value)}
               onPaste={e => { const fs = [...e.clipboardData.files]; if (fs.length) { e.preventDefault(); addFiles(fs); } }}

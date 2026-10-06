@@ -106,7 +106,7 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
   const listKeys = [...rest.filter(k => !order.includes(k)), ...order.filter(k => rest.includes(k))];
   const drag = useSidebarDrag({
     pins: pinKeys, list: listKeys, canPin: k => byKey.get(k)?.kind === 'agent',
-    nameOf: k => byKey.get(k)?.a?.name,
+    idsOf: k => { const e = byKey.get(k); return e?.kind === 'agent' ? [e.a.id] : (e?.c?.agentIds || []); },
     onCommit: ({ pins: P, list: Lk }) => { setPinIds(P); local.set('pins', P); setOrder(Lk); local.set('sideOrder', Lk); },
     renderGhost: (k, kind) => {
       const e = byKey.get(k);

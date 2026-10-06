@@ -8,32 +8,22 @@ export function useFlip(ref) {
     if (!el) return;
     const next = new Map();
     for (const node of el.querySelectorAll('[data-flip]')) {
-      const r = node.getBoundingClientRect();
-      next.set(node.dataset.flip, r);
+      const pos = { x: node.offsetLeft, y: node.offsetTop }; // posição de layout, ignora transform
+      next.set(node.dataset.flip, pos);
       const prev = last.current.get(node.dataset.flip);
       if (!prev) continue;
-      const dx = prev.left - r.left, dy = prev.top - r.top;
-      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
-      node.style.transition = 'none';
-      node.style.transform = `translate(${dx}px, ${dy}px)`;
-      node.getBoundingClientRect(); // aplica o ponto de partida antes de animar
-      node.style.transition = 'transform .28s cubic-bezier(.2, .8, .2, 1)';
-      node.style.transform = '';
+      const dx = prev.x - pos.x, dy = prev.y - pos.y;
+      if (!dx && !dy) continue;
+      const anim = node.getAnimations?.().find(a => a.id === 'flip');
+      anim?.cancel();
+      node.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: 260, easing: 'cubic-bezier(.2, .8, .2, 1)', id: 'flip' });
     }
     last.current = next;
   });
 }
 
-/** Põe "@Nome " na caixa de mensagem aberta, como se tivesse digitado. */
-function mentionInComposer(name) {
-  const ta = document.querySelector('.composer textarea');
-  if (!ta || !name) return;
-  const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
-  const sep = ta.value && !/\s$/.test(ta.value) ? ' ' : '';
-  setter.call(ta, `${ta.value}${sep}@${name} `);
-  ta.dispatchEvent(new Event('input', { bubbles: true }));
-  ta.focus();
-}
+/** Marca agentes na conversa aberta (viram botões acima do campo de mensagem). */
+const tagAgents = ids => ids.length && dispatchEvent(new CustomEvent('ripper:tag-agents', { detail: { ids } }));
 
 // Índice de inserção pela coordenada do ponteiro (o card sob o cursor se move enquanto abre espaço)
 function indexIn(zone, sel, x, y, axis) {
@@ -45,7 +35,7 @@ function indexIn(zone, sel, x, y, axis) {
  * Arrastar na mão: o item "sai" e segue o cursor; fixados (linha) e lista (coluna) abrem espaço ao vivo.
  * pins/list são arrays de chaves; onCommit recebe a ordem nova. Soltar na caixa de mensagem marca o agente.
  */
-export function useSidebarDrag({ pins, list, maxPins = 4, canPin, onCommit, renderGhost, nameOf }) {
+export function useSidebarDrag({ pins, list, maxPins = 4, canPin, onCommit, renderGhost, idsOf }) {
   const [drag, setDrag] = useState(null);
   const press = useRef(null);
   const moved = useRef(false);
@@ -72,6 +62,7 @@ export function useSidebarDrag({ pins, list, maxPins = 4, canPin, onCommit, rend
 
   const onPointerDown = (e, key) => {
     if (e.button !== 0) return;
+    e.preventDefault(); // sem seleção de texto nem arrasto nativo do link
     const r = e.currentTarget.getBoundingClientRect();
     press.current = { key, sx: e.clientX, sy: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top, w: r.width, h: r.height, kind: e.currentTarget.dataset.pin ? 'pin' : 'row' };
     moved.current = false;
@@ -96,7 +87,7 @@ export function useSidebarDrag({ pins, list, maxPins = 4, canPin, onCommit, rend
       const p = press.current; press.current = null;
       if (moved.current && p && ev.type === 'pointerup') {
         const over = hit(ev.clientX, ev.clientY);
-        if (over?.zone === 'composer') mentionInComposer(nameOf(p.key));
+        if (over?.zone === 'composer') tagAgents(idsOf(p.key));
         else if (over) onCommit(preview(p.key, over));
       }
       setDrag(null);

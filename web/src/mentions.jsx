@@ -15,7 +15,9 @@ export function mentionedAgents(text, agents) {
   return [...text.matchAll(re)].map(m => agents.find(a => a.name === m[1])).filter(a => a && !seen.has(a.id) && seen.add(a.id));
 }
 
-export const MentionChip = ({ agent }) => <span className="mention-chip"><AgentAvatar agent={agent} size={18} paused />@{agent.name}</span>;
+export const MentionChip = ({ agent, bare }) => bare
+  ? <><AgentAvatar agent={agent} size={18} paused />@{agent.name}</>
+  : <span className="mention-chip"><AgentAvatar agent={agent} size={18} paused />@{agent.name}</span>;
 
 /** Texto com cada "@Nome" de agente trocado por um botão com o mascote. */
 export function MentionText({ text, agents }) {
