@@ -21,7 +21,7 @@ export default {
   'nav.agents': 'Agentes',
   'nav.flows': 'Fluxos',
   'nav.inbox': 'Caixa',
-  'nav.explore': 'Explorar',
+  'nav.explore': 'Templates',
   'nav.library': 'Biblioteca',
   'nav.chats': 'Conversas',
   'nav.viewAll': 'Ver todas',

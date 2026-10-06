@@ -83,7 +83,8 @@ export default function Library() {
       <header className="page-head"><div><h1>Biblioteca</h1><p className="lede">Tudo o que seus agentes guardam e compartilham: artefatos, skills, arquivos, memórias e rotinas.</p></div></header>
       <label className="search-field lib-search"><Icon name="search" size={16} /><input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar dentro de artefatos, arquivos, memórias e skills" aria-label="Buscar na biblioteca" /></label>
       {found ? <LibraryResults results={found} q={q} /> : <>
-      <Segmented label="Seção" value={tab} onChange={setTab} items={[['artifacts', 'Artefatos', S.artifacts.length], ['skills', 'Skills', S.skills.length], ['scripts', 'Scripts'], ['messages', 'Mensagens'], ['files', 'Arquivos', files.length], ['memories', 'Memórias', S.memoriesCount], ['routines', 'Rotinas', routines.length]]} className="seg-scroll" />
+      {/* abas vazias (0) somem, como na Caixa; as sem contagem (scripts, mensagens) e a selecionada ficam */}
+      <Segmented label="Seção" value={tab} onChange={setTab} items={[['artifacts', 'Artefatos', S.artifacts.length], ['skills', 'Skills', S.skills.length], ['scripts', 'Scripts'], ['messages', 'Mensagens'], ['files', 'Arquivos', files.length], ['memories', 'Memórias', S.memoriesCount], ['routines', 'Rotinas', routines.length]].filter(([k, , n]) => k === tab || n == null || n > 0)} className="seg-scroll" />
       <div className="library">
         {tab === 'files' && (files.length === 0 ? <EmptyState title="Nenhum arquivo" body="Anexe arquivos numa conversa: eles aparecem aqui e ficam no computador do agente." /> :
           <ul className="rows">{files.map(f => (
