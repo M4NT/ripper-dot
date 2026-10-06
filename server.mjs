@@ -7,7 +7,7 @@ import { gzipSync } from 'node:zlib';
 import { extname, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { authed as checkAuth, hashPassword, verifyPassword, passwordProblem, passwordFile, sessionStore, sessionCookie, loginLimiter } from './lib/auth.mjs';
-import { pairingInvite, deviceStore, deviceCookie, lanAddress, qrSvg, deviceName } from './lib/pairing.mjs';
+import { pairingInvite, deviceStore, deviceCookie, lanAddress, tailscaleAddress, qrSvg, deviceName } from './lib/pairing.mjs';
 import { load, save, flush, id, newAgent, patchAgent, dataUrl, safeCheckStoreReady, TOOLS } from './lib/store.mjs';
 import { route, classifySpeaker, MODELS, EFFORTS, enabledModels, clampEffort } from './lib/router.mjs';
 import { computerFor } from './lib/boat.mjs';
@@ -2730,7 +2730,7 @@ const routes = [
     return { chatId: runFlow(flow, String(input).slice(0, 8000)) };
   }],
   // Pareamento do celular por QR (mesma rede). Ligar a rede e gerar convite só no próprio computador.
-  ['GET', /^\/api\/pair$/, req => ({ lan: lanState(), devices: devices.list(), local: isLocalRequest(req) })],
+  ['GET', /^\/api\/pair$/, req => ({ lan: lanState(), tail: tailState(), devices: devices.list(), local: isLocalRequest(req) })],
   ['POST', /^\/api\/pair\/lan$/, async req => {
     if (!isLocalRequest(req)) throw new HttpError(403, 'Ligue o acesso pela rede no computador onde o Ripper roda.');
     const { on } = await body(req);
@@ -2739,12 +2739,22 @@ const routes = [
     await setLan(!!on);
     return { lan: lanState() };
   }],
+  // Fora de casa: um ouvinte só no IP do Tailscale (rede privada do usuário; ninguém de fora enxerga)
+  ['POST', /^\/api\/pair\/tailscale$/, async req => {
+    if (!isLocalRequest(req)) throw new HttpError(403, 'Ligue no computador onde o Ripper roda.');
+    const { on } = await body(req);
+    if (on && !passwordStore.get()) throw new HttpError(409, 'Crie a senha do Ripper antes de abrir para fora de casa.');
+    db.tailAccess = !!on; save();
+    await setTail(!!on);
+    return { tail: tailState() };
+  }],
   ['POST', /^\/api\/pair\/invite$/, req => {
     if (!isLocalRequest(req)) throw new HttpError(403, 'Gere o QR no computador onde o Ripper roda.');
-    const lan = lanState();
-    if (!lan.on || !lan.address) throw new HttpError(409, 'Ligue o acesso pela rede Wi-Fi primeiro.');
+    const via = new URL(req.url, 'http://x').searchParams.get('via');
+    const net = via === 'tailscale' ? tailState() : lanState();
+    if (!net.on || !net.address) throw new HttpError(409, via === 'tailscale' ? 'Ligue o acesso fora de casa (Tailscale) primeiro.' : 'Ligue o acesso pela rede Wi-Fi primeiro.');
     const { token, expiresAt } = invite.create();
-    const link = `http://${lan.address}:${PORT}/pair?t=${token}`;
+    const link = `http://${net.address}:${PORT}/pair?t=${token}`;
     return { url: link, svg: qrSvg(link), expiresAt };
   }],
   ['DELETE', /^\/api\/pair\/devices\/([\w-]+)$/, (req, [did]) => {
@@ -3789,6 +3799,21 @@ async function setLan(on) {
   await new Promise(r => { s.once('error', e => { lanError = e.message; r(); }); s.listen(PORT, ip, () => { lanServer = s; console.log(`Ripper na rede: http://${ip}:${PORT}`); r(); }); });
 }
 if (db.lanAccess) setLan(true).catch(e => console.error('[rede]', e.message));
+let tailServer = null, tailError = null;
+function tailState() {
+  return { on: !!tailServer || (hostOpen && !!tailscaleAddress()), address: tailscaleAddress(), error: tailError };
+}
+async function setTail(on) {
+  tailError = null;
+  if (hostOpen) return;
+  if (tailServer) { const s = tailServer; tailServer = null; await new Promise(r => s.close(r)); s.closeAllConnections?.(); }
+  if (!on) return;
+  const ip = tailscaleAddress();
+  if (!ip) { tailError = 'Tailscale não encontrado neste computador. Instale e entre na sua conta.'; return; }
+  const s = createServer((req, res) => server.emit('request', req, res));
+  await new Promise(r => { s.once('error', e => { tailError = e.message; r(); }); s.listen(PORT, ip, () => { tailServer = s; console.log(`Ripper no Tailscale: http://${ip}:${PORT}`); r(); }); });
+}
+if (db.tailAccess) setTail(true).catch(e => console.error('[tailscale]', e.message));
 setTimeout(() => autoResumeAfterRestart().catch(e => console.error('retomada', e.message)), 5000);
 
 /**
