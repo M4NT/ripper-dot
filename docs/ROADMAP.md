@@ -127,10 +127,10 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - 🔨 "Conversa em grupo" no modo Simples e quem está trabalhando com autocompletar do @. *Donald.*
 - ✅ **Interface nova estilo mensageiro** (06/10/2026, referência: Grok Bot): tema escuro neutro como padrão; barra lateral de agentes com fixados no topo; **um agente = uma conversa** (as antigas juntadas, arquivadas, nada apagado); arrastar na mão para fixar e reordenar, com a grade se reorganizando; soltar um agente na conversa marca ele (botão com o mascote); Início vira a conversa; Marketplace ("Conectar aplicativos") e Configurações como janelas por cima.
 - [ ] Repaginar no padrão novo as telas que só herdaram as cores: Caixa, Agentes, Fluxos, Projetos, Biblioteca.
-- [ ] **Marcar um agente numa conversa 1:1 traz ele para a conversa** (hoje o @ só aparece como botão; precisa chamar o agente ou virar grupo).
-- [ ] Desfazer a junção de conversas pela interface (hoje só pelos dados: as antigas ficam arquivadas com `mergedInto`) e ver as arquivadas no Histórico.
-- [ ] Revisão completa do tema claro no padrão novo (foi validado principalmente no escuro).
-- [ ] Ícones que faltam no Marketplace (ex.: WhatsApp aparece com ícone genérico).
+- ✅ **Marcar um agente numa conversa 1:1 traz ele para a conversa** (06/10/2026): o @Nome chama o agente naquela rodada e ele responde ali, sem virar grupo; o @ autocompleta todos os agentes.
+- ✅ Desfazer a junção de conversas pela interface (06/10/2026): Histórico → Arquivadas → menu "…" → Desfazer junção (não junta de novo ao reiniciar; arquivos e artefatos movidos ficam na conversa de destino).
+- ✅ Revisão do tema claro (06/10/2026): tons quentes/creme trocados por cinzas neutros (terminal, aprovação, VNC, fundos de janela, cor do navegador e do app instalado).
+- ✅ Ícones que faltam no Marketplace (06/10/2026): WhatsApp com ícone próprio; Atlassian, Zapier, Granola, Stripe, Supabase e Sentry com selo na cor da marca (trocar pelos logos oficiais quando possível).
 - [ ] Celular: barra de botões da caixa de mensagem apertada; ordem dos fixados/lista sincronizada entre aparelhos (hoje fica no navegador).
 - [ ] Zero tela parada: progresso visível em rotinas de segundo plano e canais.
 - [ ] Ações em lote e atalhos na Caixa (A aprovar, R recusar).

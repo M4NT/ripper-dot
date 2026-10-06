@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeAgentChats } from '../lib/merge-agent-chats.mjs';
+import { mergeAgentChats, unmergeChat } from '../lib/merge-agent-chats.mjs';
 
 test('junta as conversas 1:1 do agente na mais recente, em ordem, sem apagar', () => {
   const db = {
@@ -23,4 +23,8 @@ test('junta as conversas 1:1 do agente na mais recente, em ordem, sem apagar', (
   assert.ok(!db.chats.find(c => c.id === 'g').archived, 'grupo fica');
   assert.ok(!db.chats.find(c => c.id === 'w').archived, 'canal fica');
   assert.equal(mergeAgentChats(db), 0, 'idempotente');
+  unmergeChat(db, a);
+  assert.deepEqual(b.messages.map(m => m.id), ['3', '4']);
+  assert.ok(!a.archived && !a.mergedInto);
+  assert.equal(mergeAgentChats(db), 0, 'não junta de novo');
 });
