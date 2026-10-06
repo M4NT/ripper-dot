@@ -61,11 +61,8 @@ export function speak(md) {
 
 /* ---------- tema ---------- */
 export function useTheme() {
-  const media = typeof matchMedia === 'function' ? matchMedia('(prefers-color-scheme: dark)') : null;
   const [pref, setPref] = useState(() => local.get('theme', null));
-  const [sys, setSys] = useState(() => media?.matches ? 'dark' : 'light');
-  useEffect(() => { if (!media) return; const f = e => setSys(e.matches ? 'dark' : 'light'); media.addEventListener('change', f); return () => media.removeEventListener('change', f); }, []);
-  const theme = pref || sys;
+  const theme = pref || 'dark'; // escuro é o padrão; o claro fica como opção
   useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
   return [theme, () => { const n = theme === 'dark' ? 'light' : 'dark'; setPref(n); local.set('theme', n); }];
 }

@@ -176,6 +176,8 @@ Acesso remoto seguro (login + HTTPS), notificações reais no Android/iPhone, ap
 **Fase 3 — Superar o Grok**
 1ª palavra < 1 s, 50 tarefas reais com ≥ 80% concluídas sozinhas, Omie com sessões que se recuperam sozinhas, mais canais (Telegram, Instagram, Slack).
 *Pronto quando:* os critérios do norte estão cumpridos e medidos.
+- **Cursores dos agentes:** ver o cursor de cada agente ao vivo na aba Computador; vários agentes no mesmo computador ao mesmo tempo, cada um numa janela (referência: trycua/cua, avaliar licença).
+- **Configuração dentro da conversa:** o agente manda no balão o interruptor da configuração que você pediu; você só clica. Sensíveis pedem confirmação.
 
 **Fase 4 — Mídia**
 Geração de imagem dentro das tarefas, depois vídeo.
