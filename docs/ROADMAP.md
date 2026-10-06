@@ -160,6 +160,34 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 
 ---
 
+## 3.1 Como fazer o design (regras para qualquer tela nova ou mudada)
+
+**Referência aprovada (06/10/2026):** o Grok Bot — mensageiro escuro, simples, rápido e eficiente. Pegar o jeito, não copiar tudo.
+Três direções inventadas foram recusadas antes (cua.ai com neon, painel claro estilo Cloudflare, "rack de servidores"); só acertou com prints concretos. **Antes de inventar um visual novo, pedir print de referência ao dono.**
+
+**Estrutura**
+- Uma tela só: agentes à esquerda (fixados no topo + lista), conversa no centro, ficha do agente à direita.
+- Um agente = uma conversa. Grupos são entradas próprias.
+- O resto abre como **janela por cima** (Marketplace, Configurações), fecha com Esc ou clique fora e volta para onde estava. Nada de página nova para tarefa rápida.
+- Cada tela tem uma ação principal; detalhes técnicos (tokens, custo, IDs, logs) só quando a pessoa abre o item.
+- Configuração vai para a conversa quando possível (o agente manda o interruptor no balão).
+
+**Visual** (variáveis em `web/src/styles.css`, `:root`)
+- Escuro é o padrão: fundo `#070707`, lateral `#111`, balões e campos `#2c2c2c`/`#303030`, linhas brancas a 8–14%. Claro como opção, neutro (sem creme).
+- Fonte Geist; cantos 14–22px; pílulas para botões pequenos; sombra só no que flutua (janelas, card sendo arrastado).
+- Mascotes dos agentes (bot-avatars) em todo lugar onde o agente aparece: lista, fixados, ficha, menções.
+- Cor só para estado: verde trabalhando/ok, âmbar esperando você, vermelho erro.
+
+**Interação**
+- Coisas que se organizam são **arrastáveis "na mão"**: o card sai inclinado seguindo o cursor, os outros deslizam abrindo espaço (animação de grade), soltar no lugar certo confirma, soltar fora cancela.
+- Soltar um agente na conversa marca ele (botão com o mascote), sem escrever texto duplicado.
+- Nada de texto cortado ou quebrado em botão, nada de rolagem lateral no celular, nada que suma ou encolha quando o conteúdo cresce.
+
+**Antes de entregar**
+- Testar a interação de verdade (arrastar, abrir/fechar janelas), não só olhar print.
+- Conferir no celular (375px) e no desktop (1280 e 1440), nos dois temas.
+- Detalhes de produto e público: `PRODUCT.md` na raiz.
+
 ## 4. Plano em fases
 
 Ordem decidida pelo dono (06/10/2026): **confiabilidade → instalação fácil → celular fora de casa**. Imagem/vídeo e Omie vêm depois.
