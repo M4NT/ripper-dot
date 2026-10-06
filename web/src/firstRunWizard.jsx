@@ -10,7 +10,7 @@ const AI = [
   ['claude', 'Claude', 'Melhor qualidade para os agentes. Use sua assinatura: rode claude login uma vez nesta máquina.'],
   ['chatgpt', 'ChatGPT', 'Boa qualidade pela assinatura. Rode codex login uma vez nesta máquina.'],
   ['key', 'Chave de API', 'Mesma qualidade do Claude, mas cada resposta é cobrada na sua conta do provedor.'],
-  ['none', 'Não tenho', 'Em breve: um modelo local que roda no seu computador, de graça. Qualidade menor e depende da sua máquina.']
+  ['none', 'Não tenho', 'Um modelo local que roda no seu computador, de graça (Configurações → Ollama → Modelo recomendado). Qualidade menor e depende da sua máquina.']
 ];
 
 /** Assistente de primeiro uso: aparece uma vez, depois do login, enquanto não há agente. */
