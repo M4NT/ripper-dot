@@ -487,7 +487,8 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
     if (e.target.closest('a, button, input, textarea, .md code, .md pre')) return; // mantém o menu nativo em links e textos de código
     if (window.getSelection()?.toString()) return;                              // e quando há texto selecionado (para copiar)
     const extra = [
-      { label: 'Nova conversa', icon: 'plus', onSelect: () => go(isGroup || project ? `/p/${projectId}/new?agents=${memberIds.join(',')}` : `/a/${agent.id}`) },
+      // 1:1 é uma conversa só por agente; nova conversa só faz sentido em grupo/projeto
+      (isGroup || project) && { label: 'Nova conversa', icon: 'plus', onSelect: () => go(`/p/${projectId}/new?agents=${memberIds.join(',')}`) },
       wide && { label: panel ? 'Recolher painel' : 'Mostrar painel', icon: 'sidebar', hint: 'Ctrl .', onSelect: togglePanel }
     ];
     if (chatId && chat) chatMenu(e, { ...chat, id: chatId, title }, extra);

@@ -87,11 +87,35 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
   const chatMenu = useChatMenu();
   const section = parts[0] === 'c' ? 'chat' : parts[0] || '';
   // Avisos de agente de canal moram na Caixa, não na lista de conversas
+  // Avisos de agente de canal moram na Caixa, não na lista
   const visible = [...S.chats].filter(c => !c.archived && !String(c.channelKey || '').startsWith('owner:')).sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
-  const recent = visible.slice(0, 30);
-  // Fixados: os agentes com conversa mais recente (até 3), como atalhos grandes no topo
-  const lastTalk = id => visible.find(c => (c.agentIds || [c.agentId]).includes(id))?.updatedAt || 0;
-  const pins = [...S.agents].filter(a => !a.archived).sort((a, b) => lastTalk(b.id) - lastTalk(a.id)).slice(0, 3);
+  // Um agente = uma conversa (como num mensageiro); grupos aparecem como entradas próprias
+  const soloOf = id => visible.find(c => !isGroupChat(c) && c.agentId === id);
+  const live = S.agents.filter(a => !a.archived);
+  const entries = [
+    ...live.map(a => ({ kind: 'agent', a, c: soloOf(a.id), at: soloOf(a.id)?.updatedAt || a.createdAt || 0 })),
+    ...visible.filter(isGroupChat).map(c => ({ kind: 'group', c, at: c.updatedAt || c.createdAt || 0 }))
+  ].sort((x, y) => y.at - x.at);
+  // Fixados: escolhidos arrastando; sem escolha salva, os 3 mais recentes
+  const [pinIds, setPinIds] = useState(() => local.get('pins', null));
+  const savePins = ids => { const v = [...new Set(ids)].filter(id => live.some(a => a.id === id)).slice(0, 4); setPinIds(v); local.set('pins', v); };
+  const pins = (pinIds || entries.filter(e => e.kind === 'agent').slice(0, 3).map(e => e.a.id)).map(id => live.find(a => a.id === id)).filter(Boolean);
+  const pinSet = new Set(pins.map(a => a.id));
+  const [drag, setDrag] = useState(null); // { id, from: 'pin' | 'list' }
+  const [dropOn, setDropOn] = useState(false);
+  const startDrag = (e, id, from) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', id); setDrag({ id, from }); };
+  const endDrag = () => { setDrag(null); setDropOn(false); };
+  const dropOnPin = (e, targetId) => {
+    e.preventDefault(); e.stopPropagation();
+    if (!drag) return;
+    const ids = pins.map(a => a.id).filter(id => id !== drag.id);
+    const at = targetId ? ids.indexOf(targetId) : -1;
+    if (drag.from === 'list' && at >= 0 && ids.length >= 4) ids.splice(at, 1, drag.id); // cheio: troca pelo alvo
+    else ids.splice(at < 0 ? ids.length : at, 0, drag.id);
+    savePins(ids); endDrag();
+  };
+  const dropOnList = e => { e.preventDefault(); if (drag?.from === 'pin') savePins(pins.map(a => a.id).filter(id => id !== drag.id)); endDrag(); };
+  const activeAgent = parts[0] === 'a' ? parts[1] : parts[0] === 'c' ? S.chats.find(c => c.id === parts[1] && !isGroupChat(c))?.agentId : null;
   const nav = to => { onNavigate(); go(to); };
   const brand = brandForChrome(S.settings);
   const logoSrc = brand ? brandLogoSrc(brand.logoUrl) : null;
@@ -99,7 +123,7 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
   const brandStyle = brand?.accentColor ? { '--brand-accent': brand.accentColor } : undefined;
   return (
     <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`} style={brandStyle}>
-      {onCollapse && <ResizeHandle side="left" cssVar="side-w" min={260} max={460} collapsed={collapsed} label="Largura da barra lateral"
+      {onCollapse && <ResizeHandle side="left" cssVar="side-w" min={300} max={480} collapsed={collapsed} label="Largura da barra lateral"
         onCollapse={() => !collapsed && onCollapse()} onExpand={() => collapsed && onCollapse()} />}
       <div className="side-top">
         <a href="#/" className="brand" onClick={onNavigate} aria-label={brand ? `${brandName}, início` : t('nav.brand')}>
@@ -113,51 +137,52 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
           <Menu align="right" className="new-menu" trigger={({ toggle, open }) => (
             <button className="round-btn" onClick={toggle} aria-expanded={open} aria-haspopup="menu" aria-label="Novo"><Icon name="plus" size={18} /></button>
           )}>
-            <MenuItem icon="chat" onClick={() => nav('/')}>Nova conversa</MenuItem>
             <MenuItem icon="agents" onClick={() => nav('/new')}>Novo agente</MenuItem>
             {enterprise && <MenuItem icon="group" onClick={() => nav('/projects')}>Novo grupo ou projeto</MenuItem>}
           </Menu>
         </div>
       </div>
 
-      {pins.length > 0 && (
-        <div className="pins" aria-label="Agentes fixados">
-          {pins.map(a => {
-            const on = parts[0] === 'a' && parts[1] === a.id;
-            return (
-              <a key={a.id} href={`#/a/${a.id}`} className={`pin ${on ? 'on' : ''}`} onClick={onNavigate} title={a.name}>
-                <span className="pin-av"><AgentAvatar agent={a} size={collapsed ? 30 : 56} state={busy[a.id] ? 'working' : undefined} />{busy[a.id] && <i className="pin-dot" aria-label="trabalhando" />}</span>
-                <b>{a.name}</b>
-                {agentTag(a) && <small>{agentTag(a)}</small>}
-              </a>
-            );
-          })}
-        </div>
-      )}
+      <div className={`pins ${drag ? 'dropzone' : ''} ${dropOn ? 'over' : ''}`} aria-label="Agentes fixados"
+        onDragOver={e => { if (drag) { e.preventDefault(); setDropOn(true); } }} onDragLeave={() => setDropOn(false)} onDrop={e => dropOnPin(e, null)}>
+        {pins.map(a => (
+          <a key={a.id} href={`#/a/${a.id}`} className={`pin ${activeAgent === a.id ? 'on' : ''} ${drag?.id === a.id ? 'dragging' : ''}`} onClick={onNavigate} title={`${a.name} · arraste para trocar ou tirar dos fixados`}
+            draggable onDragStart={e => startDrag(e, a.id, 'pin')} onDragEnd={endDrag} onDragOver={e => drag && e.preventDefault()} onDrop={e => dropOnPin(e, a.id)}>
+            <span className="pin-av"><AgentAvatar agent={a} size={collapsed ? 30 : 52} state={busy[a.id] ? 'working' : undefined} />{busy[a.id] && <i className="pin-dot" aria-label="trabalhando" />}</span>
+            <b>{a.name}</b>
+            {agentTag(a) && <small>{agentTag(a)}</small>}
+          </a>
+        ))}
+        {pins.length === 0 && <p className="pins-empty">Arraste um agente para cá para fixar</p>}
+      </div>
 
-      <nav className="side-list" aria-label={t('nav.chats')}>
+      <nav className={`side-list ${drag?.from === 'pin' ? 'dropzone' : ''}`} aria-label={t('nav.agents')} onDragOver={e => drag?.from === 'pin' && e.preventDefault()} onDrop={dropOnList}>
         <a href="#/inbox" className={`row inbox-row ${section === 'inbox' ? 'on' : ''}`} onClick={onNavigate} aria-current={section === 'inbox' ? 'page' : undefined}>
           <span className="row-icon"><Icon name="inbox" size={19} /></span>
           <span className="row-text"><b>{t('nav.inbox')}</b><small>{S.inboxCount > 0 ? `${S.inboxCount} esperando você` : 'Nada pendente'}</small></span>
           {S.inboxCount > 0 && <span className="count attn" aria-label={`${S.inboxCount} pendentes`}>{S.inboxCount}</span>}
         </a>
-        {recent.map(c => {
-          const group = isGroupChat(c);
-          const a = agent(c.agentId);
-          const unread = c.unread && parts[1] !== c.id;
-          return (
-            <a key={c.id} href={`#/c/${c.id}`} className={`row ${parts[1] === c.id ? 'on' : ''} ${unread ? 'unread' : ''} ${c.urgent && c.unread ? 'urgent' : ''}`} onClick={onNavigate}
-              onContextMenu={e => chatMenu(e, c)} title={collapsed ? c.title : undefined}>
+        {entries.filter(e => e.kind === 'group' || !pinSet.has(e.a.id)).map(e => {
+          const c = e.c;
+          const unread = c?.unread && parts[1] !== c.id;
+          if (e.kind === 'group') return (
+            <a key={c.id} href={`#/c/${c.id}`} className={`row ${parts[1] === c.id ? 'on' : ''} ${unread ? 'unread' : ''}`} onClick={onNavigate} onContextMenu={ev => chatMenu(ev, c)} title={collapsed ? c.title : undefined}>
               <span className="row-av"><ChatAvatar chat={c} size={40} /></span>
-              <span className="row-text">
-                <span className="row-top"><b>{c.title || a?.name}</b>{group ? <em className="row-tag">{t('nav.group')}</em> : a && <em className="row-tag">{a.name}</em>}</span>
-                <small>{c.preview || t('nav.noMessages')}</small>
-              </span>
-              {unread ? <span className="unread-dot" title={t('nav.routineUnread')} /> : <time>{fmtAgo(c.updatedAt || c.createdAt)}</time>}
+              <span className="row-text"><span className="row-top"><b>{c.title}</b><em className="row-tag">{t('nav.group')}</em></span><small>{c.preview || t('nav.noMessages')}</small></span>
+              {unread ? <span className="unread-dot" /> : <time>{fmtAgo(e.at)}</time>}
+            </a>
+          );
+          const a = e.a;
+          return (
+            <a key={a.id} href={`#/a/${a.id}`} className={`row ${activeAgent === a.id ? 'on' : ''} ${unread ? 'unread' : ''} ${drag?.id === a.id ? 'dragging' : ''}`} onClick={onNavigate}
+              onContextMenu={ev => c && chatMenu(ev, c)} title={collapsed ? a.name : undefined} draggable onDragStart={ev => startDrag(ev, a.id, 'list')} onDragEnd={endDrag}>
+              <span className="row-av"><AgentAvatar agent={a} size={40} state={busy[a.id] ? 'working' : undefined} /></span>
+              <span className="row-text"><span className="row-top"><b>{a.name}</b>{agentTag(a) && <em className="row-tag">{agentTag(a)}</em>}</span><small>{busy[a.id] ? 'trabalhando…' : c?.preview || 'Diga oi'}</small></span>
+              {unread ? <span className="unread-dot" /> : c && <time>{fmtAgo(e.at)}</time>}
             </a>
           );
         })}
-        {visible.length > recent.length && <a href="#/chats" className="row more-row" onClick={onNavigate}>{t('nav.viewAll')} ({visible.length})</a>}
+        {visible.length > 0 && <a href="#/chats" className="row more-row" onClick={onNavigate}>Histórico de conversas</a>}
       </nav>
 
       <div className="side-foot">
@@ -305,6 +330,9 @@ function Shell() {
     addEventListener('keydown', f); return () => removeEventListener('keydown', f);
   }, [overlayOpen, closeHub]);
   const [p0, p1, p2] = overlayOpen ? bgRef.current : parts;
+  // Um agente = uma conversa: /a/:id abre a conversa 1:1 mais recente dele
+  const soloFor = id => id && [...S.chats].filter(c => !c.archived && c.agentId === id && (c.agentIds || []).length <= 1 && !String(c.channelKey || '').startsWith('owner:')).sort((x, y) => (y.updatedAt || 0) - (x.updatedAt || 0))[0];
+  const soloChat = p0 === 'a' ? soloFor(p1) : null;
   const homeAgent = useMemo(() => {
     const live = S.agents.filter(a => !a.archived);
     const last = [...S.chats].sort((x, y) => (y.updatedAt || 0) - (x.updatedAt || 0)).find(c => live.some(a => a.id === c.agentId));
@@ -313,7 +341,7 @@ function Shell() {
   }, [S.agents.length, parts.join('/')]);
   const page =
     p0 === 'c' ? <Chat key="chat" chatId={p1} /> :
-    p0 === 'a' ? <Chat key="chat" agentId={p1} /> :
+    p0 === 'a' ? (soloChat ? <Chat key="chat" chatId={soloChat.id} /> : <Chat key="chat" agentId={p1} />) :
     p0 === 'p' && p2 === 'new' ? <Chat key="chat" projectId={p1} agentIds={query.get('agents')?.split(',').filter(Boolean)} /> :
     p0 === 'p' ? <Project id={p1} /> :
     p0 === 'projects' ? <Projects /> :
@@ -336,7 +364,7 @@ function Shell() {
     p0 === 'enterprise' ? null :
     p0 === 'settings' ? <Settings theme={theme} toggleTheme={toggleTheme} tab={p1} /> :
     // Início = conversa nova com o agente mais recente; sem agentes, a tela de boas-vindas
-    (homeAgent ? <Chat key="chat" agentId={homeAgent.id} /> : <Home />);
+    (!homeAgent ? <Home /> : soloFor(homeAgent.id) ? <Chat key="chat" chatId={soloFor(homeAgent.id).id} /> : <Chat key="chat" agentId={homeAgent.id} />);
 
   const hubPage = !overlayOpen ? null :
     parts[0] === 'marketplace' ? <Marketplace /> :

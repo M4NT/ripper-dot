@@ -2020,3 +2020,22 @@ code, .mono, pre { overflow-wrap: anywhere; }
 .hub-modal .settings-nav a.on { background: var(--surface-2); box-shadow: none; }
 .account-menu .menu, .new-menu .menu { border-radius: 16px; }
 @media (max-width: 760px) { .hub-modal .settings-page { grid-template-columns: 1fr; padding: 56px 16px 32px; } }
+
+/* ============ Checkup: arrastar fixados, cortes e camadas ============ */
+.shell { grid-template-columns: max(300px, var(--side-w, 340px)) minmax(0, 1fr); }
+.shell.side-collapsed { grid-template-columns: 76px minmax(0, 1fr); }
+.pins { min-height: 0; border-radius: 16px; border: 1px dashed transparent; transition: border-color .15s, background .15s; }
+.pins.dropzone { border-color: var(--line-2); }
+.pins.over { border-color: var(--ink-2); background: color-mix(in srgb, var(--surface-2) 50%, transparent); }
+.pins-empty { flex: 1; text-align: center; font-size: 13px; color: var(--muted); padding: 18px 8px; }
+.pin, .side-list .row[draggable] { cursor: pointer; }
+.pin.dragging, .row.dragging { opacity: .4; }
+.side-list.dropzone { outline: 1px dashed var(--line-2); outline-offset: -2px; border-radius: 14px; }
+/* textos de botão nunca quebram linha */
+.btn, .btn-sm, .connect-btn, .round-btn, .chip, .seg button, .segmented button, .mp-installed, .link-btn, .composer-chips > *, .menu-item { white-space: nowrap; }
+.btn { flex-shrink: 0; }
+/* janelas por cima ficam acima da bandeja de aprovações e da tela ao vivo */
+.hub-overlay { z-index: 1000; }
+.sidebar .side-foot { flex-direction: row; align-items: center; margin-top: 0; }
+.sidebar .side-foot .menu-wrap { width: auto; flex: none; }
+.sidebar.collapsed .side-foot { flex-direction: column; }
