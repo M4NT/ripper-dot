@@ -45,13 +45,12 @@ test('contadores HTTP e chat no formato Prometheus', () => {
 
 test('metricsAccessAllowed respeita RIPPER_METRICS_PUBLIC', () => {
   const prev = process.env.RIPPER_METRICS_PUBLIC;
-  const req = { headers: {} };
   process.env.RIPPER_METRICS_PUBLIC = '1';
-  assert.equal(metricsAccessAllowed(req, 'secret'), true);
+  assert.equal(metricsAccessAllowed(false), true);
   delete process.env.RIPPER_METRICS_PUBLIC;
-  assert.equal(metricsAccessAllowed(req, ''), true);
-  assert.equal(metricsAccessAllowed(req, 'secret'), false);
-  assert.equal(metricsAccessAllowed({ headers: { authorization: 'Bearer secret' } }, 'secret'), true);
+  // sem RIPPER_TOKEN não fica mais aberto: exige login como o resto do app
+  assert.equal(metricsAccessAllowed(false), false);
+  assert.equal(metricsAccessAllowed(true), true);
   if (prev === undefined) delete process.env.RIPPER_METRICS_PUBLIC;
   else process.env.RIPPER_METRICS_PUBLIC = prev;
 });

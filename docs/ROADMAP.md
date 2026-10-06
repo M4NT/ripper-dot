@@ -73,8 +73,8 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - ✅ Limite de tentativas no login: 5 erros bloqueiam por 15 min (por endereço, em memória).
 - ✅ Chaves e tokens cifrados no disco e nos backups. ✅ Segredos da Evolution também cifrados (`data/evolution.json`).
 - ✅ Aprovações, autonomia por agente, registro imutável de ações externas, X9 Guard nos envios.
-- [ ] Revisão de segurança completa antes do lançamento (rotas sem autenticação, uploads, caminhos de arquivo, execução de comandos, MCP de terceiros).
-- [ ] Política de permissões dos agentes revisada: o que cada nível de autonomia pode fazer sem perguntar.
+- ✅ Revisão de segurança completa antes do lançamento (rotas sem autenticação, uploads, caminhos de arquivo, execução de comandos, MCP de terceiros) — ver [seguranca.md](seguranca.md). Corrigidos: `/metrics` aberto sem `RIPPER_TOKEN` (agora exige login; público só com `RIPPER_METRICS_PUBLIC=1`) e XSS refletido nos callbacks OAuth. Pendências no documento.
+- 🔨 Política de permissões dos agentes revisada: rascunho em [seguranca.md](seguranca.md) §4, tirado do que o código aplica. Falta decidir se "somente leitura" vale também para ferramentas de conectores MCP (hoje não vale).
 
 ### B. Confiabilidade (P0)
 - ✅ Recarregar a página não para o agente; a resposta continua no servidor e fica salva.
