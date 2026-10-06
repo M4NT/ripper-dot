@@ -84,7 +84,13 @@ function HowItWorks({ open, onClose }) {
 export default function Home() {
   const { S, agent } = useApp();
   const [how, setHow] = useState(false);
-  const [agentId, setAgentId] = useState(() => (S.agents.find(a => a.id === local.get('homeAgent')) || S.agents[0]).id);
+  // Agentes por uso: ativos primeiro, depois quem conversou mais recentemente (os pausados vão para o fim).
+  const lastUsed = id => Math.max(0, ...S.chats.filter(c => (c.agentIds || [c.agentId]).includes(id)).map(c => c.updatedAt || c.createdAt || 0));
+  const byUse = [...S.agents].sort((a, b) => (a.status === 'paused') - (b.status === 'paused') || lastUsed(b.id) - lastUsed(a.id));
+  const [agentId, setAgentId] = useState(() => {
+    const saved = S.agents.find(a => a.id === local.get('homeAgent'));
+    return (saved && saved.status !== 'paused' ? saved : byUse[0]).id; // nunca abre perguntando a um agente pausado
+  });
   const current = agent(agentId) || S.agents[0];
   const [choice, setChoice] = useState({ model: current.model || S.settings.defaultModel, effort: current.effort || 'auto' });
   const dark = useDark();
@@ -102,7 +108,7 @@ export default function Home() {
     <div className="page home">
       {pulse && !pulse.empty ? (
         <section className="pulse-card" aria-label="Resumo do dia">
-          <header className="section-head"><h2>O que seus agentes fizeram hoje</h2><a href="#/agents" className="link">Ver agentes<Icon name="arrowR" size={16} /></a></header>
+          <header className="section-head"><h2>O que seus agentes fizeram nas últimas 24 horas</h2><a href="#/agents" className="link">Ver agentes<Icon name="arrowR" size={16} /></a></header>
           <p className="pulse-body">{pulse.body}</p>
         </section>
       ) : <section className="hero">
@@ -139,9 +145,9 @@ export default function Home() {
       </section>
 
       <section className="section">
-        <header className="section-head"><h2>Seus agentes</h2><a href="#/agents" className="link">Ver todos<Icon name="arrowR" size={16} /></a></header>
+        <header className="section-head"><h2>Seus agentes</h2><a href="#/agents" className="link">Ver todos{S.agents.length > 4 ? ` (${S.agents.length})` : ''}<Icon name="arrowR" size={16} /></a></header>
         <div className="agent-grid">
-          {S.agents.slice(0, 4).map(a => <AgentCard key={a.id} agent={a} />)}
+          {byUse.slice(0, 4).map(a => <AgentCard key={a.id} agent={a} />)}
           <NewAgentCard />
         </div>
       </section>
