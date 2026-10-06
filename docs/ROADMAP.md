@@ -115,6 +115,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - ✅ `.gitattributes` (fins de linha) num commit isolado.
 - 🔨 Testes que sobem o servidor disputavam a mesma porta em paralelo (falha aleatória, ex.: `chat-sse` com 401). Correção pronta: `test/helpers/free-port.mjs` reserva cada porta de forma atômica (PR #88).
 - ✅ Conjunto fixo de 50 tarefas reais (`docs/tarefas-referencia.json`) e `scripts/benchmark.mjs` (passou / precisou de ajuda / falhou + tempo + tokens; dry-run no CI). [ ] Primeira rodada com agente real e meta de "termina sozinho".
+- ✅ Correções da rodada real (06/10): MCPs/plugins do Claude Code da máquina saem do contexto do agente (`disallowedTools` + plugins desligados; o agente não tenta e não fala em "ferramenta bloqueada"); o Assistente lê anexos/arquivos csv, xlsx e docx sem Docker (`fileText` em `lib/attachments.mjs`, também via `read_artifact` pelo nome) e entrega planilha como artefato "tabela" (.csv). Falta: pdf/pptx sem Docker, gerar .xlsx.
 
 ### F. Desempenho e custo (P1)
 - ✅ Processo pré-aquecido (1ª palavra 1,3–2 s), cache de prompt, rota rápida para conversa curta, envio instantâneo no chat.
