@@ -43,8 +43,8 @@ function StepRow({ step, live, index, total }) {
   return (
     <li className={`step step-${step.kind} ${running ? 'running' : ''}`}>
       {running ? <ThinkingOrb state={ORB[step.tool] || 'working'} size={20} /> : <Icon name={step.kind === 'warn' ? 'x' : step.kind === 'done' ? 'check' : 'check'} size={13} />}
-      <span>{step.label}</span>
-      {step.detail && <code>{step.detail}</code>}
+      <span className="step-label">{step.label}</span>
+      {step.detail && <code className="step-detail" title={step.detail}>{step.detail}</code>}
     </li>
   );
 }
