@@ -33,10 +33,9 @@ export function isSettingsTabAllowed(tab, settings) {
   return SIMPLE_SETTINGS_TABS.has(tab);
 }
 
-/** Rotas principais (#/…) que exigem modo enterprise. */
+/** Rotas principais (#/…) que exigem modo enterprise. A Biblioteca não: são as entregas dos agentes. */
 export const ENTERPRISE_ONLY_ROUTES = new Set([
   'explore',
-  'library',
   'projects',
   'connectors',
   'skills',
