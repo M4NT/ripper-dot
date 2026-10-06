@@ -74,6 +74,17 @@ function LiveText({ text }) {
   return shown ? <Markdown text={closeOpen(shown)} live /> : null;
 }
 
+// O que aparece ao lado dos pontinhos enquanto o agente trabalha
+function typingLabel(phase) {
+  if (phase === 'route') return 'Lendo a sua mensagem…';
+  if (phase === 'think') return 'Pensando com calma…';
+  if (phase === 'approval') return 'Esperando a sua aprovação…';
+  if (/^(WebSearch|WebFetch)$/.test(phase || '')) return 'Pesquisando na web…';
+  if (/^computer_/.test(phase || '')) return 'Usando o computador…';
+  if (/^browser_/.test(phase || '')) return 'Navegando…';
+  return 'Escrevendo…';
+}
+
 const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, models, group, showModel, allFiles, onFileError }) {
   // ids (resposta salva) ou objetos (chegando ao vivo)
   const { agent: getAgent } = useApp();
@@ -87,7 +98,7 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, mo
           <ActionLine steps={m.steps} live={live} />
           {delivered.length > 0 && <DeliveredFiles items={delivered} onError={onFileError} />}
           {m.content ? (live ? <LiveText text={m.content} /> : <Markdown text={m.content} />)
-            : live ? <div className="thinking"><ThinkingOrb state={ORB[phase] || 'breathing'} size={20} /><span>{phase === 'route' ? 'Escolhendo o melhor modelo…' : phase === 'think' ? 'Pensando com calma…' : phase === 'approval' ? 'Aguardando sua aprovação…' : 'Pensando…'}</span></div>
+            : live ? <div className="typing" role="status" aria-live="polite"><span className="typing-dots" aria-hidden="true"><i /><i /><i /></span><span>{typingLabel(phase)}</span></div>
             : m.error ? <ErrorNote raw={m.error} onRetry={onRetry} />
             : m.stopped ? <p className="muted">{STOP_REASON[m.stopReason] || 'Resposta interrompida.'}</p> : null}
         </div>
@@ -181,6 +192,8 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   const ov = useOv();
   const [chat, setChat] = useState(null);
   const [pendingWs, setPendingWs] = useState(null); // pasta escolhida antes da 1ª mensagem
+  // Só mensagens novas animam a entrada; o histórico ao abrir a conversa aparece parado.
+  const animateFrom = useRef(Infinity);
   const [chatId, setChatId] = useState(initialId || null);
   const [loading, setLoading] = useState(!!initialId);
   const [notFound, setNotFound] = useState(false);
@@ -224,11 +237,11 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
     queueRef.current?.cancel();
     setLive(null); setNotFound(false);
     setChatId(initialId || null);
-    if (!initialId) { setChat(null); setLoading(false); setChoice(defaults(null, getAgent(initialAgent || initialMembers?.[0]), (initialMembers || []).length > 1)); return; }
+    if (!initialId) { animateFrom.current = 0; setChat(null); setLoading(false); setChoice(defaults(null, getAgent(initialAgent || initialMembers?.[0]), (initialMembers || []).length > 1)); return; }
     setLoading(true);
     let alive = true;
     api(`/api/chats/${initialId}`)
-      .then(c => { if (!alive) return; if (c.unread === false && S.chats.find(x => x.id === c.id)?.unread) refresh(); setChat(c); setInterrupted(!!c.interrupted); setChoice(defaults(c, getAgent(c.agentId), (c.agentIds || []).length > 1)); })
+      .then(c => { if (!alive) return; if (c.unread === false && S.chats.find(x => x.id === c.id)?.unread) refresh(); animateFrom.current = c.messages.length; setChat(c); setInterrupted(!!c.interrupted); setChoice(defaults(c, getAgent(c.agentId), (c.agentIds || []).length > 1)); })
       .catch(() => alive && setNotFound(true))
       .finally(() => alive && setLoading(false));
     return () => { alive = false; };
@@ -428,17 +441,19 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
       ctrl.current = null;
       setBusy(b => { const n = { ...b }; memberIds.forEach(id => delete n[id]); return n; });
       if (cid) setBusyChats(b => { const n = { ...b }; delete n[cid]; return n; });
+      // A resposta pronta entra no MESMO render em que a ao vivo sai (mesma posição na lista): sem sumir e voltar.
+      // Depois a versão salva do servidor só atualiza o conteúdo.
+      const keep = (building.content || building.steps.length || building.error || building.stopped) && !building.passed;
       setLive(null); setPhase(null);
+      if (keep) setChat(c => ({ ...c, messages: [...(c?.messages || []), { ...building, steps: [...building.steps] }] }));
       if (sawDone && building.content && !building.error && local.get('handsFree', false)) speak(building.content);
       if (cid) {
         try {
           const c = await api(`/api/chats/${cid}`);
           setChat(c);
           setInterrupted(!!c.interrupted);
-        } catch {
-          if (sawDone && building.content) setChat(c => ({ ...c, messages: [...c.messages, building] }));
-        }
-      } else if (sawDone) setChat(c => ({ ...c, messages: [...c.messages, building] }));
+        } catch { /* fica a versão local */ }
+      }
       refresh();
       queueRef.current?.scheduleFlush();
     }
@@ -521,10 +536,10 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
                 {!isGroup && <FirstRunChecklist settings={S.settings} agentCount={S.agents.length} />}
               </div>
             )}
-            {messages.map((m, i) => <div key={m.id || i} data-mi={i} className={matches.includes(i) ? `search-hit${matches[hit] === i ? ' current' : ''}` : undefined}>{m.inbox ? <InboxMessage m={m} from={getAgent(m.inbox.from)} /> : m.role === 'user'
+            {[...messages.map((m, i) => <div key={i} data-mi={i} className={[i >= animateFrom.current && 'is-new', matches.includes(i) && `search-hit${matches[hit] === i ? ' current' : ''}`].filter(Boolean).join(' ') || undefined}>{m.inbox ? <InboxMessage m={m} from={getAgent(m.inbox.from)} /> : m.role === 'user'
               ? <UserMessage m={m} name={S.settings.name} files={S.files} onEdit={canEdit && m.id && !/^u\d+$/.test(m.id) ? text => editFrom(m, text) : null} />
-              : <BotMessage m={m} agent={getAgent(m.agentId) || agent} group={isGroup || (!!m.agentId && m.agentId !== agent.id)} models={S.models} showModel={isEnterpriseMode(S.settings)} allFiles={S.files} onFileError={msg => toast(msg, 'error')} onRetry={m === messages.at(-1) && lastUser ? () => send({ text: lastUser.content }) : null} />}</div>)}
-            {live && <BotMessage m={live} agent={getAgent(live.agentId) || agent} group={isGroup} live phase={phase} models={S.models} />}
+              : <BotMessage m={m} agent={getAgent(m.agentId) || agent} group={isGroup || (!!m.agentId && m.agentId !== agent.id)} models={S.models} showModel={isEnterpriseMode(S.settings)} allFiles={S.files} onFileError={msg => toast(msg, 'error')} onRetry={m === messages.at(-1) && lastUser ? () => send({ text: lastUser.content }) : null} />}</div>),
+              live && <div key={messages.length} className="is-new"><BotMessage m={live} agent={getAgent(live.agentId) || agent} group={isGroup} live phase={phase} models={S.models} /></div>]}
           </div>
         </div>
 

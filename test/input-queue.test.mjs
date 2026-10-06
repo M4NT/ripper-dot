@@ -4,7 +4,7 @@ import { coalesceSendParts, createInputQueue, normalizeInputQueue } from '../lib
 
 test('normalizeInputQueue limita janela e mantém enabled', () => {
   assert.deepEqual(normalizeInputQueue({ inputQueue: { enabled: false, windowMs: 99_999 } }), { enabled: false, windowMs: 10_000 });
-  assert.deepEqual(normalizeInputQueue({}), { enabled: true, windowMs: 2500 });
+  assert.deepEqual(normalizeInputQueue({}), { enabled: false, windowMs: 2500 }, 'padrão: manda na hora');
 });
 
 test('coalesceSendParts junta textos e une anexos', () => {

@@ -338,7 +338,12 @@ a.row-main:hover b { text-decoration: underline; text-underline-offset: 3px; }
 .first-run-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .first-run-text small { color: var(--muted); font-size: 12px; line-height: 1.4; }
 .note { font-size: 13px; color: var(--warn); }
-.msg { display: flex; gap: 14px; margin: 0 0 26px; animation: rise .35s var(--out) both; }
+.msg { display: flex; gap: 14px; margin: 0 0 26px; }
+/* entrada só de mensagem nova: a sua sobe da caixa de texto, a do agente aparece suave */
+.is-new > .msg.user { animation: msg-send .28s var(--out) both; }
+.is-new > .msg.bot { animation: msg-in .32s var(--out) both; }
+@keyframes msg-send { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes msg-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .msg.user { justify-content: flex-end; }
 .msg-col { min-width: 0; display: flex; flex-direction: column; max-width: 100%; }
 .msg.user .msg-col { align-items: flex-end; max-width: 78%; }
@@ -1919,3 +1924,15 @@ code, .mono, pre { overflow-wrap: anywhere; }
 
 /* apelido do agente (como chamar no grupo) */
 .agent-nick { margin-left: 8px; font-size: 12px; font-weight: 400; color: var(--faint); }
+
+/* agente digitando: três pontinhos e o que ele está fazendo */
+.typing { display: flex; align-items: center; gap: 10px; min-height: 24px; color: var(--muted); font-size: 13.5px; }
+.typing-dots { display: inline-flex; gap: 4px; }
+.typing-dots i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .35; animation: typing-dot 1.2s infinite ease-in-out; }
+.typing-dots i:nth-child(2) { animation-delay: .15s; }
+.typing-dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes typing-dot { 0%, 60%, 100% { opacity: .3; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) {
+  .is-new > .msg.user, .is-new > .msg.bot { animation: none; }
+  .typing-dots i { animation: none; opacity: .7; }
+}
