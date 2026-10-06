@@ -113,6 +113,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - [ ] Testes de interface ponta a ponta (enviar mensagem, aprovar, criar agente, grupo, rotina).
 - ✅ CI no GitHub a cada push e PR (testes, build, teste das telas). [ ] Bloqueio de merge com teste falhando (o CI já falha; falta o dono marcar o check `test-and-build` como obrigatório em Settings → Branches). ✅ Teste instável achado: uso por conta dependia do login do Claude na máquina (passava no PC, falhava no CI).
 - [ ] `.gitattributes` (fins de linha) num commit isolado.
+- [ ] Testes que sobem o servidor sorteiam uma porta livre e a soltam antes de usar: em paralelo, outro teste pode pegar a mesma porta (visto em `chat-sse`, 401 por cair no servidor errado). Correção: servidor aceitar PORT=0 e informar a porta escolhida.
 - [ ] Conjunto fixo de 50 tarefas reais para medir "termina sozinho" (critério 1 do norte).
 
 ### F. Desempenho e custo (P1)
@@ -157,7 +158,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 
 ### J. Documentação (P1)
 - 🔨 Guia de instalação e primeiro uso, em português: passo a passo em [instalacao.md](instalacao.md). [ ] Imagens.
-- [ ] Central de ajuda dentro do app (o que cada coisa faz, exemplos de pedidos).
+- ✅ Central de ajuda dentro do app: menu da conta › Ajuda ou tecla ?; explica cada parte e traz pedidos prontos que vão para a conversa com um clique.
 - ✅ Documentação para quem desenvolve (arquitetura, como rodar os testes, como criar uma integração): [desenvolvimento.md](desenvolvimento.md).
 
 ### K. Distribuição e negócio (P2)

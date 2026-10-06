@@ -30,6 +30,11 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
     addEventListener('ripper:tag-agents', f); return () => removeEventListener('ripper:tag-agents', f);
   }, []);
   const taggedAgents = tagged.map(id => S.agents.find(a => a.id === id)).filter(Boolean);
+  // Pedido pronto (ex.: da Ajuda): escreve na caixa de mensagem para a pessoa revisar e enviar
+  useEffect(() => {
+    const f = e => { setText(e.detail.text); setTimeout(() => ta.current?.focus(), 0); };
+    addEventListener('ripper:compose', f); return () => removeEventListener('ripper:compose', f);
+  }, []);
   const [files, setFiles] = useState([]); // { key, name, size, file?, id?, status }
   const [plus, setPlus] = useState(false);
   const [credentials, setCredentials] = useState([]); // { ref, label }
