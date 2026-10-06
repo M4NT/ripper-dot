@@ -1,6 +1,106 @@
-# Instalação e execução
+# Instalação e primeiro uso
 
-Este guia descreve o que o repositório **realmente** oferece hoje: scripts npm em `package.json`, servidor Node e front-end Vite. Não há pacote publicado no npm registry — o Ripper roda a partir do clone do repositório.
+A primeira parte deste guia é para quem **não é da área técnica**. A segunda parte (a partir de "Referência técnica") é para quem vai configurar servidor, rede ou contribuir com o código.
+
+> Hoje ainda **não existe instalador** (aquele arquivo que se clica duas vezes). A instalação usa alguns comandos digitados no terminal. São poucos, e basta copiar e colar. Um instalador para Windows e Mac está no plano.
+
+## Parte 1 — Passo a passo
+
+### O que você precisa
+
+- Um computador com Windows, Mac ou Linux, ligado à internet.
+- Uma conta de IA: **assinatura do Claude** (Pro, Max ou Teams), **ChatGPT** (para o Codex) ou uma **chave de API** da Anthropic.
+- Uns 20 minutos.
+
+Leia antes os [termos de uso](termos-de-uso.md) e a [política de privacidade](politica-de-privacidade.md) (rascunhos), principalmente se for usar a conta da empresa ou atender clientes.
+
+### 1. Instale o Node.js
+
+O Ripper funciona em cima do Node.js (versão 22 ou mais nova).
+
+1. Entre em https://nodejs.org e baixe a versão **LTS**.
+2. Instale clicando em "Próximo" até o fim.
+3. Para conferir: abra o **Terminal** (no Windows, procure por "PowerShell" no menu Iniciar) e digite `node -v`. Deve aparecer algo como `v22...` ou maior.
+
+### 2. Baixe o Ripper
+
+Se você recebeu o Ripper como arquivo `.zip`, descompacte numa pasta fácil de achar (por exemplo, Documentos\ripper). Se tem o Git instalado, pode baixar com:
+
+```sh
+git clone https://github.com/M4NT/ripper-dot.git
+```
+
+### 3. Prepare o Ripper (só na primeira vez)
+
+No terminal, entre na pasta do Ripper e rode os dois comandos abaixo, um de cada vez. O primeiro baixa as peças que o Ripper usa; o segundo monta a tela.
+
+```sh
+cd caminho/da/pasta/ripper
+npm ci
+npm run build
+```
+
+Pode demorar alguns minutos. Avisos em amarelo são normais; só se preocupe se terminar com "ERR!".
+
+### 4. Entre na sua conta de IA
+
+- **Claude por assinatura:** instale o Claude Code (https://claude.com/claude-code) e rode `claude login` no terminal. Vai abrir o navegador para você entrar na sua conta.
+- **ChatGPT / Codex:** instale o Codex e rode `codex login`.
+- **Chave de API:** pule este passo; você cola a chave dentro do Ripper, em Configurações → Modelos (essa tela aparece no modo Enterprise: Configurações → Aparência).
+
+### 5. Abra o Ripper
+
+```sh
+npm start
+```
+
+Deixe essa janela do terminal aberta e entre no navegador em **http://127.0.0.1:3000**.
+
+### 6. Faça o Ripper abrir sozinho com o computador (recomendado)
+
+Assim você não precisa repetir o passo 5 e, se o Ripper cair, ele volta sozinho:
+
+```sh
+node scripts/service.mjs install
+```
+
+- Para ver se está ativo: `node scripts/service.mjs status`
+- Para desfazer: `node scripts/service.mjs uninstall`
+
+No Windows isso cria uma tarefa que roda quando você entra na sua conta; no Mac e no Linux, um serviço do usuário. Depois de instalar, não rode `npm start` ao mesmo tempo (os dois tentariam usar a mesma porta).
+
+### 7. Primeiros passos dentro do app
+
+Ao abrir uma conversa vazia, o Ripper mostra uma lista curta de **Primeiros passos**:
+
+1. **Conectar um modelo** — confirma que a conta de IA do passo 4 está funcionando.
+2. **Escolher quais IAs usar** (modo Enterprise) — quais modelos ficam ligados e o limite de esforço de cada um.
+3. **Criar um agente** — dê um nome e diga em uma frase o que ele faz.
+4. **Enviar uma mensagem** — peça algo simples para testar.
+
+Quando um agente quiser fazer algo em seu nome fora do computador (mandar WhatsApp, e-mail, publicar), o pedido aparece na **Caixa** para você aprovar ou recusar.
+
+### Opcional
+
+- **Docker** (https://www.docker.com/products/docker-desktop): dá a cada agente um "computador próprio" para rodar programas e navegar. Sem ele o Ripper funciona, mas os agentes não usam esse computador. O WhatsApp por QR Code também precisa do Docker.
+- **WhatsApp e e-mail:** em Conectores. Antes de atender clientes, leia a seção sobre WhatsApp nos [termos de uso](termos-de-uso.md).
+
+### Deu problema?
+
+| O que aparece | O que fazer |
+| --- | --- |
+| `node` não é reconhecido | O Node.js não foi instalado ou o terminal foi aberto antes. Feche e abra o terminal de novo. |
+| A página não abre | Confira se o terminal do `npm start` está aberto, ou rode `node scripts/service.mjs status`. |
+| "porta em uso" / `EADDRINUSE` | Já tem um Ripper rodando (talvez como serviço). Use o que já está aberto. |
+| O agente não responde | Refaça o `claude login` (ou `codex login`) e tente de novo. |
+
+Seus dados ficam na pasta `data` dentro da pasta do Ripper. Para levar para outro computador ou guardar uma cópia, use Configurações → Backup ou copie essa pasta com o Ripper fechado.
+
+---
+
+## Parte 2 — Referência técnica
+
+Esta parte descreve o que o repositório oferece hoje: scripts npm em `package.json`, servidor Node e front-end Vite. Não há pacote publicado no npm registry — o Ripper roda a partir do clone do repositório. Arquitetura e testes: [desenvolvimento.md](desenvolvimento.md).
 
 ## Requisitos
 

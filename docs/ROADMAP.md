@@ -101,10 +101,10 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 
 ### D. Dados, LGPD e termos (P0)
 - ✅ Exclusão de dados pessoais, mascaramento antes do modelo, retenção automática.
-- [ ] Termos de uso e política de privacidade (o que fica na máquina, o que vai para os provedores).
-- [ ] Aviso de uso de contas de terceiros (assinatura pessoal × Teams da empresa).
+- 🔨 Termos de uso e política de privacidade (o que fica na máquina, o que vai para os provedores): **rascunho** em [termos-de-uso.md](termos-de-uso.md) e [politica-de-privacidade.md](politica-de-privacidade.md). [ ] Revisão jurídica.
+- 🔨 Aviso de uso de contas de terceiros (assinatura pessoal × Teams da empresa): **rascunho** nos termos de uso. [ ] Revisão jurídica. [ ] Mostrar o aviso no app ao adicionar conta.
 - [ ] Exportar tudo (conversas, agentes, arquivos) num pacote legível.
-- [ ] Registro de consentimento para WhatsApp de clientes (quem pode ser atendido por agente).
+- [ ] Registro de consentimento para WhatsApp de clientes (quem pode ser atendido por agente). Regras já descritas no **rascunho** dos termos; falta o registro no app.
 
 ### E. Qualidade e testes (P0)
 - ✅ ~620 testes automáticos rodando.
@@ -154,9 +154,9 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - [ ] Aprovar e recusar direto pela notificação.
 
 ### J. Documentação (P1)
-- [ ] Guia de instalação e primeiro uso, em português, com imagens.
+- 🔨 Guia de instalação e primeiro uso, em português: passo a passo em [instalacao.md](instalacao.md). [ ] Imagens.
 - [ ] Central de ajuda dentro do app (o que cada coisa faz, exemplos de pedidos).
-- [ ] Documentação para quem desenvolve (arquitetura, como rodar os testes, como criar uma integração).
+- ✅ Documentação para quem desenvolve (arquitetura, como rodar os testes, como criar uma integração): [desenvolvimento.md](desenvolvimento.md).
 
 ### K. Distribuição e negócio (P2)
 - [ ] Versão em inglês revisada.
