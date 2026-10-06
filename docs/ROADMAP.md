@@ -10,6 +10,9 @@
 Cada agente tem computador próprio, memória, rotinas, canais (WhatsApp, e-mail, GitHub) e responde por um pedaço do negócio. O dono conversa com um ou com o time todo, aprova o que é arriscado e vê tudo o que foi feito em seu nome.
 
 **Para quem:** empresas (B2B) e pessoas (B2C). **Onde roda:** na máquina do cliente — os dados ficam com ele.
+**Um Ripper por pessoa:** cada funcionário tem o seu, na própria máquina (sem login por usuário; senha única protege cada instalação).
+**Qual IA:** a pessoa traz a própria conta (Claude, ChatGPT ou chave de API). Quem não tem, usa **modelos locais**, e o Ripper escolhe sozinho o melhor modelo que o computador dela aguenta.
+**Celular:** pareado por **QR Code**, no mesmo modelo do Orca ADE.
 *(Decisões do dono, 06/10/2026.)*
 
 O objetivo final é **ser melhor que o Grok** naquilo que importa para quem usa IA para trabalhar: **fazer o trabalho, não só responder**.
@@ -63,7 +66,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 "Produção" aqui = outra pessoa instala e usa o Ripper no dia a dia sem você do lado.
 
 ### A. Segurança (P0)
-- 🔨 **Login com senha única** (decidido em 06/10/2026). Pede a senha ao abrir; sessão por cookie seguro; chamadas de dentro dos contêineres dos agentes nunca entram sem a senha; tela de login e "esqueci a senha" (redefinir pelo terminal). *Responsável: Engenheiro (Ripper), depois do staging.*
+- 🔨 **Login com senha única** (decidido em 06/10/2026; um Ripper por pessoa, então não há login por usuário). Pede a senha ao abrir; sessão por cookie seguro; chamadas de dentro dos contêineres dos agentes nunca entram sem a senha; tela de login e "esqueci a senha" (redefinir pelo terminal). *Responsável: Engenheiro (Ripper), depois do staging.*
 - ✅ Agentes não usam a API do Ripper de dentro do próprio computador (403). [ ] Fechar de vez com o login (o cabeçalho Host pode ser forjado).
 - [ ] HTTPS para acesso fora de casa (túnel com login: Cloudflare Tunnel ou Tailscale), com passo a passo dentro do app.
 - [ ] Proteção contra CSRF nas rotas que mudam algo (hoje: verificação de origem).
@@ -89,6 +92,8 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - [ ] **Instalador para Windows e Mac** que traz Node, cria o serviço e abre o app — sem terminal.
 - [ ] Assistente de primeiro uso: conta do Claude (login), Docker (detecta e orienta), primeiro agente em 1 frase, WhatsApp opcional.
 - [ ] Funcionar sem Docker (modo "sem computador" claro, com o que o agente perde).
+- [ ] **Modelos locais para quem não tem conta de IA**: o Ripper detecta o hardware (memória, placa de vídeo, Apple Silicon) e escolhe o melhor modelo que cabe nele, baixa pelo Ollama com 1 clique e já liga nos agentes. Partir de um projeto aberto que já faz isso em vez de reinventar: **llmfit** (Alex Jones; ordena por caber, velocidade e qualidade; fala com Ollama, llama.cpp, LM Studio) ou **whichllm** (Andyyyy64; usa notas de benchmark reais do Hugging Face). Avaliar licença e escolher um.
+- [ ] Assistente de primeiro uso pergunta "Você tem conta de IA?" → Claude / ChatGPT / chave de API / "não tenho" (modelo local), explicando o que muda em qualidade.
 - [ ] Atualização automática com notas da versão.
 - [ ] Desinstalar limpo (opção de manter os dados).
 - [ ] Imagem dos agentes baixada pronta (registro de imagens), sem reconstruir na máquina.
@@ -131,9 +136,12 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - [ ] Relatório de erro com 1 clique (sem dados pessoais) para suporte.
 - [ ] Auditoria de capacidades toda noite, com alerta na Caixa se algo quebrar.
 
-### I. Acesso de qualquer lugar (P1)
+### I. Acesso de qualquer lugar (P1 → Fase 2)
 - ✅ PWA, notificações no aparelho, layout de tablet.
-- [ ] Acesso remoto seguro (depende de A: login + HTTPS).
+- [ ] **Pareamento por QR Code (modelo do Orca ADE).** O QR leva um link com: endereço do Ripper, um token do aparelho e a chave pública do computador. O celular conecta e toda a conversa vai **cifrada de ponta a ponta** (X25519 + NaCl), então quem repassa os dados não consegue ler. Aparelhos pareados ficam listados, com "Desconectar este aparelho"; gerar um QR novo invalida o anterior; o convite expira em até 10 minutos.
+- [ ] **Em casa (mesma rede):** conexão direta pelo Wi-Fi, sem servidor nenhum. Primeira entrega.
+- [ ] **Fora de casa:** um **servidor de retransmissão** (relay) que liga celular e computador — o computador abre uma conexão de saída até ele, então não precisa abrir portas no roteador. É o que o Orca faz (relay próprio em `relay.onorca.dev`). Para o Ripper: **nós hospedamos um relay** (custo baixo: só repassa bytes cifrados) ou o usuário usa Tailscale como alternativa. *Decisão pendente: hospedar o relay.*
+- [ ] Referência no código do Orca: `src/shared/pairing.ts`, `src/shared/mobile-relay-pairing-offer.ts`, `src/main/runtime/relay/`, `src/shared/e2ee-crypto.ts`, `src/main/ipc/mobile.ts`.
 - [ ] Testar notificações de verdade (Android, iPhone instalado na tela inicial).
 - [ ] Aprovar e recusar direto pela notificação.
 
@@ -181,6 +189,7 @@ Geração de imagem dentro das tarefas, depois vídeo.
 - Omie (Fase 3): agentes operando o Omie com sessões de portal que se recuperam sozinhas (detectar expiração, pausar o lote, pedir reautenticação na Caixa, retomar).
 - Linha do tempo com print da tela por ação; delegação visível também para mensagens diretas.
 - Catálogo único de Conectores / Integrações / Marketplace.
+- B2B com um Ripper por pessoa: exportar/importar um time de agentes (instruções, rotinas, skills) para outro colega usar no Ripper dele.
 
 ---
 
