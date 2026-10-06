@@ -88,3 +88,14 @@ test('SIGTERM faz novas requisições /api/* retornarem 503', { skip: process.pl
     await new Promise(r => child.on('exit', r));
   }
 });
+
+test('waitForTurns espera os turnos acabarem e respeita o prazo', async () => {
+  const { waitForTurns } = await import('../lib/shutdown.mjs');
+  let n = 2;
+  setTimeout(() => { n = 0; }, 60);
+  assert.equal(await waitForTurns(() => n, 2000, 10), 0);
+  const t0 = Date.now();
+  assert.equal(await waitForTurns(() => 1, 50, 10), 1, 'prazo esgotado devolve quantos ficaram');
+  assert.ok(Date.now() - t0 < 1000);
+  assert.equal(await waitForTurns(undefined, 50), 0);
+});

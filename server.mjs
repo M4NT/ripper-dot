@@ -62,7 +62,7 @@ import { SECRET_PATHS } from './lib/local-secret.mjs';
 import { emailReady, listEmails, readEmail, sendEmail, newEmailsSince, testEmail, getAttachment, safeName, attachmentText, readHint } from './lib/email.mjs';
 import { gh, githubReady, normalizeRepo, repoChanges, describeChange, prBranch, gitAuthArg, hideToken } from './lib/github.mjs';
 import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './lib/event-triggers.mjs';
-import { isPaidModel, paidBlockReason, addSpend, spendToday, spendLimits, normalizeBilling } from './lib/paid-usage.mjs';
+import { isPaidModel, paidBlockReason, addSpend, spendToday, spendLimits, normalizeBilling, useSpendStore, closeSpendStore } from './lib/paid-usage.mjs';
 import { runTestProvider } from './lib/test-provider.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
 import { memoryContext, isDuplicateMemory, canUseFile, selectSpeakers, mentionOrder, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent, turnPlanIds, delegationTasks } from './lib/agent-flow.mjs';
@@ -127,7 +127,7 @@ import {
 } from './lib/semantic-cache.mjs';
 import { verifyMcpConnector } from './lib/mcp-probe.mjs';
 import { shutdownStdioSupervisors } from './lib/mcp-stdio-supervisor.mjs';
-import { closeSpares } from './lib/claude-prewarm.mjs';
+import { closeSpares, warmAgent } from './lib/claude-prewarm.mjs';
 import {
   applyOAuthTokensToPlugin,
   refreshPluginOAuthToken,
@@ -208,7 +208,7 @@ import {
 } from './lib/backup.mjs';
 import { memoAsync } from './lib/ttl-cache.mjs';
 import { attachRequestId } from './lib/request-id.mjs';
-import { isShuttingDown, registerGracefulShutdown, SHUTDOWN_MESSAGE } from './lib/shutdown.mjs';
+import { isShuttingDown, registerGracefulShutdown, requestShutdown, RESTART_EXIT_CODE, SHUTDOWN_MESSAGE } from './lib/shutdown.mjs';
 import { closeUsageEventsStore, listUsageEventsSince } from './lib/usage-events.mjs';
 import { agentDayStats } from './lib/agent-day-stats.mjs';
 import { parseUsageQuery, aggregateUsage, usageCsv, resolveClient, normalizeClient } from './lib/usage-report.mjs';
@@ -287,6 +287,7 @@ function settingsForMcp(s, mcpSession) {
 const APP_PKG = JSON.parse(await readFile(new URL('./package.json', import.meta.url), 'utf8'));
 const SERVER_STARTED_AT = Date.now();
 const db = load();
+useSpendStore(fileURLToPath(dataUrl('spend.sqlite')));
 let localPull = null; // download de modelo local em andamento (um por vez)
 db.pairedDevices ||= [];
 syncOpenRouterModels(db.settings); // modelos do OpenRouter escolhidos em Configurações
@@ -1770,7 +1771,13 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
   else recordChatTurn('error');
 }
 
-async function chat({ chat, text, fileIds, signal, mcpSession, skipUserPush = false, credentialRefs, voice }, emit) {
+// Turnos em andamento: o encerramento gracioso espera chegar a zero antes de sair.
+let activeTurns = 0;
+async function chat(args, emit) {
+  activeTurns++;
+  try { return await chatTurn(args, emit); } finally { activeTurns--; }
+}
+async function chatTurn({ chat, text, fileIds, signal, mcpSession, skipUserPush = false, credentialRefs, voice }, emit) {
   logger.info('chat.turn.start', { chatId: chat.id, resume: skipUserPush });
   const refs = (credentialRefs || []).filter(isVaultRef);
   try {
@@ -3158,12 +3165,14 @@ const routes = [
     const c = db.chats.find(c => c.id === cid);
     if (!c) throw new HttpError(404, 'Conversa não encontrada.');
     if (c.unread) { c.unread = false; save(); }
+    warmAgent(c.agentId); // 1ª mensagem ao abrir já pega processo quente
     return chatDetail(c, cid);
   }],
   ['GET', /^\/api\/conversations\/([\w-]+)$/, (req, [cid]) => {
     const c = db.chats.find(c => c.id === cid);
     if (!c) throw new HttpError(404, 'Conversa não encontrada.');
     if (c.unread) { c.unread = false; save(); }
+    warmAgent(c.agentId); // 1ª mensagem ao abrir já pega processo quente
     return chatDetail(c, cid);
   }],
   ['GET', /^\/api\/chats\/([\w-]+)\/export$/, (req, [cid]) => {
@@ -3763,14 +3772,25 @@ registerGracefulShutdown(server, {
     closeSpares();
   },
   getActiveConnections: () => activeHttpConnections,
+  getActiveTurns: () => activeTurns,
   flush,
   closeStores: () => {
     closeUsageEventsStore();
     closeJuliaEventsStore();
     closePersistCoordStore();
     closeIdempotencyStore();
+    closeSpendStore();
   }
 });
+
+// Atualização sem derrubar turnos: `node scripts/service.mjs restart` cria este arquivo; o servidor para de
+// aceitar turnos, espera os em andamento e sai com RESTART_EXIT_CODE para o vigia subir a versão nova.
+const restartFlag = fileURLToPath(dataUrl('restart.request'));
+setInterval(() => {
+  if (!existsSync(restartFlag)) return;
+  try { unlinkSync(restartFlag); } catch {}
+  requestShutdown('restart', RESTART_EXIT_CODE);
+}, 2000).unref();
 
 // Rotinas: o agente dono acorda (por horário ou evento), executa e só deixa conversa se houver novidade.
 /**

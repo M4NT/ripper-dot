@@ -81,7 +81,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - ✅ **Reiniciar o servidor não perde turnos**: retoma sozinho os que só leram/pesquisaram; os que já fizeram algo com efeito fora (enviar, publicar) param com aviso na Caixa.
 - 🔨 **Staging que sobrevive a reinício** (docker-compose, dados de exemplo, provedor simulado para smoke). *Engenheiro (Ripper), em andamento.*
 - ✅ Servidor como serviço do sistema: `node scripts/service.mjs install` (Windows, macOS, Linux), com vigia que reinicia se cair. [ ] Testar o `install` em máquina real.
-- [ ] Atualização sem derrubar o que está rodando: ✅ aviso "Nova versão — recarregar" nas abas abertas (compara o id da build em `/api/auth/status` a cada minuto). [ ] Esperar turnos terminarem antes de reiniciar.
+- ✅ Atualização sem derrubar o que está rodando: aviso "Nova versão — recarregar" nas abas abertas; `node scripts/service.mjs restart` (ou SIGTERM) para de aceitar turnos, espera os em andamento (até `RIPPER_DRAIN_TURNS_MS`, padrão 2 min; o que passar é retomado depois) e o vigia sobe a versão nova na hora.
 - ✅ Backup automático diário, cópia extra em outra pasta, aviso de falha. ✅ Backup manual corrigido (link simbólico criado no Docker derrubava o `tar`; agora fica de fora com aviso). ✅ Teste de restauração automático após cada backup diário (extrai numa pasta temporária e confere o `db.json`; falha vira aviso).
 - ✅ Fila de envios com novas tentativas (WhatsApp, e-mail, publicações).
 - [ ] Contêineres dos agentes: um por agente e por pasta de trabalho (hoje duas conversas do mesmo agente em pastas diferentes se revezam recriando).
@@ -117,9 +117,9 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 
 ### F. Desempenho e custo (P1)
 - ✅ Processo pré-aquecido (1ª palavra 1,3–2 s), cache de prompt, rota rápida para conversa curta, envio instantâneo no chat.
-- [ ] 1ª palavra < 1 s na mediana; aquecer ao abrir a conversa (hoje a 1ª mensagem de cada agente é fria).
+- [ ] 1ª palavra < 1 s na mediana. ✅ Abrir a conversa reaquece o processo do agente (e o marca como recente no limite de 3). [ ] O 1º turno de cada agente após o servidor subir ainda é frio (o aquecimento reaproveita a configuração do último turno).
 - [ ] Prompt de sistema enxuto (medir por agente e cortar o que não é usado).
-- [ ] Memória do servidor sob controle com muitos agentes (processos pré-aquecidos, contêineres).
+- [ ] Memória do servidor sob controle com muitos agentes: ✅ processos pré-aquecidos limitados a 3 (sai o menos recente, inclusive ao abrir conversas). [ ] Contêineres.
 - [ ] Custo em R$ e previsão de fim de mês.
 
 ### G. Experiência de uso (P1)
@@ -234,7 +234,6 @@ Geração de imagem dentro das tarefas, depois vídeo.
 
 ## 6. Pontes conhecidas (defeitos que ainda não doem, mas vão doer)
 - **Agentes e pasta compartilhada:** os agentes trabalham em `/project`, que é a mesma pasta onde o servidor roda; trocar de branch lá muda o código do Ripper em uso. Usar cópia própria para trabalhar no código.
-- **Gasto entre processos:** com dois servidores no mesmo diretório o gasto do dia é subcontado (mover para SQLite).
 - **Testes instáveis** em máquina carregada (servidor demora a subir).
 - **`listExternal`** filtra em memória (até 5.000 linhas).
 - **Trocar sozinho no limite** (contas do Claude) está desligado nas configurações atuais — com ele assim, o Ripper não passa para a outra conta quando uma esgota.
