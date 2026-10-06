@@ -31,10 +31,11 @@ export default function Inbox() {
     <div className="page inbox-page">
       <header className="page-head">
         <div><h1>Caixa</h1><p className="lede">O que os agentes precisam de você: aprovações, recados de clientes e novidades das rotinas.</p></div>
-        <div className="row"><a className="btn" href="#/outbox">Envios</a><a className="btn" href="#/log">Ações externas</a></div>
+        <div className="row"><a className="btn" href="#/outbox" title="Mensagens, e-mails e publicações que falharam e vão tentar de novo">Fila de envios</a><a className="btn" href="#/log">Ações externas</a></div>
       </header>
       <div className="toolbar">
-        <Segmented label="Filtrar a caixa" value={filter} onChange={setFilter} items={FILTERS.map(([k, l]) => [k, l, count(k)])} />
+        {/* só os filtros que têm algo (e o selecionado): sete abas com 0 eram ruído */}
+        <Segmented label="Filtrar a caixa" value={filter} onChange={setFilter} items={FILTERS.filter(([k]) => k === 'all' || k === filter || count(k) > 0).map(([k, l]) => [k, l, count(k)])} />
       </div>
       {items.length === 0
         ? <EmptyState title="Nada esperando por você" body={filter === 'all' ? 'Quando um agente pedir aprovação, deixar um recado de cliente ou uma rotina trouxer novidade, aparece aqui.' : 'Nada deste tipo agora.'} />
