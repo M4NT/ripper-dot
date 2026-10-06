@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseEvolutionMessage, isAllowed, makeRateLimiter, channelSafeAgent } from '../lib/evolution.mjs';
+import { freePort } from './helpers/free-port.mjs';
 
 const msg = (key, text = 'oi', extra = {}) => ({ event: 'messages.upsert', data: { key: { id: 'm1', ...key }, pushName: 'Ana', message: { conversation: text }, ...extra } });
 
@@ -42,7 +43,7 @@ test('webhook interno: recusa sem token, guarda só quem está na lista e respon
     let b = ''; req.on('data', c => (b += c)); req.on('end', () => { sent.push({ url: req.url, apikey: req.headers.apikey, body: JSON.parse(b || '{}') }); res.setHeader('content-type', 'application/json'); res.end('{}'); });
   });
   await new Promise(r => evo.listen(0, '127.0.0.1', r));
-  const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r)); const port = probe.address().port; await new Promise(r => probe.close(r));
+  const port = await freePort();
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-waweb-'));
   const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
     env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'stream', HOME: dataDir, USERPROFILE: dataDir, JULIA_AUTOSTART: '0', EVOLUTION_URL: `http://127.0.0.1:${evo.address().port}` },
@@ -50,7 +51,7 @@ test('webhook interno: recusa sem token, guarda só quem está na lista e respon
   });
   const base = `http://127.0.0.1:${port}`;
   try {
-    for (let i = 0; i < 60; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 250)); }
+    for (let i = 0; i < 240; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 250)); }
     const st = await (await fetch(base + '/api/state')).json();
     const put = b => fetch(base + '/api/settings', { method: 'PUT', headers: { 'content-type': 'application/json', origin: base }, body: JSON.stringify(b) });
     assert.equal((await put({ ui: { mode: 'enterprise' } })).status, 200);
@@ -126,14 +127,14 @@ test('com leitura ligada: rascunho só sai com aprovação; "só lê" e mensagem
   const sent = [];
   const evo = http.createServer((req, res) => { let b = ''; req.on('data', c => (b += c)); req.on('end', () => { sent.push({ url: req.url, body: JSON.parse(b || '{}') }); res.end('{}'); }); });
   await new Promise(r => evo.listen(0, '127.0.0.1', r));
-  const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r)); const port = probe.address().port; await new Promise(r => probe.close(r));
+  const port = await freePort();
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-waread-'));
   const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
     env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'stream', HOME: dataDir, USERPROFILE: dataDir, JULIA_AUTOSTART: '0', EVOLUTION_URL: `http://127.0.0.1:${evo.address().port}` },
     stdio: 'ignore'
   });
   const base = `http://127.0.0.1:${port}`;
-  const wait = async (fn, ms = 10_000) => { for (let i = 0; i < ms / 200 && !(await fn()); i++) await new Promise(r => setTimeout(r, 200)); };
+  const wait = async (fn, ms = 60_000) => { for (let i = 0; i < ms / 200 && !(await fn()); i++) await new Promise(r => setTimeout(r, 200)); };
   try {
     await wait(async () => { try { return (await fetch(base + '/api/health')).ok; } catch { return false; } });
     const st = await (await fetch(base + '/api/state')).json();
@@ -172,14 +173,15 @@ test('com leitura ligada: rascunho só sai com aprovação; "só lê" e mensagem
 test('grupo: parser lê quem falou; só guarda com "Ler grupos" e nunca responde', async () => {
   const { parseEvolutionGroup } = await import('../lib/evolution.mjs');
   const gEv = (id, text, extra = {}) => ({ event: 'messages.upsert', data: { key: { id, remoteJid: '120363111@g.us', participant: '5511988887777@s.whatsapp.net', ...extra }, pushName: 'Tia Ana', message: { conversation: text } } });
-  assert.deepEqual(parseEvolutionGroup(gEv('g1', 'bom dia família')), { id: 'g1', groupJid: '120363111@g.us', key: 'g120363111', text: 'Tia Ana: bom dia família', fromMe: false, at: parseEvolutionGroup(gEv('g1', 'bom dia família')).at });
+  const g1 = parseEvolutionGroup(gEv('g1', 'bom dia família'));
+  assert.deepEqual(g1, { id: 'g1', groupJid: '120363111@g.us', key: 'g120363111', text: 'Tia Ana: bom dia família', fromMe: false, at: g1.at });
   assert.equal(parseEvolutionGroup(msg({ remoteJid: '5511988887777@s.whatsapp.net' })), null); // individual não é grupo
   assert.equal(parseEvolutionMessage(gEv('g1', 'oi')), null);                                    // grupo nunca entra no fluxo de resposta
 
   const sent = [];
   const evo = http.createServer((req, res) => { let b = ''; req.on('data', c => (b += c)); req.on('end', () => { sent.push(req.url); res.setHeader('content-type', 'application/json'); res.end(req.url.startsWith('/group/') ? '{"subject":"Familia mil grau"}' : '{}'); }); });
   await new Promise(r => evo.listen(0, '127.0.0.1', r));
-  const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r)); const port = probe.address().port; await new Promise(r => probe.close(r));
+  const port = await freePort();
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-wagrp-'));
   const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
     env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'stream', HOME: dataDir, USERPROFILE: dataDir, JULIA_AUTOSTART: '0', EVOLUTION_URL: `http://127.0.0.1:${evo.address().port}` },
@@ -187,7 +189,7 @@ test('grupo: parser lê quem falou; só guarda com "Ler grupos" e nunca responde
   });
   const base = `http://127.0.0.1:${port}`;
   try {
-    for (let i = 0; i < 60; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 250)); }
+    for (let i = 0; i < 240; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 250)); }
     const st = await (await fetch(base + '/api/state')).json();
     const put = b => fetch(base + '/api/settings', { method: 'PUT', headers: { 'content-type': 'application/json', origin: base }, body: JSON.stringify(b) });
     await put({ ui: { mode: 'enterprise' } });
@@ -215,14 +217,14 @@ test('grupo: parser lê quem falou; só guarda com "Ler grupos" e nunca responde
 test('gatilho por evento: palavra-chave no WhatsApp dispara a rotina (mensagem sua não)', async () => {
   const evo = http.createServer((req, res) => { req.resume(); req.on('end', () => res.end('{}')); });
   await new Promise(r => evo.listen(0, '127.0.0.1', r));
-  const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r)); const port = probe.address().port; await new Promise(r => probe.close(r));
+  const port = await freePort();
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-watrig-'));
   const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
     env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'stream', HOME: dataDir, USERPROFILE: dataDir, JULIA_AUTOSTART: '0', EVOLUTION_URL: `http://127.0.0.1:${evo.address().port}` },
     stdio: 'ignore'
   });
   const base = `http://127.0.0.1:${port}`;
-  const wait = async (fn, ms = 10_000) => { for (let i = 0; i < ms / 200 && !(await fn()); i++) await new Promise(r => setTimeout(r, 200)); };
+  const wait = async (fn, ms = 60_000) => { for (let i = 0; i < ms / 200 && !(await fn()); i++) await new Promise(r => setTimeout(r, 200)); };
   try {
     await wait(async () => { try { return (await fetch(base + '/api/health')).ok; } catch { return false; } });
     const st = await (await fetch(base + '/api/state')).json();

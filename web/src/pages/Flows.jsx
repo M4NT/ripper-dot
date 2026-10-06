@@ -41,7 +41,7 @@ export default function Flows() {
 
   if (edit) return <FlowEditor edit={edit} setEdit={setEdit} agents={agents} agentOf={agentOf} onSave={save} />;
   return (
-    <div className="page">
+    <div className="page v2">
       {confirmNode}
       <header className="page-head">
         <div><h1>Fluxos</h1><p className="lede">Agentes em sequência: um pesquisa, o outro escreve, o próximo publica. Cada um trabalha em cima do anterior, e você aprova onde quiser.</p></div>
@@ -90,7 +90,7 @@ function FlowEditor({ edit, setEdit, agents, agentOf, onSave }) {
   const move = (i, d) => { const steps = [...edit.steps]; [steps[i], steps[i + d]] = [steps[i + d], steps[i]]; setEdit({ ...edit, steps }); };
   const options = agents.map(a => ({ value: a.id, label: a.name, hint: a.description, icon: <AgentAvatar agent={a} size={18} /> }));
   return (
-    <div className="page">
+    <div className="page v2">
       <header className="page-head">
         <div><a className="link back" href="#/flows" onClick={e => { e.preventDefault(); setEdit(null); }}><Icon name="arrowL" size={14} />Fluxos</a>
           <input className="input flow-name" value={edit.name} onChange={e => setEdit({ ...edit, name: e.target.value })} placeholder="Nome do fluxo (ex.: Post do blog)" aria-label="Nome do fluxo" autoFocus={!edit.id} /></div>

@@ -1,12 +1,13 @@
 import { createContext, lazy as reactLazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
-import { api, go, useRoute, useTheme, useMediaQuery, fmtAgo, local, brandLogoSrc, brandTitle } from './lib.js';
+import { api, go, useRoute, useTheme, useMediaQuery, fmtAgo, local, brandLogoSrc, brandTitle, stepLabel } from './lib.js';
 import { Icon, AgentAvatar, ToastProvider, useToast, Dialog, Menu, MenuItem } from './ui.jsx';
 import Home from './pages/Home.jsx';
 import { OverlayProvider } from './overlay.jsx';
 import ChatAvatar, { isGroupChat } from './chatAvatar.jsx';
 import { useChatMenu } from './actions.jsx';
 import { ApprovalTray } from './approvals.jsx';
+import { FirstRunWizard } from './firstRunWizard.jsx';
 import { ResizeHandle } from './resize.jsx';
 import Chat from './pages/Chat.jsx';
 import { useSidebarDrag, useFlip } from './agentDrag.jsx';
@@ -28,6 +29,7 @@ const Projects = lazy(() => import('./pages/Projects.jsx'));
 const Project = lazy(() => import('./pages/Project.jsx'));
 const Chats = lazy(() => import('./pages/Chats.jsx'));
 const Explore = lazy(() => import('./pages/Explore.jsx'));
+const Help = lazy(() => import('./pages/Help.jsx'));
 const Library = lazy(() => import('./pages/Library.jsx'));
 const Integrations = lazy(() => import('./pages/Integrations.jsx'));
 const Marketplace = lazy(() => import('./pages/Marketplace.jsx'));
@@ -42,7 +44,7 @@ const Flows = lazy(() => import('./pages/Flows.jsx'));
 const Outbox = lazy(() => import('./pages/Outbox.jsx'));
 const Health = lazy(() => import('./pages/Health.jsx'));
 
-const HUB_ROUTES = new Set(['marketplace', 'connectors', 'skills', 'integrations', 'explore', 'settings', 'saude']);
+const HUB_ROUTES = new Set(['marketplace', 'connectors', 'skills', 'integrations', 'explore', 'settings', 'saude', 'ajuda']);
 const Ctx = createContext(null);
 export const useApp = () => useContext(Ctx);
 
@@ -51,6 +53,12 @@ function Provider({ children }) {
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState({}); // agentId -> true enquanto responde (em alguma conversa)
   const [busyChats, setBusyChats] = useState({}); // chatId -> true: só esta conversa anima
+  // Quem está trabalhando segundo o servidor (rotinas, WhatsApp, outra aba): a tela nunca fica parada
+  const [working, setWorking] = useState({});
+  useEffect(() => {
+    const load = () => document.visibilityState === 'visible' && api('/api/agents/working').then(r => setWorking(r.working || {}), () => {});
+    load(); const t = setInterval(load, 4000); return () => clearInterval(t);
+  }, []);
   const toast = useToast();
   const refresh = useCallback(async () => {
     try { setS(await api('/api/state')); setError(null); }
@@ -60,10 +68,12 @@ function Provider({ children }) {
   // Rotinas criam conversas no servidor: atualiza ao voltar para a aba.
   useEffect(() => { const f = () => document.visibilityState === 'visible' && refresh(); document.addEventListener('visibilitychange', f); return () => document.removeEventListener('visibilitychange', f); }, [refresh]);
   const value = useMemo(() => S && {
-    S, refresh, toast, busy, setBusy, busyChats, setBusyChats,
+    S, refresh, toast, setBusy, setBusyChats, working,
+    busy: { ...Object.fromEntries(Object.keys(working).map(id => [id, true])), ...busy },
+    busyChats: { ...Object.fromEntries(Object.values(working).filter(w => w.chatId).map(w => [w.chatId, true])), ...busyChats },
     agent: id => S.agents.find(a => a.id === id),
     updateAgent: async (id, patch) => { const a = await api(`/api/agents/${id}`, { method: 'PUT', body: patch }); setS(s => ({ ...s, agents: s.agents.map(x => x.id === id ? a : x) })); return a; }
-  }, [S, refresh, toast, busy, busyChats]);
+  }, [S, refresh, toast, busy, busyChats, working]);
   if (error && !S) return <Boot error={error} retry={refresh} />;
   if (!value) return <Boot />;
   return <Ctx.Provider value={value}><I18nProvider locale={S.settings.ui?.locale}>{children}</I18nProvider></Ctx.Provider>;
@@ -82,15 +92,16 @@ function Boot({ error, retry }) {
 const agentTag = a => a?.description || a?.category || '';
 
 function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollapse }) {
-  const { S, agent, busy } = useApp();
+  const { S, agent, busy, working } = useApp();
   const t = useT();
   const enterprise = isEnterpriseMode(S.settings);
   const { parts } = useRoute();
+  const doing = id => { const w = working[id]; return w ? `${w.tool ? stepLabel(w.tool) : 'trabalhando'}${w.chatTitle === 'WhatsApp' ? ' no WhatsApp' : ''}…` : 'trabalhando…'; };
   const chatMenu = useChatMenu();
   const section = parts[0] === 'c' ? 'chat' : parts[0] || '';
-  // Avisos de agente de canal moram na Caixa, não na lista de conversas
+  // Avisos de agente de canal moram na Caixa; conversa entre agentes abre dentro da conversa de quem pediu de conversas
   // Avisos de agente de canal moram na Caixa, não na lista
-  const visible = [...S.chats].filter(c => !c.archived && !String(c.channelKey || '').startsWith('owner:')).sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
+  const visible = [...S.chats].filter(c => !c.archived && !c.inboxKey && !String(c.channelKey || '').startsWith('owner:')).sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
   // Um agente = uma conversa (como num mensageiro); grupos aparecem como entradas próprias
   const soloOf = id => visible.find(c => !isGroupChat(c) && c.agentId === id);
   const live = S.agents.filter(a => !a.archived);
@@ -100,15 +111,45 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
   ].sort((x, y) => y.at - x.at);
   const byKey = new Map(entries.map(e => [e.key, e]));
   // Fixados e ordem da lista: escolhidos arrastando (salvo neste navegador). Itens novos entram no topo.
-  const [pinIds, setPinIds] = useState(() => local.get('pins', null));
-  const [order, setOrder] = useState(() => local.get('sideOrder', []));
+  // Salvo nas configurações (igual em todos os aparelhos); o navegador guarda só como reserva
+  const synced = S.settings.ui?.sidebar;
+  const [pinIds, setPinIds] = useState(() => synced?.pins ?? local.get('pins', null));
+  const [order, setOrder] = useState(() => synced?.order ?? local.get('sideOrder', []));
+  useEffect(() => { if (synced?.pins) setPinIds(synced.pins); if (synced?.order) setOrder(synced.order); }, [synced?.pins?.join(), synced?.order?.join()]);
   const pinKeys = (pinIds || entries.filter(e => e.kind === 'agent').slice(0, 3).map(e => e.key)).filter(k => byKey.get(k)?.kind === 'agent');
   const rest = entries.map(e => e.key).filter(k => !pinKeys.includes(k));
   const listKeys = [...rest.filter(k => !order.includes(k)), ...order.filter(k => rest.includes(k))];
+  const saveOrder = (P, Lk) => {
+    setPinIds(P); local.set('pins', P); setOrder(Lk); local.set('sideOrder', Lk);
+    api('/api/settings', { method: 'PUT', body: { ui: { sidebar: { pins: P, order: Lk.slice(0, 1000) } } } }).catch(() => {});
+  };
+  // Mesmo que arrastar, pelo teclado: Alt+setas move, Alt+P fixa/desafixa (o leitor de tela ouve o resultado)
+  const [said, setSaid] = useState('');
+  const keyMove = (e, k) => {
+    if (!e.altKey) return;
+    const P = [...pinKeys], Lk = [...listKeys], inPins = P.includes(k), arr = inPins ? P : Lk, i = arr.indexOf(k);
+    const name = byKey.get(k)?.a?.name || byKey.get(k)?.c?.title || '';
+    let d = 0;
+    if (e.key === (inPins ? 'ArrowLeft' : 'ArrowUp')) d = -1;
+    else if (e.key === (inPins ? 'ArrowRight' : 'ArrowDown')) d = 1;
+    else if (e.key.toLowerCase() === 'p') {
+      e.preventDefault();
+      if (inPins) { P.splice(i, 1); Lk.unshift(k); setSaid(`${name} saiu dos fixados`); }
+      else if (byKey.get(k)?.kind === 'agent') { Lk.splice(i, 1); P.push(k); if (P.length > 4) Lk.unshift(P.shift()); setSaid(`${name} fixado`); }
+      else return;
+      saveOrder(P, Lk); setTimeout(() => document.querySelector(`[data-flip="${k}"]`)?.focus(), 50); return;
+    } else return;
+    e.preventDefault();
+    const j = i + d;
+    if (j < 0 || j >= arr.length) return;
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+    saveOrder(P, Lk); setSaid(`${name} na posição ${j + 1}`);
+    setTimeout(() => document.querySelector(`[data-flip="${k}"]`)?.focus(), 50);
+  };
   const drag = useSidebarDrag({
     pins: pinKeys, list: listKeys, canPin: k => byKey.get(k)?.kind === 'agent',
     idsOf: k => { const e = byKey.get(k); return e?.kind === 'agent' ? [e.a.id] : (e?.c?.agentIds || []); },
-    onCommit: ({ pins: P, list: Lk }) => { setPinIds(P); local.set('pins', P); setOrder(Lk); local.set('sideOrder', Lk); },
+    onCommit: ({ pins: P, list: Lk }) => saveOrder(P, Lk),
     renderGhost: (k, kind) => {
       const e = byKey.get(k);
       if (!e) return null;
@@ -151,7 +192,7 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
       <div ref={pinsRef} className={`pins ${drag.drag ? 'drop-ready' : ''} ${drag.drag?.over?.zone === 'pins' ? 'over' : ''}`} aria-label="Agentes fixados" onClickCapture={drag.onClickCapture}>
         {drag.pins.map(k => byKey.get(k)?.a).filter(Boolean).map(a => (
           <a key={a.id} data-flip={a.id} data-pin={a.id} href={`#/a/${a.id}`} className={`pin ${activeAgent === a.id ? 'on' : ''} ${dragKey === a.id ? 'lifted' : ''}`} onClick={onNavigate}
-            title={a.name} draggable={false} onPointerDown={e => drag.onPointerDown(e, a.id)}>
+            title={`${a.name} · Alt+setas move, Alt+P desafixa`} draggable={false} onPointerDown={e => drag.onPointerDown(e, a.id)} onKeyDown={e => keyMove(e, a.id)}>
             <span className="pin-av"><AgentAvatar agent={a} size={collapsed ? 30 : 52} state={busy[a.id] ? 'working' : undefined} />{busy[a.id] && <i className="pin-dot" aria-label="trabalhando" />}</span>
             <b>{a.name}</b>
           </a>
@@ -159,6 +200,7 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
         {drag.pins.length === 0 && <p className="pins-empty">Arraste um agente para cá para fixar</p>}
       </div>
       {drag.ghost}
+      <p className="sr-only" aria-live="polite">{said}</p>
 
       <nav ref={listRef} className="side-list" aria-label={t('nav.agents')} onClickCapture={drag.onClickCapture}>
         <a href="#/inbox" className={`row inbox-row ${section === 'inbox' ? 'on' : ''}`} onClick={onNavigate} aria-current={section === 'inbox' ? 'page' : undefined}>
@@ -169,7 +211,7 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
         {drag.list.map(k => byKey.get(k)).filter(Boolean).map(e => {
           const c = e.c;
           const unread = c?.unread && parts[1] !== c.id;
-          const common = { key: e.key, 'data-flip': e.key, 'data-item': e.key, draggable: false, onClick: onNavigate, onPointerDown: ev => drag.onPointerDown(ev, e.key) };
+          const common = { key: e.key, 'data-flip': e.key, 'data-item': e.key, draggable: false, onClick: onNavigate, onPointerDown: ev => drag.onPointerDown(ev, e.key), onKeyDown: ev => keyMove(ev, e.key) };
           if (e.kind === 'group') return (
             <a {...common} href={`#/c/${c.id}`} className={`row ${parts[1] === c.id ? 'on' : ''} ${unread ? 'unread' : ''} ${dragKey === e.key ? 'lifted' : ''}`} onContextMenu={ev => chatMenu(ev, c)} title={collapsed ? c.title : undefined}>
               <span className="row-av"><ChatAvatar chat={c} size={40} /></span>
@@ -181,7 +223,7 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
           return (
             <a {...common} href={`#/a/${a.id}`} className={`row ${activeAgent === a.id ? 'on' : ''} ${unread ? 'unread' : ''} ${dragKey === e.key ? 'lifted' : ''}`} onContextMenu={ev => c && chatMenu(ev, c)} title={collapsed ? a.name : undefined}>
               <span className="row-av"><AgentAvatar agent={a} size={40} state={busy[a.id] ? 'working' : undefined} /></span>
-              <span className="row-text"><span className="row-top"><b>{a.name}</b></span><small className={busy[a.id] ? 'is-working' : ''}>{busy[a.id] ? 'trabalhando…' : c?.preview || agentTag(a) || 'Diga oi'}</small></span>
+              <span className="row-text"><span className="row-top"><b>{a.name}</b></span><small className={busy[a.id] ? 'is-working' : ''}>{busy[a.id] ? doing(a.id) : c?.preview || agentTag(a) || 'Diga oi'}</small></span>
               {unread ? <span className="unread-dot" /> : c && <time>{fmtAgo(e.at)}</time>}
             </a>
           );
@@ -200,7 +242,8 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
           <MenuItem icon="agents" onClick={() => nav('/agents')}>{t('nav.agents')}</MenuItem>
           <MenuItem icon="flow" onClick={() => nav('/flows')}>{t('nav.flows')}</MenuItem>
           {enterprise && <MenuItem icon="folder" onClick={() => nav('/projects')}>{t('nav.projects')}</MenuItem>}
-          {enterprise && <MenuItem icon="book" onClick={() => nav('/library')}>{t('nav.library')}</MenuItem>}
+          <MenuItem icon="book" onClick={() => nav('/library')}>{t('nav.library')}</MenuItem>
+          <MenuItem icon="bulb" onClick={() => nav('/ajuda')}>Ajuda<kbd className="menu-kbd">?</kbd></MenuItem>
           <MenuItem icon="gear" onClick={() => nav('/settings')}>{t('nav.settings')}<kbd className="menu-kbd">Ctrl ,</kbd></MenuItem>
           <MenuItem icon="data" onClick={() => nav('/saude')}>Saúde do Ripper</MenuItem>
           {enterprise && <MenuItem icon="grid" onClick={() => nav('/admin')}>{t('nav.adminCenter')}</MenuItem>}
@@ -294,6 +337,8 @@ function Shell() {
   useEffect(() => {
     const f = e => {
       const mod = e.ctrlKey || e.metaKey;
+      const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName) || e.target?.isContentEditable;
+      if (e.key === '?' && !mod && !typing) { e.preventDefault(); go('/ajuda'); return; }
       if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); setPalette(p => !p); }
       else if (mod && e.key === ',') { e.preventDefault(); go('/settings'); }
       else if (mod && e.key.toLowerCase() === 'b') { e.preventDefault(); toggleCollapsed(); }
@@ -371,11 +416,36 @@ function Shell() {
     // Início = conversa nova com o agente mais recente; sem agentes, a tela de boas-vindas
     (!homeAgent ? <Home /> : soloFor(homeAgent.id) ? <Chat key="chat" chatId={soloFor(homeAgent.id).id} /> : <Chat key="chat" agentId={homeAgent.id} />);
 
+  // Janela por cima: o foco entra nela, o Tab não escapa para trás e, ao fechar, volta para onde estava
+  const hubRef = useRef(null);
+  useEffect(() => {
+    if (!overlayOpen) return;
+    const before = document.activeElement;
+    const focusables = () => [...(hubRef.current?.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])') || [])].filter(el => el.offsetParent !== null);
+    // o conteúdo carrega sob demanda: tenta até aparecer algo focável (até ~2 s)
+    let tries = 0;
+    const t0 = setInterval(() => {
+      if (hubRef.current?.contains(document.activeElement) || ++tries > 40) return clearInterval(t0);
+      const el = hubRef.current?.querySelector('input:not([type=hidden]), [autofocus]') || focusables()[0];
+      if (el) { el.focus(); clearInterval(t0); }
+    }, 50);
+    const trap = e => {
+      if (e.key !== 'Tab' || !hubRef.current) return;
+      const f = focusables(); if (!f.length) return;
+      const [first, last] = [f[0], f.at(-1)];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      else if (!hubRef.current.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+    };
+    addEventListener('keydown', trap);
+    return () => { clearInterval(t0); removeEventListener('keydown', trap); before?.focus?.(); };
+  }, [overlayOpen]);
   const hubPage = !overlayOpen ? null :
     parts[0] === 'marketplace' ? <Marketplace /> :
     parts[0] === 'connectors' ? <Connectors /> :
     parts[0] === 'skills' ? <SkillsHub /> :
     parts[0] === 'explore' ? <Explore /> :
+    parts[0] === 'ajuda' ? <Help /> :
     parts[0] === 'saude' ? <Health onClose={closeHub} /> :
     parts[0] === 'settings' ? <div className="hub-settings"><button className="icon-btn hub-close" aria-label="Fechar" onClick={closeHub}><Icon name="x" /></button><Settings theme={theme} toggleTheme={toggleTheme} tab={parts[1]} /></div> : <Integrations />;
 
@@ -399,12 +469,13 @@ function Shell() {
       </main>
       {hubPage && (
         <div className="hub-overlay" onMouseDown={e => e.target === e.currentTarget && closeHub()}>
-          <div className="hub-modal" role="dialog" aria-modal="true" aria-label={parts[0] === 'settings' ? t('nav.settings') : parts[0] === 'saude' ? 'Saúde do Ripper' : 'Marketplace'}>
+          <div ref={hubRef} className="hub-modal" role="dialog" aria-modal="true" aria-label={parts[0] === 'settings' ? t('nav.settings') : parts[0] === 'saude' ? 'Saúde do Ripper' : parts[0] === 'ajuda' ? 'Ajuda' : 'Marketplace'}>
             <Suspense fallback={<div className="page-loading"><ThinkingOrb state="breathing" size={20} /></div>}>{hubPage}</Suspense>
           </div>
         </div>
       )}
       <ApprovalTray />
+      <FirstRunWizard />
       <Palette open={palette} onClose={() => setPalette(false)} toggleTheme={toggleTheme} />
     </div>
   );

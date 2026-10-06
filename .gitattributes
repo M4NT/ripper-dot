@@ -1,3 +1,11 @@
-# Scripts e Dockerfile rodam no Linux do contêiner: sempre LF.
-*.sh text eol=lf
-Dockerfile text eol=lf
+# Tudo em LF no repositório e na pasta, em qualquer sistema (acaba com os avisos de LF/CRLF no Windows).
+* text=auto eol=lf
+# Arquivos de lote do Windows precisam de CRLF para o cmd.exe.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+# Binários: nunca mexer.
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary
+*.tgz binary

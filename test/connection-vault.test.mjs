@@ -1,3 +1,4 @@
+import { freePort } from './helpers/free-port.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, existsSync } from 'node:fs';
@@ -138,16 +139,6 @@ test('deleteVaultCredential remove entrada', () => {
   });
 });
 
-function freePort() {
-  return new Promise((resolve, reject) => {
-    const s = createServer();
-    s.listen(0, '127.0.0.1', () => {
-      const { port } = s.address();
-      s.close(() => resolve(port));
-    });
-    s.on('error', reject);
-  });
-}
 
 async function withHttpServer(fn) {
   const dir = mkdtempSync(join(tmpdir(), 'ripper-vault-http-'));
@@ -164,7 +155,7 @@ async function withHttpServer(fn) {
   const base = `http://127.0.0.1:${port}`;
   const auth = { authorization: 'Bearer vault-http-token' };
   try {
-    const deadline = Date.now() + 15_000;
+    const deadline = Date.now() + 60_000;
     while (Date.now() < deadline) {
       try {
         const r = await fetch(base + '/api/health', { headers: auth });

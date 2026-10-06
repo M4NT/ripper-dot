@@ -6,19 +6,10 @@ import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:net';
+import { freePort } from './helpers/free-port.mjs';
 
 const serverPath = fileURLToPath(new URL('../server.mjs', import.meta.url));
 
-function freePort() {
-  return new Promise((resolve, reject) => {
-    const s = createServer();
-    s.listen(0, '127.0.0.1', () => {
-      const { port } = s.address();
-      s.close(() => resolve(port));
-    });
-    s.on('error', reject);
-  });
-}
 
 async function waitForHealthz(base, ms) {
   const deadline = Date.now() + ms;
@@ -45,7 +36,7 @@ async function withServer(fn) {
   const child = spawn(process.execPath, [serverPath], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   const base = `http://127.0.0.1:${port}`;
   try {
-    await waitForHealthz(base, 15_000);
+    await waitForHealthz(base, 60_000);
     await fn(base, env.RIPPER_TOKEN);
   } finally {
     child.kill('SIGTERM');

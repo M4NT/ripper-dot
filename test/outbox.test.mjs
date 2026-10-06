@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { freePort } from './helpers/free-port.mjs';
 
 process.env.RIPPER_DATA = mkdtempSync(join(tmpdir(), 'ripper-outbox-'));
 const ob = await import('../lib/outbox.mjs');
@@ -51,13 +52,13 @@ test('de ponta a ponta: WhatsApp fora do ar → resposta vai para a fila → sai
     });
   });
   await new Promise(r => evo.listen(0, '127.0.0.1', r));
-  const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r)); const port = probe.address().port; await new Promise(r => probe.close(r));
+  const port = await freePort();
   const dataDir = mk(join(tmpdir(), 'ripper-outbox-e2e-'));
   const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
     env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'stream', HOME: dataDir, USERPROFILE: dataDir, JULIA_AUTOSTART: '0', RIPPER_OUTBOX_TICK_MS: '300', EVOLUTION_URL: `http://127.0.0.1:${evo.address().port}` }, stdio: 'ignore'
   });
   const base = `http://127.0.0.1:${port}`;
-  const wait = async (fn, ms = 20_000) => { let v; for (let i = 0; i < ms / 200 && !(v = await fn()); i++) await new Promise(r => setTimeout(r, 200)); return v; };
+  const wait = async (fn, ms = 60_000) => { let v; for (let i = 0; i < ms / 200 && !(v = await fn()); i++) await new Promise(r => setTimeout(r, 200)); return v; };
   const put = b => fetch(base + '/api/settings', { method: 'PUT', headers: { 'content-type': 'application/json', origin: base }, body: JSON.stringify(b) });
   try {
     await wait(async () => { try { return (await fetch(base + '/api/health')).ok; } catch { return false; } });

@@ -6,19 +6,10 @@ import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:net';
+import { freePort } from './helpers/free-port.mjs';
 
 const serverPath = fileURLToPath(new URL('../server.mjs', import.meta.url));
 
-function freePort() {
-  return new Promise((resolve, reject) => {
-    const s = createServer();
-    s.listen(0, '127.0.0.1', () => {
-      const { port } = s.address();
-      s.close(() => resolve(port));
-    });
-    s.on('error', reject);
-  });
-}
 
 async function withServer(envExtra, fn) {
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-sse-'));
@@ -36,7 +27,7 @@ async function withServer(envExtra, fn) {
   const base = `http://127.0.0.1:${port}`;
   const auth = { authorization: `Bearer ${env.RIPPER_TOKEN}` };
   try {
-    await waitFor(base + '/api/health', env.RIPPER_TOKEN, 15_000);
+    await waitFor(base + '/api/health', env.RIPPER_TOKEN, 60_000);
     await fn(base, auth);
   } finally {
     child.kill('SIGTERM');

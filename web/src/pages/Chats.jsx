@@ -17,6 +17,7 @@ export default function Chats() {
 
   const tags = useMemo(() => [...new Set(S.chats.flatMap(c => c.tags || []))].sort(), [S.chats]);
   const visible = useMemo(() => [...S.chats]
+    .filter(c => !c.inboxKey) // conversa entre agentes: abre dentro da conversa de quem pediu
     .filter(c => (view === 'archived') === !!c.archived)
     .filter(c => who === 'all' || c.agentId === who || (c.agentIds || []).includes(who))
     .filter(c => !tag || (c.tags || []).includes(tag))

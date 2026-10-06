@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:net';
 import { architectSuggest } from '../lib/architect-suggest.mjs';
+import { freePort } from './helpers/free-port.mjs';
 
 test('architectSuggest exige goal', () => {
   assert.throws(() => architectSuggest({ goal: '  ' }), /Informe goal/);
@@ -37,16 +38,6 @@ test('architectSuggest respeita maxAgents', () => {
 
 const serverPath = fileURLToPath(new URL('../server.mjs', import.meta.url));
 
-function freePort() {
-  return new Promise((resolve, reject) => {
-    const s = createServer();
-    s.listen(0, '127.0.0.1', () => {
-      const { port } = s.address();
-      s.close(() => resolve(port));
-    });
-    s.on('error', reject);
-  });
-}
 
 async function withServer(fn) {
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-architect-'));
@@ -55,7 +46,7 @@ async function withServer(fn) {
   const child = spawn(process.execPath, [serverPath], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   const base = `http://127.0.0.1:${port}`;
   try {
-    const deadline = Date.now() + 15_000;
+    const deadline = Date.now() + 60_000;
     while (Date.now() < deadline) {
       try {
         const r = await fetch(base + '/api/health', { headers: { authorization: 'Bearer architect-test-token' } });

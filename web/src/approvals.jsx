@@ -5,10 +5,12 @@ import { useApp } from './app.jsx';
 import { useT } from './i18n/index.jsx';
 
 const KIND = { exec: 'quer rodar um comando', share: 'quer publicar um link', social: 'quer publicar em webhook', whatsapp: 'quer enviar um WhatsApp', email: 'quer enviar um e-mail', github: 'quer publicar no GitHub', agent: 'quer criar um agente', flow: 'terminou um passo do fluxo' };
+/** O que o agente está pedindo, em uma frase (a Caixa mostra isso na linha do mascote). */
+export const approvalAsk = rec => rec.kind === 'question' ? 'precisa de você' : rec.kind === 'setting' ? 'sugere uma configuração' : KIND[rec.kind] || 'pede aprovação';
 
 /** Cartão de aprovação: mostra exatamente o que vai acontecer e por que precisa do seu ok. */
 export function ApprovalCard(props) {
-  return props.rec.kind === 'question' ? <QuestionCard {...props} /> : <DecisionCard {...props} />;
+  return props.rec.kind === 'question' ? <QuestionCard {...props} /> : props.rec.kind === 'setting' ? <SettingCard {...props} /> : <DecisionCard {...props} />;
 }
 
 /** "Preciso de você": pergunta aberta do agente, com respostas rápidas e campo livre. */
@@ -46,6 +48,37 @@ function QuestionCard({ rec, status, compact, onDone }) {
   );
 }
 
+/** Interruptor de configuração oferecido pelo agente: um clique liga/desliga, sem ir às Configurações. */
+function SettingCard({ rec, status, compact, onDone }) {
+  const { agent, toast, refresh } = useApp();
+  const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+  const a = agent(rec.agentId);
+  const st = status || rec.status;
+  const v = rec.setting || {};
+  async function decide(approve) {
+    if (approve && v.sensitive && !confirm) { setConfirm(true); return; }
+    setBusy(true);
+    try { await api(`/api/approvals/${rec.id}`, { method: 'POST', body: { approve } }); onDone?.(approve ? 'approved' : 'denied'); if (approve) setTimeout(refresh, 300); }
+    catch (e) { toast(e.message, 'error'); onDone?.('expired'); }
+    setBusy(false);
+  }
+  const on = st === 'approved' ? v.proposed : v.current;
+  return (
+    <div className={`approval setting-card ${st} ${compact ? 'compact' : ''}`} role="group" aria-label={`${a?.name || 'Agente'} sugere: ${v.label}`}>
+      <div className="setting-row">
+        <span className="setting-text"><b>{v.label}</b><small>{rec.reason || v.desc}</small></span>
+        <button type="button" role="switch" aria-checked={on} className={`setting-switch ${on ? 'on' : ''}`} disabled={busy || st !== 'pending'} onClick={() => decide(true)}
+          aria-label={`${v.proposed ? 'Ligar' : 'Desligar'} ${v.label}`}><i /></button>
+      </div>
+      {st === 'pending' && confirm && <div className="setting-confirm"><span>Tem certeza? Isso muda a segurança do Ripper.</span><button className="btn btn-sm btn-danger" disabled={busy} onClick={() => decide(true)}>{v.proposed ? 'Ligar mesmo assim' : 'Desligar mesmo assim'}</button><button className="btn btn-sm" onClick={() => setConfirm(false)}>Cancelar</button></div>}
+      {st === 'pending' && !confirm && <button className="link setting-dismiss" disabled={busy} onClick={() => decide(false)}>Agora não</button>}
+      {st !== 'pending' && <p className={`approval-result ${st}`}><Icon name={st === 'approved' ? 'check' : 'x'} size={13} />{st === 'approved' ? (v.proposed ? 'Ligado' : 'Desligado') : st === 'expired' ? 'Ficou sem resposta' : 'Mantido como estava'}</p>}
+      {compact && <small className="muted">{a?.name || rec.agentName} sugeriu{rec.chatTitle ? ` em ${rec.chatTitle}` : ''}</small>}
+    </div>
+  );
+}
+
 function DecisionCard({ rec, status, compact, onDone }) {
   const { agent, toast } = useApp();
   const [busy, setBusy] = useState(false);
@@ -57,7 +90,7 @@ function DecisionCard({ rec, status, compact, onDone }) {
     catch (e) { toast(e.message, 'error'); onDone?.('expired'); }
     setBusy(false);
   }
-  const label = { approved: 'Aprovado', denied: 'Negado', expired: 'Expirou sem resposta', cancelled: 'Cancelado' }[st];
+  const label = { approved: 'Aprovado', denied: 'Recusado', expired: 'Expirou sem resposta', cancelled: 'Cancelado' }[st];
   return (
     <div className={`approval ${st} ${compact ? 'compact' : ''}`} role="group" aria-label="Pedido de aprovação">
       <div className="approval-head">
@@ -72,7 +105,7 @@ function DecisionCard({ rec, status, compact, onDone }) {
           <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => decide(true)}><Icon name="check" size={14} />Aprovar</button>
           <button className="btn btn-sm" disabled={busy} onClick={() => decide(true, true)} title="Não pergunta de novo por este mesmo comando nesta conversa">Aprovar sempre aqui</button>
           <div className="grow" />
-          <button className="btn btn-sm btn-danger" disabled={busy} onClick={() => decide(false)}>Negar</button>
+          <button className="btn btn-sm btn-danger" disabled={busy} onClick={() => decide(false)}>Recusar</button>
         </div>
       ) : <p className={`approval-result ${st}`}><Icon name={st === 'approved' ? 'check' : 'x'} size={13} />{label}</p>}
     </div>
@@ -119,7 +152,8 @@ export function ApprovalTray() {
     return () => { alive = false; clearTimeout(t); };
   }, []);
   const here = parts[0] === 'c' ? parts[1] : null;
-  const list = pending.filter(p => p.chatId !== here); // os da conversa aberta aparecem dentro dela
+  // os da conversa aberta aparecem dentro dela; na Caixa, todos já estão na tela
+  const list = parts[0] === 'inbox' ? [] : pending.filter(p => p.chatId !== here);
   useEffect(() => { if (list.length) setOpen(true); }, [list.length]);
   if (!list.length) return null;
   return (

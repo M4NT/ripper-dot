@@ -47,7 +47,7 @@ export default function Projects() {
   const { S, agent } = useApp();
   const [open, setOpen] = useState(false);
   return (
-    <div className="page">
+    <div className="page v2">
       <header className="page-head">
         <div><h1>Projetos</h1><p className="lede">Reúna agentes em torno de um objetivo. Converse com um de cada vez ou com o time todo.</p></div>
         <button className="btn btn-primary" onClick={() => setOpen(true)}><Icon name="plus" size={16} />Novo projeto</button>

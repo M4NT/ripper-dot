@@ -108,7 +108,19 @@ test('uso por conta: cada conta guarda as próprias janelas e a vista marca a qu
   rec(db, { source: 'oauth_endpoint', windows: { fiveHour: { pct: 100 } }, subscriptionType: 'pro' });
   rec(db, { source: 'oauth_endpoint', windows: { fiveHour: { pct: 12 } }, subscriptionType: 'team', account: 'teams' });
   const settings = { claude: { mode: 'subscription', defaultAccount: 'teams', accounts: [{ id: 'teams', label: 'Teams' }] } };
-  const v = view(db, settings, {});
+  // A principal só aparece se esta máquina tiver login (~/.claude/.credentials.json); no CI não tem.
+  const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const home = mkdtempSync(join(tmpdir(), 'ripper-home-'));
+  mkdirSync(join(home, '.claude'));
+  writeFileSync(join(home, '.claude', '.credentials.json'), '{}');
+  const prev = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE };
+  process.env.HOME = process.env.USERPROFILE = home;
+  let v;
+  try { v = view(db, settings, {}); } finally {
+    for (const [k, val] of Object.entries(prev)) { if (val === undefined) delete process.env[k]; else process.env[k] = val; }
+  }
   assert.equal(v.activeAccount.id, 'teams');
   assert.equal(v.windows.fiveHour.pct, 12, 'barra principal = conta em uso');
   const byId = Object.fromEntries(v.accounts.map(a => [a.id, a]));

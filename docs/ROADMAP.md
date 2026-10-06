@@ -68,20 +68,20 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 ### A. Segurança (P0)
 - ✅ **Login com senha única** (decidido em 06/10/2026; um Ripper por pessoa, então não há login por usuário). Pede a senha ao abrir; sessão por cookie seguro; chamadas de dentro dos contêineres dos agentes nunca entram sem a senha; tela de login e "esqueci a senha" (redefinir pelo terminal). Senha criada na primeira abertura (só no próprio computador) ou por `node scripts/senha.mjs`; hash scrypt em `data/auth.json`; cookie HttpOnly + SameSite=Strict (Secure em HTTPS). Sessões em memória: reiniciar o servidor pede a senha de novo.
 - ✅ Agentes não usam a API do Ripper de dentro do próprio computador: sem sessão, 401 (o cabeçalho Host não decide mais quem entra; a criação da primeira senha exige o código de configuração impresso no terminal e gravado em `data/setup-code.txt`, apagado após o uso).
-- [ ] HTTPS para acesso fora de casa (túnel com login: Cloudflare Tunnel ou Tailscale), com passo a passo dentro do app.
+- ✅ Acesso fora de casa pelo Tailscale, com passo a passo dentro do app (Configurações › Perfil › Celular fora de casa): o Ripper acha o IP do Tailscale, abre um ouvinte só nele e gera o QR. [ ] Testar com Tailscale de verdade. [ ] HTTPS (Tailscale Serve) para notificações no iPhone fora de casa.
 - ✅ Proteção contra CSRF nas rotas que mudam algo: cookie SameSite=Strict + verificação de Origin + recusa de Sec-Fetch-Site cross-site.
 - ✅ Limite de tentativas no login: 5 erros bloqueiam por 15 min (por endereço, em memória).
 - ✅ Chaves e tokens cifrados no disco e nos backups. ✅ Segredos da Evolution também cifrados (`data/evolution.json`).
 - ✅ Aprovações, autonomia por agente, registro imutável de ações externas, X9 Guard nos envios.
-- [ ] Revisão de segurança completa antes do lançamento (rotas sem autenticação, uploads, caminhos de arquivo, execução de comandos, MCP de terceiros).
-- [ ] Política de permissões dos agentes revisada: o que cada nível de autonomia pode fazer sem perguntar.
+- ✅ Revisão de segurança completa antes do lançamento (rotas sem autenticação, uploads, caminhos de arquivo, execução de comandos, MCP de terceiros) — ver [seguranca.md](seguranca.md). Corrigidos: `/metrics` aberto sem `RIPPER_TOKEN` (agora exige login; público só com `RIPPER_METRICS_PUBLIC=1`) e XSS refletido nos callbacks OAuth. Pendências no documento.
+- 🔨 Política de permissões dos agentes revisada: rascunho em [seguranca.md](seguranca.md) §4, tirado do que o código aplica. Falta decidir se "somente leitura" vale também para ferramentas de conectores MCP (hoje não vale).
 
 ### B. Confiabilidade (P0)
 - ✅ Recarregar a página não para o agente; a resposta continua no servidor e fica salva.
 - ✅ **Reiniciar o servidor não perde turnos**: retoma sozinho os que só leram/pesquisaram; os que já fizeram algo com efeito fora (enviar, publicar) param com aviso na Caixa.
 - 🔨 **Staging que sobrevive a reinício** (docker-compose, dados de exemplo, provedor simulado para smoke). *Engenheiro (Ripper), em andamento.*
 - ✅ Servidor como serviço do sistema: `node scripts/service.mjs install` (Windows, macOS, Linux), com vigia que reinicia se cair. [ ] Testar o `install` em máquina real.
-- [ ] Atualização sem derrubar o que está rodando: ✅ aviso "Nova versão — recarregar" nas abas abertas (compara o id da build em `/api/auth/status` a cada minuto). [ ] Esperar turnos terminarem antes de reiniciar.
+- ✅ Atualização sem derrubar o que está rodando: aviso "Nova versão — recarregar" nas abas abertas; `node scripts/service.mjs restart` (ou SIGTERM) para de aceitar turnos, espera os em andamento (até `RIPPER_DRAIN_TURNS_MS`, padrão 2 min; o que passar é retomado depois) e o vigia sobe a versão nova na hora.
 - ✅ Backup automático diário, cópia extra em outra pasta, aviso de falha. ✅ Backup manual corrigido (link simbólico criado no Docker derrubava o `tar`; agora fica de fora com aviso). ✅ Teste de restauração automático após cada backup diário (extrai numa pasta temporária e confere o `db.json`; falha vira aviso).
 - ✅ Fila de envios com novas tentativas (WhatsApp, e-mail, publicações).
 - [ ] Contêineres dos agentes: um por agente e por pasta de trabalho (hoje duas conversas do mesmo agente em pastas diferentes se revezam recriando).
@@ -90,73 +90,75 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - ✅ Limites de recursos por contêiner (`computer.dockerMemory`/`dockerCpus`, padrão 2g/2) e limpeza de contêineres parados na subida.
 
 ### C. Instalação e atualização (P0)
-- [ ] **Instalador para Windows e Mac** que traz Node, cria o serviço e abre o app — sem terminal.
-- [ ] Assistente de primeiro uso: conta do Claude (login), Docker (detecta e orienta), primeiro agente em 1 frase, WhatsApp opcional.
-- [ ] Funcionar sem Docker (modo "sem computador" claro, com o que o agente perde).
 - ✅ **Modelos locais para quem não tem conta de IA** (base): detecta RAM, GPU NVIDIA (nvidia-smi) e Apple Silicon, recomenda o maior Qwen3 que cabe (tabela curta em `lib/local-models.mjs`), detecta o Ollama e baixa com 1 clique mostrando o progresso (Configurações → Ollama); o modelo entra direto nos agentes pelo provedor Ollama já existente. Avaliados llmfit (MIT, binário Rust, `llmfit recommend --json`) e whichllm (MIT, Python, notas de benchmark do HF): ficou a ideia do llmfit sem embutir código. Falta: instalar o Ollama pelo Ripper, AMD/Intel GPU, chamar o llmfit se instalado.
-- [ ] Assistente de primeiro uso pergunta "Você tem conta de IA?" → Claude / ChatGPT / chave de API / "não tenho" (modelo local), explicando o que muda em qualidade.
-- [ ] Atualização automática com notas da versão.
-- [ ] Desinstalar limpo (opção de manter os dados).
+- [ ] **Instalador para Windows e Mac** que traz Node, cria o serviço e abre o app — sem terminal. *(Windows feito: `scripts\instalar-windows.cmd`; falta Mac.)*
+- ✅ Assistente de primeiro uso: conta do Claude (login), Docker (detecta e orienta), primeiro agente em 1 frase, WhatsApp opcional.
+- ✅ Funcionar sem Docker (modo "sem computador" claro, com o que o agente perde).
+- ✅ Assistente de primeiro uso pergunta "Você tem conta de IA?" → Claude / ChatGPT / chave de API / "não tenho" (modelo local), explicando o que muda em qualidade. *("Não tenho" aponta para o modelo recomendado em Configurações → Ollama.)*
+- ✅ Atualização pela interface com notas da versão: confere a cada 6 h, avisa na Caixa, Configurações › Backup mostra as novidades e "Atualizar agora" (só avança; recusa se houver mudança local; como serviço, reinicia sozinho). [ ] Testar uma atualização de verdade numa instalação.
+- ✅ Desinstalar limpo: `scripts/desinstalar-windows.cmd` (ou `node scripts/desinstalar.mjs`) tira o serviço e os computadores dos agentes e mantém os dados; `--apagar-dados` apaga após digitar APAGAR. [ ] Testar numa máquina real.
 - [ ] Imagem dos agentes baixada pronta (registro de imagens), sem reconstruir na máquina.
 
 ### D. Dados, LGPD e termos (P0)
 - ✅ Exclusão de dados pessoais, mascaramento antes do modelo, retenção automática.
 - 🔨 Termos de uso e política de privacidade (o que fica na máquina, o que vai para os provedores): **rascunho** em [termos-de-uso.md](termos-de-uso.md) e [politica-de-privacidade.md](politica-de-privacidade.md). [ ] Revisão jurídica.
-- 🔨 Aviso de uso de contas de terceiros (assinatura pessoal × Teams da empresa): **rascunho** nos termos de uso. [ ] Revisão jurídica. [ ] Mostrar o aviso no app ao adicionar conta.
-- [ ] Exportar tudo (conversas, agentes, arquivos) num pacote legível.
-- [ ] Registro de consentimento para WhatsApp de clientes (quem pode ser atendido por agente). Regras já descritas no **rascunho** dos termos; falta o registro no app.
+- 🔨 Aviso de uso de contas de terceiros (assinatura pessoal × Teams da empresa): **rascunho** nos termos de uso. [ ] Revisão jurídica. ✅ Aviso mostrado no app ao adicionar conta (Configurações → Conta do Claude).
+- ✅ Exportar tudo: `GET /api/data/export-all` (.tar.gz com conversas em Markdown, agentes + instruções, rotinas, arquivos, artefatos; sem segredos) e botão em Segurança → LGPD.
+- ✅ Registro de consentimento para WhatsApp de clientes (número, data, como foi obtido) no Canal WhatsApp; "Exigir consentimento" (opt-in) rebaixa resposta automática a rascunho para quem não tem registro.
 
 ### E. Qualidade e testes (P0)
 - ✅ ~620 testes automáticos rodando.
-- [ ] Testes que sobem o servidor estáveis em máquina carregada (hoje alguns estouram o tempo).
-- [ ] **Smoke diário automático** (Quinn no staging): checklist de 10 fluxos, relatório na Caixa.
+- ✅ Testes que sobem o servidor estáveis em máquina carregada (espera pelo /api/health até 60 s, porta livre do sistema).
+- ✅ **Smoke diário automático** (06/10/2026): `npm run smoke` roda 10 fluxos (login, saúde, criar agente, mensagem, aprovar, grupo, rotina, backup, exportar, convite de pareamento) num servidor temporário com o provedor de teste, ou contra um rodando (`RIPPER_URL`). Opt-in `settings.checks.smoke`: roda toda noite (3h) e falha vira aviso na Caixa. [ ] Interruptor na tela de Configurações.
 - [ ] Testes de interface ponta a ponta (enviar mensagem, aprovar, criar agente, grupo, rotina).
-- ✅ CI no GitHub a cada push e PR (testes, build, teste das telas). [ ] Bloqueio de merge com teste falhando. [ ] Achar o teste que falha às vezes (instável).
-- [ ] `.gitattributes` (fins de linha) num commit isolado.
+- ✅ CI no GitHub a cada push e PR (testes, build, teste das telas). ✅ Bloqueio de merge com teste falhando (regra da main exige `test-and-build` nos PRs; administradores ainda podem enviar direto) (o CI já falha; o dono marcou o check `test-and-build` como obrigatório em Settings → Branches). ✅ Teste instável achado: uso por conta dependia do login do Claude na máquina (passava no PC, falhava no CI).
+- ✅ `.gitattributes` (fins de linha) num commit isolado.
+- 🔨 Testes que sobem o servidor disputavam a mesma porta em paralelo (falha aleatória, ex.: `chat-sse` com 401). Correção pronta: `test/helpers/free-port.mjs` reserva cada porta de forma atômica (PR #88).
 - [ ] Conjunto fixo de 50 tarefas reais para medir "termina sozinho" (critério 1 do norte).
 
 ### F. Desempenho e custo (P1)
 - ✅ Processo pré-aquecido (1ª palavra 1,3–2 s), cache de prompt, rota rápida para conversa curta, envio instantâneo no chat.
-- [ ] 1ª palavra < 1 s na mediana; aquecer ao abrir a conversa (hoje a 1ª mensagem de cada agente é fria).
-- [ ] Prompt de sistema enxuto (medir por agente e cortar o que não é usado).
-- [ ] Memória do servidor sob controle com muitos agentes (processos pré-aquecidos, contêineres).
-- [ ] Custo em R$ e previsão de fim de mês.
+- [ ] 1ª palavra < 1 s na mediana. ✅ Abrir a conversa reaquece o processo do agente (e o marca como recente no limite de 3). [ ] O 1º turno de cada agente após o servidor subir ainda é frio (o aquecimento reaproveita a configuração do último turno).
+- [ ] Memória do servidor sob controle com muitos agentes: ✅ processos pré-aquecidos limitados a 3 (sai o menos recente, inclusive ao abrir conversas). [ ] Contêineres.
+- ✅ Prompt de sistema enxuto: `node scripts/prompt-size.mjs` mede por agente e por seção. Cortados título/link da skill padrão, dicas de computador/arquivos/scripts quando o computador está desligado, aviso de social sem webhook e o modo X9 fora do enterprise (média 3.795 → 3.682 chars nos agentes reais; até ~470 chars a menos com computador desligado). O grosso que sobra são as instruções escritas para cada agente.
+- ✅ Custo em R$ e previsão de fim de mês (linear pelo ritmo do mês) no painel de uso; cotação em Configurações → Provedores (vazio = AwesomeAPI do dia, R$ 5,50 se falhar).
 
 ### G. Experiência de uso (P1)
 - ✅ Revisão de todas as telas (06/10/2026): navegação enxuta, chat limpo, busca de configurações, páginas sem rolagem dupla.
 - 🔨 "Conversa em grupo" no modo Simples e quem está trabalhando com autocompletar do @. *Donald.*
 - ✅ **Interface nova estilo mensageiro** (06/10/2026, referência: Grok Bot): tema escuro neutro como padrão; barra lateral de agentes com fixados no topo; **um agente = uma conversa** (as antigas juntadas, arquivadas, nada apagado); arrastar na mão para fixar e reordenar, com a grade se reorganizando; soltar um agente na conversa marca ele (botão com o mascote); Início vira a conversa; Marketplace ("Conectar aplicativos") e Configurações como janelas por cima.
-- [ ] Repaginar no padrão novo as telas que só herdaram as cores: Caixa, Agentes, Fluxos, Projetos, Biblioteca.
+- ✅ Repaginar no padrão novo as telas que só herdaram as cores (06/10/2026): Caixa, Agentes, Fluxos, Projetos e Biblioteca com a linguagem da conversa (cartões cinza sem contorno, cantos 22, pílulas, listas como as da lateral, título menor; cor só para estado). Classe `.page.v2` em `styles.css`. A bandeja flutuante de aprovações some na Caixa (tudo já está na tela).
 - ✅ **Marcar um agente numa conversa 1:1 traz ele para a conversa** (06/10/2026): o @Nome chama o agente naquela rodada e ele responde ali, sem virar grupo; o @ autocompleta todos os agentes.
 - ✅ Desfazer a junção de conversas pela interface (06/10/2026): Histórico → Arquivadas → menu "…" → Desfazer junção (não junta de novo ao reiniciar; arquivos e artefatos movidos ficam na conversa de destino).
 - ✅ Revisão do tema claro (06/10/2026): tons quentes/creme trocados por cinzas neutros (terminal, aprovação, VNC, fundos de janela, cor do navegador e do app instalado).
 - ✅ Ícones que faltam no Marketplace (06/10/2026): WhatsApp com ícone próprio; Atlassian, Zapier, Granola, Stripe, Supabase e Sentry com selo na cor da marca (trocar pelos logos oficiais quando possível).
-- [ ] Celular: barra de botões da caixa de mensagem apertada; ordem dos fixados/lista sincronizada entre aparelhos (hoje fica no navegador).
-- [ ] Zero tela parada: progresso visível em rotinas de segundo plano e canais.
-- [ ] Ações em lote e atalhos na Caixa (A aprovar, R recusar).
-- [ ] Modo Simples × Enterprise revisado (nada importante escondido).
-- [ ] Linguagem revisada em todas as telas (sem termos técnicos no modo Simples).
-- [ ] Acessibilidade: navegação por teclado completa, leitores de tela, contraste.
+- ✅ Celular: barra de botões da caixa de mensagem apertada (06/10/2026): em 375px o botão de enviar não é mais espremido, o esforço sai da pílula do modelo (continua no seletor) e o nome do modelo encolhe primeiro.
+- ✅ Ordem dos fixados e da lista salva nas configurações: igual em todos os aparelhos.
+- ✅ Zero tela parada: a barra lateral mostra quem está trabalhando segundo o servidor (rotinas, WhatsApp, outra aba), com o passo atual ("Pesquisando na web…", "Enviando WhatsApp…"). [ ] Progresso detalhado das rotinas na Caixa.
+- ✅ Ações em lote e atalhos na Caixa (06/10/2026): marcar várias aprovações (ou todas) e aprovar/recusar de uma vez; teclado J/K navega, X marca, A aprova, R recusa (a seleção ou o item em foco). Perguntas abertas ("precisa de você") ficam fora do lote porque pedem texto. "Negar" virou "Recusar".
+- 🔨 Modo Simples × Enterprise revisado: ✅ Biblioteca (entregas dos agentes) e Atualização também no Simples; onde algo é do Enterprise, botão "Ativar modo Enterprise" em vez de texto solto. [ ] Decidir: WhatsApp e conversas em grupo no modo Simples.
+- 🔨 Linguagem revisada (sem termos técnicos no modo Simples): ✅ Backup, Perfil, LGPD, formulário do agente e escolha de modelo. [ ] Telas do modo Enterprise e mensagens de erro do servidor.
+- ✅ Acessibilidade: nenhum botão sem nome para leitor de tela (conferido em todas as telas); contraste do texto ≥ 4,5:1 nos dois temas, protegido por teste (`test/contrast.test.mjs`); janelas por cima prendem o foco, Esc fecha e o foco volta para onde estava; fixados e lista reorganizáveis pelo teclado. [ ] Testar com leitor de tela de verdade (NVDA/VoiceOver).
 
 ### H. Observabilidade e suporte (P1)
 - ✅ Logs estruturados, métricas, erros em linguagem humana, avisos do sistema na Caixa.
 - ✅ Painel de saúde: servidor, Docker, contas do Claude, WhatsApp, e-mail, fila, backup — tudo numa tela (menu da conta › Saúde do Ripper, `GET /api/health/detalhado`).
 - ✅ Relatório de erro com 1 clique (sem dados pessoais) para suporte (`GET /api/health/relatorio`; erros só em memória desde o último início).
-- [ ] Auditoria de capacidades toda noite, com alerta na Caixa se algo quebrar.
+- ✅ Auditoria de capacidades toda noite (06/10/2026), sem tokens: confere se as ferramentas usadas pelas áreas de `docs/capacidades.json` ainda existem e se alguma área falhou na última auditoria real; aviso na Caixa. Opt-in `settings.checks.audit`. [ ] Rodar a auditoria real (paga) periodicamente para manter o .json fresco.
 
 ### I. Acesso de qualquer lugar (P1 → Fase 2)
 - ✅ PWA, notificações no aparelho, layout de tablet.
-- [ ] **Pareamento por QR Code (modelo do Orca ADE).** O QR leva um link com: endereço do Ripper, um token do aparelho e a chave pública do computador. O celular conecta e toda a conversa vai **cifrada de ponta a ponta** (X25519 + NaCl), então quem repassa os dados não consegue ler. Aparelhos pareados ficam listados, com "Desconectar este aparelho"; gerar um QR novo invalida o anterior; o convite expira em até 10 minutos.
+- ✅ **Pareamento por QR Code** em casa (Wi-Fi) e fora (Tailscale): convite de 10 min, aparelho pareado sem senha, lista com "Desconectar este aparelho". [ ] Cifra de ponta a ponta no modelo do Orca (só necessária se houver relay).
 - ✅ **Em casa (mesma rede):** conexão direta pelo Wi-Fi, sem servidor nenhum. Configurações → "Celular na mesma rede": liga o acesso pela rede (padrão continua só 127.0.0.1; ligado, abre um segundo ouvinte só no IP do Wi-Fi, e exige senha criada), mostra o QR (link `http://<ip>:<porta>/pair?t=<token>`, uso único, 10 min, gerar outro invalida o anterior). Abrir o link cria uma sessão do aparelho (cookie `ripper_device`, separada da senha, guardada só com hash em `db.pairedDevices`, sobrevive a reinício); lista de aparelhos com "Desconectar este aparelho". `lib/pairing.mjs`, `test/pairing.test.mjs`.
   - Ainda falta nesta entrega: a chave pública no QR e a cifra de ponta a ponta (fica para a fase do relay). Hoje, na rede local, o tráfego vai em http puro: quem está no mesmo Wi-Fi pode ler. Trocar a senha não desconecta aparelhos (desconecte pela lista).
 - [ ] **Fora de casa:** um **servidor de retransmissão** (relay) que liga celular e computador — o computador abre uma conexão de saída até ele, então não precisa abrir portas no roteador. É o que o Orca faz (relay próprio em `relay.onorca.dev`). Para o Ripper: **nós hospedamos um relay** (custo baixo: só repassa bytes cifrados) ou o usuário usa Tailscale como alternativa. *Decisão pendente: hospedar o relay.*
 - [ ] Referência no código do Orca: `src/shared/pairing.ts`, `src/shared/mobile-relay-pairing-offer.ts`, `src/main/runtime/relay/`, `src/shared/e2ee-crypto.ts`, `src/main/ipc/mobile.ts`.
 - [ ] Testar notificações de verdade (Android, iPhone instalado na tela inicial).
-- [ ] Aprovar e recusar direto pela notificação.
+- ✅ Aprovar e recusar direto pela notificação (botões na notificação; perguntas abertas e configurações continuam abrindo o app). [ ] Testar num celular de verdade.
 
 ### J. Documentação (P1)
 - 🔨 Guia de instalação e primeiro uso, em português: passo a passo em [instalacao.md](instalacao.md). [ ] Imagens.
-- [ ] Central de ajuda dentro do app (o que cada coisa faz, exemplos de pedidos).
+- ✅ Central de ajuda dentro do app: menu da conta › Ajuda ou tecla ?; explica cada parte e traz pedidos prontos que vão para a conversa com um clique.
 - ✅ Documentação para quem desenvolve (arquitetura, como rodar os testes, como criar uma integração): [desenvolvimento.md](desenvolvimento.md).
 
 ### K. Distribuição e negócio (P2)
@@ -214,7 +216,7 @@ Acesso remoto seguro (login + HTTPS), notificações reais no Android/iPhone, ap
 1ª palavra < 1 s, 50 tarefas reais com ≥ 80% concluídas sozinhas, Omie com sessões que se recuperam sozinhas, mais canais (Telegram, Instagram, Slack).
 *Pronto quando:* os critérios do norte estão cumpridos e medidos.
 - **Cursores dos agentes:** ver o cursor de cada agente ao vivo na aba Computador; vários agentes no mesmo computador ao mesmo tempo, cada um numa janela (referência: trycua/cua, avaliar licença).
-- **Configuração dentro da conversa:** o agente manda no balão o interruptor da configuração que você pediu; você só clica. Sensíveis pedem confirmação.
+- ✅ **Configuração dentro da conversa:** o agente oferece no balão o interruptor da configuração (ferramenta `offer_setting`, catálogo em `lib/setting-cards.mjs`); nada muda até o clique; sensíveis pedem confirmação. [ ] Ampliar o catálogo (escolhas com mais de duas opções, como modelo padrão).
 
 **Fase 4 — Mídia**
 Geração de imagem dentro das tarefas, depois vídeo.
@@ -234,7 +236,6 @@ Geração de imagem dentro das tarefas, depois vídeo.
 
 ## 6. Pontes conhecidas (defeitos que ainda não doem, mas vão doer)
 - **Agentes e pasta compartilhada:** os agentes trabalham em `/project`, que é a mesma pasta onde o servidor roda; trocar de branch lá muda o código do Ripper em uso. Usar cópia própria para trabalhar no código.
-- **Gasto entre processos:** com dois servidores no mesmo diretório o gasto do dia é subcontado (mover para SQLite).
 - **Testes instáveis** em máquina carregada (servidor demora a subir).
 - **`listExternal`** filtra em memória (até 5.000 linhas).
 - **Trocar sozinho no limite** (contas do Claude) está desligado nas configurações atuais — com ele assim, o Ripper não passa para a outra conta quando uma esgota.

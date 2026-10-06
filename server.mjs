@@ -1,16 +1,17 @@
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { readFile, stat, writeFile, unlink, copyFile } from 'node:fs/promises';
-import { mkdirSync, existsSync, writeFileSync, statSync, unlinkSync } from 'node:fs';
+import { mkdirSync, existsSync, writeFileSync, statSync, unlinkSync, readFileSync } from 'node:fs';
 import { generateVapidKeys, sendPushAll } from './lib/web-push.mjs';
 import { gzipSync } from 'node:zlib';
 import { extname, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { authed as checkAuth, hashPassword, verifyPassword, passwordProblem, passwordFile, sessionStore, sessionCookie, loginLimiter } from './lib/auth.mjs';
-import { pairingInvite, deviceStore, deviceCookie, lanAddress, qrSvg, deviceName } from './lib/pairing.mjs';
+import { pairingInvite, deviceStore, deviceCookie, lanAddress, tailscaleAddress, qrSvg, deviceName } from './lib/pairing.mjs';
 import { load, save, flush, id, newAgent, patchAgent, dataUrl, safeCheckStoreReady, TOOLS } from './lib/store.mjs';
 import { route, classifySpeaker, MODELS, EFFORTS, enabledModels, clampEffort } from './lib/router.mjs';
 import { computerFor } from './lib/boat.mjs';
+import { effectiveComputer, NO_COMPUTER_HINT } from './lib/computer-mode.mjs';
 import { dockerAvailable, imageStatus, ensureImage, outdatedImage, hostnameOf, transcribeAudio } from './lib/docker.mjs';
 import { sandboxStatus } from './lib/exec-sandbox.mjs';
 import { ApprovalGate } from './lib/approvals.mjs';
@@ -51,6 +52,7 @@ import { allAccounts, isLoggedIn, exhaustedUntil, loginCommand, openLoginTermina
 import { normalizeWorkspace, listDirs, gitBranch, workspaceFor, workspaceForAgent } from './lib/workspace.mjs';
 import { recordExternal, listExternal, externalCsv, EXTERNAL_KINDS } from './lib/external-actions.mjs';
 import { buildPulse, pulseDue, pulseWhatsappTo } from './lib/pulse.mjs';
+import { checkDue, capabilityGaps } from './lib/self-check.mjs';
 import { normalizeFlow, stepPrompt, stepRuns } from './lib/flows.mjs';
 import { DRAFT_SYSTEM, DRAFT_SCHEMA, sanitizeDraft, heuristicDraft } from './lib/agent-draft.mjs';
 import { askWithContract } from './lib/model-contract.mjs';
@@ -62,7 +64,7 @@ import { SECRET_PATHS } from './lib/local-secret.mjs';
 import { emailReady, listEmails, readEmail, sendEmail, newEmailsSince, testEmail, getAttachment, safeName, attachmentText, readHint } from './lib/email.mjs';
 import { gh, githubReady, normalizeRepo, repoChanges, describeChange, prBranch, gitAuthArg, hideToken } from './lib/github.mjs';
 import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './lib/event-triggers.mjs';
-import { isPaidModel, paidBlockReason, addSpend, spendToday, spendLimits, normalizeBilling } from './lib/paid-usage.mjs';
+import { isPaidModel, paidBlockReason, addSpend, spendToday, spendLimits, normalizeBilling, useSpendStore, closeSpendStore } from './lib/paid-usage.mjs';
 import { runTestProvider } from './lib/test-provider.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
 import { memoryContext, isDuplicateMemory, canUseFile, selectSpeakers, mentionOrder, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent, turnPlanIds, delegationTasks } from './lib/agent-flow.mjs';
@@ -104,6 +106,8 @@ import { timingSafeEqual, randomBytes } from 'node:crypto';
 import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStreaming, activeChatStreamCount } from './lib/chat-stream.mjs';
 import { truncateChatFrom } from './lib/chat-edit.mjs';
 import { mergeAgentChats, unmergeChat } from './lib/merge-agent-chats.mjs';
+import { settingCardView, settingPatch } from './lib/setting-cards.mjs';
+import { checkUpdate, applyUpdate } from './lib/updater.mjs';
 import { beginChatRun,bumpChatRunSeq, finishChatRun, chatRunPublic, canResumeChatRun, trimPartialRepliesAfterLastUser, noteChatRunTool, canAutoResume } from './lib/chat-run.mjs';
 import { exportChatPayload, importChatPayload } from './lib/chat-transfer.mjs';
 import { listAgentTemplates, createSavedTemplate, patchSavedTemplate, agentFromSavedTemplate } from './lib/agent-templates.mjs';
@@ -127,7 +131,7 @@ import {
 } from './lib/semantic-cache.mjs';
 import { verifyMcpConnector } from './lib/mcp-probe.mjs';
 import { shutdownStdioSupervisors } from './lib/mcp-stdio-supervisor.mjs';
-import { closeSpares } from './lib/claude-prewarm.mjs';
+import { closeSpares, warmAgent } from './lib/claude-prewarm.mjs';
 import {
   applyOAuthTokensToPlugin,
   refreshPluginOAuthToken,
@@ -137,6 +141,7 @@ import {
   getOAuthFlow,
   mergePluginAuth,
   oauthRedirectUri,
+  escapeHtml,
   pluginOAuthStatus,
   startMcpOAuthFlow
 } from './lib/mcp-oauth.mjs';
@@ -204,14 +209,16 @@ import {
   restoreDataSnapshot,
   maybeRunScheduledBackup,
   pruneOldSnapshots,
-  normalizeBackupSettings
+  normalizeBackupSettings,
+  tarGzDir
 } from './lib/backup.mjs';
+import { exportAllEntries, writeEntries, removeDir } from './lib/export-all.mjs';
 import { memoAsync } from './lib/ttl-cache.mjs';
 import { attachRequestId } from './lib/request-id.mjs';
-import { isShuttingDown, registerGracefulShutdown, SHUTDOWN_MESSAGE } from './lib/shutdown.mjs';
+import { isShuttingDown, registerGracefulShutdown, requestShutdown, RESTART_EXIT_CODE, SHUTDOWN_MESSAGE } from './lib/shutdown.mjs';
 import { closeUsageEventsStore, listUsageEventsSince } from './lib/usage-events.mjs';
 import { agentDayStats } from './lib/agent-day-stats.mjs';
-import { parseUsageQuery, aggregateUsage, usageCsv, resolveClient, normalizeClient } from './lib/usage-report.mjs';
+import { parseUsageQuery, aggregateUsage, usageCsv, resolveClient, normalizeClient, monthForecast, usdBrlRate } from './lib/usage-report.mjs';
 import { loadBenchmarkCatalog } from './lib/julia-cascade.mjs';
 import { agentTimeline } from './lib/agent-timeline.mjs';
 import { closeJuliaEventsStore } from './lib/julia-events.mjs';
@@ -287,6 +294,7 @@ function settingsForMcp(s, mcpSession) {
 const APP_PKG = JSON.parse(await readFile(new URL('./package.json', import.meta.url), 'utf8'));
 const SERVER_STARTED_AT = Date.now();
 const db = load();
+useSpendStore(fileURLToPath(dataUrl('spend.sqlite')));
 let localPull = null; // download de modelo local em andamento (um por vez)
 db.pairedDevices ||= [];
 syncOpenRouterModels(db.settings); // modelos do OpenRouter escolhidos em Configurações
@@ -682,8 +690,10 @@ function notifyOwner(msg) {
     save();
   }).catch(() => {});
 }
-function notifyApproval(agent, command) {
-  notifyOwner({ title: `${agent.name || 'Agente'} precisa de você`, body: command, url: '#/inbox' });
+function notifyApproval(agent, command, rec) {
+  // Aprovar/recusar direto da notificação: só pedidos de sim/não (perguntas abertas pedem resposta escrita)
+  const actions = rec && rec.kind !== 'question' && rec.kind !== 'setting';
+  notifyOwner({ title: `${agent.name || 'Agente'} precisa de você`, body: command, url: rec?.chatId ? `#/c/${rec.chatId}` : '#/inbox', ...(actions ? { approvalId: rec.id } : {}) });
 }
 
 const LOOPBACK = ['127.0.0.1', '::1', '::ffff:127.0.0.1'];
@@ -905,7 +915,7 @@ async function askApproval({ agent, chat, emit, signal }, kind, command, reason,
   db.approvals.push(rec);
   if (db.approvals.length > 300) db.approvals.splice(0, db.approvals.length - 300);
   emit({ approval: approvalView(rec) });
-  notifyApproval(agent, command);
+  notifyApproval(agent, command, rec);
   const done = await gate.request(rec, signal);
   emit({ approvalDone: { id: rec.id, status: done.status } });
   if (remember && done.status === 'approved' && done.remember) rememberAllowedCommand(chat, command);
@@ -997,7 +1007,7 @@ async function askOwner({ agent, chat, emit, signal }, question, context, option
   db.approvals.push(rec);
   if (db.approvals.length > 300) db.approvals.splice(0, db.approvals.length - 300);
   emit({ approval: approvalView(rec) });
-  notifyApproval(agent, rec.command);
+  notifyApproval(agent, rec.command, rec);
   save();
   const done = await gate.request(rec, signal);
   emit({ approvalDone: { id: rec.id, status: done.status } });
@@ -1006,13 +1016,35 @@ async function askOwner({ agent, chat, emit, signal }, question, context, option
   return done.status === 'expired' ? 'O usuário não respondeu em 2 horas. Não adivinhe: deixe a tarefa pausada e registre a pergunta pendente.' : 'O usuário não respondeu (pergunta cancelada). Não adivinhe.';
 }
 
+/** Interruptor de configuração no balão: o agente oferece, a pessoa liga/desliga; só então muda. */
+async function offerSetting({ agent, chat, emit, signal }, { key, on, reason }) {
+  const view = settingCardView(db.settings, key, on);
+  if (!view) return `Configuração desconhecida: ${key}.`;
+  if (view.current === view.proposed) return `"${view.label}" já está ${view.current ? 'ligado' : 'desligado'}. Avise o usuário; não precisa oferecer.`;
+  const rec = { id: id(), agentId: agent.id, chatId: chat.id, kind: 'setting', command: view.label, reason: String(reason || view.desc).slice(0, 300),
+    setting: view, status: 'pending', createdAt: Date.now(), timeoutMs: 2 * 3600_000 };
+  db.approvals.push(rec);
+  if (db.approvals.length > 300) db.approvals.splice(0, db.approvals.length - 300);
+  emit({ approval: approvalView(rec) });
+  save();
+  const done = await gate.request(rec, signal);
+  emit({ approvalDone: { id: rec.id, status: done.status } });
+  if (done.status !== 'approved') { save(); return `O usuário não ${on ? 'ligou' : 'desligou'} "${view.label}". Não insista.`; }
+  const before = structuredClone(db.settings);
+  const patch = settingPatch(key, on);
+  patchSettings(db.settings, patch, { mergePluginAuth });
+  recordCorporateAudit(db.settings, auditSettingsPatch(before, db.settings, patch));
+  save();
+  return `Pronto: "${view.label}" ${on ? 'ligado' : 'desligado'} pelo usuário.`;
+}
+
 function guarded(computer, { agent, chat, emit, signal }) {
   const ask = async (kind, command, reason) => {
     const rec = { id: id(), agentId: agent.id, chatId: chat.id, kind, command, reason, status: 'pending', createdAt: Date.now() };
     db.approvals.push(rec);
     if (db.approvals.length > 300) db.approvals.splice(0, db.approvals.length - 300);
     emit({ approval: approvalView(rec) });
-    notifyApproval(agent, command);
+    notifyApproval(agent, command, rec);
     const done = await gate.request(rec, signal);
     emit({ approvalDone: { id: rec.id, status: done.status } });
     if (done.status === 'approved' && done.remember) rememberAllowedCommand(chat, command);
@@ -1122,7 +1154,9 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
   // Pasta de trabalho da conversa (pasta desta máquina ou repositório); repositório privado usa o token do Guardião.
   const agentWs = workspaceForAgent(chat.workspace, agent.id);
   const chatWs = agentWs?.kind === 'repo' && s.github?.token ? { ...agentWs, auth: gitAuthArg(s.github.token) } : agentWs || null;
-  if (agent.tools.includes('computer')) { try { computer = computerFor(agent, s, save, chatWs); } catch {} }
+  // Docker parado / boat sem chave: modo sem computador claro, em vez de erro no meio da conversa.
+  const pcMode = agent.tools.includes('computer') ? effectiveComputer(s.computer, s.computer.mode === 'docker' ? (await dockerStatusCached()).version : null) : 'none';
+  if (pcMode !== 'none') { try { computer = computerFor(agent, s, save, chatWs); } catch {} }
   let browser = null;
   if (computer?.kind === 'docker' && agent.tools.includes('browser')) {
     const b = browsers.get(agent.id) || browserFor(computer, sandboxDir(agent));
@@ -1165,6 +1199,7 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
     settings: s,
     // "Preciso de você": pergunta aberta na Caixa (não em conversa de canal: lá o cliente está esperando)
     askOwner: chat.channel ? null : a => askOwner({ agent, chat, emit, signal }, a.question, a.context, a.options),
+    offerSetting: chat.channel ? null : a => offerSetting({ agent, chat, emit, signal }, a),
     // Entrega um arquivo do computador do agente na conversa (Abrir / Baixar / Mostrar na pasta).
     deliverFile: async a => {
       const rel = vmPathToData(a.path, agent.id);
@@ -1605,6 +1640,7 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
     systemStable,
     memoryContext(memories, s.memoryLogInContext ?? 10),
     chat.workspace && (computer ? workspaceFor(workspaceForAgent(chat.workspace, agent.id), computer.kind).hint : `O usuário escolheu a pasta de trabalho ${chat.workspace.path || chat.workspace.repo}, mas você não tem computador ligado: diga isso se ele pedir para mexer nos arquivos.`),
+    agent.tools.includes('computer') && !computer && NO_COMPUTER_HINT,
     await projectContext(project),
     visibleArtifacts(chat).length && `Artefatos do time (leia com read_artifact; salve entregas com save_artifact): ${visibleArtifacts(chat).slice(-20).map(x => `"${x.title}" (${x.kind}, v${x.version})`).join('; ')}`,
     (() => {
@@ -1770,7 +1806,13 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
   else recordChatTurn('error');
 }
 
-async function chat({ chat, text, fileIds, signal, mcpSession, skipUserPush = false, credentialRefs, voice }, emit) {
+// Turnos em andamento: o encerramento gracioso espera chegar a zero antes de sair.
+let activeTurns = 0;
+async function chat(args, emit) {
+  activeTurns++;
+  try { return await chatTurn(args, emit); } finally { activeTurns--; }
+}
+async function chatTurn({ chat, text, fileIds, signal, mcpSession, skipUserPush = false, credentialRefs, voice }, emit) {
   logger.info('chat.turn.start', { chatId: chat.id, resume: skipUserPush });
   const refs = (credentialRefs || []).filter(isVaultRef);
   try {
@@ -1923,6 +1965,19 @@ const routes = [
   }],
   ['GET', /^\/api\/data\/backup$/, () => buildBackupPayload(db)],
   ['GET', /^\/api\/data\/backups$/, () => ({ auto: listAutoBackups(), snapshots: listDataSnapshots() })],
+  // "Exportar tudo": .tar.gz legível (conversas em Markdown, agentes, rotinas, arquivos, artefatos), sem segredos.
+  ['GET', /^\/api\/data\/export-all$/, async (req, _, url, res) => {
+    const entries = await exportAllEntries(db, { dataPath: rel => fileURLToPath(dataUrl(rel)), readArtifact: readArtifactContent });
+    const dir = writeEntries(entries);
+    const out = dir + '.tar.gz';
+    try {
+      await tarGzDir(dir, out);
+      const buf = await readFile(out);
+      const name = `ripper-exportacao-${new Date().toISOString().slice(0, 10)}.tar.gz`;
+      res.writeHead(200, hdr(req, { 'content-type': 'application/gzip', 'content-disposition': `attachment; filename="${name}"`, 'cache-control': 'no-store' }));
+      res.end(buf);
+    } finally { removeDir(dir); removeDir(out); }
+  }],
   ['POST', /^\/api\/data\/restore$/, async req => {
     const b = await body(req);
     if (!b.confirm) throw new HttpError(400, 'Envie confirm: true para substituir o estado local.');
@@ -2040,7 +2095,11 @@ const routes = [
     let catalog = null; try { catalog = loadBenchmarkCatalog(); } catch {}
     const report = aggregateUsage(listUsageEventsSince(q.since), q, catalog, { clients: db.clients, chats: db.chats });
     const label = k => q.group === 'client' ? db.clients?.find(c => c.id === k)?.name || 'Sem cliente' : q.group === 'agent' ? db.agents.find(a => a.id === k)?.name || (/^[0-9a-f-]{36}$/.test(k) ? `Agente excluído · ${k.slice(0, 6)}` : k) : k;
-    if (!m[0]) return { ...q, rows: report.rows.map(r => ({ ...r, label: label(r.key) })), totals: report.totals };
+    if (!m[0]) {
+      const now = Date.now(), monthStart = Date.UTC(new Date(now).getUTCFullYear(), new Date(now).getUTCMonth(), 1);
+      const month = { ...monthForecast(listUsageEventsSince(monthStart), now, catalog), ...(await usdBrlRate(db.settings)) };
+      return { ...q, rows: report.rows.map(r => ({ ...r, label: label(r.key) })), totals: report.totals, month };
+    }
     const name = `ripper-uso-${url.searchParams.get('from')}-${url.searchParams.get('to')}-${q.group}.csv`;
     res.writeHead(200, hdr(req, {
       'content-type': 'text/csv; charset=utf-8',
@@ -2375,6 +2434,20 @@ const routes = [
     return { logoUrl: rel };
   }],
   ['GET', /^\/api\/settings$/, () => ({ settings: redact(db.settings), meta: settingsMeta() })],
+  // Atualização pela interface: ver novidades e aplicar (só avança; o vigia sobe a versão nova)
+  ['GET', /^\/api\/update$/, async (req, _m, url) => ({ ...(url?.searchParams?.get('check') ? await refreshUpdateInfo() : updateInfo), supervised: !!process.env.RIPPER_SUPERVISED, applying: updateApplying })],
+  ['POST', /^\/api\/update$/, async req => {
+    if (!isLocalRequest(req)) throw new HttpError(403, 'Atualize pelo computador onde o Ripper está instalado.');
+    if (updateApplying) return { applying: updateApplying };
+    updateApplying = { step: 'Começando', at: Date.now() };
+    applyUpdate(APP_ROOT, { onStep: step => { updateApplying = { step, at: Date.now() }; } }).then(r => {
+      logger.info('update.applied', r);
+      resolveSystemAlert('update');
+      if (process.env.RIPPER_SUPERVISED) requestShutdown('update', RESTART_EXIT_CODE);
+      else updateApplying = { step: 'Pronto. Reinicie o Ripper para usar a versão nova.', done: true, at: Date.now() };
+    }, e => { updateApplying = { step: e.message, error: true, at: Date.now() }; });
+    return { applying: updateApplying };
+  }],
   ['GET', /^\/api\/flags$/, () => ({ flags: effectiveFeatureFlags(db.settings) })],
   // Provedores de IA → OpenRouter: testar a chave e listar o catálogo (para escolher modelos).
   // Provedores compatíveis com OpenAI: testar conexão e listar modelos (o caminho antigo /api/openrouter/* continua)
@@ -2665,7 +2738,7 @@ const routes = [
     return { chatId: runFlow(flow, String(input).slice(0, 8000)) };
   }],
   // Pareamento do celular por QR (mesma rede). Ligar a rede e gerar convite só no próprio computador.
-  ['GET', /^\/api\/pair$/, req => ({ lan: lanState(), devices: devices.list(), local: isLocalRequest(req) })],
+  ['GET', /^\/api\/pair$/, req => ({ lan: lanState(), tail: tailState(), devices: devices.list(), local: isLocalRequest(req) })],
   ['POST', /^\/api\/pair\/lan$/, async req => {
     if (!isLocalRequest(req)) throw new HttpError(403, 'Ligue o acesso pela rede no computador onde o Ripper roda.');
     const { on } = await body(req);
@@ -2674,12 +2747,22 @@ const routes = [
     await setLan(!!on);
     return { lan: lanState() };
   }],
+  // Fora de casa: um ouvinte só no IP do Tailscale (rede privada do usuário; ninguém de fora enxerga)
+  ['POST', /^\/api\/pair\/tailscale$/, async req => {
+    if (!isLocalRequest(req)) throw new HttpError(403, 'Ligue no computador onde o Ripper roda.');
+    const { on } = await body(req);
+    if (on && !passwordStore.get()) throw new HttpError(409, 'Crie a senha do Ripper antes de abrir para fora de casa.');
+    db.tailAccess = !!on; save();
+    await setTail(!!on);
+    return { tail: tailState() };
+  }],
   ['POST', /^\/api\/pair\/invite$/, req => {
     if (!isLocalRequest(req)) throw new HttpError(403, 'Gere o QR no computador onde o Ripper roda.');
-    const lan = lanState();
-    if (!lan.on || !lan.address) throw new HttpError(409, 'Ligue o acesso pela rede Wi-Fi primeiro.');
+    const via = new URL(req.url, 'http://x').searchParams.get('via');
+    const net = via === 'tailscale' ? tailState() : lanState();
+    if (!net.on || !net.address) throw new HttpError(409, via === 'tailscale' ? 'Ligue o acesso fora de casa (Tailscale) primeiro.' : 'Ligue o acesso pela rede Wi-Fi primeiro.');
     const { token, expiresAt } = invite.create();
-    const link = `http://${lan.address}:${PORT}/pair?t=${token}`;
+    const link = `http://${net.address}:${PORT}/pair?t=${token}`;
     return { url: link, svg: qrSvg(link), expiresAt };
   }],
   ['DELETE', /^\/api\/pair\/devices\/([\w-]+)$/, (req, [did]) => {
@@ -2792,7 +2875,7 @@ const routes = [
     if (report.files?.removedRecords?.length) save();
     return report;
   }],
-  ['GET', /^\/api\/computer\/docker$/, async () => dockerStatusCached()],
+  ['GET', /^\/api\/computer\/docker$/, async () => { const d = await dockerStatusCached(); return { ...d, effective: effectiveComputer(db.settings.computer, d.version) }; }],
   ['GET', /^\/api\/sandbox\/status$/, async () => sandboxStatus(db.settings)],
   ['POST', /^\/api\/computer\/image$/, async () => { ensureImage().then(() => { resolveSystemAlert('agent-image'); save(); }).catch(e => console.error('imagem', e.message)); return { image: await imageStatus() }; }],
   ['GET', /^\/api\/agents\/([\w-]+)\/vnc$/, async (req, [aid]) => {
@@ -3160,12 +3243,14 @@ const routes = [
     const c = db.chats.find(c => c.id === cid);
     if (!c) throw new HttpError(404, 'Conversa não encontrada.');
     if (c.unread) { c.unread = false; save(); }
+    warmAgent(c.agentId); // 1ª mensagem ao abrir já pega processo quente
     return chatDetail(c, cid);
   }],
   ['GET', /^\/api\/conversations\/([\w-]+)$/, (req, [cid]) => {
     const c = db.chats.find(c => c.id === cid);
     if (!c) throw new HttpError(404, 'Conversa não encontrada.');
     if (c.unread) { c.unread = false; save(); }
+    warmAgent(c.agentId); // 1ª mensagem ao abrir já pega processo quente
     return chatDetail(c, cid);
   }],
   ['GET', /^\/api\/chats\/([\w-]+)\/export$/, (req, [cid]) => {
@@ -3470,7 +3555,7 @@ const server = createServer(async (req, res) => {
       return res.end();
     }
     if (req.method === 'GET' && p === '/metrics') {
-      if (!metricsAccessAllowed(req, TOKEN)) throw new HttpError(401, 'Não autorizado.');
+      if (!metricsAccessAllowed(signedIn(req))) throw new HttpError(401, 'Entre com a senha do Ripper.');
       const metricsBody = formatPrometheusExposition();
       res.writeHead(200, hdr(req, { 'content-type': prometheusContentType(), 'cache-control': 'no-store' }));
       res.end(metricsBody);
@@ -3584,7 +3669,7 @@ const server = createServer(async (req, res) => {
         flow.status = 'error';
         flow.error = url.searchParams.get('error_description') || err;
         res.writeHead(400, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
-        res.end(`<!doctype html><meta charset=utf-8><title>Ripper · Google Tasks</title><p>Login negado: ${flow.error}</p><script>setTimeout(()=>window.close(),1200)</script>`);
+        res.end(`<!doctype html><meta charset=utf-8><title>Ripper · Google Tasks</title><p>Login negado: ${escapeHtml(flow.error)}</p><script>setTimeout(()=>window.close(),1200)</script>`);
         return;
       }
       if (!code) {
@@ -3630,7 +3715,7 @@ const server = createServer(async (req, res) => {
         flow.status = 'error';
         flow.error = url.searchParams.get('error_description') || err;
         res.writeHead(400, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
-        res.end(`<!doctype html><meta charset=utf-8><title>Ripper OAuth</title><p>Login negado: ${flow.error}</p><script>setTimeout(()=>window.close(),1200)</script>`);
+        res.end(`<!doctype html><meta charset=utf-8><title>Ripper OAuth</title><p>Login negado: ${escapeHtml(flow.error)}</p><script>setTimeout(()=>window.close(),1200)</script>`);
         return;
       }
       if (!code) {
@@ -3722,6 +3807,21 @@ async function setLan(on) {
   await new Promise(r => { s.once('error', e => { lanError = e.message; r(); }); s.listen(PORT, ip, () => { lanServer = s; console.log(`Ripper na rede: http://${ip}:${PORT}`); r(); }); });
 }
 if (db.lanAccess) setLan(true).catch(e => console.error('[rede]', e.message));
+let tailServer = null, tailError = null;
+function tailState() {
+  return { on: !!tailServer || (hostOpen && !!tailscaleAddress()), address: tailscaleAddress(), error: tailError };
+}
+async function setTail(on) {
+  tailError = null;
+  if (hostOpen) return;
+  if (tailServer) { const s = tailServer; tailServer = null; await new Promise(r => s.close(r)); s.closeAllConnections?.(); }
+  if (!on) return;
+  const ip = tailscaleAddress();
+  if (!ip) { tailError = 'Tailscale não encontrado neste computador. Instale e entre na sua conta.'; return; }
+  const s = createServer((req, res) => server.emit('request', req, res));
+  await new Promise(r => { s.once('error', e => { tailError = e.message; r(); }); s.listen(PORT, ip, () => { tailServer = s; console.log(`Ripper no Tailscale: http://${ip}:${PORT}`); r(); }); });
+}
+if (db.tailAccess) setTail(true).catch(e => console.error('[tailscale]', e.message));
 setTimeout(() => autoResumeAfterRestart().catch(e => console.error('retomada', e.message)), 5000);
 
 /**
@@ -3765,14 +3865,36 @@ registerGracefulShutdown(server, {
     closeSpares();
   },
   getActiveConnections: () => activeHttpConnections,
+  getActiveTurns: () => activeTurns,
   flush,
   closeStores: () => {
     closeUsageEventsStore();
     closeJuliaEventsStore();
     closePersistCoordStore();
     closeIdempotencyStore();
+    closeSpendStore();
   }
 });
+
+// Atualização sem derrubar turnos: `node scripts/service.mjs restart` cria este arquivo; o servidor para de
+// aceitar turnos, espera os em andamento e sai com RESTART_EXIT_CODE para o vigia subir a versão nova.
+// Versão nova: confere a cada 6 h e avisa na Caixa com as novidades
+const APP_ROOT = fileURLToPath(new URL('.', import.meta.url));
+let updateInfo = { supported: null }, updateApplying = null;
+async function refreshUpdateInfo() {
+  updateInfo = await checkUpdate(APP_ROOT);
+  if (updateInfo.available) raiseSystemAlert({ key: 'update', title: `Nova versão do Ripper (${updateInfo.behind} novidade${updateInfo.behind > 1 ? 's' : ''})`,
+    body: updateInfo.notes.slice(0, 5).join(' · '), href: '/settings/backup', hrefLabel: 'Ver e atualizar' });
+  return updateInfo;
+}
+if (!process.env.RIPPER_TEST_PROVIDER) { setTimeout(() => refreshUpdateInfo().catch(() => {}), 60_000).unref(); setInterval(() => refreshUpdateInfo().catch(() => {}), 6 * 3600_000).unref(); }
+
+const restartFlag = fileURLToPath(dataUrl('restart.request'));
+setInterval(() => {
+  if (!existsSync(restartFlag)) return;
+  try { unlinkSync(restartFlag); } catch {}
+  requestShutdown('restart', RESTART_EXIT_CODE);
+}, 2000).unref();
 
 // Rotinas: o agente dono acorda (por horário ou evento), executa e só deixa conversa se houver novidade.
 /**
@@ -3948,6 +4070,34 @@ setInterval(() => {
   const p = currentPulse();
   raiseSystemAlert({ key: 'pulse', title: p.title, body: p.body, href: '/agents', hrefLabel: 'Ver agentes', quiet: true });
   sendPulseWhatsapp(p).catch(e => console.error('pulse.whatsapp', ...redactForLog(db.settings, e.message)));
+}, 60_000).unref?.();
+
+// Checagens noturnas (opt-in em Configurações › checks): smoke de 10 fluxos num servidor temporário e
+// auditoria de capacidades sem tokens. Falhou → aviso na Caixa; passou → o aviso some.
+setInterval(() => {
+  const smokeDay = checkDue(db.settings, 'smoke', db.smokeLastDay);
+  if (smokeDay) {
+    db.smokeLastDay = smokeDay; save();
+    const child = spawn(process.execPath, [fileURLToPath(new URL('./scripts/smoke.mjs', import.meta.url)), '--json'], { stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, RIPPER_URL: '' } });
+    let out = '';
+    child.stdout.on('data', d => { out += d; });
+    child.on('close', () => {
+      let rep; try { rep = JSON.parse(out.trim().split('\n').at(-1)); } catch { rep = { ok: false, results: [{ name: 'smoke', ok: false, error: 'não terminou' }] }; }
+      if (rep.ok) { resolveSystemAlert('smoke'); save(); return; }
+      const bad = rep.results.filter(r => !r.ok);
+      raiseSystemAlert({ key: 'smoke', title: `Smoke diário: ${bad.length} fluxo${bad.length > 1 ? 's' : ''} quebrado${bad.length > 1 ? 's' : ''}`, body: bad.map(r => `${r.name}: ${r.error}`).join('\n').slice(0, 1500), href: '/saude', hrefLabel: 'Ver saúde' });
+    });
+  }
+  const auditDay = checkDue(db.settings, 'audit', db.auditLastDay);
+  if (auditDay) {
+    db.auditLastDay = auditDay;
+    let gaps;
+    try { gaps = capabilityGaps(JSON.parse(readFileSync(fileURLToPath(new URL('./docs/capacidades.json', import.meta.url)), 'utf8'))); }
+    catch (e) { gaps = [`não li docs/capacidades.json: ${e.message}`]; }
+    if (gaps.length) raiseSystemAlert({ key: 'cap-audit', title: 'Auditoria noturna: capacidade quebrada', body: gaps.join('\n').slice(0, 1500) });
+    else resolveSystemAlert('cap-audit');
+    save();
+  }
 }, 60_000).unref?.();
 
 // Relatório da rotina (ex.: Radar) só para o próprio dono: número do Pulso e e-mail da conta; nunca terceiros.

@@ -15,6 +15,7 @@ const EFFORT_CAPS = EFFORTS.filter(([k]) => k !== 'auto');
 import { useSettingsDraft } from '../settingsForm.js';
 import UiModeToggle from '../uiModeToggle.jsx';
 import { isEnterpriseMode, isSettingsTabAllowed } from '../uiMode.js';
+import { EnterpriseHint } from '../uiModeToggle.jsx';
 import { useT, settingsTabs } from '../i18n/index.jsx';
 
 export function SaveBar({ dirty, saving, save, reset }) {
@@ -51,7 +52,7 @@ function DataBackup({ s, set }) {
       a.download = `ripper-backup-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(a.href);
-      toast('Backup JSON baixado (sensível — só db.json)');
+      toast('Arquivo baixado. Guarde em lugar seguro: tem suas conversas.');
     } catch (e) { toast(e.message, 'error'); }
     finally { setBusy(''); }
   };
@@ -60,18 +61,18 @@ function DataBackup({ s, set }) {
     try {
       await api('/api/backup', { method: 'POST' });
       await reloadList();
-      toast('Snapshot completo gravado em RIPPER_DATA/backups');
+      toast('Cópia completa feita');
     } catch (e) { toast(e.message, 'error'); }
     finally { setBusy(''); }
   };
   const restoreSnapshot = async id => {
-    if (!(await ov.confirm({ title: 'Restaurar este snapshot?', body: 'Isso sobrescreve os dados vivos em RIPPER_DATA (db.json, SQLite, sandbox, etc.).', action: 'Restaurar', danger: true }))) return;
+    if (!(await ov.confirm({ title: 'Restaurar esta cópia?', body: 'Seus agentes, conversas e configurações atuais serão trocados pelos desta cópia.', action: 'Restaurar', danger: true }))) return;
     setBusy(`restore-${id}`);
     try {
       await api('/api/backup/restore', { method: 'POST', body: { confirm: true, id } });
       await refresh();
       await reloadList();
-      toast('Dados restaurados a partir do snapshot');
+      toast('Dados restaurados');
     } catch (e) { toast(e.message, 'error'); }
     finally { setBusy(''); }
   };
@@ -83,30 +84,30 @@ function DataBackup({ s, set }) {
       const backup = JSON.parse(text);
       await api('/api/data/restore', { method: 'POST', body: { confirm: true, backup } });
       await refresh();
-      toast('db.json restaurado (SQLite e pastas não mudam)');
+      toast('Agentes e conversas restaurados');
     } catch (e) { toast(e.message, 'error'); }
     finally { setBusy(''); if (fileRef.current) fileRef.current.value = ''; }
   };
   const backup = s.backup || { enabled: true, intervalHours: 24, keepCount: 7 };
   return (
     <>
-      <Card title="Snapshot completo (RIPPER_DATA)" desc="Arquivo .tar.gz em RIPPER_DATA/backups com db.json, usage/julia SQLite, sandbox e anexos. Restaurar substitui os dados vivos — pare outros processos Ripper no mesmo diretório.">
+      <Card title="Cópia completa dos dados" desc="Guarda tudo: agentes, conversas, configurações, arquivos e histórico de uso. Restaurar uma cópia troca os dados atuais pelos dela.">
         <Row title="Backup manual">
-          <button type="button" className="btn btn-primary" disabled={!!busy} onClick={createSnapshot} aria-busy={busy === 'snapshot'}>{busy === 'snapshot' ? 'Criando…' : 'Criar snapshot agora'}</button>
+          <button type="button" className="btn btn-primary" disabled={!!busy} onClick={createSnapshot} aria-busy={busy === 'snapshot'}>{busy === 'snapshot' ? 'Criando…' : 'Fazer uma cópia agora'}</button>
         </Row>
-        <Row title="Agendamento" desc="Snapshots automáticos na pasta backups/; os mais antigos são removidos conforme manter abaixo.">
+        <Row title="Cópia automática" desc="O Ripper faz cópias sozinho; as mais antigas são apagadas para não encher o disco.">
           <Switch checked={!!backup.enabled} onChange={v => set('backup', { ...backup, enabled: v })} label="Backup automático" />
         </Row>
         {backup.enabled && <>
           <Row title="Intervalo"><div className="input-unit"><input className="input" type="number" min={1} max={168} value={backup.intervalHours ?? 24} onChange={e => set('backup', { ...backup, intervalHours: +e.target.value })} /><span>horas</span></div></Row>
-          <Row title="Manter no disco"><div className="input-unit"><input className="input" type="number" min={1} max={50} value={backup.keepCount ?? 7} onChange={e => set('backup', { ...backup, keepCount: +e.target.value })} /><span>snapshots</span></div></Row>
+          <Row title="Manter no disco"><div className="input-unit"><input className="input" type="number" min={1} max={50} value={backup.keepCount ?? 7} onChange={e => set('backup', { ...backup, keepCount: +e.target.value })} /><span>cópias</span></div></Row>
           <Row title="Cópia extra em outra pasta" desc="Recomendado: uma pasta sincronizada (OneDrive, Google Drive, Dropbox) ou um disco externo. Assim, se este disco falhar, o backup não vai junto. Caminho completo; deixe vazio para não copiar." stack>
             <input className="input" value={backup.copyTo || ''} onChange={e => set('backup', { ...backup, copyTo: e.target.value })} placeholder="Ex.: C:\Users\voce\OneDrive\Ripper-backups" aria-label="Pasta da cópia extra" />
           </Row>
         </>}
         <Row title="Último backup">{snapshots[0] ? <span>{new Date(snapshots[0].createdAt).toLocaleString('pt-BR')} · {(snapshots[0].bytes / 1048576).toFixed(1).replace('.', ',')} MB</span> : <span className="tag tag-warn">nenhum ainda</span>}</Row>
         {snapshots.length > 0 && (
-          <Row title="Snapshots no servidor" stack>
+          <Row title="Cópias guardadas" stack>
             <ul className="rows flat">
               {snapshots.map(row => (
                 <li key={row.id} className="row-item">
@@ -118,18 +119,18 @@ function DataBackup({ s, set }) {
           </Row>
         )}
       </Card>
-      <Card title="Exportar só db.json" desc="JSON leve (agentes, chats, configurações). Não inclui usage.sqlite nem arquivos em sandbox/.">
-        <Row title="Download JSON">
-          <button type="button" className="btn" disabled={!!busy} onClick={download} aria-busy={busy === 'export'}>{busy === 'export' ? 'Gerando…' : 'Baixar JSON'}</button>
+      <Card title="Arquivo leve de agentes e conversas" desc="Um arquivo pequeno com agentes, conversas e configurações, sem os arquivos anexados. Bom para levar para outro computador.">
+        <Row title="Baixar">
+          <button type="button" className="btn" disabled={!!busy} onClick={download} aria-busy={busy === 'export'}>{busy === 'export' ? 'Gerando…' : 'Baixar arquivo'}</button>
         </Row>
-        <Row title="Restaurar JSON" desc="Grava db.pre-restore.*.backup.json antes de substituir só o db.json." tip="Substitui conversas e configurações atuais. Guarde o JSON em lugar seguro.">
+        <Row title="Restaurar de um arquivo" desc="Antes de trocar, o Ripper guarda uma cópia do que você tem hoje." tip="Substitui conversas e configurações atuais. Guarde o arquivo em lugar seguro.">
           <div className="row">
             <input ref={fileRef} type="file" hidden accept="application/json,.json" onChange={e => restoreJson(e.target.files?.[0])} />
             <button type="button" className="btn" disabled={!!busy} onClick={() => fileRef.current?.click()} aria-busy={busy === 'import'}><Icon name="upload" size={16} />{busy === 'import' ? 'Restaurando…' : 'Escolher arquivo…'}</button>
           </div>
         </Row>
         {auto?.length > 0 && (
-          <Row title="Backups automáticos de db.json" desc="Migração de schema ou antes de restaurar." stack>
+          <Row title="Cópias de segurança automáticas" desc="Feitas antes de atualizações e restaurações." stack>
             <ul className="rows flat">{auto.map(n => <li key={n} className="row-item"><div className="row-main"><b className="mono small">{n}</b></div></li>)}</ul>
           </Row>
         )}
@@ -184,6 +185,42 @@ function PushCard() {
 }
 
 /** Celular na mesma rede: liga o acesso pelo Wi-Fi, mostra o QR de pareamento e lista os aparelhos. */
+/** Celular fora de casa pelo Tailscale: rede privada entre os seus aparelhos, sem abrir portas no roteador. */
+function AwayCard() {
+  const [st, setSt] = useState(null);
+  const [qr, setQr] = useState(null);
+  const [err, setErr] = useState('');
+  const load = () => api('/api/pair').then(setSt, e => setErr(e.message));
+  useEffect(() => { load(); }, []);
+  if (!st?.local) return null;
+  const t = st.tail || {};
+  const run = p => p.then(() => setErr(''), e => setErr(e.message));
+  const toggle = on => run(api('/api/pair/tailscale', { method: 'POST', body: { on } }).then(() => { if (!on) setQr(null); return load(); }));
+  return (
+    <Card title="Celular fora de casa" desc="Use o Ripper no 4G ou em outro Wi-Fi, com segurança, pelo Tailscale (grátis para uso pessoal). Só os seus aparelhos enxergam o Ripper.">
+      <ol className="steps-list">
+        <li className={t.address ? 'done' : ''}>Instale o <a href="https://tailscale.com/download" target="_blank" rel="noreferrer">Tailscale</a> neste computador e entre com a sua conta. {t.address ? <b>Encontrado ({t.address}).</b> : <span className="muted">Ainda não encontrado.</span>}</li>
+        <li>Instale o Tailscale no celular e entre com a <b>mesma conta</b>.</li>
+        <li>Ligue o acesso abaixo e leia o QR Code com o celular.</li>
+      </ol>
+      <Row title="Acesso fora de casa" desc={t.error || (t.on ? `Aberto no Tailscale em ${t.address}.` : 'Desligado.')}>
+        <button className={`btn btn-sm ${t.on ? '' : 'btn-primary'}`} disabled={!t.address && !t.on} onClick={() => toggle(!t.on)}>{t.on ? 'Desligar' : 'Ligar'}</button>
+      </Row>
+      {t.on && (
+        <Row title="Parear o celular" desc={qr ? 'Vale por 10 minutos e uma só vez.' : 'Funciona de qualquer lugar com o Tailscale ligado no celular.'} stack={!!qr}>
+          {qr
+            ? <div style={{ display: 'grid', gap: 8, justifyItems: 'start' }}>
+                <div style={{ width: 220, background: '#fff', borderRadius: 8 }} role="img" aria-label="QR Code para fora de casa" dangerouslySetInnerHTML={{ __html: qr.svg }} />
+                <button className="btn btn-sm" onClick={() => run(api('/api/pair/invite?via=tailscale', { method: 'POST' }).then(setQr))}>Gerar outro</button>
+              </div>
+            : <button className="btn btn-sm btn-primary" onClick={() => run(api('/api/pair/invite?via=tailscale', { method: 'POST' }).then(setQr))}>Mostrar QR Code</button>}
+        </Row>
+      )}
+      {err && <p className="small warn-text">{err}</p>}
+    </Card>
+  );
+}
+
 function DevicesCard() {
   const [st, setSt] = useState(null);
   const [qr, setQr] = useState(null);
@@ -320,6 +357,7 @@ function ClaudeAccountsCard({ s, set, S }) {
           ? <button type="button" onClick={() => setAdding(accounts.some(a => /teams/i.test(a.label)) ? '' : 'Teams')} disabled={!!busy}><b>+ Adicionar</b><small>outra conta (ex.: Teams)</small></button>
           : <form className="claude-acc-new" onSubmit={e => { e.preventDefault(); add(); }}>
               <input className="input" autoFocus value={adding} maxLength={40} onChange={e => setAdding(e.target.value)} placeholder="Nome da conta" aria-label="Nome da conta nova" />
+              <small className="muted" role="note">Assinatura pessoal (Pro/Max) costuma ser para uso de uma pessoa: atender clientes ou dividir pode contrariar os termos do provedor. Conta da empresa (Teams, Enterprise) só com autorização de quem a administra. Não use a conta de outra pessoa. A responsabilidade pelos termos de cada provedor é sua.</small>
               <div className="row"><button type="submit" className="btn btn-sm btn-primary" disabled={!adding.trim() || busy === 'add'}>Adicionar e entrar</button><button type="button" className="btn btn-sm" onClick={() => setAdding(null)}>Cancelar</button></div>
             </form>}
       </div>
@@ -369,6 +407,9 @@ function PaidUsageCard({ s, set, S }) {
       </Row>
       <Row title="Limite de todos os agentes, por dia">
         <div className="input-unit"><span>US$</span><input className="input" type="number" min={0} step={1} value={b.totalDailyUsd ?? 10} onChange={e => set('billing', { ...b, totalDailyUsd: e.target.value })} aria-label="Limite diário total em dólares" /></div>
+      </Row>
+      <Row title="Cotação do dólar" desc="Para mostrar custos em R$. Vazio = cotação do dia (AwesomeAPI), ou R$ 5,50 se não der para buscar.">
+        <div className="input-unit"><span>R$</span><input className="input" type="number" min={0} step={0.01} placeholder="auto" value={b.usdBrl ?? ''} onChange={e => set('billing', { ...b, usdBrl: e.target.value })} aria-label="Cotação do dólar em reais" /></div>
       </Row>
       <div className="row">
         {on || pending
@@ -487,6 +528,38 @@ function LocalModelPick({ onDone }) {
         : <div className="row"><b>{pick.label}</b><button type="button" className="btn btn-primary" onClick={start}>Baixar e usar</button></div>}
       {(err || pull?.error) && <p className="muted small">{err || pull.error}</p>}
     </Row>
+  );
+}
+
+/** Versão do Ripper: confere se há nova, mostra as novidades e atualiza com um clique. */
+function UpdateCard() {
+  const { toast } = useApp();
+  const [info, setInfo] = useState(null);
+  const [checking, setChecking] = useState(false);
+  const load = (check = false) => { setChecking(check); return api(`/api/update${check ? '?check=1' : ''}`).then(setInfo).catch(e => toast(e.message, 'error')).finally(() => setChecking(false)); };
+  useEffect(() => { load(); }, []);
+  // Enquanto atualiza, acompanha o passo; quando o servidor reinicia, recarrega a página
+  useEffect(() => {
+    if (!info?.applying || info.applying.done || info.applying.error) return;
+    const t = setInterval(() => api('/api/update').then(setInfo).catch(() => { clearInterval(t); setTimeout(() => location.reload(), 4000); }), 2000);
+    return () => clearInterval(t);
+  }, [info?.applying?.step]);
+  const apply = () => api('/api/update', { method: 'POST' }).then(r => setInfo(i => ({ ...i, ...r }))).catch(e => toast(e.message, 'error'));
+  const a = info?.applying;
+  return (
+    <Card title="Versão do Ripper" desc={info?.reason === 'no-git' ? 'Esta instalação não veio do Git; atualize baixando a versão nova.' : info?.reason === 'offline' ? 'Não consegui conferir a versão oficial agora (sem internet ou sem acesso ao repositório).' : info?.current ? `Versão instalada: ${info.current}` : 'Conferindo…'}>
+      {info?.available && <>
+        <p className="small"><b>{info.behind} novidade{info.behind > 1 ? 's' : ''}</b> na versão nova:</p>
+        <ul className="update-notes">{info.notes.map((n, i) => <li key={i}>{n}</li>)}</ul>
+      </>}
+      {info?.current && !info.available && !a && <p className="small muted">Você está na versão mais recente.</p>}
+      {a && <p className={`small ${a.error ? 'warn-text' : 'muted'}`}>{a.step}{!a.done && !a.error ? '…' : ''}</p>}
+      <div className="row-actions">
+        {info?.available && !a && <button className="btn btn-primary" onClick={apply}><Icon name="download" size={15} />Atualizar agora</button>}
+        <button className="btn" disabled={checking || (a && !a.error && !a.done)} onClick={() => load(true)}>{checking ? 'Conferindo…' : 'Procurar versão nova'}</button>
+      </div>
+      {info?.available && !info.supervised && !a && <p className="small muted">O Ripper não está rodando como serviço: depois de atualizar, feche e abra de novo.</p>}
+    </Card>
   );
 }
 
@@ -645,7 +718,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
           </a>
         ))}
         {!enterprise && (
-          <p className="settings-simple-hint muted small">Computador, conectores e opções técnicas ficam no <a href="#/settings/appearance">modo Enterprise</a>.</p>
+          <p className="settings-simple-hint muted small"><EnterpriseHint>Computador, conectores e opções técnicas ficam no modo Enterprise.</EnterpriseHint></p>
         )}
       </nav>
 
@@ -655,11 +728,11 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
         {tab === 'profile' && <>
           <Card>
             <Row title="Seu nome" desc="Os agentes usam isso quando falam com você."><input className="input" value={s.name} maxLength={80} onChange={e => set('name', e.target.value)} placeholder="Ex.: Rafael" /></Row>
-            <Row stack title="Instruções gerais" desc="Entram em toda conversa, junto das instruções de cada agente e da skill token-the-ripper.">
+            <Row stack title="Instruções gerais" desc="Valem para todos os agentes, em toda conversa, junto com as instruções de cada um.">
               <textarea className="input" rows={6} value={s.customInstructions} maxLength={8000} onChange={e => set('customInstructions', e.target.value)} placeholder="Ex.: Sou dev frontend em SP. Respostas curtas, TypeScript no código." />
             </Row>
           </Card>
-          <Card title="Voz padrão dos agentes" desc="Agentes sem perfil de voz próprio herdam estes valores no prompt do modelo.">
+          <Card title="Voz padrão dos agentes" desc="Jeito de falar dos agentes que não têm um estilo próprio.">
             <Row title="Tom">
               <div className="pills">
                 {TONES.map(([k, l]) => <button key={k} type="button" className={`pill ${(s.defaults?.agentStyle?.tone || 'direto') === k ? 'on' : ''}`} onClick={() => set('defaults', { ...s.defaults, agentStyle: { ...(s.defaults?.agentStyle || {}), tone: k } })}>{l}</button>)}
@@ -676,7 +749,8 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
           </Card>
           <PushCard />
           <DevicesCard />
-          <Card title="Resumo do dia" desc="Todo dia, na Caixa: o que cada agente fez, o que espera você e quanto gastou. Montado sem gastar tokens.">
+          <AwayCard />
+          <Card title="Resumo do dia" desc="Todo dia, na Caixa: o que cada agente fez, o que espera você e quanto gastou. Não gasta nada da sua assinatura.">
             <Row title="Receber o resumo"><Switch checked={s.pulse?.enabled !== false} onChange={v => set('pulse', { ...(s.pulse || {}), enabled: v })} label="Resumo do dia" /></Row>
             {s.pulse?.enabled !== false && <Row title="Horário">
               <select className="select" value={s.pulse?.hour ?? 8} onChange={e => set('pulse', { ...(s.pulse || {}), hour: +e.target.value })}>
@@ -785,7 +859,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
           </Card>
           {s.computer.mode === 'docker' && (
             <Card title="Docker" badge={docker === undefined ? <span className="tag" role="status">Verificando…</span> : docker ? <span className="tag tag-ok">Docker {docker} ativo</span> : <span className="tag tag-warn">Docker não encontrado</span>} aria-busy={docker === undefined}>
-              {docker === null && <p className="form-error">Abra o Docker Desktop e recarregue esta página.</p>}
+              {docker === null && <p className="form-error">Modo sem computador: enquanto o Docker não estiver rodando, os agentes conversam, pesquisam e lembram, mas não rodam comandos, não abrem navegador nem criam arquivos. Abra o Docker Desktop e recarregue esta página.</p>}
               <Row title="Imagem de referência" desc="A imagem do Ripper já vem com Chromium, tela virtual (noVNC), Node 22 e Python 3." tip="Cada agente ganha um contêiner isolado; arquivos ficam na pasta do agente, não na sua máquina.">
                 <div className="row">{image && <span className={`tag ${image === 'ready' ? 'tag-ok' : 'tag-warn'}`}>{image === 'ready' ? 'pronta' : image === 'building' ? 'construindo…' : image === 'outdated' ? 'desatualizada' : 'não construída'}</span>}
                   {(image === 'missing' || image === 'outdated') && <button className="btn btn-sm" onClick={() => api('/api/computer/image', { method: 'POST' }).then(r => setImage(r.image === 'missing' ? 'building' : r.image))}>{image === 'outdated' ? 'Atualizar imagem' : 'Construir agora'}</button>}</div>
@@ -816,7 +890,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
         {tab === 'plugins' && <Plugins s={s} set={set} />}
         {tab === 'channels' && <EmailCard s={s} set={set} toast={toast} />}
         {tab === 'channels' && <GithubCard s={s} toast={toast} refresh={refresh} />}
-        {tab === 'channels' && !enterprise && <p className="muted small">WhatsApp fica no <a href="#/settings/appearance">modo Enterprise</a>.</p>}
+        {tab === 'channels' && !enterprise && <p className="muted small"><EnterpriseHint>O WhatsApp (atender clientes, receber recados e o resumo diário) fica no modo Enterprise.</EnterpriseHint></p>}
         {tab === 'channels' && enterprise && (() => {
           const w = s.whatsapp || {};
           const setW = (k, v) => set('whatsapp', { ...w, [k]: v });
@@ -876,8 +950,11 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
               ))}
             </div>
           </Card>
-          <Card title="LGPD — dados pessoais" desc="Opt-in: antes de enviar texto a Claude, Codex ou Julia 1, o Ripper pode substituir CPF, contas, documentos e contatos por [PII]. Conversas locais continuam com o texto original.">
-            <Row title="Mascaramento antes do modelo" desc="Recomendado se você cola dados de clientes no chat."><Switch checked={!!s.lgpd?.enabled} onChange={v => set('lgpd', { ...(s.lgpd || {}), enabled: v })} label="Ativar mascaramento LGPD" /></Row>
+          <Card title="LGPD — dados pessoais" desc="Se você ligar, antes de mandar qualquer texto para a IA o Ripper troca CPF, contas, documentos e contatos por marcadores. Aqui no seu computador, as conversas continuam com o texto original.">
+            <Row title="Exportar tudo" desc="Um pacote com tudo em formato fácil de abrir: conversas, agentes, rotinas e arquivos. Senhas e chaves ficam de fora.">
+              <a className="btn" href="/api/data/export-all" download><Icon name="download" size={16} />Baixar pacote</a>
+            </Row>
+            <Row title="Esconder dados pessoais da IA" desc="Recomendado se você cola dados de clientes no chat."><Switch checked={!!s.lgpd?.enabled} onChange={v => set('lgpd', { ...(s.lgpd || {}), enabled: v })} label="Esconder dados pessoais da IA" /></Row>
             {s.lgpd?.enabled && <>
               <Row title="Também em avisos do servidor" desc="SSE warn/erro e logs do Node quando ligado."><Switch checked={!!s.lgpd?.redactInLogs} onChange={v => set('lgpd', { ...(s.lgpd || {}), redactInLogs: v })} label="Mascarar PII em logs" /></Row>
               <Row title="Eliminar meus dados" desc="Direito de eliminação (art. 18): apaga conversas, memórias, anexos e telemetria local. Agentes e plugins permanecem.">
@@ -950,7 +1027,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
           </Card>
         </>}
 
-        {tab === 'backup' && <DataBackup s={s} set={set} />}
+        {tab === 'backup' && <><UpdateCard /><DataBackup s={s} set={set} /></>}
 
         {tab === 'memory' && <>
           <Card>

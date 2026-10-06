@@ -28,7 +28,7 @@ export default function Agents() {
     .filter(a => !q || (a.name + a.description + a.category).toLowerCase().includes(q.toLowerCase()));
   const count = s => S.agents.filter(a => s === 'all' || (s === 'working' ? !!working[a.id] : a.status === s)).length;
   return (
-    <div className="page">
+    <div className="page v2">
       <header className="page-head">
         <div><h1>{t('agents.title')}</h1><p className="lede">{t('agents.lede')}</p></div>
         <div className="page-head-actions">

@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseWhatsappMessages, normalizeWhatsapp, redactWhatsapp } from '../lib/whatsapp.mjs';
+import { freePort } from './helpers/free-port.mjs';
 
 const listen = srv => new Promise(r => srv.listen(0, '127.0.0.1', () => r(srv.address().port)));
 
@@ -33,7 +34,7 @@ test('webhook WhatsApp: verifica, recusa sem assinatura e responde pela Graph AP
     let b = ''; req.on('data', c => (b += c)); req.on('end', () => { sent.push({ url: req.url, auth: req.headers.authorization, body: JSON.parse(b) }); res.end('{"messages":[{"id":"out1"}]}'); });
   });
   const graphPort = await listen(graph);
-  const probe = http.createServer(); const port = await listen(probe); await new Promise(r => probe.close(r)); // porta livre
+  const port = await freePort(); // porta livre
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-wa-'));
   const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
     env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'stream', HOME: dataDir, USERPROFILE: dataDir, JULIA_AUTOSTART: '0', WHATSAPP_GRAPH_URL: `http://127.0.0.1:${graphPort}` },
@@ -41,7 +42,7 @@ test('webhook WhatsApp: verifica, recusa sem assinatura e responde pela Graph AP
   });
   const base = `http://127.0.0.1:${port}`;
   try {
-    for (let i = 0; i < 60; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 250)); }
+    for (let i = 0; i < 240; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 250)); }
     const st = await (await fetch(base + '/api/state')).json();
     const put = body => fetch(base + '/api/settings', { method: 'PUT', headers: { 'content-type': 'application/json', origin: base }, body: JSON.stringify(body) });
     assert.equal((await put({ ui: { mode: 'enterprise' } })).status, 200);

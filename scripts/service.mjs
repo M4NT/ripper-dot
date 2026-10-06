@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Ripper como serviço: sobe com o computador e volta sozinho se cair.
-//   node scripts/service.mjs install | uninstall | status | run
+//   node scripts/service.mjs install | uninstall | status | run | restart
+// `restart` (depois de atualizar o código): o servidor espera os turnos em andamento e o vigia sobe a versão nova.
 // `run` é o vigia: reinicia o servidor quando ele sai com erro (espera crescente até 1 min).
 import { spawn, execFileSync } from 'node:child_process';
 import { writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
@@ -20,19 +21,27 @@ export function nextDelay(prev, uptimeMs) {
 }
 
 function run() {
-  let delay = 0;
+  let delay = 0, child;
   const start = () => {
     const t0 = Date.now();
-    const child = spawn(node, ['server.mjs'], { cwd: ROOT, stdio: 'inherit', windowsHide: true });
+    child = spawn(node, ['server.mjs'], { cwd: ROOT, stdio: 'inherit', windowsHide: true, env: { ...process.env, RIPPER_SUPERVISED: '1' } });
     child.on('exit', code => {
       if (code === 0) process.exit(0); // saída limpa = desligado de propósito
+      if (code === 75) { delay = 0; console.log('[vigia] reiniciando para atualizar'); return start(); } // RESTART_EXIT_CODE
       delay = nextDelay(delay, Date.now() - t0);
       console.error(`[vigia] servidor caiu (código ${code}); reiniciando em ${delay / 1000}s`);
       setTimeout(start, delay);
     });
-    for (const s of ['SIGINT', 'SIGTERM']) process.once(s, () => { child.kill(s); process.exit(0); });
   };
+  // uma vez só, sempre no filho atual (antes, cada reinício somava um handler que matava o filho antigo)
+  for (const s of ['SIGINT', 'SIGTERM']) process.once(s, () => { child.kill(s); process.exit(0); });
   start();
+}
+
+function restart() {
+  const dir = process.env.RIPPER_DATA ? resolve(process.env.RIPPER_DATA) : join(ROOT, 'data');
+  writeFileSync(join(dir, 'restart.request'), String(Date.now()));
+  console.log('Pedido enviado: o Ripper reinicia assim que os turnos em andamento terminarem (até 2 min).');
 }
 
 const unitPath = () => process.platform === 'darwin'
@@ -98,5 +107,5 @@ function status() {
 
 if (process.argv[1] && resolve(process.argv[1]) === self) {
   const cmd = process.argv[2];
-  ({ install, uninstall, status, run }[cmd] || (() => { console.log('uso: node scripts/service.mjs install|uninstall|status|run'); process.exit(1); }))();
+  ({ install, uninstall, status, run, restart }[cmd] || (() => { console.log('uso: node scripts/service.mjs install|uninstall|status|run|restart'); process.exit(1); }))();
 }

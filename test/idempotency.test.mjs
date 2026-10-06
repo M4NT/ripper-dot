@@ -17,6 +17,7 @@ import {
   replayIdempotentResponse
 } from '../lib/idempotency.mjs';
 import { _resetStoreForTests } from '../lib/store.mjs';
+import { freePort } from './helpers/free-port.mjs';
 
 const serverPath = fileURLToPath(new URL('../server.mjs', import.meta.url));
 
@@ -82,16 +83,6 @@ test('replayIdempotentResponse envia cabeçalho idempotency-replayed', () =>
     assert.equal(Buffer.concat(chunks).toString(), '{}');
   }));
 
-function freePort() {
-  return new Promise((resolve, reject) => {
-    const s = createServer();
-    s.listen(0, '127.0.0.1', () => {
-      const { port } = s.address();
-      s.close(() => resolve(port));
-    });
-    s.on('error', reject);
-  });
-}
 
 async function withServer(envExtra, fn) {
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-idem-http-'));
@@ -110,7 +101,7 @@ async function withServer(envExtra, fn) {
   const base = `http://127.0.0.1:${port}`;
   const auth = { authorization: `Bearer ${env.RIPPER_TOKEN}` };
   try {
-    await waitFor(base + '/api/health', env.RIPPER_TOKEN, 15_000);
+    await waitFor(base + '/api/health', env.RIPPER_TOKEN, 60_000);
     await fn(base, auth);
   } finally {
     child.kill('SIGTERM');

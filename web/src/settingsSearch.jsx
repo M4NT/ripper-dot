@@ -26,7 +26,7 @@ const INDEX = [
   ['channels', 'GitHub — Guardião', 'github token repositórios guardião pr'],
   ['plugins', 'Servidores MCP', 'mcp conectores plugins'],
   ['security', 'Sandbox Docker', 'sandbox isolamento'],
-  ['security', 'LGPD — dados pessoais', 'lgpd privacidade mascarar eliminar dados'],
+  ['security', 'LGPD — dados pessoais', 'lgpd privacidade mascarar eliminar dados exportar tudo'],
   ['security', 'Limite de taxa', 'rate limit taxa'],
   ['security', 'Retenção de dados', 'apagar automaticamente retenção conversas antigas'],
   ['backup', 'Backup automático', 'backup cópia snapshot restaurar'],

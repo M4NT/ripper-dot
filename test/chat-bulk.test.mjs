@@ -2,6 +2,7 @@ import './helpers/signed-in.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { applyBulk, normalizeTag } from '../lib/chat-bulk.mjs';
+import { freePort } from './helpers/free-port.mjs';
 
 const fresh = () => [{ id: 'a' }, { id: 'b', tags: ['cliente'] }, { id: 'c' }];
 
@@ -30,7 +31,7 @@ test('rota de lote: etiqueta, arquiva, desarquiva e apaga conversas de verdade',
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
   const { fileURLToPath } = await import('node:url');
-  const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r)); const port = probe.address().port; await new Promise(r => probe.close(r));
+  const port = await freePort();
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-bulk-'));
   const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
     env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'stream', HOME: dataDir, USERPROFILE: dataDir, JULIA_AUTOSTART: '0' }, stdio: 'ignore'
@@ -39,7 +40,7 @@ test('rota de lote: etiqueta, arquiva, desarquiva e apaga conversas de verdade',
   const post = (path, b) => fetch(base + path, { method: 'POST', headers: { 'content-type': 'application/json', origin: base }, body: JSON.stringify(b) });
   const state = () => fetch(base + '/api/state').then(r => r.json());
   try {
-    for (let i = 0; i < 75; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 200)); }
+    for (let i = 0; i < 300; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 200)); }
     const [a] = (await state()).agents;
     for (const t of ['um', 'dois', 'três']) await (await post('/api/chat', { agentId: a.id, text: t, model: 'claude-sonnet-5-5', effort: 'low' })).text();
     const ids = (await state()).chats.map(c => c.id);

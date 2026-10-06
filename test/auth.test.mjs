@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { authed, hashPassword, verifyPassword, loginLimiter, sessionStore, passwordProblem } from '../lib/auth.mjs';
+import { freePort } from './helpers/free-port.mjs';
 
 test('senha: scrypt com sal, confere só a certa; sessão presa ao hash; bloqueio após erros', async () => {
   const h = await hashPassword('senha-boa-123');
@@ -25,7 +26,7 @@ test('senha: scrypt com sal, confere só a certa; sessão presa ao hash; bloquei
 });
 
 test('HTTP: criar senha, login, cookie HttpOnly/Strict, contêiner sem senha não entra, CSRF, bloqueio, sair', async () => {
-  const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r)); const port = probe.address().port; await new Promise(r => probe.close(r));
+  const port = await freePort();
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-auth-'));
   const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
     env: { ...process.env, RIPPER_TOKEN: '', RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', HOME: dataDir, USERPROFILE: dataDir, JULIA_AUTOSTART: '0' }, stdio: 'ignore'
@@ -60,6 +61,8 @@ test('HTTP: criar senha, login, cookie HttpOnly/Strict, contêiner sem senha nã
     assert.equal((await fetch(base + '/api/state', { headers: { cookie } })).status, 200);
     assert.equal((await post('/api/auth/setup', { password: 'outra-senha-123', code })).status, 409, 'senha só se cria uma vez');
     assert.equal(await fromContainer('/api/state'), 401, 'contêiner sem sessão não entra');
+    assert.equal((await fetch(base + '/metrics')).status, 401, '/metrics sem login fica fechado (mesmo sem RIPPER_TOKEN)');
+    assert.equal((await fetch(base + '/metrics', { headers: { cookie } })).status, 200);
     assert.equal((await fetch(base + '/api/state', { headers: { cookie: 'ripper_session=forjado' } })).status, 401);
     assert.equal((await post('/api/auth/logout', {}, { cookie, origin: 'https://evil.example' })).status, 403, 'CSRF: outro site é recusado');
     assert.equal((await post('/api/auth/logout', {}, { cookie, origin: '', 'sec-fetch-site': 'cross-site' })).status, 403, 'CSRF sem Origin');

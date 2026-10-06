@@ -23,3 +23,14 @@ export default function UiModeToggle({ compact = false, className = '' }) {
     </div>
   );
 }
+
+/** Onde algo é do modo Enterprise: diz o que é e liga com um clique (em vez de esconder). */
+export function EnterpriseHint({ children, className = '' }) {
+  const { setMode } = useUiMode();
+  return (
+    <span className={`enterprise-hint ${className}`}>
+      {children}{' '}
+      <button type="button" className="link enterprise-hint-btn" onClick={() => setMode('enterprise')}>Ativar modo Enterprise</button>
+    </span>
+  );
+}

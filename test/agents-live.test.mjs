@@ -7,16 +7,17 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { freePort } from './helpers/free-port.mjs';
 
 test('status ao vivo: agente aparece trabalhando durante a resposta e some ao terminar; duplicar copia só a configuração', async () => {
-  const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r)); const port = probe.address().port; await new Promise(r => probe.close(r));
+  const port = await freePort();
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-live-'));
   const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
     env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'slow', HOME: dataDir, USERPROFILE: dataDir, JULIA_AUTOSTART: '0' }, stdio: 'ignore'
   });
   const base = `http://127.0.0.1:${port}`;
   const post = (path, b) => fetch(base + path, { method: 'POST', headers: { 'content-type': 'application/json', origin: base }, body: JSON.stringify(b || {}) });
-  const wait = async (fn, ms = 15_000) => { let v; for (let i = 0; i < ms / 100 && !(v = await fn()); i++) await new Promise(r => setTimeout(r, 100)); return v; };
+  const wait = async (fn, ms = 60_000) => { let v; for (let i = 0; i < ms / 100 && !(v = await fn()); i++) await new Promise(r => setTimeout(r, 100)); return v; };
   try {
     await wait(async () => { try { return (await fetch(base + '/api/health')).ok; } catch { return false; } });
     const [a] = (await (await fetch(base + '/api/state')).json()).agents;

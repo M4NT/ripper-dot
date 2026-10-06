@@ -33,3 +33,19 @@ test('aviso de limite aparece na Caixa como urgente', () => {
   const it = buildInbox(db).items[0];
   assert.deepEqual([it.kind, it.agentName, it.urgent], ['spend', 'Ana', true]);
 });
+
+test('dois processos no mesmo SQLite somam o gasto (não subcontam)', async () => {
+  const { mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { useSpendStore, closeSpendStore, spendToday } = await import('../lib/paid-usage.mjs');
+  const file = join(mkdtempSync(join(tmpdir(), 'spend-')), 'spend.sqlite');
+  const settings = { billing: { paidConsentAt: 1, perAgentDailyUsd: 1, totalDailyUsd: 10 } };
+  const now = Date.now();
+  useSpendStore(file);
+  const a = {}, b = {}; // duas cópias do db.json, como em dois servidores
+  addSpend(a, settings, 'x', 0.6, now);
+  assert.equal(addSpend(b, settings, 'x', 0.5, now), 'agent', 'o segundo vê o gasto do primeiro');
+  assert.equal(spendToday(a, now).total, 1.1);
+  closeSpendStore();
+});

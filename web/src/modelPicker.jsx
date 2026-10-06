@@ -21,7 +21,7 @@ export const effortCap = (settings, id) => (LEVELS.includes(settings?.models?.ma
 
 export const MODEL_DESC = {
   agent: 'Cada agente usa o modelo e o esforço que você definiu nele',
-  auto: 'Julia 1 escolhe entre Sonnet, Opus e Codex a cada pedido',
+  auto: 'O Ripper escolhe entre Sonnet, Opus e Codex a cada pedido',
   'claude-sonnet-5-5': 'Rápido para o dia a dia',
   'claude-opus-5-5': 'O mais capaz para raciocínio longo',
   'claude-fable-5-1': 'Voltado para escrita criativa',

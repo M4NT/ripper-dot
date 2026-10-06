@@ -8,11 +8,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { freePort } from './helpers/free-port.mjs';
 
 test('Radar: rotina em dias úteis, rodar agora e relatório vai para o e-mail do dono', async () => {
   let raw = '', rcpt = '';
   const smtp = net.createServer(sock => {
     let data = false;
+    sock.on('error', () => {}); // servidor morto no fim do teste derruba o socket (ECONNRESET)
     sock.write('220 ok\r\n');
     sock.on('data', d => {
       const s = d.toString();
@@ -28,7 +30,7 @@ test('Radar: rotina em dias úteis, rodar agora e relatório vai para o e-mail d
     });
   });
   await new Promise(r => smtp.listen(0, '127.0.0.1', r));
-  const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r)); const port = probe.address().port; await new Promise(r => probe.close(r));
+  const port = await freePort();
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-radar-'));
   const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
     env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'stream', HOME: dataDir, USERPROFILE: dataDir, RIPPER_SECRET_KEY_FILE: join(dataDir, 'k'), JULIA_AUTOSTART: '0' },
@@ -37,7 +39,7 @@ test('Radar: rotina em dias úteis, rodar agora e relatório vai para o e-mail d
   const base = `http://127.0.0.1:${port}`;
   const send = (path, b, method = 'POST') => fetch(base + path, { method, headers: { 'content-type': 'application/json', origin: base }, body: JSON.stringify(b) });
   try {
-    for (let i = 0; i < 50; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 200)); }
+    for (let i = 0; i < 300; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 200)); }
     await send('/api/settings', { email: { enabled: true, user: 'dono@empresa.test', pass: 'x', imapHost: '127.0.0.1', imapPort: 1, smtpHost: '127.0.0.1', smtpPort: smtp.address().port } }, 'PUT');
     const st = await (await fetch(base + '/api/state')).json();
     const r = await (await send('/api/routines', { agentId: st.agents[0].id, name: 'Radar', prompt: 'Vigie licitação.', dailyAt: '07:00', weekdays: true, quiet: true, deliver: { email: true, whatsapp: true } })).json();

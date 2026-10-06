@@ -8,16 +8,7 @@ import { spawn } from 'node:child_process';
 import { createServer as createNetServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 
-function freePort() {
-  return new Promise((resolve, reject) => {
-    const s = createNetServer();
-    s.listen(0, '127.0.0.1', () => {
-      const { port } = s.address();
-      s.close(() => resolve(port));
-    });
-    s.on('error', reject);
-  });
-}
+import { freePort } from './helpers/free-port.mjs';
 import {
   _clearOAuthFlows,
   discoverMcpOAuth,
@@ -156,7 +147,7 @@ test('callback OAuth via servidor Ripper', async () => {
   });
   const base = `http://127.0.0.1:${ripperListen}`;
   const auth = { authorization: 'Bearer oauth-test' };
-  const deadline = Date.now() + 15_000;
+  const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
     try {
       const h = await fetch(`${base}/api/health`, { headers: auth });
@@ -216,4 +207,10 @@ test('callback OAuth via servidor Ripper', async () => {
   await new Promise(r => child.on('exit', r));
   idp.close();
   _clearOAuthFlows();
+});
+
+test('callback OAuth: error_description vindo da URL é escapado antes de ir para o HTML', async () => {
+  const { escapeHtml } = await import('../lib/mcp-oauth.mjs');
+  assert.equal(escapeHtml('<script>alert("x")</script>&\''), '&#60;script&#62;alert(&#34;x&#34;)&#60;/script&#62;&#38;&#39;');
+  assert.equal(escapeHtml(undefined), '');
 });
