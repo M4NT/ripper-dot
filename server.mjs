@@ -687,8 +687,10 @@ function notifyOwner(msg) {
     save();
   }).catch(() => {});
 }
-function notifyApproval(agent, command) {
-  notifyOwner({ title: `${agent.name || 'Agente'} precisa de você`, body: command, url: '#/inbox' });
+function notifyApproval(agent, command, rec) {
+  // Aprovar/recusar direto da notificação: só pedidos de sim/não (perguntas abertas pedem resposta escrita)
+  const actions = rec && rec.kind !== 'question' && rec.kind !== 'setting';
+  notifyOwner({ title: `${agent.name || 'Agente'} precisa de você`, body: command, url: rec?.chatId ? `#/c/${rec.chatId}` : '#/inbox', ...(actions ? { approvalId: rec.id } : {}) });
 }
 
 const LOOPBACK = ['127.0.0.1', '::1', '::ffff:127.0.0.1'];
@@ -910,7 +912,7 @@ async function askApproval({ agent, chat, emit, signal }, kind, command, reason,
   db.approvals.push(rec);
   if (db.approvals.length > 300) db.approvals.splice(0, db.approvals.length - 300);
   emit({ approval: approvalView(rec) });
-  notifyApproval(agent, command);
+  notifyApproval(agent, command, rec);
   const done = await gate.request(rec, signal);
   emit({ approvalDone: { id: rec.id, status: done.status } });
   if (remember && done.status === 'approved' && done.remember) rememberAllowedCommand(chat, command);
@@ -1002,7 +1004,7 @@ async function askOwner({ agent, chat, emit, signal }, question, context, option
   db.approvals.push(rec);
   if (db.approvals.length > 300) db.approvals.splice(0, db.approvals.length - 300);
   emit({ approval: approvalView(rec) });
-  notifyApproval(agent, rec.command);
+  notifyApproval(agent, rec.command, rec);
   save();
   const done = await gate.request(rec, signal);
   emit({ approvalDone: { id: rec.id, status: done.status } });
@@ -1039,7 +1041,7 @@ function guarded(computer, { agent, chat, emit, signal }) {
     db.approvals.push(rec);
     if (db.approvals.length > 300) db.approvals.splice(0, db.approvals.length - 300);
     emit({ approval: approvalView(rec) });
-    notifyApproval(agent, command);
+    notifyApproval(agent, command, rec);
     const done = await gate.request(rec, signal);
     emit({ approvalDone: { id: rec.id, status: done.status } });
     if (done.status === 'approved' && done.remember) rememberAllowedCommand(chat, command);
