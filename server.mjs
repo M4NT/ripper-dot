@@ -1762,6 +1762,8 @@ async function chat({ chat, text, fileIds, signal, mcpSession, skipUserPush = fa
     emit({ turnDone: agent.id });
     save();
   }
+  // Mensagem que não chegou a ninguém: avisa no grupo em vez de silêncio.
+  if (group && !answered && !signal?.aborted && tried.size) emit({ warn: 'Ninguém do grupo respondeu. Mencione alguém com @Nome ou reformule.' });
   if (chat.title === 'Nova conversa') chat.title = text.replace(/\s+/g, ' ').trim().slice(0, 60) || 'Conversa';
   chat.updatedAt = Date.now();
   save();

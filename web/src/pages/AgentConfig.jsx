@@ -167,13 +167,17 @@ export default function AgentConfig({ id }) {
       <Segmented label="Seções" value={tab} onChange={setTab} items={TABS} className="seg-scroll config-tabs" />
       <div className="config-body">
         {tab === 'identity' && <>
-          <Appearance v={v} set={set} />
+          {/* o que se edita no dia a dia vem primeiro; a aparência fica recolhida */}
           <Basics v={v} set={set} categories={S.categories} />
           <div className="field"><span>Status</span>
             <Select label="Status" value={v.status} onChange={status => set({ status })} options={[
               { value: 'online', label: 'Ativo', hint: 'Responde e roda rotinas', icon: <i className="dot dot-ok" /> },
               { value: 'paused', label: 'Pausado', hint: 'Responde, mas as rotinas não rodam', icon: <i className="dot" /> }]} />
           </div>
+          <details className="adv-model">
+            <summary><Icon name="down" size={14} className="adv-chev" />Aparência <small>Avatar, formato e cor</small></summary>
+            <Appearance v={v} set={set} />
+          </details>
           <h3 className="sub">Voz e estilo</h3>
           <VoiceStyle v={v} set={set} />
           <h3 className="sub">Mais</h3>
