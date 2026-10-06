@@ -3,6 +3,7 @@
 //
 //   node scripts/benchmark.mjs                 → dry-run: servidor próprio com o provedor de teste (não gasta nada)
 //   node scripts/benchmark.mjs --limit 5       → só as 5 primeiras
+//   node scripts/benchmark.mjs --ids t03,t07   → só essas tarefas
 //   RIPPER_TOKEN=... node scripts/benchmark.mjs --real --url http://127.0.0.1:3000 [--agent <id>]
 //                                              → servidor e agente de verdade (gasta assinatura/tokens)
 // Relatório: docs/benchmark/<data>.json (ou --out <arquivo>). Pedido de aprovação ou pergunta ao dono =
@@ -17,13 +18,14 @@ import { parseArgs } from 'node:util';
 
 const { values: opt } = parseArgs({ options: {
   real: { type: 'boolean', default: false }, url: { type: 'string' }, agent: { type: 'string' },
-  limit: { type: 'string' }, out: { type: 'string' }, timeout: { type: 'string', default: '600' }
+  limit: { type: 'string' }, ids: { type: 'string' }, out: { type: 'string' }, timeout: { type: 'string', default: '600' }
 } });
 if (opt.real && !opt.url) { console.error('--real exige --url do servidor (e RIPPER_TOKEN no ambiente).'); process.exit(2); }
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const { tarefas } = JSON.parse(readFileSync(join(root, 'docs/tarefas-referencia.json'), 'utf8'));
-const list = opt.limit ? tarefas.slice(0, +opt.limit) : tarefas;
+const only = opt.ids?.split(',').map(s => s.trim());
+const list = only ? tarefas.filter(t => only.includes(t.id)) : opt.limit ? tarefas.slice(0, +opt.limit) : tarefas;
 
 let server, base = opt.url?.replace(/\/$/, ''), token = process.env.RIPPER_TOKEN || '';
 if (!opt.real) {

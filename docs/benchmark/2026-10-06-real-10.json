@@ -1,0 +1,117 @@
+{
+  "quando": "2026-10-06T19:27:00.089Z",
+  "modo": "real",
+  "servidor": "http://127.0.0.1:3999",
+  "agentId": "fc777ac0-4a5e-4c53-a396-7d9335bbc62f",
+  "resumo": {
+    "total": 10,
+    "passou": 3,
+    "precisouDeAjuda": 0,
+    "falhou": 7,
+    "terminaSozinho": 30,
+    "segundosTotal": 70.3,
+    "tokensEstimados": 2263
+  },
+  "resultados": [
+    {
+      "id": "t03",
+      "titulo": "Resumo de lei",
+      "categoria": "pesquisa",
+      "status": "falhou",
+      "segundos": 1.2,
+      "tokensEstimados": 0,
+      "pedidosDeAjuda": 0,
+      "resposta": ""
+    },
+    {
+      "id": "t06",
+      "titulo": "Tendências do setor",
+      "categoria": "pesquisa",
+      "status": "falhou",
+      "segundos": 2.7,
+      "tokensEstimados": 0,
+      "pedidosDeAjuda": 0,
+      "resposta": ""
+    },
+    {
+      "id": "t07",
+      "titulo": "Comparar ferramentas",
+      "categoria": "pesquisa",
+      "status": "passou",
+      "segundos": 39.1,
+      "tokensEstimados": 1061,
+      "pedidosDeAjuda": 0,
+      "resposta": "## Comparativo para 4 vendedores (out/2026)\n\n| | **Pipedrive** | **RD Station CRM** | **HubSpot Free** |\n|---|---|---|---|\n| **Preço** | Sem plano grátis (teste de 14 dias). Valores por usuário/mês em USD: Essential/Lite ~US$14 no anual. Planos acima variam de US$29 a US$64, conforme a fonte. | **Free: R$0, até 4 usuários.** Basic: R$73 mensal ou R$65,70 anual. Pro: R$131 mensal ou R$117,90 anual, com mínimo de 4 usuários. | R$0 |\n| **Custo para 4 usuários** | Essential/Lite: ~US$56/mês no anual"
+    },
+    {
+      "id": "t09",
+      "titulo": "Fluxo de caixa",
+      "categoria": "planilha",
+      "status": "falhou",
+      "segundos": 0.7,
+      "tokensEstimados": 0,
+      "pedidosDeAjuda": 0,
+      "resposta": ""
+    },
+    {
+      "id": "t28",
+      "titulo": "Explicar erro",
+      "categoria": "codigo",
+      "status": "passou",
+      "segundos": 7.2,
+      "tokensEstimados": 343,
+      "pedidosDeAjuda": 0,
+      "resposta": "**O que significa:** seu programa tentou conectar no PostgreSQL (porta 5432, na sua própria máquina) e ninguém atendeu. Ou seja: o banco não está rodando, ou está em outra porta/endereço.\n\n**Como resolver (Windows):**\n\n1. **Verifique se o serviço está ligado:**\n   ```\n   Get-Service *postgres*\n   ```\n   Se estiver `Stopped`:\n   ```\n   Start-Service postgresql-x64-16\n   ```\n   (ajuste o nome conforme o resultado acima). Também dá para abrir `services.msc` e iniciar o PostgreSQL.\n\n2. **Se usa Dock"
+    },
+    {
+      "id": "t33",
+      "titulo": "Resumo de reunião",
+      "categoria": "relatorio",
+      "status": "falhou",
+      "segundos": 0.7,
+      "tokensEstimados": 0,
+      "pedidosDeAjuda": 0,
+      "resposta": ""
+    },
+    {
+      "id": "t34",
+      "titulo": "Contrato de prestação",
+      "categoria": "documento",
+      "status": "falhou",
+      "segundos": 2.7,
+      "tokensEstimados": 0,
+      "pedidosDeAjuda": 0,
+      "resposta": ""
+    },
+    {
+      "id": "t35",
+      "titulo": "Política de trocas",
+      "categoria": "documento",
+      "status": "passou",
+      "segundos": 12.5,
+      "tokensEstimados": 859,
+      "pedidosDeAjuda": 0,
+      "resposta": "# Política de Trocas e Devoluções\n\n**Última atualização:** 06/10/2026\n\n## 1. Direito de arrependimento (compras online)\nConforme o art. 49 do Código de Defesa do Consumidor (Lei 8.078/90), você pode desistir da compra em até **7 (sete) dias corridos**, contados a partir da data de recebimento do produto, **sem precisar justificar**.\n\n**Como solicitar:**\n- E-mail: [atendimento@sualoja.com.br] ou WhatsApp: [(00) 00000-0000]\n- Informe nome, número do pedido e CPF.\n- Enviaremos as instruções de devo"
+    },
+    {
+      "id": "t41",
+      "titulo": "Responder avaliação",
+      "categoria": "marketing",
+      "status": "falhou",
+      "segundos": 0.7,
+      "tokensEstimados": 0,
+      "pedidosDeAjuda": 0,
+      "resposta": ""
+    },
+    {
+      "id": "t45",
+      "titulo": "Precificação",
+      "categoria": "financeiro",
+      "status": "falhou",
+      "segundos": 2.8,
+      "tokensEstimados": 0,
+      "pedidosDeAjuda": 0,
+      "resposta": ""
+    }
+  ]
+}

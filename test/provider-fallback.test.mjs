@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { providerAttemptOrder, runProviderAttemptLoop } from '../lib/provider-turn.mjs';
+import { providerAttemptOrder, runProviderAttemptLoop, needsUsageCredits } from '../lib/provider-turn.mjs';
 
 test('providerAttemptOrder: Claude primário com Codex instalado', () => {
   assert.deepEqual(providerAttemptOrder('claude-sonnet-5-5', true), ['claude-sonnet-5-5', 'codex']);
@@ -164,4 +164,11 @@ test('runProviderAttemptLoop: abort após stream sem throw marca aborted', async
   });
   assert.equal(result.aborted, true);
   assert.equal(stopped, 'par');
+});
+
+test('providerAttemptOrder: Fable fora da assinatura cai no Opus antes do Codex', () => {
+  assert.deepEqual(providerAttemptOrder('claude-fable-5-1', false), ['claude-fable-5-1', 'claude-opus-5-5']);
+  assert.deepEqual(providerAttemptOrder('claude-fable-5-1', true), ['claude-fable-5-1', 'claude-opus-5-5', 'codex']);
+  assert.equal(needsUsageCredits(new Error('Fable 5.1 requires usage credits. Switch to another model')), true);
+  assert.equal(needsUsageCredits(new Error('rate limit')), false);
 });

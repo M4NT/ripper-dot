@@ -68,7 +68,7 @@ import { isPaidModel, paidBlockReason, addSpend, spendToday, spendLimits, normal
 import { runTestProvider } from './lib/test-provider.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
 import { memoryContext, isDuplicateMemory, canUseFile, selectSpeakers, mentionOrder, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent, turnPlanIds, delegationTasks } from './lib/agent-flow.mjs';
-import { providerAttemptOrder, runProviderAttemptLoop } from './lib/provider-turn.mjs';
+import { providerAttemptOrder, runProviderAttemptLoop, needsUsageCredits } from './lib/provider-turn.mjs';
 import { normalizeProviderRetry } from './lib/provider-retry.mjs';
 import { patchSettings, settingsMeta, SettingsValidationError } from './lib/settings-patch.mjs';
 import { normalizeContextPruning, pruneContextMessages } from './lib/context-pruning.mjs';
@@ -614,6 +614,7 @@ const dockerStatusCached = memoAsync(async () => ({ version: await dockerAvailab
 
 // ---------- mensagens entre agentes ----------
 const inboxBusy = new Set();
+const creditOnlyModels = new Set(); // modelos que a assinatura recusou ("requires usage credits") desde que o servidor subiu
 const inboxLimits = () => ({ maxPerHour: 20, maxHops: 3, ...(db.settings?.inbox || {}) });
 
 /** Entrega uma mensagem/call na thread A2A e roda o turno do destinatário. */
@@ -1673,7 +1674,9 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
   const requestedEffort = (chat.effort && chat.effort !== 'auto' ? chat.effort : null) || agent.effort || 'auto';
   const corrections = (db.juliaCorrections || []).filter(x => x.agentId === agent.id).slice(-20);
   timing.prepMs = Date.now() - t0;
-  const pick = model === 'auto' ? await route(text, history, s, { effort: requestedEffort, corrections }) : { model, by: 'manual' };
+  // Auto não escolhe modelo que a assinatura recusou por exigir créditos de uso.
+  const routeSettings = creditOnlyModels.size ? { ...s, models: { ...s.models, enabled: { ...s.models?.enabled, ...Object.fromEntries([...creditOnlyModels].map(m => [m, false])) } } } : s;
+  const pick = model === 'auto' ? await route(text, history, routeSettings, { effort: requestedEffort, corrections }) : { model, by: 'manual' };
   // A Julia pode ter escolhido o esforço; em todo caso, nunca passa do teto do modelo.
   const effort = clampEffort(s, pick.model, pick.effort || requestedEffort);
   const routedBy = pick.by;
@@ -1801,6 +1804,7 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
         save();
         emit({ quota: { provider: prov, ...limitSig } });
       }
+      if (needsUsageCredits(e)) creditOnlyModels.add(m); // o Auto para de escolher até reiniciar
       emit({ warn: `${MODELS[m].label} falhou: ${e.message}` });
       if (!canFallback) push(out, steps, { model: m, error: e.message });
     }

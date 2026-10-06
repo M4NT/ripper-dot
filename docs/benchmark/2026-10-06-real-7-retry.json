@@ -1,0 +1,87 @@
+{
+  "quando": "2026-10-06T19:30:13.510Z",
+  "modo": "real",
+  "servidor": "http://127.0.0.1:3999",
+  "agentId": "c1f8532b-99f0-47b9-ac8e-6f7fddd66c13",
+  "resumo": {
+    "total": 7,
+    "passou": 6,
+    "precisouDeAjuda": 0,
+    "falhou": 1,
+    "terminaSozinho": 85.7,
+    "segundosTotal": 101,
+    "tokensEstimados": 3103
+  },
+  "resultados": [
+    {
+      "id": "t03",
+      "titulo": "Resumo de lei",
+      "categoria": "pesquisa",
+      "status": "falhou",
+      "segundos": 35,
+      "tokensEstimados": 411,
+      "pedidosDeAjuda": 0,
+      "resposta": "Na prática, nada mudou ainda. O limite do MEI continua em **R$ 81 mil por ano** (cerca de R$ 6.750 por mês). Nenhum aumento virou lei até agora.\n\n- **O que está andando:** o PLP 108/21 sobe o limite para R$ 144,9 mil e permite contratar 2 funcionários. Em 17/03/2026 a Câmara só aprovou a urgência, que acelera a votação mas não aprova o projeto. Outras propostas falam em R$ 140 mil a R$ 150 mil, também sem aprovação final.\n- **Se passar do limite:** até 20% acima (R$ 97.200), você paga um DAS com"
+    },
+    {
+      "id": "t06",
+      "titulo": "Tendências do setor",
+      "categoria": "pesquisa",
+      "status": "passou",
+      "segundos": 22.2,
+      "tokensEstimados": 898,
+      "pedidosDeAjuda": 0,
+      "resposta": "# 5 tendências de e-commerce de moda para 2027\n\n[?] Ainda não existe relatório específico de 2027. O State of Fashion 2027 costuma sair em nov/dez. O resumo abaixo usa projeções para 2027 de relatórios de 2025 e 2026.\n\n**Contexto:** o mercado global de e-commerce de moda deve passar de US$ 1,2 trilhão em 2027, segundo a Statista. As estimativas variam conforme a metodologia ([Shopify](https://www.shopify.com/enterprise/blog/ecommerce-fashion-industry)). O clima entre executivos é de cautela: 46%"
+    },
+    {
+      "id": "t09",
+      "titulo": "Fluxo de caixa",
+      "categoria": "planilha",
+      "status": "passou",
+      "segundos": 21.2,
+      "tokensEstimados": 342,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não consegui criar a planilha direto no Google Drive, porque essa ferramenta não está liberada para este agente. Salvei o conteúdo como artefato em CSV, com o título \"Fluxo de Caixa 6 meses (Nov26-Abr27)\".\n\n**Para abrir como planilha:** copie o conteúdo para um arquivo `.csv` e abra no Excel, ou importe no Google Sheets em Arquivo > Importar. As fórmulas funcionam nos dois.\n\n**Estrutura:** os meses vão de Nov/26 a Abr/27, em B a G, e a coluna H traz o total.\n- **Saldo inicial (linha 3):** só B3 "
+    },
+    {
+      "id": "t33",
+      "titulo": "Resumo de reunião",
+      "categoria": "relatorio",
+      "status": "passou",
+      "segundos": 3.1,
+      "tokensEstimados": 220,
+      "pedidosDeAjuda": 0,
+      "resposta": "# Ata de Reunião\n\n**Data:** [?] missing: data da reunião\n**Participantes:** Ana, Pedro [?] missing: demais presentes\n\n## Decisões\n1. Reajustar o preço em **8%**.\n\n## Ações\n\n| Ação | Responsável | Prazo |\n|---|---|---|\n| Fechar contrato com o fornecedor | Ana | Sexta-feira (09/10/2026) |\n| Revisar o site | Pedro | 20/10/2026 |\n\n## Pendências\n- [?] Data de vigência do reajuste de 8%.\n- [?] Responsável por comunicar o novo preço.\n\n*Premissas: \"sexta\" = 09/10/2026 e \"dia 20\" = 20/10/2026, com base e"
+    },
+    {
+      "id": "t34",
+      "titulo": "Contrato de prestação",
+      "categoria": "documento",
+      "status": "passou",
+      "segundos": 11.9,
+      "tokensEstimados": 879,
+      "pedidosDeAjuda": 0,
+      "resposta": "# CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE DESIGN\n\n**CONTRATANTE:** [Nome/Razão Social], [CPF/CNPJ], [endereço], doravante \"CONTRATANTE\".\n\n**CONTRATADO(A):** [Nome/Razão Social], [CPF/CNPJ], [endereço], doravante \"CONTRATADO(A)\".\n\n## Cláusula 1ª – Objeto\nO CONTRATADO(A) prestará serviços de design consistentes em: [descrever: ex. criação de identidade visual, logotipo, peças gráficas etc.], conforme briefing aprovado pelas partes.\n\n## Cláusula 2ª – Prazo\nA entrega da primeira versão ocorrerá em até "
+    },
+    {
+      "id": "t41",
+      "titulo": "Responder avaliação",
+      "categoria": "marketing",
+      "status": "passou",
+      "segundos": 3.9,
+      "tokensEstimados": 212,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não recebi o texto da avaliação, então use este modelo e ajuste o que for específico:\n\n> Olá, [Nome]. Obrigado por compartilhar sua experiência. Lamentamos muito a demora na entrega: não é o padrão que buscamos e entendemos o transtorno que isso causou. Gostaríamos de entender melhor o que aconteceu com o seu pedido para corrigir o problema. Pode nos chamar em [telefone/WhatsApp/e-mail] com o número do pedido? Queremos resolver isso e, se possível, reconquistar sua confiança.\n\nSe me enviar a ava"
+    },
+    {
+      "id": "t45",
+      "titulo": "Precificação",
+      "categoria": "financeiro",
+      "status": "passou",
+      "segundos": 3.7,
+      "tokensEstimados": 141,
+      "pedidosDeAjuda": 0,
+      "resposta": "**Preço de venda ≈ R$ 71,19**\n\nFórmula (impostos e margem sobre o preço de venda):\n\nPV = Custo ÷ (1 − imposto − margem) = 42 ÷ (1 − 0,06 − 0,35) = 42 ÷ 0,59 ≈ **R$ 71,19**\n\nConferência:\n- Impostos (6%): R$ 4,27\n- Lucro (35%): R$ 24,92\n- Custo: R$ 42,00\n- Total: R$ 71,19\n\n[?] Se a margem fosse markup sobre o custo, o resultado seria diferente: 42 × 1,35 ÷ 0,94 ≈ R$ 60,32."
+    }
+  ]
+}
