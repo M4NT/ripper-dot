@@ -1,6 +1,6 @@
 import { createContext, lazy as reactLazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
-import { api, go, useRoute, useTheme, useMediaQuery, fmtAgo, local, brandLogoSrc, brandTitle } from './lib.js';
+import { api, go, useRoute, useTheme, useMediaQuery, fmtAgo, local, brandLogoSrc, brandTitle, stepLabel } from './lib.js';
 import { Icon, AgentAvatar, ToastProvider, useToast, Dialog, Menu, MenuItem } from './ui.jsx';
 import Home from './pages/Home.jsx';
 import { OverlayProvider } from './overlay.jsx';
@@ -52,6 +52,12 @@ function Provider({ children }) {
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState({}); // agentId -> true enquanto responde (em alguma conversa)
   const [busyChats, setBusyChats] = useState({}); // chatId -> true: só esta conversa anima
+  // Quem está trabalhando segundo o servidor (rotinas, WhatsApp, outra aba): a tela nunca fica parada
+  const [working, setWorking] = useState({});
+  useEffect(() => {
+    const load = () => document.visibilityState === 'visible' && api('/api/agents/working').then(r => setWorking(r.working || {}), () => {});
+    load(); const t = setInterval(load, 4000); return () => clearInterval(t);
+  }, []);
   const toast = useToast();
   const refresh = useCallback(async () => {
     try { setS(await api('/api/state')); setError(null); }
@@ -61,10 +67,12 @@ function Provider({ children }) {
   // Rotinas criam conversas no servidor: atualiza ao voltar para a aba.
   useEffect(() => { const f = () => document.visibilityState === 'visible' && refresh(); document.addEventListener('visibilitychange', f); return () => document.removeEventListener('visibilitychange', f); }, [refresh]);
   const value = useMemo(() => S && {
-    S, refresh, toast, busy, setBusy, busyChats, setBusyChats,
+    S, refresh, toast, setBusy, setBusyChats, working,
+    busy: { ...Object.fromEntries(Object.keys(working).map(id => [id, true])), ...busy },
+    busyChats: { ...Object.fromEntries(Object.values(working).filter(w => w.chatId).map(w => [w.chatId, true])), ...busyChats },
     agent: id => S.agents.find(a => a.id === id),
     updateAgent: async (id, patch) => { const a = await api(`/api/agents/${id}`, { method: 'PUT', body: patch }); setS(s => ({ ...s, agents: s.agents.map(x => x.id === id ? a : x) })); return a; }
-  }, [S, refresh, toast, busy, busyChats]);
+  }, [S, refresh, toast, busy, busyChats, working]);
   if (error && !S) return <Boot error={error} retry={refresh} />;
   if (!value) return <Boot />;
   return <Ctx.Provider value={value}><I18nProvider locale={S.settings.ui?.locale}>{children}</I18nProvider></Ctx.Provider>;
@@ -83,10 +91,11 @@ function Boot({ error, retry }) {
 const agentTag = a => a?.description || a?.category || '';
 
 function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollapse }) {
-  const { S, agent, busy } = useApp();
+  const { S, agent, busy, working } = useApp();
   const t = useT();
   const enterprise = isEnterpriseMode(S.settings);
   const { parts } = useRoute();
+  const doing = id => { const w = working[id]; return w ? `${w.tool ? stepLabel(w.tool) : 'trabalhando'}${w.chatTitle === 'WhatsApp' ? ' no WhatsApp' : ''}…` : 'trabalhando…'; };
   const chatMenu = useChatMenu();
   const section = parts[0] === 'c' ? 'chat' : parts[0] || '';
   // Avisos de agente de canal moram na Caixa, não na lista de conversas
@@ -188,7 +197,7 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
           return (
             <a {...common} href={`#/a/${a.id}`} className={`row ${activeAgent === a.id ? 'on' : ''} ${unread ? 'unread' : ''} ${dragKey === e.key ? 'lifted' : ''}`} onContextMenu={ev => c && chatMenu(ev, c)} title={collapsed ? a.name : undefined}>
               <span className="row-av"><AgentAvatar agent={a} size={40} state={busy[a.id] ? 'working' : undefined} /></span>
-              <span className="row-text"><span className="row-top"><b>{a.name}</b></span><small className={busy[a.id] ? 'is-working' : ''}>{busy[a.id] ? 'trabalhando…' : c?.preview || agentTag(a) || 'Diga oi'}</small></span>
+              <span className="row-text"><span className="row-top"><b>{a.name}</b></span><small className={busy[a.id] ? 'is-working' : ''}>{busy[a.id] ? doing(a.id) : c?.preview || agentTag(a) || 'Diga oi'}</small></span>
               {unread ? <span className="unread-dot" /> : c && <time>{fmtAgo(e.at)}</time>}
             </a>
           );
