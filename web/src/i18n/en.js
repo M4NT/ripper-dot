@@ -84,7 +84,7 @@ export default {
   'settings.tab.security': 'Security',
   'settings.tab.securityHint': 'Approvals and limits',
   'settings.tab.backup': 'Backup',
-  'settings.tab.backupHint': 'Snapshot and recovery',
+  'settings.tab.backupHint': 'Data copies and updates',
   'settings.tab.memory': 'Memory',
   'settings.tab.memoryHint': 'What agents remember',
   'settings.tab.appearance': 'Appearance',
