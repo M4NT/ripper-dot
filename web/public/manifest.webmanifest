@@ -5,8 +5,8 @@
   "start_url": "/#/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f3f1ec",
-  "theme_color": "#151412",
+  "background_color": "#070707",
+  "theme_color": "#070707",
   "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }],
   "shortcuts": [
     { "name": "Caixa", "url": "/#/inbox" },

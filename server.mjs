@@ -63,7 +63,7 @@ import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './li
 import { isPaidModel, paidBlockReason, addSpend, spendToday, spendLimits, normalizeBilling } from './lib/paid-usage.mjs';
 import { runTestProvider } from './lib/test-provider.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
-import { memoryContext, isDuplicateMemory, canUseFile, selectSpeakers, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent, turnPlanIds, delegationTasks } from './lib/agent-flow.mjs';
+import { memoryContext, isDuplicateMemory, canUseFile, selectSpeakers, mentionOrder, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent, turnPlanIds, delegationTasks } from './lib/agent-flow.mjs';
 import { providerAttemptOrder, runProviderAttemptLoop } from './lib/provider-turn.mjs';
 import { normalizeProviderRetry } from './lib/provider-retry.mjs';
 import { patchSettings, settingsMeta, SettingsValidationError } from './lib/settings-patch.mjs';
@@ -101,7 +101,7 @@ import { history as waHistory, recordMessage as recordWaMessage, listChats as wa
 import { timingSafeEqual } from 'node:crypto';
 import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStreaming, activeChatStreamCount } from './lib/chat-stream.mjs';
 import { truncateChatFrom } from './lib/chat-edit.mjs';
-import { mergeAgentChats } from './lib/merge-agent-chats.mjs';
+import { mergeAgentChats, unmergeChat } from './lib/merge-agent-chats.mjs';
 import { beginChatRun,bumpChatRunSeq, finishChatRun, chatRunPublic, canResumeChatRun, trimPartialRepliesAfterLastUser, noteChatRunTool, canAutoResume } from './lib/chat-run.mjs';
 import { exportChatPayload, importChatPayload } from './lib/chat-transfer.mjs';
 import { listAgentTemplates, createSavedTemplate, patchSavedTemplate, agentFromSavedTemplate } from './lib/agent-templates.mjs';
@@ -1706,10 +1706,14 @@ async function chat({ chat, text, fileIds, signal, mcpSession, skipUserPush = fa
     });
     if (chat.run?.status === 'running' && !chat.run.userMessageId) chat.run.userMessageId = uid;
   }
-  const members = groupMembers(chat, db.agents);
+  // @Nome de quem não está na conversa (ex.: 1:1) traz o agente para esta rodada, sem virar grupo.
+  const base = groupMembers(chat, db.agents);
+  const guests = mentionOrder(text, db.agents.filter(a => !base.includes(a)));
+  const members = [...base, ...guests];
+  const turnChat = guests.length ? { ...chat, agentIds: members.map(a => a.id) } : chat;
   const group = members.length > 1 ? members : null;
   // Julia 1 (ou a heurística) escolhe quem abre; @menções definem a ordem; delegações entram na fila.
-  const first = await selectSpeakers(chat, text, db.agents, (t, ms) => classifySpeaker(t, ms, db.settings, heuristicSpeaker));
+  const first = await selectSpeakers(turnChat, text, db.agents, (t, ms) => classifySpeaker(t, ms, db.settings, heuristicSpeaker));
   const floor = new Floor(first, members, group ? 5 : 1);
   if (group) emit({ turnPlan: turnPlanIds(first, floor) });
   // Ninguém fica sem resposta: se quem abriu passar a vez (PASSO) e ninguém mais falou, chama o próximo membro.
@@ -3119,6 +3123,7 @@ const routes = [
     if (typeof b.title === 'string' && b.title.trim()) c.title = b.title.trim().slice(0, 80);
     if ('workspace' in b) setChatWorkspace(req, c, b.workspace);
     if ('workspace' in b) { c.updatedAt = Date.now(); save(); return { ...summary(c), workspace: c.workspace || null, workspaceBranch: c.workspace?.kind === 'folder' ? gitBranch(c.workspace.path) : null }; }
+    if (b.unmerge && c.mergedInto) { unmergeChat(db, c); save(); return summary(c); }
     if (typeof b.archived === 'boolean') applyBulk([c], [c.id], b.archived ? 'archive' : 'unarchive');
     if (b.projectId === null) delete c.projectId;
     else if (typeof b.projectId === 'string' && b.projectId) {

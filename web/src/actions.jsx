@@ -55,6 +55,10 @@ export function useChatMenu() {
         input.click();
       } },
       { label: 'Copiar link', icon: 'share', onSelect: () => { navigator.clipboard.writeText(`${location.origin}/#/c/${c.id}`); toast('Link copiado'); } },
+      ...(c.mergedInto ? [{ label: 'Desfazer junção', icon: 'arrowUp', onSelect: async () => {
+        try { await api(`/api/chats/${c.id}`, { method: 'PUT', body: { unmerge: true } }); refresh(); toast('Conversa separada de novo'); }
+        catch (err) { toast(err.message, 'error'); }
+      } }] : []),
       ...extra,
       { sep: true },
       { label: 'Apagar conversa', icon: 'trash', danger: true, onSelect: async () => {

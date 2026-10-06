@@ -39,7 +39,7 @@ export function listInstalledPlugins(settings, claudeList = []) {
   });
   // Canais já ligados nas Configurações
   const channels = [
-    (settings.whatsappWeb?.enabled || settings.whatsapp?.enabled) && { id: 'channel-whatsapp', name: 'WhatsApp', icon: 'plug', desc: 'Canal ligado' },
+    (settings.whatsappWeb?.enabled || settings.whatsapp?.enabled) && { id: 'channel-whatsapp', name: 'WhatsApp', icon: 'whatsapp', desc: 'Canal ligado' },
     settings.email?.enabled && { id: 'channel-email', name: 'E-mail', icon: 'gmail', desc: settings.email.user || 'Canal ligado' },
     settings.github?.token && { id: 'channel-github', name: 'GitHub', icon: 'github', desc: 'Conectado' }
   ].filter(Boolean);
