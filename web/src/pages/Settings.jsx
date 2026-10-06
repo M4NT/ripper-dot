@@ -703,7 +703,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
           </Card>
           {s.computer.mode === 'docker' && (
             <Card title="Docker" badge={docker === undefined ? <span className="tag" role="status">Verificando…</span> : docker ? <span className="tag tag-ok">Docker {docker} ativo</span> : <span className="tag tag-warn">Docker não encontrado</span>} aria-busy={docker === undefined}>
-              {docker === null && <p className="form-error">Abra o Docker Desktop e recarregue esta página.</p>}
+              {docker === null && <p className="form-error">Modo sem computador: enquanto o Docker não estiver rodando, os agentes conversam, pesquisam e lembram, mas não rodam comandos, não abrem navegador nem criam arquivos. Abra o Docker Desktop e recarregue esta página.</p>}
               <Row title="Imagem de referência" desc="A imagem do Ripper já vem com Chromium, tela virtual (noVNC), Node 22 e Python 3." tip="Cada agente ganha um contêiner isolado; arquivos ficam na pasta do agente, não na sua máquina.">
                 <div className="row">{image && <span className={`tag ${image === 'ready' ? 'tag-ok' : 'tag-warn'}`}>{image === 'ready' ? 'pronta' : image === 'building' ? 'construindo…' : image === 'outdated' ? 'desatualizada' : 'não construída'}</span>}
                   {(image === 'missing' || image === 'outdated') && <button className="btn btn-sm" onClick={() => api('/api/computer/image', { method: 'POST' }).then(r => setImage(r.image === 'missing' ? 'building' : r.image))}>{image === 'outdated' ? 'Atualizar imagem' : 'Construir agora'}</button>}</div>

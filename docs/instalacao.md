@@ -14,6 +14,12 @@ Este guia descreve o que o repositório **realmente** oferece hoje: scripts npm 
 
 ## Instalação (primeira vez)
 
+**Windows, sem terminal:** dois cliques em `scripts\instalar-windows.cmd`. Ele instala o Node 22 pelo winget se faltar, roda `npm ci` e `npm run build`, cria o serviço (`scripts/service.mjs install`) e abre `http://127.0.0.1:3000`. Na primeira entrada, um assistente pergunta qual conta de IA usar, detecta o Docker e cria o primeiro agente a partir de uma frase.
+
+**Sem Docker:** o Ripper funciona em "modo sem computador": os agentes conversam, pesquisam na web e lembram, mas não rodam comandos, não abrem navegador nem criam arquivos. Para ligar depois: abra o Docker Desktop e escolha Docker em Configurações → Computador.
+
+Manual:
+
 No diretório raiz do repositório:
 
 ```sh

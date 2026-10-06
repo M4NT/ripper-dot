@@ -177,6 +177,12 @@ code { font: .88em var(--mono); }
 .dialog::backdrop { background: rgb(22 21 19 / .32); backdrop-filter: blur(3px); }
 .dialog[open] { animation: pop .24s var(--out); }
 .confirm { max-width: 420px; padding: 24px; }
+.wizard { max-width: min(480px, calc(100vw - 32px)); }
+.wizard .input { width: 100%; margin-bottom: 16px; }
+.wizard-options { display: grid; gap: 8px; margin-bottom: 16px; }
+.wizard-option { display: grid; gap: 2px; text-align: left; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line-2); background: transparent; color: inherit; cursor: pointer; }
+.wizard-option small { color: var(--muted); }
+.wizard-option.on { border-color: var(--ink); }
 .confirm h2 { font-size: 18px; margin-bottom: 8px; }
 .confirm p { color: var(--muted); margin-bottom: 22px; }
 .dialog-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }

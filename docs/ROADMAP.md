@@ -90,11 +90,11 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - [ ] Limites de recursos por contêiner e limpeza de contêineres parados.
 
 ### C. Instalação e atualização (P0)
-- [ ] **Instalador para Windows e Mac** que traz Node, cria o serviço e abre o app — sem terminal.
-- [ ] Assistente de primeiro uso: conta do Claude (login), Docker (detecta e orienta), primeiro agente em 1 frase, WhatsApp opcional.
-- [ ] Funcionar sem Docker (modo "sem computador" claro, com o que o agente perde).
+- [ ] **Instalador para Windows e Mac** que traz Node, cria o serviço e abre o app — sem terminal. *(Windows feito: `scripts\instalar-windows.cmd`; falta Mac.)*
+- [x] Assistente de primeiro uso: conta do Claude (login), Docker (detecta e orienta), primeiro agente em 1 frase, WhatsApp opcional.
+- [x] Funcionar sem Docker (modo "sem computador" claro, com o que o agente perde).
 - [ ] **Modelos locais para quem não tem conta de IA**: o Ripper detecta o hardware (memória, placa de vídeo, Apple Silicon) e escolhe o melhor modelo que cabe nele, baixa pelo Ollama com 1 clique e já liga nos agentes. Partir de um projeto aberto que já faz isso em vez de reinventar: **llmfit** (Alex Jones; ordena por caber, velocidade e qualidade; fala com Ollama, llama.cpp, LM Studio) ou **whichllm** (Andyyyy64; usa notas de benchmark reais do Hugging Face). Avaliar licença e escolher um.
-- [ ] Assistente de primeiro uso pergunta "Você tem conta de IA?" → Claude / ChatGPT / chave de API / "não tenho" (modelo local), explicando o que muda em qualidade.
+- [x] Assistente de primeiro uso pergunta "Você tem conta de IA?" → Claude / ChatGPT / chave de API / "não tenho" (modelo local), explicando o que muda em qualidade. *("Não tenho" ainda só avisa; liga quando os modelos locais existirem.)*
 - [ ] Atualização automática com notas da versão.
 - [ ] Desinstalar limpo (opção de manter os dados).
 - [ ] Imagem dos agentes baixada pronta (registro de imagens), sem reconstruir na máquina.
