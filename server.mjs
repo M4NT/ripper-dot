@@ -11,6 +11,7 @@ import { pairingInvite, deviceStore, deviceCookie, lanAddress, qrSvg, deviceName
 import { load, save, flush, id, newAgent, patchAgent, dataUrl, safeCheckStoreReady, TOOLS } from './lib/store.mjs';
 import { route, classifySpeaker, MODELS, EFFORTS, enabledModels, clampEffort } from './lib/router.mjs';
 import { computerFor } from './lib/boat.mjs';
+import { effectiveComputer, NO_COMPUTER_HINT } from './lib/computer-mode.mjs';
 import { dockerAvailable, imageStatus, ensureImage, outdatedImage, hostnameOf, transcribeAudio } from './lib/docker.mjs';
 import { sandboxStatus } from './lib/exec-sandbox.mjs';
 import { ApprovalGate } from './lib/approvals.mjs';
@@ -1125,7 +1126,9 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
   // Pasta de trabalho da conversa (pasta desta máquina ou repositório); repositório privado usa o token do Guardião.
   const agentWs = workspaceForAgent(chat.workspace, agent.id);
   const chatWs = agentWs?.kind === 'repo' && s.github?.token ? { ...agentWs, auth: gitAuthArg(s.github.token) } : agentWs || null;
-  if (agent.tools.includes('computer')) { try { computer = computerFor(agent, s, save, chatWs); } catch {} }
+  // Docker parado / boat sem chave: modo sem computador claro, em vez de erro no meio da conversa.
+  const pcMode = agent.tools.includes('computer') ? effectiveComputer(s.computer, s.computer.mode === 'docker' ? (await dockerStatusCached()).version : null) : 'none';
+  if (pcMode !== 'none') { try { computer = computerFor(agent, s, save, chatWs); } catch {} }
   let browser = null;
   if (computer?.kind === 'docker' && agent.tools.includes('browser')) {
     const b = browsers.get(agent.id) || browserFor(computer, sandboxDir(agent));
@@ -1608,6 +1611,7 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
     systemStable,
     memoryContext(memories, s.memoryLogInContext ?? 10),
     chat.workspace && (computer ? workspaceFor(workspaceForAgent(chat.workspace, agent.id), computer.kind).hint : `O usuário escolheu a pasta de trabalho ${chat.workspace.path || chat.workspace.repo}, mas você não tem computador ligado: diga isso se ele pedir para mexer nos arquivos.`),
+    agent.tools.includes('computer') && !computer && NO_COMPUTER_HINT,
     await projectContext(project),
     visibleArtifacts(chat).length && `Artefatos do time (leia com read_artifact; salve entregas com save_artifact): ${visibleArtifacts(chat).slice(-20).map(x => `"${x.title}" (${x.kind}, v${x.version})`).join('; ')}`,
     (() => {
@@ -2812,7 +2816,7 @@ const routes = [
     if (report.files?.removedRecords?.length) save();
     return report;
   }],
-  ['GET', /^\/api\/computer\/docker$/, async () => dockerStatusCached()],
+  ['GET', /^\/api\/computer\/docker$/, async () => { const d = await dockerStatusCached(); return { ...d, effective: effectiveComputer(db.settings.computer, d.version) }; }],
   ['GET', /^\/api\/sandbox\/status$/, async () => sandboxStatus(db.settings)],
   ['POST', /^\/api\/computer\/image$/, async () => { ensureImage().then(() => { resolveSystemAlert('agent-image'); save(); }).catch(e => console.error('imagem', e.message)); return { image: await imageStatus() }; }],
   ['GET', /^\/api\/agents\/([\w-]+)\/vnc$/, async (req, [aid]) => {

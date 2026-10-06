@@ -7,6 +7,7 @@ import { OverlayProvider } from './overlay.jsx';
 import ChatAvatar, { isGroupChat } from './chatAvatar.jsx';
 import { useChatMenu } from './actions.jsx';
 import { ApprovalTray } from './approvals.jsx';
+import { FirstRunWizard } from './firstRunWizard.jsx';
 import { ResizeHandle } from './resize.jsx';
 import Chat from './pages/Chat.jsx';
 import { useSidebarDrag, useFlip } from './agentDrag.jsx';
@@ -405,6 +406,7 @@ function Shell() {
         </div>
       )}
       <ApprovalTray />
+      <FirstRunWizard />
       <Palette open={palette} onClose={() => setPalette(false)} toggleTheme={toggleTheme} />
     </div>
   );

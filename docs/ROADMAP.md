@@ -90,11 +90,11 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - ✅ Limites de recursos por contêiner (`computer.dockerMemory`/`dockerCpus`, padrão 2g/2) e limpeza de contêineres parados na subida.
 
 ### C. Instalação e atualização (P0)
-- [ ] **Instalador para Windows e Mac** que traz Node, cria o serviço e abre o app — sem terminal.
-- [ ] Assistente de primeiro uso: conta do Claude (login), Docker (detecta e orienta), primeiro agente em 1 frase, WhatsApp opcional.
-- [ ] Funcionar sem Docker (modo "sem computador" claro, com o que o agente perde).
 - ✅ **Modelos locais para quem não tem conta de IA** (base): detecta RAM, GPU NVIDIA (nvidia-smi) e Apple Silicon, recomenda o maior Qwen3 que cabe (tabela curta em `lib/local-models.mjs`), detecta o Ollama e baixa com 1 clique mostrando o progresso (Configurações → Ollama); o modelo entra direto nos agentes pelo provedor Ollama já existente. Avaliados llmfit (MIT, binário Rust, `llmfit recommend --json`) e whichllm (MIT, Python, notas de benchmark do HF): ficou a ideia do llmfit sem embutir código. Falta: instalar o Ollama pelo Ripper, AMD/Intel GPU, chamar o llmfit se instalado.
-- [ ] Assistente de primeiro uso pergunta "Você tem conta de IA?" → Claude / ChatGPT / chave de API / "não tenho" (modelo local), explicando o que muda em qualidade.
+- [ ] **Instalador para Windows e Mac** que traz Node, cria o serviço e abre o app — sem terminal. *(Windows feito: `scripts\instalar-windows.cmd`; falta Mac.)*
+- ✅ Assistente de primeiro uso: conta do Claude (login), Docker (detecta e orienta), primeiro agente em 1 frase, WhatsApp opcional.
+- ✅ Funcionar sem Docker (modo "sem computador" claro, com o que o agente perde).
+- ✅ Assistente de primeiro uso pergunta "Você tem conta de IA?" → Claude / ChatGPT / chave de API / "não tenho" (modelo local), explicando o que muda em qualidade. *("Não tenho" ainda só avisa; liga quando os modelos locais existirem.)*
 - [ ] Atualização automática com notas da versão.
 - [ ] Desinstalar limpo (opção de manter os dados).
 - [ ] Imagem dos agentes baixada pronta (registro de imagens), sem reconstruir na máquina.
