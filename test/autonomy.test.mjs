@@ -72,3 +72,34 @@ test('browser e share respeitam autonomia', () => {
   assert.ok(shareAutonomyGate(agent('read_only'), enterprise));
   assert.equal(shareAutonomyGate(agent('fully_autonomous'), enterprise), null);
 });
+
+test('somente leitura bloqueia conectores MCP salvo readOnlyHint (Claude e Codex)', async () => {
+  const { claudeAllowedTools, connectorToolAllowed, buildCodexSpawnArgs } = await import('../lib/providers.mjs');
+  const { readOnlyToolNames } = await import('../lib/mcp-probe.mjs');
+  assert.deepEqual(readOnlyToolNames([{ name: 'ler', annotations: { readOnlyHint: true } }, { name: 'gravar' }, { name: 'x', annotations: { readOnlyHint: false } }]), ['ler']);
+  const settings = {
+    ...enterprise,
+    claude: { useConnectors: true },
+    computer: { mode: 'boat' },
+    plugins: [
+      { name: 'crm', type: 'http', url: 'https://crm.example/mcp', readOnlyTools: ['ler'] },
+      { name: 'sem', type: 'stdio', command: 'x', args: [] }
+    ]
+  };
+  const ag = level => ({ ...agent(level), tools: [...agent(level).tools, 'plugins'] });
+  assert.ok(connectorToolAllowed('mcp__crm__gravar', ag('semi_autonomous'), settings));
+  assert.ok(connectorToolAllowed('mcp__claude_ai_Gmail__send', ag('semi_autonomous'), settings));
+  assert.ok(claudeAllowedTools(ag('semi_autonomous'), settings, { computer: {} }).includes('mcp__crm__*'));
+  const ro = ag('read_only');
+  assert.ok(connectorToolAllowed('mcp__crm__ler', ro, settings));
+  assert.ok(!connectorToolAllowed('mcp__crm__gravar', ro, settings));
+  assert.ok(!connectorToolAllowed('mcp__sem__qualquer', ro, settings));
+  assert.ok(!connectorToolAllowed('mcp__claude_ai_Gmail__send', ro, settings));
+  const allowed = claudeAllowedTools(ro, settings, { computer: {} });
+  assert.ok(allowed.includes('mcp__crm__ler'));
+  assert.ok(!allowed.some(t => t === 'mcp__crm__*' || t.startsWith('mcp__sem__')));
+  const args = buildCodexSpawnArgs({ agent: ro, settings }).join(' ');
+  assert.match(args, /mcp_servers\.crm\.enabled_tools=\["ler"\]/);
+  assert.doesNotMatch(args, /mcp_servers\.sem\./);
+  assert.doesNotMatch(buildCodexSpawnArgs({ agent: ag('semi_autonomous'), settings }).join(' '), /enabled_tools/);
+});
