@@ -11,6 +11,7 @@ import { createInputQueue, normalizeInputQueue } from '../../../lib/input-queue.
 import { effortLabel } from '../modelPicker.jsx';
 import MessageAttachments, { DeliveredFiles } from '../MessageAttachments.jsx';
 import ChatPanel, { MiniScreen } from '../chatPanel.jsx';
+import { MentionText } from '../mentions.jsx';
 import { ResizeHandle } from '../resize.jsx';
 import ActionLine from '../actionLine.jsx';
 import { useChatMenu } from '../actions.jsx';
@@ -154,6 +155,7 @@ function InboxMessage({ m, from }) {
 }
 
 const UserMessage = memo(function UserMessage({ m, name, files, onEdit }) {
+  const { S } = useApp();
   // Prévias locais (recém-enviadas) ou os arquivos já salvos no servidor.
   const mine = m.previews || (m.files || []).map(id => files.find(f => f.id === id)).filter(Boolean).map(f => ({ ...f, url: `/api/files/${f.id}` }));
   const hasFiles = mine.length > 0;
@@ -173,7 +175,7 @@ const UserMessage = memo(function UserMessage({ m, name, files, onEdit }) {
               </div>
               <p className="fine">As respostas a partir daqui serão substituídas.</p>
             </div>
-          : m.content && <div className={`bubble user-bubble${m.voice ? ' voice' : ''}`} title={m.voice ? 'Mensagem ditada' : undefined}>{m.content}</div>}
+          : m.content && <div className={`bubble user-bubble${m.voice ? ' voice' : ''}`} title={m.voice ? 'Mensagem ditada' : undefined}><MentionText text={m.content} agents={S.agents} /></div>}
         <div className="msg-meta">
           {m.at && <time className="msg-time">{fmtTime(m.at)}</time>}
           {m.content && draft === null && <button className="meta-btn" aria-label="Copiar mensagem" onClick={() => navigator.clipboard.writeText(m.content)}><Icon name="copy" size={14} />Copiar</button>}

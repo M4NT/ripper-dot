@@ -3,6 +3,7 @@ import { VoiceBeam, useMicrophone } from 'voice-glow';
 import { api, fmtSize, go, local, useDark, canSpeak } from './lib.js';
 import { AgentAvatar, Icon, useToast } from './ui.jsx';
 import { useApp } from './app.jsx';
+import { MentionChip, mentionedAgents } from './mentions.jsx';
 import { isEnterpriseMode } from './uiMode.js';
 import ModelPicker from './modelPicker.jsx';
 import ComposerPlusMenu from './composerPlusMenu.jsx';
@@ -209,6 +210,7 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
                 ))}
               </div>
             )}
+            {mentionedAgents(text, S.agents).length > 0 && <div className="composer-mentions" aria-label="Agentes marcados">{mentionedAgents(text, S.agents).map(a => <MentionChip key={a.id} agent={a} />)}</div>}
             <textarea ref={ta} rows={1} value={text} autoFocus={autoFocus} placeholder={listening ? 'Ouvindo…' : transcribing ? 'Transcrevendo…' : placeholder}
               aria-label="Mensagem" onChange={e => setText(e.target.value)}
               onPaste={e => { const fs = [...e.clipboardData.files]; if (fs.length) { e.preventDefault(); addFiles(fs); } }}
