@@ -96,7 +96,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - ✅ Funcionar sem Docker (modo "sem computador" claro, com o que o agente perde).
 - ✅ Assistente de primeiro uso pergunta "Você tem conta de IA?" → Claude / ChatGPT / chave de API / "não tenho" (modelo local), explicando o que muda em qualidade. *("Não tenho" aponta para o modelo recomendado em Configurações → Ollama.)*
 - [ ] Atualização automática com notas da versão.
-- [ ] Desinstalar limpo (opção de manter os dados).
+- ✅ Desinstalar limpo: `scripts/desinstalar-windows.cmd` (ou `node scripts/desinstalar.mjs`) tira o serviço e os computadores dos agentes e mantém os dados; `--apagar-dados` apaga após digitar APAGAR. [ ] Testar numa máquina real.
 - [ ] Imagem dos agentes baixada pronta (registro de imagens), sem reconstruir na máquina.
 
 ### D. Dados, LGPD e termos (P0)
