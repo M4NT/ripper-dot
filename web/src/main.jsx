@@ -27,7 +27,21 @@ class Guard extends Component {
 }
 
 // Senha única: sem sessão, mostra a tela de entrar (ou de criar a senha) em vez do app.
+let build; // id da build quando a aba abriu
 const root = createRoot(document.getElementById('root'));
-const boot = () => fetch('/api/auth/status').then(r => r.json()).catch(() => ({ authed: true })).then(s =>
-  root.render(<StrictMode><Guard>{s.authed ? <App /> : <Login status={s} onDone={boot} />}</Guard></StrictMode>));
+const boot = () => fetch('/api/auth/status').then(r => r.json()).catch(() => ({ authed: true })).then(s => {
+  build ??= s.build;
+  root.render(<StrictMode><Guard>{s.authed ? <App /> : <Login status={s} onDone={boot} />}</Guard></StrictMode>);
+});
 boot();
+
+// Nova build no servidor (npm run build) com a aba aberta: avisa em vez de quebrar ao abrir uma tela sob demanda.
+setInterval(() => fetch('/api/auth/status').then(r => r.json()).then(s => {
+  if (!s.build) return;
+  if (build && s.build !== build && !document.getElementById('new-version')) {
+    const b = Object.assign(document.createElement('button'), { id: 'new-version', className: 'btn btn-primary', textContent: 'Nova versão — recarregar', onclick: () => location.reload() });
+    Object.assign(b.style, { position: 'fixed', bottom: '16px', left: '50%', transform: 'translateX(-50%)', zIndex: 9999 });
+    document.body.append(b);
+  }
+}).catch(() => {}), 60e3);
+

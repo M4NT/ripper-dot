@@ -67,7 +67,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 
 ### A. Segurança (P0)
 - ✅ **Login com senha única** (decidido em 06/10/2026; um Ripper por pessoa, então não há login por usuário). Pede a senha ao abrir; sessão por cookie seguro; chamadas de dentro dos contêineres dos agentes nunca entram sem a senha; tela de login e "esqueci a senha" (redefinir pelo terminal). Senha criada na primeira abertura (só no próprio computador) ou por `node scripts/senha.mjs`; hash scrypt em `data/auth.json`; cookie HttpOnly + SameSite=Strict (Secure em HTTPS). Sessões em memória: reiniciar o servidor pede a senha de novo.
-- ✅ Agentes não usam a API do Ripper de dentro do próprio computador: sem sessão, 401 (o cabeçalho Host não decide mais quem entra; só a criação da primeira senha ainda depende de estar na máquina).
+- ✅ Agentes não usam a API do Ripper de dentro do próprio computador: sem sessão, 401 (o cabeçalho Host não decide mais quem entra; a criação da primeira senha exige o código de configuração impresso no terminal e gravado em `data/setup-code.txt`, apagado após o uso).
 - [ ] HTTPS para acesso fora de casa (túnel com login: Cloudflare Tunnel ou Tailscale), com passo a passo dentro do app.
 - ✅ Proteção contra CSRF nas rotas que mudam algo: cookie SameSite=Strict + verificação de Origin + recusa de Sec-Fetch-Site cross-site.
 - ✅ Limite de tentativas no login: 5 erros bloqueiam por 15 min (por endereço, em memória).
@@ -81,7 +81,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - ✅ **Reiniciar o servidor não perde turnos**: retoma sozinho os que só leram/pesquisaram; os que já fizeram algo com efeito fora (enviar, publicar) param com aviso na Caixa.
 - 🔨 **Staging que sobrevive a reinício** (docker-compose, dados de exemplo, provedor simulado para smoke). *Engenheiro (Ripper), em andamento.*
 - ✅ Servidor como serviço do sistema: `node scripts/service.mjs install` (Windows, macOS, Linux), com vigia que reinicia se cair. [ ] Testar o `install` em máquina real.
-- [ ] Atualização sem derrubar o que está rodando (esperar turnos terminarem, aviso "nova versão — recarregar" nas abas abertas).
+- [ ] Atualização sem derrubar o que está rodando: ✅ aviso "Nova versão — recarregar" nas abas abertas (compara o id da build em `/api/auth/status` a cada minuto). [ ] Esperar turnos terminarem antes de reiniciar.
 - ✅ Backup automático diário, cópia extra em outra pasta, aviso de falha. ✅ Backup manual corrigido (link simbólico criado no Docker derrubava o `tar`; agora fica de fora com aviso). ✅ Teste de restauração automático após cada backup diário (extrai numa pasta temporária e confere o `db.json`; falha vira aviso).
 - ✅ Fila de envios com novas tentativas (WhatsApp, e-mail, publicações).
 - [ ] Contêineres dos agentes: um por agente e por pasta de trabalho (hoje duas conversas do mesmo agente em pastas diferentes se revezam recriando).
@@ -234,7 +234,6 @@ Geração de imagem dentro das tarefas, depois vídeo.
 ## 6. Pontes conhecidas (defeitos que ainda não doem, mas vão doer)
 - **Agentes e pasta compartilhada:** os agentes trabalham em `/project`, que é a mesma pasta onde o servidor roda; trocar de branch lá muda o código do Ripper em uso. Usar cópia própria para trabalhar no código.
 - **Gasto entre processos:** com dois servidores no mesmo diretório o gasto do dia é subcontado (mover para SQLite).
-- **Aba aberta durante uma atualização** continua com o código antigo; telas carregadas sob demanda dão 404.
 - **Testes instáveis** em máquina carregada (servidor demora a subir).
 - **`listExternal`** filtra em memória (até 5.000 linhas).
 - **Trocar sozinho no limite** (contas do Claude) está desligado nas configurações atuais — com ele assim, o Ripper não passa para a outra conta quando uma esgota.

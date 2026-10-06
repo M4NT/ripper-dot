@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { readFile, stat, writeFile, unlink, copyFile } from 'node:fs/promises';
-import { mkdirSync, existsSync } from 'node:fs';
+import { mkdirSync, existsSync, writeFileSync, statSync, unlinkSync } from 'node:fs';
 import { generateVapidKeys, sendPushAll } from './lib/web-push.mjs';
 import { gzipSync } from 'node:zlib';
 import { extname, basename, dirname } from 'node:path';
@@ -98,7 +98,7 @@ import { vmPathToData, mimeOf, inlineType } from './lib/deliver-file.mjs';
 import { parseWhatsappMessages, whatsappPrompt, sendWhatsappText, whatsappReady } from './lib/whatsapp.mjs';
 import { evolutionSecrets, connectInstance, instanceState, disconnectInstance, sendText as sendEvolutionText, parseEvolutionAny, parseEvolutionGroup, groupName, evolutionMedia, withMediaText, downloadMedia, contactMode, isAllowed, makeRateLimiter, channelSafeAgent } from './lib/evolution.mjs';
 import { history as waHistory, recordMessage as recordWaMessage, listChats as waListChats, readChat as waReadChat, findContacts as waFindContacts, styleProfile as waStyleProfile, styleHint, stats as waStats, wipeHistory as waWipeHistory } from './lib/whatsapp-store.mjs';
-import { timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual, randomBytes } from 'node:crypto';
 import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStreaming, activeChatStreamCount } from './lib/chat-stream.mjs';
 import { truncateChatFrom } from './lib/chat-edit.mjs';
 import { mergeAgentChats, unmergeChat } from './lib/merge-agent-chats.mjs';
@@ -462,6 +462,22 @@ function authed(req) {
 const passwordStore = passwordFile(fileURLToPath(dataUrl('./data/auth.json')));
 const sessions = sessionStore();
 const loginTries = loginLimiter();
+// Código de configuração: antes da primeira senha, só quem vê o terminal (ou data/setup-code.txt) cria a senha.
+// Fecha o Host forjado (um contêiner mandando Host: localhost).
+const setupCodePath = fileURLToPath(dataUrl('./data/setup-code.txt'));
+let setupCode = null;
+function ensureSetupCode() {
+  if (passwordStore.get()) return;
+  if (!setupCode) {
+    setupCode = randomBytes(6).toString('hex').toUpperCase().replace(/(.{4})(?=.)/g, '$1-');
+    try { mkdirSync(dirname(setupCodePath), { recursive: true }); writeFileSync(setupCodePath, `${setupCode}\n`, { mode: 0o600 }); } catch {}
+  }
+  console.log(`Código de configuração do Ripper (para criar a senha): ${setupCode}  (também em ${setupCodePath})`);
+}
+const setupCodeOk = c => { const a = Buffer.from(String(c || '').trim().toUpperCase()), b = Buffer.from(setupCode || ''); return !!setupCode && a.length === b.length && timingSafeEqual(a, b); };
+ensureSetupCode();
+// Id da build do front: muda a cada `npm run build`; abas abertas comparam e oferecem recarregar.
+const buildId = () => { try { return String(statSync(new URL('./index.html', DIST)).mtimeMs | 0); } catch { return ''; } };
 const viaToken = req => !!TOKEN && authed(req);
 function signedIn(req) {
   if (viaToken(req)) return true;
@@ -474,21 +490,23 @@ function startSession(req, res, hash) {
 }
 async function authRoute(req, res, p) {
   const hash = passwordStore.get();
-  if (req.method === 'GET' && p === '/api/auth/status') return json(res, { configured: !!hash, authed: signedIn(req), canSetup: !hash && isLocalRequest(req) }, 200, {}, req);
+  if (req.method === 'GET' && p === '/api/auth/status') return json(res, { configured: !!hash, authed: signedIn(req), canSetup: !hash && isLocalRequest(req), build: buildId() }, 200, {}, req);
   if (req.method !== 'POST') throw new HttpError(404, 'Rota não encontrada.');
   if (p === '/api/auth/logout') {
     sessions.drop(sessionCookie(req));
     return json(res, { ok: true }, 200, { 'set-cookie': 'ripper_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0' }, req);
   }
-  const { password } = await body(req);
+  const { password, code } = await body(req);
   if (p === '/api/auth/setup') {
     if (hash) throw new HttpError(409, 'A senha já foi criada. Para trocar, use: node scripts/senha.mjs');
-    // ponytail: antes da primeira senha, só o próprio computador cria (Host forjável); depois disso só a senha vale.
+    // Antes da primeira senha: computador local E o código de configuração do terminal (o Host é forjável).
     if (!isLocalRequest(req) && !viaToken(req)) throw new HttpError(403, 'Crie a senha no computador onde o Ripper roda.');
+    if (!viaToken(req) && !setupCodeOk(code)) { ensureSetupCode(); throw new HttpError(403, 'Código de configuração incorreto. Ele aparece no terminal do Ripper e em data/setup-code.txt.'); }
     const err = passwordProblem(password);
     if (err) throw new HttpError(400, err);
     const h = await hashPassword(password);
     passwordStore.set(h);
+    setupCode = null; try { unlinkSync(setupCodePath); } catch {}
     return startSession(req, res, h);
   }
   if (p === '/api/auth/login') {

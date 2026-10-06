@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,16 +40,25 @@ test('HTTP: criar senha, login, cookie HttpOnly/Strict, contêiner sem senha nã
   try {
     for (let i = 0; i < 100; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 150)); }
     assert.equal((await fetch(base + '/api/state')).status, 401, 'sem senha criada, nada passa');
-    assert.deepEqual(await (await fetch(base + '/api/auth/status')).json(), { configured: false, authed: false, canSetup: true });
+    const st = await (await fetch(base + '/api/auth/status')).json();
+    assert.deepEqual({ ...st, build: undefined }, { configured: false, authed: false, canSetup: true, build: undefined });
+    const codeFile = join(dataDir, 'setup-code.txt');
+    const code = readFileSync(codeFile, 'utf8').trim();
+    assert.match(code, /^[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$/);
+    assert.equal((await post('/api/auth/setup', { password: 'minha-senha-123' })).status, 403, 'sem código não cria');
+    assert.equal((await post('/api/auth/setup', { password: 'minha-senha-123', code: 'AAAA-BBBB-CCCC' })).status, 403, 'código errado não cria');
+    // Host forjado (contêiner dizendo ser localhost) sem o código também não cria
+    assert.equal((await post('/api/auth/setup', { password: 'minha-senha-123' }, { host: `localhost:${port}` })).status, 403);
     assert.equal(await fromContainer('/api/auth/setup', 'POST', { password: 'do-conteiner-123' }), 403, 'contêiner não cria a senha');
-    assert.equal((await post('/api/auth/setup', { password: 'curta' })).status, 400);
-    const setup = await post('/api/auth/setup', { password: 'minha-senha-123' });
+    assert.equal((await post('/api/auth/setup', { password: 'curta', code })).status, 400);
+    const setup = await post('/api/auth/setup', { password: 'minha-senha-123', code: code.toLowerCase() });
     assert.equal(setup.status, 200);
+    assert.equal(existsSync(codeFile), false, 'código apagado depois de usado');
     const cookieHdr = setup.headers.get('set-cookie');
     assert.match(cookieHdr, /HttpOnly/); assert.match(cookieHdr, /SameSite=Strict/); assert.doesNotMatch(cookieHdr, /Secure/);
     const cookie = cookieHdr.split(';')[0];
     assert.equal((await fetch(base + '/api/state', { headers: { cookie } })).status, 200);
-    assert.equal((await post('/api/auth/setup', { password: 'outra-senha-123' })).status, 409, 'senha só se cria uma vez');
+    assert.equal((await post('/api/auth/setup', { password: 'outra-senha-123', code })).status, 409, 'senha só se cria uma vez');
     assert.equal(await fromContainer('/api/state'), 401, 'contêiner sem sessão não entra');
     assert.equal((await fetch(base + '/api/state', { headers: { cookie: 'ripper_session=forjado' } })).status, 401);
     assert.equal((await post('/api/auth/logout', {}, { cookie, origin: 'https://evil.example' })).status, 403, 'CSRF: outro site é recusado');
