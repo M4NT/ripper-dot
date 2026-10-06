@@ -138,7 +138,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - ✅ Ações em lote e atalhos na Caixa (06/10/2026): marcar várias aprovações (ou todas) e aprovar/recusar de uma vez; teclado J/K navega, X marca, A aprova, R recusa (a seleção ou o item em foco). Perguntas abertas ("precisa de você") ficam fora do lote porque pedem texto. "Negar" virou "Recusar".
 - 🔨 Modo Simples × Enterprise revisado: ✅ Biblioteca (entregas dos agentes) e Atualização também no Simples; onde algo é do Enterprise, botão "Ativar modo Enterprise" em vez de texto solto. [ ] Decidir: WhatsApp e conversas em grupo no modo Simples.
 - 🔨 Linguagem revisada (sem termos técnicos no modo Simples): ✅ Backup, Perfil, LGPD, formulário do agente e escolha de modelo. [ ] Telas do modo Enterprise e mensagens de erro do servidor.
-- 🔨 Acessibilidade: ✅ fixados e lista reorganizáveis pelo teclado (Alt+setas, Alt+P), com aviso para leitor de tela. [ ] Revisão completa de teclado nas outras telas, rótulos de leitor de tela e contraste.
+- ✅ Acessibilidade: nenhum botão sem nome para leitor de tela (conferido em todas as telas); contraste do texto ≥ 4,5:1 nos dois temas, protegido por teste (`test/contrast.test.mjs`); janelas por cima prendem o foco, Esc fecha e o foco volta para onde estava; fixados e lista reorganizáveis pelo teclado. [ ] Testar com leitor de tela de verdade (NVDA/VoiceOver).
 
 ### H. Observabilidade e suporte (P1)
 - ✅ Logs estruturados, métricas, erros em linguagem humana, avisos do sistema na Caixa.
