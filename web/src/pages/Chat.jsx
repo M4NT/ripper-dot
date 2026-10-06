@@ -12,6 +12,7 @@ import { effortLabel } from '../modelPicker.jsx';
 import MessageAttachments, { DeliveredFiles } from '../MessageAttachments.jsx';
 import ChatPanel, { MiniScreen } from '../chatPanel.jsx';
 import { MentionText } from '../mentions.jsx';
+import { AgentThread, ViaLabel } from '../agentThread.jsx';
 import { ResizeHandle } from '../resize.jsx';
 import ActionLine from '../actionLine.jsx';
 import { useChatMenu } from '../actions.jsx';
@@ -108,7 +109,6 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, mo
           {/* detalhes (tempo, custo, modelo) só ao passar o mouse: no dia a dia é ruído em toda mensagem */}
           <span className="msg-meta-more">
           {m.timing?.totalMs > 0 && <span className="msg-took" title={m.timing.firstMs ? `Começou a responder em ${(m.timing.firstMs / 1000).toFixed(1)}s` : undefined}>· {(m.timing.totalMs / 1000).toFixed(1)}s{m.costUsd ? ` · US$ ${m.costUsd.toFixed(3).replace('.', ',')}` : ''}{m.steps?.length ? ` · ${m.steps.length} ${m.steps.length === 1 ? 'ação' : 'ações'}` : ''}</span>}
-          {m.via?.type === 'inbox' && <a className="badge via" href={`#/c/${m.via.threadChatId}`} title="Abrir a troca entre os agentes"><Icon name="chat" size={12} />Resposta por mensagem</a>}
           {/* qual modelo respondeu: só no Enterprise — para os demais é ruído em toda mensagem */}
           {m.model && showModel && <span className="badge">{m.routed ? 'Auto → ' : ''}{models[m.model]?.label || m.model}{m.effort && m.effort !== 'auto' ? ` · ${effortLabel(m.effort)}` : ''}</span>}
           </span>
@@ -196,6 +196,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   const [pendingWs, setPendingWs] = useState(null); // pasta escolhida antes da 1ª mensagem
   // Só mensagens novas animam a entrada; o histórico ao abrir a conversa aparece parado.
   const animateFrom = useRef(Infinity);
+  const [thread, setThread] = useState(null); // conversa entre agentes aberta ao lado
   const [chatId, setChatId] = useState(initialId || null);
   const [loading, setLoading] = useState(!!initialId);
   const [notFound, setNotFound] = useState(false);
@@ -541,7 +542,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
             )}
             {[...messages.map((m, i) => <div key={i} data-mi={i} className={[i >= animateFrom.current && 'is-new', matches.includes(i) && `search-hit${matches[hit] === i ? ' current' : ''}`].filter(Boolean).join(' ') || undefined}>{m.inbox ? <InboxMessage m={m} from={getAgent(m.inbox.from)} /> : m.role === 'user'
               ? <UserMessage m={m} name={S.settings.name} files={S.files} onEdit={canEdit && m.id && !/^u\d+$/.test(m.id) ? text => editFrom(m, text) : null} />
-              : <BotMessage m={m} agent={getAgent(m.agentId) || agent} group={isGroup || (!!m.agentId && m.agentId !== agent.id)} models={S.models} showModel={isEnterpriseMode(S.settings)} allFiles={S.files} onFileError={msg => toast(msg, 'error')} onRetry={m === messages.at(-1) && lastUser ? () => send({ text: lastUser.content }) : null} />}</div>),
+              : <>{m.via?.type === 'inbox' && m.via.threadChatId && <ViaLabel m={m} onOpen={setThread} />}<BotMessage m={m} agent={getAgent(m.agentId) || agent} group={isGroup || (!!m.agentId && m.agentId !== agent.id)} models={S.models} showModel={isEnterpriseMode(S.settings)} allFiles={S.files} onFileError={msg => toast(msg, 'error')} onRetry={m === messages.at(-1) && lastUser ? () => send({ text: lastUser.content }) : null} /></>}</div>),
               live && <div key={messages.length} className="is-new"><BotMessage m={live} agent={getAgent(live.agentId) || agent} group={isGroup} live phase={phase} models={S.models} /></div>]}
           </div>
         </div>
@@ -563,6 +564,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
       </div>
       {!showPanel && wide && <div className="panel-collapsed-edge"><ResizeHandle side="right" cssVar="panel-w" min={280} max={620} collapsed label="Abrir painel" onExpand={togglePanel} /><button className="panel-reopen" onClick={togglePanel} aria-label="Mostrar painel" title="Mostrar painel (Ctrl .)"><Icon name="sidebar" size={16} style={{ transform: 'scaleX(-1)' }} /></button></div>}
       {pip && !showPanel && getAgent(pip) && <MiniScreen agent={getAgent(pip)} working={!!busy[pip]} onClose={() => setPip(null)} />}
+      {thread && <AgentThread chatId={thread} onClose={() => setThread(null)} Text={Markdown} />}
       {showPanel && <ChatPanel members={members} project={project} chatId={chatId} messages={messages} files={files} onCollapse={() => { setPanel(false); local.set('panel.v2', false); }} />}
       {confirmNode}
     </div>
