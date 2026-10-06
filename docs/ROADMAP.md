@@ -132,7 +132,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - ✅ Revisão do tema claro (06/10/2026): tons quentes/creme trocados por cinzas neutros (terminal, aprovação, VNC, fundos de janela, cor do navegador e do app instalado).
 - ✅ Ícones que faltam no Marketplace (06/10/2026): WhatsApp com ícone próprio; Atlassian, Zapier, Granola, Stripe, Supabase e Sentry com selo na cor da marca (trocar pelos logos oficiais quando possível).
 - ✅ Celular: barra de botões da caixa de mensagem apertada (06/10/2026): em 375px o botão de enviar não é mais espremido, o esforço sai da pílula do modelo (continua no seletor) e o nome do modelo encolhe primeiro.
-- [ ] Celular: ordem dos fixados/lista sincronizada entre aparelhos (hoje fica no navegador).
+- ✅ Ordem dos fixados e da lista salva nas configurações: igual em todos os aparelhos.
 - [ ] Zero tela parada: progresso visível em rotinas de segundo plano e canais.
 - ✅ Ações em lote e atalhos na Caixa (06/10/2026): marcar várias aprovações (ou todas) e aprovar/recusar de uma vez; teclado J/K navega, X marca, A aprova, R recusa (a seleção ou o item em foco). Perguntas abertas ("precisa de você") ficam fora do lote porque pedem texto. "Negar" virou "Recusar".
 - [ ] Modo Simples × Enterprise revisado (nada importante escondido).

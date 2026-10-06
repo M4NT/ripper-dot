@@ -101,15 +101,21 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
   ].sort((x, y) => y.at - x.at);
   const byKey = new Map(entries.map(e => [e.key, e]));
   // Fixados e ordem da lista: escolhidos arrastando (salvo neste navegador). Itens novos entram no topo.
-  const [pinIds, setPinIds] = useState(() => local.get('pins', null));
-  const [order, setOrder] = useState(() => local.get('sideOrder', []));
+  // Salvo nas configurações (igual em todos os aparelhos); o navegador guarda só como reserva
+  const synced = S.settings.ui?.sidebar;
+  const [pinIds, setPinIds] = useState(() => synced?.pins ?? local.get('pins', null));
+  const [order, setOrder] = useState(() => synced?.order ?? local.get('sideOrder', []));
+  useEffect(() => { if (synced?.pins) setPinIds(synced.pins); if (synced?.order) setOrder(synced.order); }, [synced?.pins?.join(), synced?.order?.join()]);
   const pinKeys = (pinIds || entries.filter(e => e.kind === 'agent').slice(0, 3).map(e => e.key)).filter(k => byKey.get(k)?.kind === 'agent');
   const rest = entries.map(e => e.key).filter(k => !pinKeys.includes(k));
   const listKeys = [...rest.filter(k => !order.includes(k)), ...order.filter(k => rest.includes(k))];
   const drag = useSidebarDrag({
     pins: pinKeys, list: listKeys, canPin: k => byKey.get(k)?.kind === 'agent',
     idsOf: k => { const e = byKey.get(k); return e?.kind === 'agent' ? [e.a.id] : (e?.c?.agentIds || []); },
-    onCommit: ({ pins: P, list: Lk }) => { setPinIds(P); local.set('pins', P); setOrder(Lk); local.set('sideOrder', Lk); },
+    onCommit: ({ pins: P, list: Lk }) => {
+      setPinIds(P); local.set('pins', P); setOrder(Lk); local.set('sideOrder', Lk);
+      api('/api/settings', { method: 'PUT', body: { ui: { sidebar: { pins: P, order: Lk.slice(0, 1000) } } } }).catch(() => {});
+    },
     renderGhost: (k, kind) => {
       const e = byKey.get(k);
       if (!e) return null;
