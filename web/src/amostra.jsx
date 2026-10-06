@@ -1,106 +1,79 @@
-// Página de amostra da identidade nova (estilo cua.ai + verde neon). Não faz parte do app.
+// Página de amostra da identidade nova (sensação de painel Cloudflare: claro, seguro, direto). Não faz parte do app.
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BotAvatar } from 'bot-avatars';
 import './amostra.css';
 
 const AGENTES = [
-  { nome: 'Donald', funcao: 'Design & Front-end', type: 'cloud', state: 'working' },
-  { nome: 'Engenheiro', funcao: 'Escreve e roda código', type: 'droid', state: 'default' },
-  { nome: 'Quinn', funcao: 'Testa e reporta bugs', type: 'ghost', state: 'default' },
-  { nome: 'Porteiro', funcao: 'Recepção do WhatsApp', type: 'cat', state: 'sleeping' }
+  { nome: 'Donald', funcao: 'Design & Front-end', type: 'cloud', cor: '#5b8def', st: 'trabalhando', ult: 'agora' },
+  { nome: 'Engenheiro', funcao: 'Escreve e roda código', type: 'droid', cor: '#8a6cf0', st: 'ativo', ult: 'há 12 min' },
+  { nome: 'Quinn', funcao: 'Testa e reporta bugs', type: 'ghost', cor: '#e0904a', st: 'ativo', ult: 'há 1 h' },
+  { nome: 'Porteiro', funcao: 'Recepção do WhatsApp', type: 'cat', cor: '#4bb38a', st: 'pausado', ult: 'ontem' }
 ];
+const NAV = [['Início', true], ['Caixa', false, 2], ['Agentes'], ['Conversas'], ['Rotinas'], ['Conectores']];
 
-function Mascote({ type, state, size = 72, tema }) {
-  const dormindo = state === 'sleeping';
-  return <BotAvatar type={type} size={size} state={state} shading="flat"
-    color={tema === 'claro' ? '#1b1d1c' : '#2e322f'}
-    ink={dormindo ? '#4a4d4b' : '#3DFF7A'} paused={state !== 'working'} />;
-}
+const Av = ({ a, size = 28 }) => <BotAvatar type={a.type} color={a.cor} size={size} shading="flat"
+  state={a.st === 'pausado' ? 'sleeping' : a.st === 'trabalhando' ? 'working' : 'default'} paused={a.st !== 'trabalhando'} />;
+const Status = ({ st }) => <span className={`badge b-${st}`}><i />{st[0].toUpperCase() + st.slice(1)}</span>;
 
 function Amostra() {
-  const [tema, setTema] = useState('escuro');
+  const [tema, setTema] = useState('claro');
   return (
-    <div className={`am tema-${tema}`}>
-      <header className="am-top">
-        <span className="am-logo"><span className="dot" /> Ripper</span>
-        <nav className="am-nav">
-          <button className={tema === 'escuro' ? 'on' : ''} onClick={() => setTema('escuro')}>Escuro</button>
-          <button className={tema === 'claro' ? 'on' : ''} onClick={() => setTema('claro')}>Claro</button>
-        </nav>
-      </header>
+    <div className={`app tema-${tema}`}>
+      <aside className="side">
+        <div className="brand"><span className="mark" />Ripper</div>
+        <button className="search">Buscar <kbd>Ctrl K</kbd></button>
+        <nav>{NAV.map(([n, on, c]) => <a key={n} className={on ? 'on' : ''}>{n}{c && <span className="count">{c}</span>}</a>)}</nav>
+        <div className="side-foot">
+          <div className="secure"><span className="lock" />Tudo roda no seu computador</div>
+          <div className="seg"><button className={tema === 'claro' ? 'on' : ''} onClick={() => setTema('claro')}>Claro</button><button className={tema === 'escuro' ? 'on' : ''} onClick={() => setTema('escuro')}>Escuro</button></div>
+        </div>
+      </aside>
 
-      {/* Início limpo */}
-      <section className="am-hero">
-        <div className="am-mascote-hero"><Mascote type="cloud" state="working" size={132} tema={tema} /></div>
-        <p className="eyebrow">Início</p>
-        <h1>O que seus agentes<br />fazem <em>por você</em> hoje?</h1>
-        <div className="am-ask">
-          <span className="am-ask-cmd">/pergunte</span>
-          <input placeholder="peça qualquer coisa ao Donald…" />
-          <button className="btn-primary" aria-label="Enviar">Enviar</button>
-        </div>
-        <div className="am-pills">
-          <button className="pill">Resuma meus e-mails de hoje</button>
-          <button className="pill">Crie um agente de atendimento</button>
-          <button className="pill">O que mudou no projeto?</button>
-        </div>
-      </section>
+      <main className="main">
+        <header className="page-head">
+          <div><p className="crumb">Início</p><h1>Bom dia, Yan</h1></div>
+          <button className="btn primary">+ Novo agente</button>
+        </header>
 
-      {/* Paleta */}
-      <section className="am-sec">
-        <p className="eyebrow">01 · Cores</p>
-        <h2>Preto, branco e <em>um</em> verde.</h2>
-        <div className="am-swatches">
-          {[['--bg', 'Fundo'], ['--s1', 'Superfície'], ['--s2', 'Superfície 2'], ['--line', 'Linha'], ['--ink', 'Texto'], ['--muted', 'Apagado'], ['--neon', 'Neon'], ['--neon-ink', 'Texto verde']].map(([v, n]) =>
-            <div key={v} className="sw"><span style={{ background: `var(${v})` }} /><b>{n}</b><code>{v}</code></div>)}
-        </div>
-        <p className="am-note">Neon é raro: uma ação principal por tela e o que está vivo agora. No tema claro, texto verde usa <code>--neon-ink</code>.</p>
-      </section>
+        <section className="panel ask">
+          <textarea rows={2} placeholder="Peça algo ao Donald…" />
+          <div className="ask-bar">
+            <span className="chip">Donald ▾</span>
+            <button className="btn primary sm">Enviar</button>
+          </div>
+        </section>
 
-      {/* Tipografia */}
-      <section className="am-sec">
-        <p className="eyebrow">02 · Tipografia</p>
-        <div className="am-type">
-          <div><p className="eyebrow">Títulos · Instrument Serif</p><p className="t-display">Agentes que <em>trabalham</em></p></div>
-          <div><p className="eyebrow">Texto e interface · Urbanist</p><p className="t-body">Cada agente tem computador próprio, memória e rotinas. Você acompanha tudo pela Caixa.</p></div>
-          <div><p className="eyebrow">Rótulos e comandos · JetBrains Mono</p><p className="t-mono">3 AGENTES ONLINE / 1 PRECISA DE VOCÊ</p></div>
+        <div className="stats">
+          {[['Agentes ativos', '3 de 4'], ['Tarefas hoje', '46'], ['Precisam de você', '2'], ['Uso da assinatura', '38%']].map(([k, v]) =>
+            <div key={k} className="panel stat"><p>{k}</p><b>{v}</b></div>)}
         </div>
-      </section>
 
-      {/* Componentes */}
-      <section className="am-sec">
-        <p className="eyebrow">03 · Componentes</p>
-        <div className="am-row">
-          <button className="btn-primary">Criar agente</button>
-          <button className="btn">Ver Caixa</button>
-          <button className="btn ghost">Cancelar</button>
-          <span className="status"><span className="dot pulse" /> online</span>
-          <span className="status off"><span className="dot" /> pausado</span>
-          <span className="badge">2 novas</span>
-        </div>
-        <div className="am-cards">
-          {[['01', 'Computador próprio', 'Cada agente roda num computador isolado, com seus arquivos.'],
-            ['02', 'Memória e rotinas', 'Lembra do que importa e trabalha no horário que você marcar.'],
-            ['03', 'No seu celular', 'Pareie com um QR Code e converse de qualquer lugar.']].map(([n, t, d]) =>
-            <article key={n} className="card"><span className="eyebrow">{n}</span><h3>{t}</h3><p>{d}</p></article>)}
-        </div>
-      </section>
+        <section className="panel">
+          <div className="panel-head"><h2>Agentes</h2><a className="link">Ver todos →</a></div>
+          <table>
+            <thead><tr><th>Nome</th><th>Função</th><th>Status</th><th>Última ação</th></tr></thead>
+            <tbody>{AGENTES.map(a =>
+              <tr key={a.nome}><td><span className="who"><Av a={a} />{a.nome}</span></td><td className="muted">{a.funcao}</td><td><Status st={a.st} /></td><td className="muted">{a.ult}</td></tr>)}
+            </tbody>
+          </table>
+        </section>
 
-      {/* Mascotes */}
-      <section className="am-sec">
-        <p className="eyebrow">04 · Mascotes com a pele Ripper</p>
-        <h2>Corpo grafite, olhos <em>acesos</em>.</h2>
-        <div className="am-agents">
-          {AGENTES.map(a =>
-            <article key={a.nome} className="agent">
-              <Mascote type={a.type} state={a.state} tema={tema} />
-              <div><h3>{a.nome}</h3><p>{a.funcao}</p></div>
-              <span className={`status ${a.state === 'sleeping' ? 'off' : ''}`}><span className={`dot ${a.state === 'working' ? 'pulse' : ''}`} />{a.state === 'working' ? 'trabalhando' : a.state === 'sleeping' ? 'pausado' : 'online'}</span>
-            </article>)}
-        </div>
-        <p className="am-note">Olho verde = acordado. Olho apagado = pausado. O cartão mostra só nome, função e status; números ficam na página do agente.</p>
-      </section>
+        <section className="panel">
+          <div className="panel-head"><h2>Precisa de você</h2></div>
+          <div className="alert warn"><b>Quinn quer enviar um e-mail</b><span>Para cliente@empresa.com · "Relatório de testes da semana"</span><div className="alert-actions"><button className="btn sm">Ver</button><button className="btn primary sm">Aprovar</button></div></div>
+          <div className="alert info"><b>Conta Claude perto do limite</b><span>O Ripper troca sozinho para a outra conta às 17:20.</span></div>
+        </section>
+
+        <section className="panel">
+          <div className="panel-head"><h2>Componentes</h2></div>
+          <div className="row">
+            <button className="btn primary">Salvar</button><button className="btn">Cancelar</button><button className="btn danger">Excluir</button>
+            <Status st="ativo" /><Status st="trabalhando" /><Status st="pausado" /><Status st="erro" />
+          </div>
+          <div className="row"><label className="field">Nome do agente<input defaultValue="Donald" /></label><label className="field">Função<input placeholder="Ex.: atendimento" /></label></div>
+        </section>
+      </main>
     </div>
   );
 }
