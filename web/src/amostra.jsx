@@ -1,79 +1,111 @@
-// Página de amostra da identidade nova (sensação de painel Cloudflare: claro, seguro, direto). Não faz parte do app.
+// Amostra da identidade "Rack": cada agente é uma unidade no rack. Não faz parte do app.
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BotAvatar } from 'bot-avatars';
+import { Icon } from './ui.jsx';
 import './amostra.css';
 
-const AGENTES = [
-  { nome: 'Donald', funcao: 'Design & Front-end', type: 'cloud', cor: '#5b8def', st: 'trabalhando', ult: 'agora' },
-  { nome: 'Engenheiro', funcao: 'Escreve e roda código', type: 'droid', cor: '#8a6cf0', st: 'ativo', ult: 'há 12 min' },
-  { nome: 'Quinn', funcao: 'Testa e reporta bugs', type: 'ghost', cor: '#e0904a', st: 'ativo', ult: 'há 1 h' },
-  { nome: 'Porteiro', funcao: 'Recepção do WhatsApp', type: 'cat', cor: '#4bb38a', st: 'pausado', ult: 'ontem' }
+// dados ilustrativos
+const RACKS = [
+  { nome: 'Multipli', unidades: [
+    { id: 'donald', nome: 'Donald', funcao: 'Design e front-end', type: 'cloud', cor: '#8fb4ff', st: 'on', agora: 'Ajustando a tela de login do site', desde: '3 min' },
+    { id: 'eng', nome: 'Engenheiro', funcao: 'Escreve e roda código', type: 'droid', cor: '#b9a4ff', st: 'wait', agora: 'Quer abrir um PR em ripper-dot', desde: '1 min', pedido: { o: 'Abrir pull request', d: '“Retoma turnos após reinício” · 3 arquivos' } },
+    { id: 'quinn', nome: 'Quinn', funcao: 'Testa e reporta bugs', type: 'ghost', cor: '#ffc28a', st: 'idle', agora: 'Terminou 24 testes, 0 falhas', desde: '40 min' },
+    { id: 'porteiro', nome: 'Porteiro', funcao: 'Recepção do WhatsApp', type: 'cat', cor: '#8fe0b8', st: 'off', agora: 'Pausado por você', desde: 'ontem' }
+  ] },
+  { nome: 'Pessoal', unidades: [
+    { id: 'agenda', nome: 'Agenda', funcao: 'Organiza compromissos', type: 'pebble', cor: '#ffadc6', st: 'fault', agora: 'Não conseguiu acessar o Google Agenda', desde: '2 h' }
+  ] }
 ];
-const NAV = [['Início', true], ['Caixa', false, 2], ['Agentes'], ['Conversas'], ['Rotinas'], ['Conectores']];
+const ST = { on: 'Trabalhando', wait: 'Esperando você', idle: 'Ligado', off: 'Desligado', fault: 'Com problema' };
+const CONVERSA = {
+  donald: [['eu', 'Deixa a tela de login mais simples, só e-mail e senha.'], ['ag', 'Feito o primeiro corte: tirei os botões de redes sociais e juntei os textos. Estou ajustando o espaçamento agora.']],
+  eng: [['eu', 'Corrige o bug do reinício e abre o PR.'], ['ag', 'Corrigido e testado (624 testes passando). Posso abrir o pull request?']],
+  quinn: [['ag', 'Rodei a bateria completa: 24 testes, nenhuma falha. Relatório salvo na Biblioteca.']],
+  porteiro: [['ag', 'Fui pausado. Mensagens novas no WhatsApp ficam esperando até você me ligar de novo.']],
+  agenda: [['ag', 'A permissão do Google Agenda expirou. Reconecte em Conectores para eu voltar a funcionar.']]
+};
+const NAV = [['home', 'Início'], ['inbox', 'Caixa', 1], ['agents', 'Agentes'], ['chat', 'Conversas'], ['clock', 'Rotinas'], ['plug', 'Conectores']];
 
-const Av = ({ a, size = 28 }) => <BotAvatar type={a.type} color={a.cor} size={size} shading="flat"
-  state={a.st === 'pausado' ? 'sleeping' : a.st === 'trabalhando' ? 'working' : 'default'} paused={a.st !== 'trabalhando'} />;
-const Status = ({ st }) => <span className={`badge b-${st}`}><i />{st[0].toUpperCase() + st.slice(1)}</span>;
+function resumo(us) {
+  const ligados = us.filter(u => u.st !== 'off').length, esperando = us.filter(u => u.st === 'wait').length, falha = us.filter(u => u.st === 'fault').length;
+  return [`${ligados} de ${us.length} ligados`, esperando && `${esperando} esperando você`, falha && `${falha} com problema`].filter(Boolean).join(' · ');
+}
+
+function Unidade({ u, aberta, onOpen, n }) {
+  return (
+    <li className={`unit st-${u.st}${aberta ? ' out' : ''}`}>
+      <button className="unit-face" onClick={onOpen} aria-expanded={aberta} aria-label={`${u.nome}, ${ST[u.st]}`}>
+        <span className="u-num">{String(n).padStart(2, '0')}</span>
+        <span className="led" aria-hidden="true" />
+        <span className="u-av"><BotAvatar type={u.type} color={u.cor} size={30} shading="flat" state={u.st === 'off' ? 'sleeping' : u.st === 'on' ? 'working' : 'default'} paused={u.st !== 'on'} /></span>
+        <span className="plate"><b>{u.nome}</b><small>{u.funcao}</small></span>
+        <span className="u-now"><span>{u.agora}</span><small>{ST[u.st]} · {u.desde}</small></span>
+        <span className="vent" aria-hidden="true" />
+      </button>
+      {u.pedido && (
+        <div className="unit-ask">
+          <span><b>{u.pedido.o}</b> {u.pedido.d}</span>
+          <button className="btn">Ver</button>
+          <button className="btn go">Aprovar</button>
+        </div>
+      )}
+    </li>
+  );
+}
 
 function Amostra() {
   const [tema, setTema] = useState('claro');
+  const [aberta, setAberta] = useState('eng');
+  const todas = RACKS.flatMap(r => r.unidades);
+  const sel = todas.find(u => u.id === aberta);
+  let n = 0;
   return (
     <div className={`app tema-${tema}`}>
-      <aside className="side">
-        <div className="brand"><span className="mark" />Ripper</div>
-        <button className="search">Buscar <kbd>Ctrl K</kbd></button>
-        <nav>{NAV.map(([n, on, c]) => <a key={n} className={on ? 'on' : ''}>{n}{c && <span className="count">{c}</span>}</a>)}</nav>
-        <div className="side-foot">
-          <div className="secure"><span className="lock" />Tudo roda no seu computador</div>
-          <div className="seg"><button className={tema === 'claro' ? 'on' : ''} onClick={() => setTema('claro')}>Claro</button><button className={tema === 'escuro' ? 'on' : ''} onClick={() => setTema('escuro')}>Escuro</button></div>
+      <aside className="rail">
+        <div className="brand"><span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>Ripper</div>
+        <nav>{NAV.map(([ic, nome, c], i) => <a key={nome} href="#" className={i === 0 ? 'on' : ''} onClick={e => e.preventDefault()}><Icon name={ic} size={17} />{nome}{c && <span className="count">{c}</span>}</a>)}</nav>
+        <div className="rail-foot">
+          <button className="theme" onClick={() => setTema(t => t === 'claro' ? 'escuro' : 'claro')}><Icon name={tema === 'claro' ? 'moon' : 'sun'} size={16} />{tema === 'claro' ? 'Tema escuro' : 'Tema claro'}</button>
+          <p className="local"><Icon name="key" size={14} />Roda no seu computador</p>
         </div>
       </aside>
 
-      <main className="main">
-        <header className="page-head">
-          <div><p className="crumb">Início</p><h1>Bom dia, Yan</h1></div>
-          <button className="btn primary">+ Novo agente</button>
+      <main className="floor">
+        <header className="floor-head">
+          <h1>Seus agentes</h1>
+          <p>{resumo(todas)}</p>
         </header>
-
-        <section className="panel ask">
-          <textarea rows={2} placeholder="Peça algo ao Donald…" />
-          <div className="ask-bar">
-            <span className="chip">Donald ▾</span>
-            <button className="btn primary sm">Enviar</button>
-          </div>
-        </section>
-
-        <div className="stats">
-          {[['Agentes ativos', '3 de 4'], ['Tarefas hoje', '46'], ['Precisam de você', '2'], ['Uso da assinatura', '38%']].map(([k, v]) =>
-            <div key={k} className="panel stat"><p>{k}</p><b>{v}</b></div>)}
-        </div>
-
-        <section className="panel">
-          <div className="panel-head"><h2>Agentes</h2><a className="link">Ver todos →</a></div>
-          <table>
-            <thead><tr><th>Nome</th><th>Função</th><th>Status</th><th>Última ação</th></tr></thead>
-            <tbody>{AGENTES.map(a =>
-              <tr key={a.nome}><td><span className="who"><Av a={a} />{a.nome}</span></td><td className="muted">{a.funcao}</td><td><Status st={a.st} /></td><td className="muted">{a.ult}</td></tr>)}
-            </tbody>
-          </table>
-        </section>
-
-        <section className="panel">
-          <div className="panel-head"><h2>Precisa de você</h2></div>
-          <div className="alert warn"><b>Quinn quer enviar um e-mail</b><span>Para cliente@empresa.com · "Relatório de testes da semana"</span><div className="alert-actions"><button className="btn sm">Ver</button><button className="btn primary sm">Aprovar</button></div></div>
-          <div className="alert info"><b>Conta Claude perto do limite</b><span>O Ripper troca sozinho para a outra conta às 17:20.</span></div>
-        </section>
-
-        <section className="panel">
-          <div className="panel-head"><h2>Componentes</h2></div>
-          <div className="row">
-            <button className="btn primary">Salvar</button><button className="btn">Cancelar</button><button className="btn danger">Excluir</button>
-            <Status st="ativo" /><Status st="trabalhando" /><Status st="pausado" /><Status st="erro" />
-          </div>
-          <div className="row"><label className="field">Nome do agente<input defaultValue="Donald" /></label><label className="field">Função<input placeholder="Ex.: atendimento" /></label></div>
-        </section>
+        {RACKS.map(r => (
+          <section key={r.nome} className="rack" aria-label={`Projeto ${r.nome}`}>
+            <h2><span>{r.nome}</span><small>{resumo(r.unidades)}</small></h2>
+            <ol className="rack-body">
+              {r.unidades.map(u => <Unidade key={u.id} u={u} n={++n} aberta={aberta === u.id} onOpen={() => setAberta(a => a === u.id ? null : u.id)} />)}
+              <li className="unit empty"><button className="unit-face add"><Icon name="plus" size={16} />Instalar novo agente</button></li>
+            </ol>
+          </section>
+        ))}
+        <form className="ask" onSubmit={e => e.preventDefault()}>
+          <label className="ask-to">Para <b>{sel?.nome || 'Ripper'}</b></label>
+          <input placeholder={`Peça algo${sel ? ` ao ${sel.nome}` : ''}…`} aria-label="Mensagem" />
+          <button className="btn go" aria-label="Enviar"><Icon name="arrowUp" size={16} /></button>
+        </form>
       </main>
+
+      <aside className={`side${sel ? ' open' : ''}`} aria-label="Conversa">
+        {sel ? <>
+          <header className="side-head">
+            <BotAvatar type={sel.type} color={sel.cor} size={40} shading="flat" state={sel.st === 'on' ? 'working' : sel.st === 'off' ? 'sleeping' : 'default'} paused={sel.st !== 'on'} />
+            <div><h2>{sel.nome}</h2><p className={`st-txt st-${sel.st}`}><span className="led" />{ST[sel.st]}</p></div>
+            <button className="icon-btn" onClick={() => setAberta(null)} aria-label="Fechar"><Icon name="x" size={16} /></button>
+          </header>
+          <div className="msgs">{CONVERSA[sel.id].map(([q, t], i) => <p key={i} className={`msg ${q}`}>{t}</p>)}</div>
+          <dl className="spec">
+            <div><dt>Computador</dt><dd>{sel.st === 'off' ? 'Desligado' : 'Ligado · 2 GB'}</dd></div>
+            <div><dt>Hoje</dt><dd>{sel.st === 'off' ? '—' : '18 respostas · 31 ações'}</dd></div>
+          </dl>
+        </> : <p className="side-empty">Abra uma unidade do rack para conversar.</p>}
+      </aside>
     </div>
   );
 }
