@@ -320,6 +320,7 @@ function ClaudeAccountsCard({ s, set, S }) {
           ? <button type="button" onClick={() => setAdding(accounts.some(a => /teams/i.test(a.label)) ? '' : 'Teams')} disabled={!!busy}><b>+ Adicionar</b><small>outra conta (ex.: Teams)</small></button>
           : <form className="claude-acc-new" onSubmit={e => { e.preventDefault(); add(); }}>
               <input className="input" autoFocus value={adding} maxLength={40} onChange={e => setAdding(e.target.value)} placeholder="Nome da conta" aria-label="Nome da conta nova" />
+              <small className="muted" role="note">Assinatura pessoal (Pro/Max) costuma ser para uso de uma pessoa: atender clientes ou dividir pode contrariar os termos do provedor. Conta da empresa (Teams, Enterprise) só com autorização de quem a administra. Não use a conta de outra pessoa. A responsabilidade pelos termos de cada provedor é sua.</small>
               <div className="row"><button type="submit" className="btn btn-sm btn-primary" disabled={!adding.trim() || busy === 'add'}>Adicionar e entrar</button><button type="button" className="btn btn-sm" onClick={() => setAdding(null)}>Cancelar</button></div>
             </form>}
       </div>
@@ -877,6 +878,9 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
             </div>
           </Card>
           <Card title="LGPD — dados pessoais" desc="Opt-in: antes de enviar texto a Claude, Codex ou Julia 1, o Ripper pode substituir CPF, contas, documentos e contatos por [PII]. Conversas locais continuam com o texto original.">
+            <Row title="Exportar tudo" desc="Pacote legível (.tar.gz): conversas em Markdown, agentes, rotinas, arquivos e artefatos. Senhas e chaves ficam de fora.">
+              <a className="btn" href="/api/data/export-all" download><Icon name="download" size={16} />Baixar pacote</a>
+            </Row>
             <Row title="Mascaramento antes do modelo" desc="Recomendado se você cola dados de clientes no chat."><Switch checked={!!s.lgpd?.enabled} onChange={v => set('lgpd', { ...(s.lgpd || {}), enabled: v })} label="Ativar mascaramento LGPD" /></Row>
             {s.lgpd?.enabled && <>
               <Row title="Também em avisos do servidor" desc="SSE warn/erro e logs do Node quando ligado."><Switch checked={!!s.lgpd?.redactInLogs} onChange={v => set('lgpd', { ...(s.lgpd || {}), redactInLogs: v })} label="Mascarar PII em logs" /></Row>

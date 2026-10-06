@@ -51,7 +51,11 @@ Se você usa o Ripper para atender clientes, **você é o responsável** pelos d
 - as mensagens dele serão enviadas à empresa de IA para gerar a resposta;
 - se ele pedir para apagar os dados, apague a conversa no Ripper (ou use a eliminação em Segurança → LGPD) e, se for o caso, no próprio WhatsApp.
 
-*Ainda não existe no Ripper um registro formal de consentimento por contato; hoje o controle é a lista de números permitidos.*
+Em Configurações → Plugins → Canal WhatsApp você registra o consentimento de cada cliente (número, data e como foi obtido). Ligando **Exigir consentimento**, quem não tem registro não recebe resposta automática: o agente só faz um rascunho para você aprovar. Desligado (padrão), vale só a lista de números permitidos.
+
+## Levar seus dados
+
+Em Configurações → Segurança → LGPD, **Exportar tudo** baixa um pacote (.tar.gz) com as conversas em Markdown, agentes e rotinas em JSON, arquivos e artefatos. Senhas, chaves e tokens não entram.
 
 ## Por quanto tempo os dados ficam
 

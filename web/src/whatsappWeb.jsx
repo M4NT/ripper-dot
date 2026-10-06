@@ -111,6 +111,45 @@ export function WhatsappWebPanel({ w, setW, Row }) {
         <small className="muted">{(w.allowlist || []).filter(n => n.replace(/\D/g, '').length >= 10).length} número(s) válido(s)</small>
       </div>
     </Row>
+    <Consents w={w} setW={setW} Row={Row} />
+  </>;
+}
+
+const HOW = [
+  { value: 'mensagem', label: 'Por mensagem' }, { value: 'formulario', label: 'Formulário' },
+  { value: 'contrato', label: 'Contrato' }, { value: 'verbal', label: 'Verbal' }, { value: 'outro', label: 'Outro' }
+];
+
+/** Registro de consentimento: quem aceitou ser atendido por IA, quando e como. Exigir é opcional. */
+function Consents({ w, setW, Row }) {
+  const [num, setNum] = useState('');
+  const [how, setHow] = useState('mensagem');
+  const list = Object.entries(w.consents || {});
+  const add = () => {
+    const d = num.replace(/\D/g, '');
+    if (d.length < 10) return;
+    setW('consents', { ...(w.consents || {}), [d]: { at: Date.now(), how } }); setNum('');
+  };
+  const del = n => { const { [n]: _, ...rest } = w.consents || {}; setW('consents', rest); };
+  return <>
+    <Row title="Exigir consentimento" desc="Ligado: quem não tem consentimento registrado não recebe resposta automática; o agente faz um rascunho para você aprovar.">
+      <Switch checked={!!w.requireConsent} onChange={v => setW('requireConsent', v)} label="Exigir consentimento" />
+    </Row>
+    <Row title="Consentimentos registrados" desc="Clientes que aceitaram ser atendidos por um assistente automatizado (avise que é IA)." stack>
+      <form className="row" onSubmit={e => { e.preventDefault(); add(); }}>
+        <input className="input" value={num} onChange={e => setNum(e.target.value)} placeholder="+55 11 98888-7777" aria-label="Número do cliente" />
+        <Select label="Como foi obtido" size="sm" value={how} onChange={setHow} options={HOW} />
+        <button type="submit" className="btn btn-sm" disabled={num.replace(/\D/g, '').length < 10}>Registrar</button>
+      </form>
+      {list.length > 0 && <ul className="rows flat">
+        {list.map(([n, c]) => (
+          <li key={n} className="row-item">
+            <div className="row-main"><b>+{n}</b><small>{new Date(c.at).toLocaleDateString('pt-BR')} · {HOW.find(h => h.value === c.how)?.label || c.how}</small></div>
+            <button type="button" className="btn btn-sm" onClick={() => del(n)}>Remover</button>
+          </li>
+        ))}
+      </ul>}
+    </Row>
   </>;
 }
 
