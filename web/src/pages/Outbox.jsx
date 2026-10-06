@@ -20,7 +20,7 @@ export default function Outbox() {
   const items = data.items.filter(i => view === 'all' || i.status === view);
   return (
     <div className="page narrow">
-      <header className="page-head"><div><h1>Envios</h1><p className="lede">WhatsApp, e-mails e publicações que não saíram de primeira. Falha passageira (rede, servidor fora) tenta de novo sozinha: em 1, 5, 15 minutos, 1 e 4 horas. Se não der, fica aqui para você decidir.</p></div></header>
+      <header className="page-head"><div><h1>Fila de envios</h1><p className="lede">WhatsApp, e-mails e publicações que não saíram de primeira. Falha passageira (rede, servidor fora) tenta de novo sozinha: em 1, 5, 15 minutos, 1 e 4 horas. Se não der, fica aqui para você decidir.</p></div></header>
       {data.items.length > 0 && <div className="toolbar"><Segmented label="Mostrar" value={view} onChange={setView} items={[['all', 'Tudo', data.items.length], ['pending', 'Na fila', data.counts.pending || 0], ['dead', 'Não saíram', data.counts.dead || 0]]} /></div>}
       {!items.length ? <EmptyState title="Nada pendente" body="Quando um envio falhar por queda de rede ou servidor fora do ar, ele aparece aqui e sai sozinho quando voltar." />
         : <ul className="rows">{items.map(it => {
