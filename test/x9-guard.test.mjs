@@ -47,7 +47,7 @@ test('de ponta a ponta: a resposta automática no WhatsApp sai com a senha masca
     await put({ ui: { mode: 'enterprise' } });
     await put({ whatsappWeb: { enabled: true, agentId: st.agents[0].id, allowlist: ['5511988887777'] } });
     await fetch(base + '/api/channels/whatsapp-web/' + 'f'.repeat(48), { method: 'POST', body: '{}' });
-    const { hookToken } = JSON.parse(readFileSync(join(dataDir, 'evolution.json'), 'utf8'));
+    const { hookToken } = (await import('./helpers/evolution-secrets.mjs')).readEvolutionSecrets(dataDir);
     await fetch(base + '/api/channels/whatsapp-web/' + hookToken, { method: 'POST', headers: { 'content-type': 'application/json', 'x-ripper-token': hookToken },
       body: JSON.stringify({ event: 'messages.upsert', data: { key: { id: 'x1', remoteJid: '5511988887777@s.whatsapp.net', fromMe: false }, pushName: 'Ana', message: { conversation: 'confirma minha senha: Segredo123 por favor' }, messageTimestamp: Math.floor(Date.now() / 1000) } }) });
     assert.ok(await wait(async () => sent.length > 0), 'a resposta deveria sair');

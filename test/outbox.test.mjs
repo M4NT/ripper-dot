@@ -64,7 +64,7 @@ test('de ponta a ponta: WhatsApp fora do ar → resposta vai para a fila → sai
     await put({ ui: { mode: 'enterprise' } });
     await put({ whatsappWeb: { enabled: true, agentId: st.agents[0].id, allowlist: ['5511988887777'] } });
     await fetch(base + '/api/channels/whatsapp-web/' + 'f'.repeat(48), { method: 'POST', body: '{}' });
-    const { hookToken } = JSON.parse(readFileSync(join(dataDir, 'evolution.json'), 'utf8'));
+    const { hookToken } = (await import('./helpers/evolution-secrets.mjs')).readEvolutionSecrets(dataDir);
     await fetch(base + '/api/channels/whatsapp-web/' + hookToken, { method: 'POST', headers: { 'content-type': 'application/json', 'x-ripper-token': hookToken },
       body: JSON.stringify({ event: 'messages.upsert', data: { key: { id: 'm1', remoteJid: '5511988887777@s.whatsapp.net', fromMe: false }, pushName: 'Ana', message: { conversation: 'oi, tudo bem?' }, messageTimestamp: Math.floor(Date.now() / 1000) } }) });
     const queued = await wait(async () => (await (await fetch(base + '/api/outbox')).json()).items[0]);

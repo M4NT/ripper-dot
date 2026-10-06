@@ -71,7 +71,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - [ ] HTTPS para acesso fora de casa (túnel com login: Cloudflare Tunnel ou Tailscale), com passo a passo dentro do app.
 - [ ] Proteção contra CSRF nas rotas que mudam algo (hoje: verificação de origem).
 - [ ] Limite de tentativas no login e bloqueio temporário.
-- ✅ Chaves e tokens cifrados no disco e nos backups. [ ] Cifrar também os segredos da Evolution (`data/evolution.json`).
+- ✅ Chaves e tokens cifrados no disco e nos backups. ✅ Segredos da Evolution também cifrados (`data/evolution.json`).
 - ✅ Aprovações, autonomia por agente, registro imutável de ações externas, X9 Guard nos envios.
 - [ ] Revisão de segurança completa antes do lançamento (rotas sem autenticação, uploads, caminhos de arquivo, execução de comandos, MCP de terceiros).
 - [ ] Política de permissões dos agentes revisada: o que cada nível de autonomia pode fazer sem perguntar.
@@ -87,7 +87,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - [ ] Contêineres dos agentes: um por agente e por pasta de trabalho (hoje duas conversas do mesmo agente em pastas diferentes se revezam recriando).
 - [ ] Agentes trabalhando no código do Ripper em cópia própria (`/work/repos`), nunca trocando o branch da pasta compartilhada.
 - [ ] Branch `ripper/staging` ficou para trás da `main` (06/10/2026) e o `scripts/staging.sh` do Engenheiro está fora do Git: alinhar com ele antes de retomar o staging.
-- [ ] Limites de recursos por contêiner e limpeza de contêineres parados.
+- ✅ Limites de recursos por contêiner (`computer.dockerMemory`/`dockerCpus`, padrão 2g/2) e limpeza de contêineres parados na subida.
 
 ### C. Instalação e atualização (P0)
 - [ ] **Instalador para Windows e Mac** que traz Node, cria o serviço e abre o app — sem terminal.
