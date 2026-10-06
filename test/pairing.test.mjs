@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pairingInvite, deviceStore, lanAddress, qrSvg, deviceName } from '../lib/pairing.mjs';
+import { freePort } from './helpers/free-port.mjs';
 
 test('convite: uso único, expira, gerar outro invalida o anterior', async () => {
   const inv = pairingInvite({ ttlMs: 30 });
@@ -47,7 +48,7 @@ test('rede local, QR e nome do aparelho', () => {
 });
 
 test('HTTP: rede desligada por padrão, convite só com rede, /pair cria sessão do aparelho, desconectar derruba', async () => {
-  const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r)); const port = probe.address().port; await new Promise(r => probe.close(r));
+  const port = await freePort();
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-pair-'));
   const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
     env: { ...process.env, RIPPER_TOKEN: '', RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', HOME: dataDir, USERPROFILE: dataDir, JULIA_AUTOSTART: '0' }, stdio: 'ignore'

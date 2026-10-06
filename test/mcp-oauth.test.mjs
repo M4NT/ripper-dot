@@ -8,16 +8,7 @@ import { spawn } from 'node:child_process';
 import { createServer as createNetServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 
-function freePort() {
-  return new Promise((resolve, reject) => {
-    const s = createNetServer();
-    s.listen(0, '127.0.0.1', () => {
-      const { port } = s.address();
-      s.close(() => resolve(port));
-    });
-    s.on('error', reject);
-  });
-}
+import { freePort } from './helpers/free-port.mjs';
 import {
   _clearOAuthFlows,
   discoverMcpOAuth,

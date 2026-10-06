@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { freePort } from './helpers/free-port.mjs';
 
 test('Radar: rotina em dias úteis, rodar agora e relatório vai para o e-mail do dono', async () => {
   let raw = '', rcpt = '';
@@ -29,7 +30,7 @@ test('Radar: rotina em dias úteis, rodar agora e relatório vai para o e-mail d
     });
   });
   await new Promise(r => smtp.listen(0, '127.0.0.1', r));
-  const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r)); const port = probe.address().port; await new Promise(r => probe.close(r));
+  const port = await freePort();
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-radar-'));
   const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
     env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'stream', HOME: dataDir, USERPROFILE: dataDir, RIPPER_SECRET_KEY_FILE: join(dataDir, 'k'), JULIA_AUTOSTART: '0' },

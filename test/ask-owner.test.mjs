@@ -7,9 +7,10 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { freePort } from './helpers/free-port.mjs';
 
 test('"Preciso de você": o agente pausa, a pergunta vai para a Caixa, a resposta volta e ele continua', async () => {
-  const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r)); const port = probe.address().port; await new Promise(r => probe.close(r));
+  const port = await freePort();
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-ask-'));
   const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
     env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'ask', HOME: dataDir, USERPROFILE: dataDir, JULIA_AUTOSTART: '0' }, stdio: 'ignore'

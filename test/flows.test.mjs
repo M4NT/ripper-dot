@@ -2,6 +2,7 @@ import './helpers/signed-in.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeFlow, stepPrompt } from '../lib/flows.mjs';
+import { freePort } from './helpers/free-port.mjs';
 
 const agents = [{ id: 'a' }, { id: 'b' }];
 
@@ -33,7 +34,7 @@ test('rodar: passo 1 → pausa para aprovação → passo 2; recusar para o flux
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
   const { fileURLToPath } = await import('node:url');
-  const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r)); const port = probe.address().port; await new Promise(r => probe.close(r));
+  const port = await freePort();
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-flow-'));
   const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
     env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'stream', HOME: dataDir, USERPROFILE: dataDir, JULIA_AUTOSTART: '0' }, stdio: 'ignore'
@@ -79,7 +80,7 @@ test('automatizar: webhook dispara o fluxo com o evento como pedido; resultado n
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
   const { fileURLToPath } = await import('node:url');
-  const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r)); const port = probe.address().port; await new Promise(r => probe.close(r));
+  const port = await freePort();
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-flowauto-'));
   const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
     env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'stream', HOME: dataDir, USERPROFILE: dataDir, JULIA_AUTOSTART: '0' }, stdio: 'ignore'
@@ -133,7 +134,7 @@ test('rodar com ramificação: o ramo que não bate é pulado', async () => {
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
   const { fileURLToPath } = await import('node:url');
-  const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r)); const port = probe.address().port; await new Promise(r => probe.close(r));
+  const port = await freePort();
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-flowif-'));
   const child = spawn(process.execPath, [fileURLToPath(new URL('../server.mjs', import.meta.url))], {
     env: { ...process.env, RIPPER_DATA: dataDir, PORT: String(port), HOST: '127.0.0.1', RIPPER_TEST_PROVIDER: 'stream', HOME: dataDir, USERPROFILE: dataDir, JULIA_AUTOSTART: '0' }, stdio: 'ignore'

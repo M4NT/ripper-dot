@@ -13,6 +13,7 @@ import {
   BRAND_LOGO_MAX
 } from '../lib/brand.mjs';
 import { applySettingsPatch } from '../lib/settings-patch.mjs';
+import { freePort } from './helpers/free-port.mjs';
 
 test('normalizeBrand defaults vazios e sanitiza campos', () => {
   const b = normalizeBrand({
@@ -61,16 +62,6 @@ test('detectImageType reconhece PNG mínimo', () => {
 
 const serverPath = fileURLToPath(new URL('../server.mjs', import.meta.url));
 
-function freePort() {
-  return new Promise((resolve, reject) => {
-    const s = createServer();
-    s.listen(0, '127.0.0.1', () => {
-      const { port } = s.address();
-      s.close(() => resolve(port));
-    });
-    s.on('error', reject);
-  });
-}
 
 async function withServer(fn) {
   const dataDir = mkdtempSync(join(tmpdir(), 'ripper-brand-'));

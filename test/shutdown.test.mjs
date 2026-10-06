@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { connect, createServer } from 'node:net';
 import { isShuttingDown, _markShuttingDownForTests, SHUTDOWN_MESSAGE } from '../lib/shutdown.mjs';
+import { freePort } from './helpers/free-port.mjs';
 
 test('isShuttingDown inicia false e pode ser marcado em testes', () => {
   assert.equal(isShuttingDown(), false);
@@ -18,16 +19,6 @@ test('isShuttingDown inicia false e pode ser marcado em testes', () => {
 
 const serverPath = fileURLToPath(new URL('../server.mjs', import.meta.url));
 
-function freePort() {
-  return new Promise((resolve, reject) => {
-    const s = createServer();
-    s.listen(0, '127.0.0.1', () => {
-      const { port } = s.address();
-      s.close(() => resolve(port));
-    });
-    s.on('error', reject);
-  });
-}
 
 async function waitForHealth(base, token, ms) {
   const deadline = Date.now() + ms;
