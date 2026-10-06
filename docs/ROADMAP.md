@@ -133,7 +133,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - ✅ Ícones que faltam no Marketplace (06/10/2026): WhatsApp com ícone próprio; Atlassian, Zapier, Granola, Stripe, Supabase e Sentry com selo na cor da marca (trocar pelos logos oficiais quando possível).
 - ✅ Celular: barra de botões da caixa de mensagem apertada (06/10/2026): em 375px o botão de enviar não é mais espremido, o esforço sai da pílula do modelo (continua no seletor) e o nome do modelo encolhe primeiro.
 - ✅ Ordem dos fixados e da lista salva nas configurações: igual em todos os aparelhos.
-- [ ] Zero tela parada: progresso visível em rotinas de segundo plano e canais.
+- ✅ Zero tela parada: a barra lateral mostra quem está trabalhando segundo o servidor (rotinas, WhatsApp, outra aba), com o passo atual ("Pesquisando na web…", "Enviando WhatsApp…"). [ ] Progresso detalhado das rotinas na Caixa.
 - ✅ Ações em lote e atalhos na Caixa (06/10/2026): marcar várias aprovações (ou todas) e aprovar/recusar de uma vez; teclado J/K navega, X marca, A aprova, R recusa (a seleção ou o item em foco). Perguntas abertas ("precisa de você") ficam fora do lote porque pedem texto. "Negar" virou "Recusar".
 - [ ] Modo Simples × Enterprise revisado (nada importante escondido).
 - [ ] Linguagem revisada em todas as telas (sem termos técnicos no modo Simples).
