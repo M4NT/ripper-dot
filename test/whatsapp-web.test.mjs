@@ -172,7 +172,8 @@ test('com leitura ligada: rascunho só sai com aprovação; "só lê" e mensagem
 test('grupo: parser lê quem falou; só guarda com "Ler grupos" e nunca responde', async () => {
   const { parseEvolutionGroup } = await import('../lib/evolution.mjs');
   const gEv = (id, text, extra = {}) => ({ event: 'messages.upsert', data: { key: { id, remoteJid: '120363111@g.us', participant: '5511988887777@s.whatsapp.net', ...extra }, pushName: 'Tia Ana', message: { conversation: text } } });
-  assert.deepEqual(parseEvolutionGroup(gEv('g1', 'bom dia família')), { id: 'g1', groupJid: '120363111@g.us', key: 'g120363111', text: 'Tia Ana: bom dia família', fromMe: false, at: parseEvolutionGroup(gEv('g1', 'bom dia família')).at });
+  const g1 = parseEvolutionGroup(gEv('g1', 'bom dia família'));
+  assert.deepEqual(g1, { id: 'g1', groupJid: '120363111@g.us', key: 'g120363111', text: 'Tia Ana: bom dia família', fromMe: false, at: g1.at });
   assert.equal(parseEvolutionGroup(msg({ remoteJid: '5511988887777@s.whatsapp.net' })), null); // individual não é grupo
   assert.equal(parseEvolutionMessage(gEv('g1', 'oi')), null);                                    // grupo nunca entra no fluxo de resposta
 

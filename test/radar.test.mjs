@@ -13,6 +13,7 @@ test('Radar: rotina em dias úteis, rodar agora e relatório vai para o e-mail d
   let raw = '', rcpt = '';
   const smtp = net.createServer(sock => {
     let data = false;
+    sock.on('error', () => {}); // servidor morto no fim do teste derruba o socket (ECONNRESET)
     sock.write('220 ok\r\n');
     sock.on('data', d => {
       const s = d.toString();
