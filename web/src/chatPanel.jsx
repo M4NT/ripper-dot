@@ -208,7 +208,6 @@ export default function ChatPanel({ members, project, chatId, messages, files, o
   const group = members.length > 1, a = members[0];
   const working = members.some(x => busy[x.id]);
   const arts = S.artifacts.filter(x => project ? x.projectId === project.id : chatId && x.chatId === chatId);
-  const pcUses = messages.reduce((n, m) => n + (m.steps || []).filter(s => (s.tool || '').startsWith('computer_')).length, 0);
   return (
     <aside className="agent-panel v2" data-resizable aria-label={group ? 'Conversa em grupo' : `Sobre ${a.name}`}>
       <ResizeHandle side="right" cssVar="panel-w" min={280} max={620} label="Largura do painel" onCollapse={onCollapse} />
@@ -224,8 +223,8 @@ export default function ChatPanel({ members, project, chatId, messages, files, o
         {working ? <span className="status status-online"><i />respondendo…</span> : group ? <small className="muted">{members.length} agentes</small> : <StatusDot status={a.status} />}
       </div>
       <Segmented label="Seções do painel" value={tab} onChange={setTab} size="sm" className="panel-tabs"
-        items={[['details', 'Detalhes'], ['artifacts', 'Artefatos', arts.length || null], ['files', 'Arquivos', files.length || null], ['computer', 'Computador', pcUses || null]]} />
-      {tab === 'details' && <Details members={members} project={project} S={S} />}
+        items={[['details', 'Detalhes'], ['artifacts', 'Artefatos', arts.length || null], ['files', 'Arquivos', files.length || null], ['computer', 'Computador']]} />
+    {tab === 'details' && <Details members={members} project={project} S={S} />}
       {tab === 'artifacts' && <div className="panel-tab">
         <ArtifactList items={arts} empty={project ? 'Nenhum artefato no projeto ainda. Peça: “salve isso como artefato”. Todos os agentes do projeto veem.' : 'Nenhum artefato ainda. Peça: “salve isso como artefato”.'} />
         {arts.length > 0 && <p className="muted small">{project ? 'Compartilhados com todos os agentes do projeto.' : 'Salvos nesta conversa.'}</p>}

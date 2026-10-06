@@ -14,7 +14,8 @@ import { builtinToolAllowed } from '../lib/permissions.mjs';
 test('callAgentPrompt indica espera síncrona', () => {
   const p = callAgentPrompt({ body: 'Qual o título?' }, 'Ana');
   assert.match(p, /Chamada síncrona de Ana/);
-  assert.match(p, /aguardando sua resposta agora/);
+  assert.match(p, /aguardando agora/);
+  assert.match(p, /Não traga assuntos pendentes/);
 });
 
 test('clampCallTimeoutMs respeita limites e configuração', () => {

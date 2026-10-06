@@ -840,6 +840,8 @@ async function pluginsForTurn(s, agent) {
 async function deliver(m) {
   const to = db.agents.find(a => a.id === m.to), from = db.agents.find(a => a.id === m.from);
   if (!to || !from) { markInboxDeliveryFailed(m, 'Agente não existe mais.'); save(); return; }
+  // Aviso de encerramento é só registro: a resposta já foi para a conversa; rodar um turno nele vira "Recebido" à toa.
+  if (m.taskClosure) { m.status = 'delivered'; m.deliveredAt = Date.now(); save(); return; }
   inboxBusy.add(to.id); m.status = 'delivering'; save();
   try {
     const result = await runInboxDelivery(m, {});
@@ -875,7 +877,8 @@ async function deliver(m) {
           id,
           limits: inboxLimits(),
           hops: m.hops || 0,
-          googleTasksSync
+          googleTasksSync,
+          skipInbox: !!origin // a resposta já está na conversa de origem: aviso extra só duplicaria
         });
       } catch (e) { console.error('task-closure', ...redactForLog(db.settings, e.message)); }
     }
