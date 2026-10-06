@@ -86,6 +86,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - ✅ Fila de envios com novas tentativas (WhatsApp, e-mail, publicações).
 - [ ] Contêineres dos agentes: um por agente e por pasta de trabalho (hoje duas conversas do mesmo agente em pastas diferentes se revezam recriando).
 - [ ] Agentes trabalhando no código do Ripper em cópia própria (`/work/repos`), nunca trocando o branch da pasta compartilhada.
+- [ ] Branch `ripper/staging` ficou para trás da `main` (06/10/2026) e o `scripts/staging.sh` do Engenheiro está fora do Git: alinhar com ele antes de retomar o staging.
 - [ ] Limites de recursos por contêiner e limpeza de contêineres parados.
 
 ### C. Instalação e atualização (P0)
@@ -126,6 +127,10 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - 🔨 "Conversa em grupo" no modo Simples e quem está trabalhando com autocompletar do @. *Donald.*
 - ✅ **Interface nova estilo mensageiro** (06/10/2026, referência: Grok Bot): tema escuro neutro como padrão; barra lateral de agentes com fixados no topo; **um agente = uma conversa** (as antigas juntadas, arquivadas, nada apagado); arrastar na mão para fixar e reordenar, com a grade se reorganizando; soltar um agente na conversa marca ele (botão com o mascote); Início vira a conversa; Marketplace ("Conectar aplicativos") e Configurações como janelas por cima.
 - [ ] Repaginar no padrão novo as telas que só herdaram as cores: Caixa, Agentes, Fluxos, Projetos, Biblioteca.
+- [ ] **Marcar um agente numa conversa 1:1 traz ele para a conversa** (hoje o @ só aparece como botão; precisa chamar o agente ou virar grupo).
+- [ ] Desfazer a junção de conversas pela interface (hoje só pelos dados: as antigas ficam arquivadas com `mergedInto`) e ver as arquivadas no Histórico.
+- [ ] Revisão completa do tema claro no padrão novo (foi validado principalmente no escuro).
+- [ ] Ícones que faltam no Marketplace (ex.: WhatsApp aparece com ícone genérico).
 - [ ] Celular: barra de botões da caixa de mensagem apertada; ordem dos fixados/lista sincronizada entre aparelhos (hoje fica no navegador).
 - [ ] Zero tela parada: progresso visível em rotinas de segundo plano e canais.
 - [ ] Ações em lote e atalhos na Caixa (A aprovar, R recusar).
