@@ -408,6 +408,9 @@ function PaidUsageCard({ s, set, S }) {
       <Row title="Limite de todos os agentes, por dia">
         <div className="input-unit"><span>US$</span><input className="input" type="number" min={0} step={1} value={b.totalDailyUsd ?? 10} onChange={e => set('billing', { ...b, totalDailyUsd: e.target.value })} aria-label="Limite diário total em dólares" /></div>
       </Row>
+      <Row title="Cotação do dólar" desc="Para mostrar custos em R$. Vazio = cotação do dia (AwesomeAPI), ou R$ 5,50 se não der para buscar.">
+        <div className="input-unit"><span>R$</span><input className="input" type="number" min={0} step={0.01} placeholder="auto" value={b.usdBrl ?? ''} onChange={e => set('billing', { ...b, usdBrl: e.target.value })} aria-label="Cotação do dólar em reais" /></div>
+      </Row>
       <div className="row">
         {on || pending
           ? <button type="button" className="btn" onClick={() => set('billing', { ...b, paidConsent: false })}>Desativar uso pago</button>

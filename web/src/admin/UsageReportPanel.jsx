@@ -9,6 +9,20 @@ const nf = new Intl.NumberFormat('pt-BR');
 const compact = new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 });
 const usd = v => `US$ ${v.toFixed(v < 1 ? 4 : 2)}`;
 
+const brl = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+/** Custo do mês corrente em R$ e previsão linear para o fim do mês. */
+function MonthCost({ m }) {
+  const rate = m.rate.toFixed(2).replace('.', ',');
+  return (
+    <p className="usage-month">
+      Este mês: <b>{m.costEstimated ? '~' : ''}{brl(m.costUsd * m.rate)}</b> ({usd(m.costUsd)})
+      {' · '}Previsão até o fim do mês: <b>~{brl(m.forecastUsd * m.rate)}</b>
+      <span className="muted small"> · US$ 1 = R$ {rate} ({m.source === 'manual' ? 'definida em Configurações' : m.source === 'awesomeapi' ? 'cotação do dia' : 'padrão'}); previsão = ritmo do mês até hoje.</span>
+    </p>
+  );
+}
+
 /** Uso por período: gráfico de barras (tokens estimados), tabela com totais e CSV. */
 export default function UsageReportPanel() {
   const [preset, setPreset] = useState('30');
@@ -68,6 +82,7 @@ export default function UsageReportPanel() {
         <button type="button" className="btn btn-sm" onClick={exportCsv} disabled={!data}>Exportar CSV</button>
       </div>
 
+      {data?.month && <MonthCost m={data.month} />}
       {err && <p className="form-error" role="alert">{err}</p>}
       {!data && !err && <p className="muted" role="status">Carregando…</p>}
       {empty && <p className="muted">Nenhum uso registrado neste período.</p>}

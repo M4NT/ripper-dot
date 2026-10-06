@@ -119,9 +119,9 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 ### F. Desempenho e custo (P1)
 - ✅ Processo pré-aquecido (1ª palavra 1,3–2 s), cache de prompt, rota rápida para conversa curta, envio instantâneo no chat.
 - [ ] 1ª palavra < 1 s na mediana. ✅ Abrir a conversa reaquece o processo do agente (e o marca como recente no limite de 3). [ ] O 1º turno de cada agente após o servidor subir ainda é frio (o aquecimento reaproveita a configuração do último turno).
-- [ ] Prompt de sistema enxuto (medir por agente e cortar o que não é usado).
 - [ ] Memória do servidor sob controle com muitos agentes: ✅ processos pré-aquecidos limitados a 3 (sai o menos recente, inclusive ao abrir conversas). [ ] Contêineres.
-- [ ] Custo em R$ e previsão de fim de mês.
+- ✅ Prompt de sistema enxuto: `node scripts/prompt-size.mjs` mede por agente e por seção. Cortados título/link da skill padrão, dicas de computador/arquivos/scripts quando o computador está desligado, aviso de social sem webhook e o modo X9 fora do enterprise (média 3.795 → 3.682 chars nos agentes reais; até ~470 chars a menos com computador desligado). O grosso que sobra são as instruções escritas para cada agente.
+- ✅ Custo em R$ e previsão de fim de mês (linear pelo ritmo do mês) no painel de uso; cotação em Configurações → Provedores (vazio = AwesomeAPI do dia, R$ 5,50 se falhar).
 
 ### G. Experiência de uso (P1)
 - ✅ Revisão de todas as telas (06/10/2026): navegação enxuta, chat limpo, busca de configurações, páginas sem rolagem dupla.

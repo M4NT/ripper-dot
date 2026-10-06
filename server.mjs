@@ -216,7 +216,7 @@ import { attachRequestId } from './lib/request-id.mjs';
 import { isShuttingDown, registerGracefulShutdown, requestShutdown, RESTART_EXIT_CODE, SHUTDOWN_MESSAGE } from './lib/shutdown.mjs';
 import { closeUsageEventsStore, listUsageEventsSince } from './lib/usage-events.mjs';
 import { agentDayStats } from './lib/agent-day-stats.mjs';
-import { parseUsageQuery, aggregateUsage, usageCsv, resolveClient, normalizeClient } from './lib/usage-report.mjs';
+import { parseUsageQuery, aggregateUsage, usageCsv, resolveClient, normalizeClient, monthForecast, usdBrlRate } from './lib/usage-report.mjs';
 import { loadBenchmarkCatalog } from './lib/julia-cascade.mjs';
 import { agentTimeline } from './lib/agent-timeline.mjs';
 import { closeJuliaEventsStore } from './lib/julia-events.mjs';
@@ -2093,7 +2093,11 @@ const routes = [
     let catalog = null; try { catalog = loadBenchmarkCatalog(); } catch {}
     const report = aggregateUsage(listUsageEventsSince(q.since), q, catalog, { clients: db.clients, chats: db.chats });
     const label = k => q.group === 'client' ? db.clients?.find(c => c.id === k)?.name || 'Sem cliente' : q.group === 'agent' ? db.agents.find(a => a.id === k)?.name || (/^[0-9a-f-]{36}$/.test(k) ? `Agente excluído · ${k.slice(0, 6)}` : k) : k;
-    if (!m[0]) return { ...q, rows: report.rows.map(r => ({ ...r, label: label(r.key) })), totals: report.totals };
+    if (!m[0]) {
+      const now = Date.now(), monthStart = Date.UTC(new Date(now).getUTCFullYear(), new Date(now).getUTCMonth(), 1);
+      const month = { ...monthForecast(listUsageEventsSince(monthStart), now, catalog), ...(await usdBrlRate(db.settings)) };
+      return { ...q, rows: report.rows.map(r => ({ ...r, label: label(r.key) })), totals: report.totals, month };
+    }
     const name = `ripper-uso-${url.searchParams.get('from')}-${url.searchParams.get('to')}-${q.group}.csv`;
     res.writeHead(200, hdr(req, {
       'content-type': 'text/csv; charset=utf-8',
