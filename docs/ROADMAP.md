@@ -95,7 +95,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - ✅ Assistente de primeiro uso: conta do Claude (login), Docker (detecta e orienta), primeiro agente em 1 frase, WhatsApp opcional.
 - ✅ Funcionar sem Docker (modo "sem computador" claro, com o que o agente perde).
 - ✅ Assistente de primeiro uso pergunta "Você tem conta de IA?" → Claude / ChatGPT / chave de API / "não tenho" (modelo local), explicando o que muda em qualidade. *("Não tenho" aponta para o modelo recomendado em Configurações → Ollama.)*
-- [ ] Atualização automática com notas da versão.
+- ✅ Atualização pela interface com notas da versão: confere a cada 6 h, avisa na Caixa, Configurações › Backup mostra as novidades e "Atualizar agora" (só avança; recusa se houver mudança local; como serviço, reinicia sozinho). [ ] Testar uma atualização de verdade numa instalação.
 - ✅ Desinstalar limpo: `scripts/desinstalar-windows.cmd` (ou `node scripts/desinstalar.mjs`) tira o serviço e os computadores dos agentes e mantém os dados; `--apagar-dados` apaga após digitar APAGAR. [ ] Testar numa máquina real.
 - [ ] Imagem dos agentes baixada pronta (registro de imagens), sem reconstruir na máquina.
 

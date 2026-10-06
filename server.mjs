@@ -106,6 +106,7 @@ import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStrea
 import { truncateChatFrom } from './lib/chat-edit.mjs';
 import { mergeAgentChats, unmergeChat } from './lib/merge-agent-chats.mjs';
 import { settingCardView, settingPatch } from './lib/setting-cards.mjs';
+import { checkUpdate, applyUpdate } from './lib/updater.mjs';
 import { beginChatRun,bumpChatRunSeq, finishChatRun, chatRunPublic, canResumeChatRun, trimPartialRepliesAfterLastUser, noteChatRunTool, canAutoResume } from './lib/chat-run.mjs';
 import { exportChatPayload, importChatPayload } from './lib/chat-transfer.mjs';
 import { listAgentTemplates, createSavedTemplate, patchSavedTemplate, agentFromSavedTemplate } from './lib/agent-templates.mjs';
@@ -2425,6 +2426,20 @@ const routes = [
     return { logoUrl: rel };
   }],
   ['GET', /^\/api\/settings$/, () => ({ settings: redact(db.settings), meta: settingsMeta() })],
+  // Atualização pela interface: ver novidades e aplicar (só avança; o vigia sobe a versão nova)
+  ['GET', /^\/api\/update$/, async (req, _m, url) => ({ ...(url?.searchParams?.get('check') ? await refreshUpdateInfo() : updateInfo), supervised: !!process.env.RIPPER_SUPERVISED, applying: updateApplying })],
+  ['POST', /^\/api\/update$/, async req => {
+    if (!isLocalRequest(req)) throw new HttpError(403, 'Atualize pelo computador onde o Ripper está instalado.');
+    if (updateApplying) return { applying: updateApplying };
+    updateApplying = { step: 'Começando', at: Date.now() };
+    applyUpdate(APP_ROOT, { onStep: step => { updateApplying = { step, at: Date.now() }; } }).then(r => {
+      logger.info('update.applied', r);
+      resolveSystemAlert('update');
+      if (process.env.RIPPER_SUPERVISED) requestShutdown('update', RESTART_EXIT_CODE);
+      else updateApplying = { step: 'Pronto. Reinicie o Ripper para usar a versão nova.', done: true, at: Date.now() };
+    }, e => { updateApplying = { step: e.message, error: true, at: Date.now() }; });
+    return { applying: updateApplying };
+  }],
   ['GET', /^\/api\/flags$/, () => ({ flags: effectiveFeatureFlags(db.settings) })],
   // Provedores de IA → OpenRouter: testar a chave e listar o catálogo (para escolher modelos).
   // Provedores compatíveis com OpenAI: testar conexão e listar modelos (o caminho antigo /api/openrouter/* continua)
@@ -3830,6 +3845,17 @@ registerGracefulShutdown(server, {
 
 // Atualização sem derrubar turnos: `node scripts/service.mjs restart` cria este arquivo; o servidor para de
 // aceitar turnos, espera os em andamento e sai com RESTART_EXIT_CODE para o vigia subir a versão nova.
+// Versão nova: confere a cada 6 h e avisa na Caixa com as novidades
+const APP_ROOT = fileURLToPath(new URL('.', import.meta.url));
+let updateInfo = { supported: null }, updateApplying = null;
+async function refreshUpdateInfo() {
+  updateInfo = await checkUpdate(APP_ROOT);
+  if (updateInfo.available) raiseSystemAlert({ key: 'update', title: `Nova versão do Ripper (${updateInfo.behind} novidade${updateInfo.behind > 1 ? 's' : ''})`,
+    body: updateInfo.notes.slice(0, 5).join(' · '), href: '/settings/backup', hrefLabel: 'Ver e atualizar' });
+  return updateInfo;
+}
+if (!process.env.RIPPER_TEST_PROVIDER) { setTimeout(() => refreshUpdateInfo().catch(() => {}), 60_000).unref(); setInterval(() => refreshUpdateInfo().catch(() => {}), 6 * 3600_000).unref(); }
+
 const restartFlag = fileURLToPath(dataUrl('restart.request'));
 setInterval(() => {
   if (!existsSync(restartFlag)) return;

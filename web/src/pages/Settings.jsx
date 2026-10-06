@@ -491,6 +491,38 @@ function LocalModelPick({ onDone }) {
   );
 }
 
+/** Versão do Ripper: confere se há nova, mostra as novidades e atualiza com um clique. */
+function UpdateCard() {
+  const { toast } = useApp();
+  const [info, setInfo] = useState(null);
+  const [checking, setChecking] = useState(false);
+  const load = (check = false) => { setChecking(check); return api(`/api/update${check ? '?check=1' : ''}`).then(setInfo).catch(e => toast(e.message, 'error')).finally(() => setChecking(false)); };
+  useEffect(() => { load(); }, []);
+  // Enquanto atualiza, acompanha o passo; quando o servidor reinicia, recarrega a página
+  useEffect(() => {
+    if (!info?.applying || info.applying.done || info.applying.error) return;
+    const t = setInterval(() => api('/api/update').then(setInfo).catch(() => { clearInterval(t); setTimeout(() => location.reload(), 4000); }), 2000);
+    return () => clearInterval(t);
+  }, [info?.applying?.step]);
+  const apply = () => api('/api/update', { method: 'POST' }).then(r => setInfo(i => ({ ...i, ...r }))).catch(e => toast(e.message, 'error'));
+  const a = info?.applying;
+  return (
+    <Card title="Versão do Ripper" desc={info?.reason === 'no-git' ? 'Esta instalação não veio do Git; atualize baixando a versão nova.' : info?.reason === 'offline' ? 'Não consegui conferir a versão oficial agora (sem internet ou sem acesso ao repositório).' : info?.current ? `Versão instalada: ${info.current}` : 'Conferindo…'}>
+      {info?.available && <>
+        <p className="small"><b>{info.behind} novidade{info.behind > 1 ? 's' : ''}</b> na versão nova:</p>
+        <ul className="update-notes">{info.notes.map((n, i) => <li key={i}>{n}</li>)}</ul>
+      </>}
+      {info?.current && !info.available && !a && <p className="small muted">Você está na versão mais recente.</p>}
+      {a && <p className={`small ${a.error ? 'warn-text' : 'muted'}`}>{a.step}{!a.done && !a.error ? '…' : ''}</p>}
+      <div className="row-actions">
+        {info?.available && !a && <button className="btn btn-primary" onClick={apply}><Icon name="download" size={15} />Atualizar agora</button>}
+        <button className="btn" disabled={checking || (a && !a.error && !a.done)} onClick={() => load(true)}>{checking ? 'Conferindo…' : 'Procurar versão nova'}</button>
+      </div>
+      {info?.available && !info.supervised && !a && <p className="small muted">O Ripper não está rodando como serviço: depois de atualizar, feche e abra de novo.</p>}
+    </Card>
+  );
+}
+
 const Card = ({ title, badge, children, desc }) => (
   <section className="set-card">
     {title && <header><h3>{title}</h3>{badge}</header>}
@@ -954,7 +986,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
           </Card>
         </>}
 
-        {tab === 'backup' && <DataBackup s={s} set={set} />}
+        {tab === 'backup' && <><UpdateCard /><DataBackup s={s} set={set} /></>}
 
         {tab === 'memory' && <>
           <Card>

@@ -24,7 +24,7 @@ function run() {
   let delay = 0, child;
   const start = () => {
     const t0 = Date.now();
-    child = spawn(node, ['server.mjs'], { cwd: ROOT, stdio: 'inherit', windowsHide: true });
+    child = spawn(node, ['server.mjs'], { cwd: ROOT, stdio: 'inherit', windowsHide: true, env: { ...process.env, RIPPER_SUPERVISED: '1' } });
     child.on('exit', code => {
       if (code === 0) process.exit(0); // saída limpa = desligado de propósito
       if (code === 75) { delay = 0; console.log('[vigia] reiniciando para atualizar'); return start(); } // RESTART_EXIT_CODE
