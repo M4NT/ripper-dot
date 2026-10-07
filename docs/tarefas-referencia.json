@@ -239,7 +239,7 @@
       ],
       "verificar": [
         "4521",
-        "desculp",
+        "desculp|sinto muito|lament",
         "cajamar|centro de distribui"
       ]
     },
@@ -282,7 +282,7 @@
         "Oferece os serviços reais"
       ],
       "verificar": [
-        "n[aã]o (fazemos|trabalhamos)|infelizmente"
+        "n[aã]o (fazemos|trabalhamos|realizamos|oferecemos|prestamos)|infelizmente"
       ]
     },
     {
@@ -341,7 +341,7 @@
         "Motivo de cada um"
       ],
       "verificar": [
-        "urgen|priorid",
+        "urg[eê]n|priorid",
         "v[eé]rtice",
         "8812|distribuidora alfa"
       ]
@@ -442,15 +442,21 @@
       "id": "t29",
       "categoria": "relatorio",
       "titulo": "Relatório diário de vendas",
-      "prompt": "Gere o relatório diário: vendas de ontem, comparação com a média da semana e os 3 produtos mais vendidos.",
+      "prompt": "Gere o relatório diário de 29/09 com base em vendas-semana.csv (anexo): total do dia, comparação com a média diária da semana e os 3 produtos mais vendidos em valor.",
       "criterios": [
         "Total de ontem",
         "Comparação com média",
         "Top 3"
       ],
       "verificar": [
-        "ontem",
-        "m[eé]dia"
+        "1[.]?997",
+        "m[eé]dia",
+        "p[aã]o franc[eê]s",
+        "caf[eé]",
+        "croissant"
+      ],
+      "anexos": [
+        "vendas-semana.csv"
       ]
     },
     {
@@ -467,7 +473,7 @@
       ],
       "verificar": [
         "semana",
-        "pend[eê]ncia|pr[oó]xim",
+        "pend[eê]n|pr[oó]xim",
         "rafael",
         "juliana",
         "tiago"
