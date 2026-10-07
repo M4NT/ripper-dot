@@ -12,6 +12,7 @@ import { effortLabel } from '../modelPicker.jsx';
 import MessageAttachments, { DeliveredFiles } from '../MessageAttachments.jsx';
 import ChatPanel, { MiniScreen } from '../chatPanel.jsx';
 import { MentionText } from '../mentions.jsx';
+import ImageGenLoader from '../imageGenLoader.jsx';
 import { AgentThread, ViaLabel } from '../agentThread.jsx';
 import { delegationCardState } from '../../../lib/agent-flow.mjs';
 import { ResizeHandle } from '../resize.jsx';
@@ -142,6 +143,7 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, on
         {group && <span className="speaker" style={{ color: agentColor(agent) }}>{agent.name}</span>}
         <div className="bubble bot-bubble">
           <ActionLine steps={m.steps} live={live} />
+          {live && phase === 'generate_image' && <ImageGenLoader />}
           {live && phase !== 'approval' && <StallNote label={phase === 'text' ? 'Escrevendo' : phase === 'route' || phase === 'think' || !phase ? 'Pensando' : stepLabel(phase)} sig={`${phase}|${m.steps.length}|${m.content.length}|${m.agentId}`} onStop={onStop} />}
           {delivered.length > 0 && <DeliveredFiles items={delivered} onError={onFileError} />}
           {m.content ? (live ? <LiveText text={m.content} /> : <Markdown text={m.content} />)

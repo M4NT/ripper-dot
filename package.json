@@ -25,6 +25,7 @@
     "border-beam": "^1.4.1",
     "bot-avatars": "^0.1.2",
     "imapflow": "^2.2.5",
+    "img-fx": "^0.5.1",
     "liquid-gooey": "^0.2.2",
     "mailparser": "^3.9.36",
     "metal-fx": "^2.0.11",
@@ -33,6 +34,7 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "thinking-orbs": "^0.3.2",
+    "three": "^0.186.1",
     "voice-glow": "^0.2.1",
     "zod": "^4.6.5"
   },

@@ -42,6 +42,37 @@ function PluginRow({ item, settings, onChange, onOpen, claudeList }) {
   );
 }
 
+/** Skills de terceiros: o Ripper baixa do GitHub do autor ao adicionar e mostra a licença antes. */
+function MarketSkills({ filter }) {
+  const ov = useOv();
+  const { toast } = useApp();
+  const [list, setList] = useState(null);
+  const [busy, setBusy] = useState('');
+  useEffect(() => { api('/api/skills/market').then(setList).catch(() => setList([])); }, []);
+  async function add(s) {
+    const ok = await ov.confirm({ title: `Licença: ${s.license}`, body: `${s.licenseNote} O Ripper baixa a skill do GitHub do autor (${s.author}); o código não vem com o Ripper.`, action: 'Entendi, adicionar' });
+    if (!ok) return;
+    setBusy(s.id);
+    try { setList(await api(`/api/skills/market/${s.id}`, { method: 'POST' })); toast(`${s.name} pronta para os agentes`); }
+    catch (e) { toast(e.message, 'error'); }
+    setBusy('');
+  }
+  const shown = (list || []).filter(filter);
+  if (!shown.length) return null;
+  return (
+    <section className="mp-section">
+      <div className="mp-section-head"><h2>Skills</h2><span className="muted small">Gratuitas, de autores da comunidade</span></div>
+      <div className="mp-grid two">{shown.map(s => (
+        <div key={s.id} className="mp-card">
+          <span className="mp-icon"><Icon name="image" size={18} /></span>
+          <div><b>{s.name}</b><small>{s.desc}</small><em>por {s.author} · <a href={s.home} target="_blank" rel="noopener">{s.license}</a></em></div>
+          <button type="button" className="btn btn-sm" disabled={s.installed || busy === s.id} onClick={() => add(s)}>{s.installed ? 'Instalada' : busy === s.id ? 'Baixando…' : 'Adicionar'}</button>
+        </div>
+      ))}</div>
+    </section>
+  );
+}
+
 function Browse({ settings, refresh, onOpenDetail, claudeList }) {
   const [q, setQ] = useState('');
   const t = q.trim().toLowerCase();
@@ -103,6 +134,7 @@ function Browse({ settings, refresh, onOpenDetail, claudeList }) {
           ))}</div>
         </section>
       )}
+      <MarketSkills filter={filter} />
     </HubShell>
   );
 }
