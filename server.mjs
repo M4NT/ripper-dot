@@ -100,6 +100,7 @@ import { listClaudeConnectors } from './lib/claude-connectors.mjs';
 import { buildInbox, resolveInboxItem } from './lib/inbox-feed.mjs';
 import { vmPathToData, mimeOf, inlineType } from './lib/deliver-file.mjs';
 import { generateImages, IMAGE_EXT } from './lib/image-gen.mjs';
+import { extractEmails, campaignText, runCampaign, MAX_RECIPIENTS } from './lib/email-campaign.mjs';
 import { listMarketSkills, installMarketSkill, uninstallMarketSkill } from './lib/skill-market.mjs';
 import { parseWhatsappMessages, whatsappPrompt, sendWhatsappText, whatsappReady } from './lib/whatsapp.mjs';
 import { evolutionSecrets, connectInstance, instanceState, disconnectInstance, sendText as sendEvolutionText, parseEvolutionAny, parseEvolutionGroup, groupName, evolutionMedia, withMediaText, downloadMedia, contactMode, isAllowed, makeRateLimiter, channelSafeAgent } from './lib/evolution.mjs';
@@ -1237,10 +1238,35 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
       return `"${name}" entregue: o usuário vê botões para abrir, baixar e mostrar na pasta. Não cite caminho, porta nem link.`;
     },
     // Campanha de e-mail em DEMONSTRAÇÃO: só monta o cartão; nenhum e-mail sai daqui.
-    campaign: a => {
-      const rec = { id: id(), subject: String(a.subject), preview: String(a.preview || ''), body: String(a.body || ''), audience: String(a.audience || ''), recipients: Math.max(1, Math.min(100000, a.recipients | 0)), demo: true };
+    // Campanha de e-mail: de verdade só com a lista do usuário e um e-mail conectado; senão, demonstração (nada sai).
+    campaign: async a => {
+      const base = { id: id(), subject: String(a.subject), preview: String(a.preview || ''), body: String(a.body || ''), audience: String(a.audience || '') };
+      const file = a.list && db.files.find(f => canUseFile(f, agent, chat) && f.name.toLowerCase() === String(a.list).trim().toLowerCase());
+      const ready = !chat.channel && emailReady(s.email);
+      if (!file || !ready) {
+        const rec = { ...base, recipients: Math.max(1, Math.min(100000, a.recipients | 0 || 1)), demo: true };
+        cardSteps.push({ kind: 'campaign', rec }); emit({ campaign: rec });
+        const why = a.list && !file ? `Não achei a lista "${a.list}" entre os arquivos anexados. ` : a.list && !ready ? 'Não há e-mail conectado (Configurações → Canais), então ' : '';
+        return `${why}Campanha "${rec.subject}" montada em modo demonstração: o usuário vê o cartão e pode simular o disparo, mas nenhum e-mail é enviado. Não diga que enviou.`;
+      }
+      const emails = extractEmails(fileText(file.name, await readFile(dataUrl(file.path)).catch(() => Buffer.alloc(0))) || '');
+      if (!emails.length) return `Não encontrei nenhum e-mail na lista "${file.name}". Peça ao usuário uma planilha com uma coluna de e-mails.`;
+      if (emails.length > MAX_RECIPIENTS) return `A lista "${file.name}" tem ${emails.length} e-mails; o limite por campanha é ${MAX_RECIPIENTS}. Peça para dividir a lista.`;
+      const camp = { id: base.id, chatId: chat.id, agentId: agent.id, subject: base.subject, list: file.name, total: emails.length, sent: 0, failed: 0, status: 'aguardando aprovação', errors: [], createdAt: Date.now() };
+      (db.campaigns ||= []).push(camp); save();
+      const rec = { ...base, recipients: emails.length, list: file.name, demo: false, campaignId: camp.id };
       cardSteps.push({ kind: 'campaign', rec }); emit({ campaign: rec });
-      return `Campanha "${rec.subject}" montada para ${rec.recipients} destinatários, em modo demonstração: o usuário vê o cartão e pode simular o disparo, mas nenhum e-mail é enviado. Não diga que enviou.`;
+      const sample = emails.slice(0, 5).join(', ') + (emails.length > 5 ? `… (+${emails.length - 5})` : '');
+      const ok = await askApproval({ agent, chat, emit, signal }, 'email', `Campanha "${base.subject}" para ${emails.length} contato(s) da lista ${file.name}\nPrimeiros: ${sample}\n\n${campaignText(base.body)}`, 'Cada e-mail sai da sua conta, um por vez, em seu nome.', false);
+      if (!ok) { camp.status = 'recusada'; save(); return 'O usuário NÃO aprovou a campanha. Nada foi enviado.'; }
+      // Em segundo plano: a conversa segue; o cartão acompanha pelo /api/campaigns/:id.
+      runCampaign({
+        emails,
+        stopped: () => camp.status === 'parando',
+        send: async to => { await deliverOut('email', { to, subject: base.subject, text: campaignText(base.body) }, { target: to, agentId: agent.id, chatId: chat.id, ext: { kind: 'email.campaign', approved: 'user' } }); },
+        onProgress: p => { Object.assign(camp, { sent: p.sent, failed: p.failed, errors: p.errors, status: camp.status === 'parando' && p.status === 'enviando' ? 'parando' : p.status }); save(); }
+      }).catch(e => { camp.status = 'falhou'; camp.errors = [e.message]; save(); });
+      return `Campanha aprovada: ${emails.length} e-mails saindo agora, um a cada poucos segundos (o cartão mostra o andamento e tem o botão Parar envio).`;
     },
     // Imagem pela assinatura do ChatGPT (Codex): o kit de marca são as imagens anexadas ao agente.
     images: codexOk && agent.tools.includes('images') ? {
@@ -1253,7 +1279,9 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
           out = await generateImages({ prompt: a.prompt, refs, format: a.format, slides: a.slides, outDir: fileURLToPath(new URL('imagens/', sandboxDir(agent))), base, signal });
         } catch (e) { return `Não consegui gerar a imagem: ${e.message}`; }
         for (const f of out) await ctx.deliverFile({ path: `/work/imagens/${basename(f)}` });
-        return out.length > 1 ? `${out.length} slides do carrossel entregues na conversa, em ordem.` : 'Imagem entregue na conversa.';
+        // Dizer exatamente o que foi usado: sem isso o agente supõe que seguiu a marca mesmo sem referência nenhuma.
+        const brand = refs.length ? `Referências de marca usadas: ${refs.map(r => basename(r)).join(', ')}.` : 'Nenhuma referência de marca foi usada (não há logo nem paleta anexados a você): não diga que seguiu a marca; se fizer sentido, sugira anexar logo e cores.';
+        return `${out.length > 1 ? `${out.length} slides do carrossel entregues na conversa, em ordem.` : 'Imagem entregue na conversa.'} ${brand}`;
       }
     } : null,
     x9: isEnterpriseMode(s) ? {
@@ -3208,6 +3236,9 @@ const routes = [
   }],
   ['DELETE', /^\/api\/memories\/([\w-]+)$/, (req, [mid]) => { db.memories = db.memories.filter(x => x.id !== mid); save(); return {}; }],
   // Skills de terceiros do Marketplace: baixadas do repositório do autor, nunca embutidas no Ripper.
+  // Campanha de e-mail de verdade: andamento (o cartão consulta) e parar.
+  ['GET', /^\/api\/campaigns\/([\w-]+)$/, (req, [cid]) => { const c = (db.campaigns || []).find(x => x.id === cid); if (!c) throw new HttpError(404, 'Campanha não encontrada.'); return c; }],
+  ['POST', /^\/api\/campaigns\/([\w-]+)\/stop$/, (req, [cid]) => { const c = (db.campaigns || []).find(x => x.id === cid); if (!c) throw new HttpError(404, 'Campanha não encontrada.'); if (c.status === 'enviando') { c.status = 'parando'; save(); } return c; }],
   ['GET', /^\/api\/skills\/market$/, () => listMarketSkills()],
   ['POST', /^\/api\/skills\/market\/([\w-]+)$/, async (req, [sid]) => { await installMarketSkill(sid); return listMarketSkills(); }],
   ['DELETE', /^\/api\/skills\/market\/([\w-]+)$/, (req, [sid]) => { uninstallMarketSkill(sid); return listMarketSkills(); }],
