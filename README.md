@@ -117,6 +117,13 @@ Feito para dois públicos com o mesmo peso: quem **não programa** (dono de pequ
 
 Ele instala o Node pelo winget se faltar, prepara tudo, cria o serviço que sobe com o Windows e abre o Ripper no navegador.
 
+### Mac, sem terminal
+
+1. Baixe o Ripper (ZIP ou `git clone`).
+2. Dê **dois cliques em `scripts/instalar-mac.command`**. Na primeira vez, o macOS pode bloquear: clique com o botão direito → **Abrir**.
+
+Ele instala o Node (pelo Homebrew, se você tiver, ou pelo instalador oficial, que pede a sua senha), prepara tudo, cria o serviço que sobe com o Mac e abre o Ripper no navegador.
+
 ### Manual (Windows, macOS e Linux)
 
 ```bash
@@ -224,7 +231,7 @@ node scripts/service.mjs restart
 
 ### Desinstalar
 
-Dois cliques em `scripts\desinstalar-windows.cmd` (ou `node scripts/desinstalar.mjs` em qualquer sistema). Isso tira o serviço e os computadores dos agentes e **mantém os seus dados**: reinstalando, tudo volta como estava. Para apagar também os dados, use `--apagar-dados`; o script lista o que vai sumir e pede que você digite `APAGAR`.
+Dois cliques em `scripts\desinstalar-windows.cmd` (Windows) ou `scripts/desinstalar-mac.command` (Mac), ou `node scripts/desinstalar.mjs` em qualquer sistema. Isso tira o serviço e os computadores dos agentes e **mantém os seus dados**: reinstalando, tudo volta como estava. Para apagar também os dados, use `--apagar-dados`; o script lista o que vai sumir e pede que você digite `APAGAR`.
 
 ---
 
