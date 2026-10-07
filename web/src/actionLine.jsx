@@ -144,12 +144,12 @@ export default function ActionLine({ steps, live }) {
  * Passo sem mudança há 20 s+: "ainda em: <passo> · 40 s" + Parar. `sig` muda quando há sinal novo (passo, texto).
  * setInterval e não requestAnimationFrame: rAF pode não disparar (aba em segundo plano, alguns ambientes).
  */
-export function StallNote({ label, sig, onStop }) {
+export function StallNote({ label, sig, onStop, slowAfterMs }) {
   const since = useRef({ sig, at: Date.now() });
   if (since.current.sig !== sig) since.current = { sig, at: Date.now() };
   const [now, setNow] = useState(Date.now);
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
-  const text = stallLabel(label, now - since.current.at);
+  const text = stallLabel(label, now - since.current.at, slowAfterMs);
   if (!text) return null;
   return (
     <div className="stall-note" role="status">
