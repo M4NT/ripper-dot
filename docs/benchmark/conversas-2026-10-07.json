@@ -1,0 +1,510 @@
+{
+  "quando": "2026-10-07T22:47:29.607Z",
+  "modo": "real",
+  "servidor": "http://127.0.0.1:3999",
+  "limites": {
+    "primeiroSinalSeg": 5,
+    "primeiroTextoSeg": 20
+  },
+  "notaGeral": 88.6,
+  "resultados": [
+    {
+      "id": "c01",
+      "titulo": "Pergunta simples",
+      "nota": 100,
+      "segundos": 4.9,
+      "primeiroSinalSeg": 0.01,
+      "primeiroTextoSeg": 4.25,
+      "falaram": [
+        "AnaBench"
+      ],
+      "caixa": false,
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.01 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "4.25 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Cinco dias úteis, de segunda a sexta-feira."
+    },
+    {
+      "id": "c02",
+      "titulo": "Cumprimento",
+      "nota": 100,
+      "segundos": 4.6,
+      "primeiroSinalSeg": 0.02,
+      "primeiroTextoSeg": 3.96,
+      "falaram": [
+        "AnaBench"
+      ],
+      "caixa": false,
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.02 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "3.96 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "curto",
+          "ok": true,
+          "detalhe": "27 car."
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Bom dia! Como posso ajudar?"
+    },
+    {
+      "id": "c03",
+      "titulo": "Tarefa com ferramentas",
+      "nota": 88.9,
+      "segundos": 22.5,
+      "primeiroSinalSeg": 0.02,
+      "primeiroTextoSeg": 4.63,
+      "falaram": [
+        "AnaBench"
+      ],
+      "caixa": false,
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.02 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "4.63 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "\"Vou…\" antes das ferramentas",
+          "ok": true,
+          "detalhe": "Vou buscar a cotação atual."
+        },
+        {
+          "nome": "fecho Feito/Como verifiquei/Falta",
+          "ok": false
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Vou buscar a cotação atual.O dólar comercial está em cerca de **R$ 4,99** hoje (07/10/2026), na atualização da [Avenue](https://avenue.us/dolar-hoje/) das 13h05. De manhã ele estava em [R$ 4,98](https://boca.com.br/economia/dolar/cotacao-dolar-hoje-07-10).\n\nOntem (06/10), fechou a R$ 4,9745, o menor valor desde maio, segundo a [InfoMoney](https://infomoney.com.br/mercados/dolar-hoje-abertura-fechamento-comercial-turismo-06102026).\n\nOs valores vêm do resumo da busca; não abri as páginas para conferir. Se for fazer uma operação, confira antes, porque a cotação muda ao longo do dia. O dólar turis"
+    },
+    {
+      "id": "c04",
+      "titulo": "Delegação por @menção numa conversa 1:1",
+      "nota": 90,
+      "segundos": 61.1,
+      "primeiroSinalSeg": 0.03,
+      "primeiroTextoSeg": 7.1,
+      "falaram": [
+        "BrunoBench"
+      ],
+      "caixa": false,
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.03 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "7.1 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "fecho Feito/Como verifiquei/Falta",
+          "ok": false
+        },
+        {
+          "nome": "delegação registrada",
+          "ok": true
+        },
+        {
+          "nome": "Bruno respondeu",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Vou pesquisar fornecedores na web e já te passo.Estes 3 vendem café em grãos para empresas e estão em SP ou têm ligação com o estado:\n\n1. **[Rei do Café](https://reidocafe.com.br/)**: torrefação em Santos (SP) desde 1912. Vende em grãos ou moído para escritórios, hotéis, restaurantes e cafeterias, com entrega recorrente. A área de entrega anunciada é a Baixada Santista, o Litoral Sul e o Vale do Ribeira. Não está claro se atende a capital.\n2. **[No More Bad Coffee / Café Hotel](https://exame.com/casual/por-cafes-mais-frescos-maquinas-de-torra-viram-objeto-de-destaque-em-cafeterias-de-sao-paulo"
+    },
+    {
+      "id": "c05",
+      "titulo": "Grupo de 3: só o mencionado responde",
+      "nota": 100,
+      "segundos": 9,
+      "primeiroSinalSeg": 0.01,
+      "primeiroTextoSeg": 5.58,
+      "falaram": [
+        "CarlaBench"
+      ],
+      "caixa": false,
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.01 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "5.58 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "Carla respondeu",
+          "ok": true
+        },
+        {
+          "nome": "Ana ficou calado",
+          "ok": true
+        },
+        {
+          "nome": "Bruno ficou calado",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Não existe um prazo fixo em dias para devolver o dinheiro. A lei exige reembolso **imediato**.\n\n- **Arrependimento:** o consumidor tem **7 dias corridos**, contados da compra ou do recebimento do produto, para desistir sem justificar (CDC, art. 49).\n- **Reembolso:** deve ser **imediato**, do valor total pago, incluindo o frete, com correção monetária (art. 49, parágrafo único).\n- **Cartão de crédito:** a loja precisa avisar a operadora na hora para estornar a compra ou não lançá-la na fatura (Decreto 7.962/2013, art. 5º). Na prática, o estorno pode aparecer em 1 ou 2 faturas.\n- **Produto com d"
+    },
+    {
+      "id": "c06",
+      "titulo": "Bloqueado: precisa do dono",
+      "nota": 88.9,
+      "segundos": 34.8,
+      "primeiroSinalSeg": 0,
+      "primeiroTextoSeg": 7.99,
+      "falaram": [
+        "AnaBench"
+      ],
+      "caixa": true,
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "7.99 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "fecho Feito/Como verifiquei/Falta",
+          "ok": false
+        },
+        {
+          "nome": "bloqueio → Caixa",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Vou procurar a proposta e o contato da Ana no e-mail e no Drive.Não enviei a proposta. Não sei qual é a proposta, quem é o cliente novo nem qual é o e-mail da Ana, e mandar um e-mail sem isso seria chutar o destinatário e o anexo.\n\nTentei achar esses dados no e-mail, no Drive e na base da empresa, mas nenhum desses acessos estava funcionando. Também deixei um pedido na sua Caixa; você respondeu para eu decidir sozinha, mas sem esses três dados não há como enviar.\n\n**Falta / preciso de você:** o e-mail da Ana, o nome do cliente e o arquivo da proposta (ou onde ele está). Com isso, eu mando na h"
+    },
+    {
+      "id": "c07",
+      "titulo": "Correção no meio da tarefa",
+      "nota": 100,
+      "segundos": 16,
+      "primeiroSinalSeg": 0.01,
+      "primeiroTextoSeg": 7.74,
+      "falaram": [
+        "AnaBench"
+      ],
+      "caixa": false,
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.01 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "7.74 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "não inventou / não ignorou",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "**Assunto:** Reunião de equipe – terça, 13/10, às 10h\n\nOlá, pessoal,\n\nConvido todos para a reunião de equipe na **terça-feira, 13/10, às 10h**.\n\nPeço que confirmem presença e tragam os principais pontos de andamento das suas atividades.\n\nAbraços,\n[Seu nome]"
+    },
+    {
+      "id": "c08",
+      "titulo": "Continuação que referencia a resposta anterior",
+      "nota": 71.4,
+      "segundos": 7.9,
+      "primeiroSinalSeg": 0.01,
+      "primeiroTextoSeg": null,
+      "falaram": [],
+      "caixa": false,
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.01 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": false,
+          "detalhe": "— s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": false
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": ""
+    },
+    {
+      "id": "c09",
+      "titulo": "Pedido que exige fonte citada",
+      "nota": 71.4,
+      "segundos": 0.8,
+      "primeiroSinalSeg": 0.02,
+      "primeiroTextoSeg": null,
+      "falaram": [],
+      "caixa": false,
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.02 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": false,
+          "detalhe": "— s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": false
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": ""
+    },
+    {
+      "id": "c10",
+      "titulo": "Recusar/perguntar em vez de inventar",
+      "nota": 75,
+      "segundos": 0.2,
+      "primeiroSinalSeg": 0.02,
+      "primeiroTextoSeg": null,
+      "falaram": [],
+      "caixa": false,
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.02 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": false,
+          "detalhe": "— s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": false
+        },
+        {
+          "nome": "não inventou / não ignorou",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": ""
+    }
+  ]
+}

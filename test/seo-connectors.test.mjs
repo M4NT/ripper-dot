@@ -27,5 +27,5 @@ test('o Codex recebe as variáveis do conector local', () => {
   const agent = { tools: ['plugins'] };
   const settings = { computer: { mode: 'off' }, plugins: [{ name: 'google-analytics', type: 'stdio', command: 'pipx', args: ['run', 'analytics-mcp==0.7.0'], env: { GOOGLE_PROJECT_ID: 'meu-projeto' } }] };
   const args = buildCodexSpawnArgs({ agent, settings, effort: 'auto' }).join(' ');
-  assert.match(args, /mcp_servers\.google-analytics\.env\.GOOGLE_PROJECT_ID="meu-projeto"/);
+  assert.match(args, /mcp_servers\.google-analytics\.env\.GOOGLE_PROJECT_ID='meu-projeto'/);
 });
