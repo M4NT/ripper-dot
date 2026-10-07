@@ -39,7 +39,7 @@ test('HTTP: criar senha, login, cookie HttpOnly/Strict, contêiner sem senha nã
     r.on('error', reject); r.end(body ? JSON.stringify(body) : undefined);
   });
   try {
-    for (let i = 0; i < 100; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 150)); }
+    for (let i = 0; i < 400; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 150)); } // até 60 s: máquina carregada demora a subir
     assert.equal((await fetch(base + '/api/state')).status, 401, 'sem senha criada, nada passa');
     const st = await (await fetch(base + '/api/auth/status')).json();
     assert.deepEqual({ ...st, build: undefined }, { configured: false, authed: false, canSetup: true, build: undefined });

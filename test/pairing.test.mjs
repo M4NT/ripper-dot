@@ -57,7 +57,7 @@ test('HTTP: rede desligada por padrão, convite só com rede, /pair cria sessão
   const call = (path, method = 'GET', b, cookie = '') => fetch(base + path, { method, redirect: 'manual', headers: { 'content-type': 'application/json', origin: base, cookie }, body: b && JSON.stringify(b) });
   const pathOf = u => { const x = new URL(u); return x.pathname + x.search; };
   try {
-    for (let i = 0; i < 100; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 150)); }
+    for (let i = 0; i < 400; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 150)); } // até 60 s: máquina carregada demora a subir
     const cookie = (await call('/api/auth/setup', 'POST', { password: 'minha-senha-123', code: readFileSync(join(dataDir, 'setup-code.txt'), 'utf8').trim() })).headers.get('set-cookie').split(';')[0];
     const st = await (await call('/api/pair', 'GET', null, cookie)).json();
     assert.equal(st.lan.on, false, 'padrão: só localhost');
