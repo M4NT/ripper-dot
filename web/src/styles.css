@@ -370,6 +370,9 @@ a.row-main:hover b { text-decoration: underline; text-underline-offset: 3px; }
 @media (hover: none) { .msg-meta-more { opacity: 1; } }
 .meta-btn:hover { background: var(--surface); color: var(--ink); }
 .msg.user .msg-meta { margin-top: 4px; }
+.msg-ack { font-size: 12px; color: var(--faint); display: inline-flex; align-items: center; gap: 4px; }
+.msg-ack.late { color: var(--warn); }
+.stall-note { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 12px; color: var(--warn); }
 .user-edit { display: flex; flex-direction: column; gap: 6px; width: min(560px, 100%); }
 .user-edit textarea { width: 100%; resize: vertical; font: inherit; }
 .user-edit-actions { display: flex; justify-content: flex-end; gap: 6px; }

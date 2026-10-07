@@ -11,8 +11,8 @@ Legenda: ✅ feito · [ ] falta. **P0** = sem isso não dá para confiar.
 - ✅ Histórico de ações: uma linha por ação, nomes legíveis, repetidas viram ×N.
 - ✅ Palavras aparecem com opacidade (sem cursor de barra).
 - ✅ Turno sem texto não fica em branco; login expirado vira aviso claro.
-- [ ] **P0** Mensagem recebida na hora: "Ripper viu" em menos de 1 s (hoje você repete a mensagem achando que não chegou).
-- [ ] **P0** Tarefa longa sem sinal: depois de 20 s no mesmo passo, mostrar "ainda em: rodando o build · 40 s" e permitir parar.
+- ✅ **P0** Mensagem recebida na hora: "Ripper viu" em menos de 1 s (hoje você repete a mensagem achando que não chegou).
+- ✅ **P0** Tarefa longa sem sinal: depois de 20 s no mesmo passo, mostrar "ainda em: rodando o build · 40 s" e permitir parar.
 - [ ] P1 Escrever durante o trabalho: deixar claro que a mensagem nova entra no próximo passo (fila visível), em vez de parecer ignorada.
 
 ## 2. Respostas em que dá para confiar

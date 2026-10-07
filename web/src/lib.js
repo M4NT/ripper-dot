@@ -102,6 +102,21 @@ export const STEP_LABEL = {
   ask_owner: 'Perguntando a você', notify_owner: 'Avisando você', github_read: 'Lendo o GitHub', github_clone: 'Clonando o repositório', github_open_pr: 'Abrindo PR', github_comment: 'Comentando no GitHub', github_issue: 'Abrindo issue', email_list: 'Vendo e-mails', email_read: 'Lendo e-mail', email_attachment: 'Baixando anexo', email_send: 'Enviando e-mail', whatsapp_send: 'Enviando WhatsApp', whatsapp_chats: 'Vendo conversas do WhatsApp', whatsapp_read: 'Lendo conversa do WhatsApp', whatsapp_contacts: 'Buscando contato',
   list_skills: 'Listando skills', x9_context: 'Coletando dados', x9_checklist: 'Rodando checklist'
 };
+/** "Ripper viu" / "Ripper e Donald viram" / "Ana, Bia e Caio viram". */
+export function seenLabel(names) {
+  const n = (names || []).filter(Boolean);
+  if (!n.length) return '';
+  if (n.length === 1) return `${n[0]} viu`;
+  return `${n.slice(0, -1).join(', ')} e ${n.at(-1)} viram`;
+}
+
+/** Passo parado há 20 s ou mais: "ainda em: Rodando o build · 40 s"; antes disso, null. */
+export function stallLabel(label, ms) {
+  const s = Math.floor(ms / 1000);
+  if (s < 20) return null;
+  return `ainda em: ${label} · ${s < 120 ? `${s} s` : `${Math.floor(s / 60)} min`}`;
+}
+
 /** Rótulo humano de uma ferramenta; conectores (mcp__claude_ai_Google_Calendar__list_events) viram "Google Calendar: list events". */
 export function stepLabel(tool) {
   if (STEP_LABEL[tool]) return STEP_LABEL[tool];
