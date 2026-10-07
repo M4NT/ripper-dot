@@ -615,6 +615,7 @@ const dockerStatusCached = memoAsync(async () => ({ version: await dockerAvailab
 
 // ---------- mensagens entre agentes ----------
 const inboxBusy = new Set();
+const LOGIN_EXPIRED = /OAuth session expired|Failed to authenticate|not logged in|Invalid API key|please run \/login/i;
 const creditOnlyModels = new Set(); // modelos que a assinatura recusou ("requires usage credits") desde que o servidor subiu
 const inboxLimits = () => ({ maxPerHour: 20, maxHops: 3, ...(db.settings?.inbox || {}) });
 
@@ -1776,6 +1777,7 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
         : runClaude({ ...args, model: m, ctx });
     },
     onSuccess: ({ model: m, out, steps }) => {
+      if (MODELS[m]?.provider === 'claude') resolveSystemAlert('claude-login'); // entrou de novo: some o aviso
       timing.totalMs = Date.now() - t0;
       logger.info('turn.timing', { agent: agent.name, model: m, ...timing });
       push(out, steps, { model: m, effort, routedBy, timing, ...(turnCost ? { costUsd: turnCost } : {}), ...(delivered.length ? { files: [...delivered] } : {}) });
@@ -1813,8 +1815,11 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
         emit({ quota: { provider: prov, ...limitSig } });
       }
       if (needsUsageCredits(e)) creditOnlyModels.add(m); // o Auto para de escolher até reiniciar
-      emit({ warn: `${MODELS[m].label} falhou: ${e.message}` });
-      if (!canFallback) push(out, steps, { model: m, error: e.message });
+      const loggedOut = prov === 'claude' && LOGIN_EXPIRED.test(e.message || '');
+      if (loggedOut) { raiseSystemAlert({ key: 'claude-login', title: 'Sua conta do Claude saiu', body: 'Os agentes não conseguem responder até você entrar de novo. No terminal: claude login', href: '/settings', hrefLabel: 'Abrir configurações' }); save(); }
+      const msg = loggedOut ? 'Sua conta do Claude saiu. Entre de novo (no terminal: claude login) e mande a mensagem outra vez.' : e.message;
+      emit({ warn: `${MODELS[m].label} falhou: ${msg}` });
+      if (!canFallback) push(out, steps, { model: m, error: msg });
     }
   });
   if (loopResult.aborted) recordChatTurn('interrupted');
