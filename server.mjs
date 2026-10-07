@@ -99,7 +99,7 @@ import { listScripts, deleteScript } from './lib/script-pool.mjs';
 import { listClaudeConnectors } from './lib/claude-connectors.mjs';
 import { buildInbox, resolveInboxItem } from './lib/inbox-feed.mjs';
 import { vmPathToData, mimeOf, inlineType } from './lib/deliver-file.mjs';
-import { generateImage, IMAGE_EXT } from './lib/image-gen.mjs';
+import { generateImages, IMAGE_EXT } from './lib/image-gen.mjs';
 import { listMarketSkills, installMarketSkill, uninstallMarketSkill } from './lib/skill-market.mjs';
 import { parseWhatsappMessages, whatsappPrompt, sendWhatsappText, whatsappReady } from './lib/whatsapp.mjs';
 import { evolutionSecrets, connectInstance, instanceState, disconnectInstance, sendText as sendEvolutionText, parseEvolutionAny, parseEvolutionGroup, groupName, evolutionMedia, withMediaText, downloadMedia, contactMode, isAllowed, makeRateLimiter, channelSafeAgent } from './lib/evolution.mjs';
@@ -1247,11 +1247,13 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
       generate: async a => {
         const refs = a.use_brand === false ? [] : db.files.filter(f => canUseFile(f, agent, chat) && !f.delivered && IMAGE_EXT.test(f.name)).slice(-4).map(f => fileURLToPath(dataUrl(f.path)));
         const slug = String(a.name || a.prompt).toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'imagem';
-        const name = `${slug}-${Date.now().toString(36)}.png`;
+        const base = `${slug}-${Date.now().toString(36)}`;
+        let out;
         try {
-          await generateImage({ prompt: a.prompt, refs, outFile: fileURLToPath(new URL(`imagens/${name}`, sandboxDir(agent))), signal });
+          out = await generateImages({ prompt: a.prompt, refs, format: a.format, slides: a.slides, outDir: fileURLToPath(new URL('imagens/', sandboxDir(agent))), base, signal });
         } catch (e) { return `Não consegui gerar a imagem: ${e.message}`; }
-        return ctx.deliverFile({ path: `/work/imagens/${name}` });
+        for (const f of out) await ctx.deliverFile({ path: `/work/imagens/${basename(f)}` });
+        return out.length > 1 ? `${out.length} slides do carrossel entregues na conversa, em ordem.` : 'Imagem entregue na conversa.';
       }
     } : null,
     x9: isEnterpriseMode(s) ? {
