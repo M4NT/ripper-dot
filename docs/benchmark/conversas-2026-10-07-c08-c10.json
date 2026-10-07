@@ -1,0 +1,155 @@
+{
+  "quando": "2026-10-07T22:53:20.021Z",
+  "modo": "real",
+  "servidor": "http://127.0.0.1:3999",
+  "limites": {
+    "primeiroSinalSeg": 5,
+    "primeiroTextoSeg": 20
+  },
+  "notaGeral": 91.5,
+  "resultados": [
+    {
+      "id": "c08",
+      "titulo": "Continuação que referencia a resposta anterior",
+      "nota": 85.7,
+      "segundos": 15.4,
+      "primeiroSinalSeg": 0.02,
+      "primeiroTextoSeg": 9.19,
+      "falaram": [
+        "AnaBench"
+      ],
+      "caixa": false,
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.02 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "9.19 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": false
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Miolo & Afeto — pão feito com tempo, servido com carinho."
+    },
+    {
+      "id": "c09",
+      "titulo": "Pedido que exige fonte citada",
+      "nota": 100,
+      "segundos": 11.9,
+      "primeiroSinalSeg": 0.01,
+      "primeiroTextoSeg": 4.73,
+      "falaram": [
+        "AnaBench"
+      ],
+      "caixa": false,
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.01 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "4.73 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Vou conferir o valor vigente no Diário Oficial e no site do governo.O salário mínimo nacional atual é **R$ 1.621,00 por mês**, vigente desde 1º de janeiro de 2026. Fonte oficial: [Decreto nº 12.797/2025, no Portal da Legislação](https://www.planalto.gov.••••.htm)."
+    },
+    {
+      "id": "c10",
+      "titulo": "Recusar/perguntar em vez de inventar",
+      "nota": 88.9,
+      "segundos": 17.4,
+      "primeiroSinalSeg": 0.02,
+      "primeiroTextoSeg": 4.64,
+      "falaram": [
+        "AnaBench"
+      ],
+      "caixa": false,
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.02 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "4.64 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "não inventou / não ignorou",
+          "ok": true
+        },
+        {
+          "nome": "fecho Feito/Como verifiquei/Falta",
+          "ok": false
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Vou procurar os dados financeiros de setembro de 2026 para calcular o faturamento.Não consigo informar o faturamento de setembro de 2026 sem os dados da empresa. Envie o relatório de vendas ou uma planilha desse mês para eu calcular o total. Tentei registrar esse pedido na Caixa, mas a ferramenta foi bloqueada pela política de aprovação desta execução."
+    }
+  ]
+}

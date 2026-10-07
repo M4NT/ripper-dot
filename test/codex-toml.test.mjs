@@ -23,3 +23,9 @@ test('modelo fora da assinatura não abre o disjuntor do provedor', async () => 
   });
   assert.equal(failures, 0);
 });
+
+test('Windows: argumentos com espaço vão entre aspas para o cmd não quebrar', async () => {
+  const { shellArgs } = await import('../lib/providers.mjs');
+  assert.deepEqual(shellArgs(['exec', String.raw`a.command='C:\Program Files\node.exe'`, '-'], true), ['exec', String.raw`"a.command='C:\Program Files\node.exe'"`, '-']);
+  assert.deepEqual(shellArgs(['x y'], false), ['x y']);
+});
