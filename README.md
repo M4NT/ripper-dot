@@ -4,7 +4,7 @@
 
 Cada agente tem função, memória e **um computador próprio** (isolado) para navegar, rodar programas e criar arquivos. Eles trabalham sozinhos em rotinas, conversam entre si e pedem a sua aprovação antes de qualquer coisa com efeito fora (mandar mensagem, publicar, gastar). Você usa a **sua própria assinatura de IA** (Claude, ChatGPT ou chave de API) e os dados ficam com você.
 
-Feito para dois públicos com o mesmo peso: quem **não programa** (dono de pequena empresa, atendimento, financeiro) e quem é **técnico** (devs e TI montando times de agentes). Interface em português, com modo **Simples** e modo **Enterprise**.
+Feito para dois públicos com o mesmo peso: quem **não programa** (dono de pequena empresa, atendimento, financeiro) e quem é **técnico** (devs e TI montando times de agentes). Interface em português, uma plataforma só, com tudo visível.
 
 > Norte do projeto: **ser melhor que o Grok Bot**, com critérios medidos. Plano completo em [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -66,7 +66,7 @@ Feito para dois públicos com o mesmo peso: quem **não programa** (dono de pequ
 
 ### Conectores e canais
 - **Marketplace** ("Conectar aplicativos", no pé da barra lateral): Gmail, Google Agenda, Drive, GitHub, Notion, Linear, Slack, Vercel e outros, pelos conectores da sua conta do Claude ou por servidores **MCP** (HTTP ou stdio, com OAuth).
-- **WhatsApp:** pelo QR Code (WhatsApp Web) ou pela Cloud API oficial da Meta. Um agente atende os contatos liberados e deixa recados na Caixa; cada envio pede aprovação. *(Modo Enterprise.)*
+- **WhatsApp:** pelo QR Code (WhatsApp Web) ou pela Cloud API oficial da Meta. Um agente atende os contatos liberados e deixa recados na Caixa; cada envio pede aprovação.
 - **E-mail** (IMAP/SMTP), **GitHub** (ler, comentar, abrir issue e PR), **webhooks** de saída e **Google Tasks**.
 
 ### Memória, biblioteca e skills
@@ -83,7 +83,7 @@ Feito para dois públicos com o mesmo peso: quem **não programa** (dono de pequ
 
 ### Interface
 - Tema **escuro** (padrão) e **claro**. Barra lateral com **agentes fixados** e lista reorganizáveis **arrastando** ou pelo **teclado**.
-- **Modo Simples** (o essencial, sem termos técnicos) e **modo Enterprise** (projetos, administração, auditoria, opções avançadas). Onde algo é do Enterprise, aparece um botão "Ativar modo Enterprise".
+- **Uma plataforma só, com tudo visível** (decisão de 07/10/2026). A separação em modo Simples × Enterprise continua no código e volta com `RIPPER_MODES=1`.
 - **Ajuda** dentro do app (tecla `?`), com pedidos prontos.
 - Acessível: navegação por teclado, foco preso nas janelas, contraste AA nos dois temas (verificado por teste).
 
@@ -261,7 +261,7 @@ Tudo fica na pasta **`data/`** do Ripper (ou em `RIPPER_DATA`), que nunca vai pa
 | `artifacts/`, `shared/` | Artefatos e arquivos compartilhados |
 | `sandbox/`, `tmp/` | Áreas de trabalho e temporários dos agentes |
 | `backups/` | Cópias automáticas e manuais |
-| `brand/` | Logo da marca personalizada (Enterprise) |
+| `brand/` | Logo da marca personalizada |
 | `auth.json`, `setup-code.txt` | Senha (só o hash) e código da primeira configuração |
 
 Fora da pasta de dados, em `~/.ripper/`: `secret.key` (chave de cifragem) e `claude-accounts/` (uma pasta de login por conta do Claude).
@@ -292,7 +292,8 @@ Quase tudo se configura pela interface. As variáveis abaixo servem para servido
 | `RIPPER_METRICS_PUBLIC` | — | `1` libera `/metrics` sem token (para o Prometheus) |
 | `RIPPER_STRICT` / `NODE_ENV=production` | — | Erros de configuração encerram o servidor em vez de só avisar |
 | `RIPPER_LOG_JSON` | — | `1` = logs em JSON estruturado |
-| `RIPPER_ENTERPRISE_MODE` | — | `1` força o modo Enterprise |
+| `RIPPER_MODES` | — | `1` religa a separação modo Simples × Enterprise (os testes rodam assim) |
+| `RIPPER_ENTERPRISE_MODE` | — | Com `RIPPER_MODES=1`, `1` força o modo Enterprise |
 | `RIPPER_SECRET_KEY_FILE` | `~/.ripper/secret.key` | Onde fica a chave de cifragem local |
 | `RIPPER_VAULT_KEY` | — | Chave explícita do cofre de credenciais |
 | `RIPPER_SUPERVISED` | (o vigia define) | Indica que o servidor roda sob o serviço; atualizações reiniciam sozinhas |
@@ -422,7 +423,7 @@ Para conversar sem gastar conta de IA: `RIPPER_TEST_PROVIDER=stream npm run dev:
 | `npm start` | Sobe o servidor (`node server.mjs`) |
 | `npm run build` | Monta a interface em `dist/` |
 | `npm run prod` | Build + servidor |
-| `npm test` | Todos os testes (`node --test test/*.test.mjs`) |
+| `npm test` | Todos os testes (com `RIPPER_MODES=1`, cobrindo os dois modos) |
 | `npm run test:ui` | Abre todas as telas num navegador de verdade (Playwright) e falha em erro de JavaScript |
 | `npm run dev:server` / `npm run dev:web` | Desenvolvimento com recarga |
 | `npm run julia` / `npm run julia:dry` | Classificador Julia (real / sem pesos) |
@@ -434,7 +435,7 @@ Outros scripts: `node scripts/agent-audit.mjs` (auditoria de capacidades com tar
 
 - **660+ testes** de unidade e integração. Os testes de integração sobem o servidor isolado, com pasta de dados temporária e provedor falso.
 - Cada servidor de teste reserva a própria porta (`test/helpers/free-port.mjs`), então os testes podem rodar em paralelo sem colidir.
-- Máquina sobrecarregada? `node --test --test-concurrency=3 test/*.test.mjs` é mais estável.
+- Máquina sobrecarregada? `npm test -- --test-concurrency=3` é mais estável. Rode sempre pelo `npm test`: ele liga `RIPPER_MODES=1`, que alguns testes exigem.
 - O **CI** (GitHub Actions) roda testes, build e o teste das telas a cada push e pull request. A `main` exige `test-and-build` verde para juntar um pull request.
 
 ---
@@ -442,7 +443,7 @@ Outros scripts: `node scripts/agent-audit.mjs` (auditoria de capacidades com tar
 ## Como contribuir
 
 1. Crie um branch a partir da `main` (`claude/…`, `feat/…`).
-2. Faça a mudança com testes. Interface em **português simples**, sem termos técnicos no modo Simples.
+2. Faça a mudança com testes. Interface em **português simples**, sem termos técnicos para quem não programa.
 3. **Rode todos os testes e só envie se passarem.**
 4. Abra um pull request explicando, para quem nunca viu o código: o antes e o depois do ponto de vista de quem usa, o que mudou por dentro e por que essa abordagem.
 5. Ligue o **merge automático**: o pull request entra sozinho quando o CI passar.
@@ -484,7 +485,7 @@ Fora do ar, o Ripper continua com as regras de reserva e avisa `[julia] fallback
 | "porta em uso" / `EADDRINUSE` | Já tem um Ripper rodando (talvez como serviço); use esse ou pare com `node scripts/service.mjs uninstall` |
 | O agente não responde | Refaça `claude login` (ou `codex login`); veja a janela **Saúde** no menu da conta |
 | "Conta do Claude no limite" | Adicione outra conta em Provedores de IA e ligue a troca automática |
-| Agente "sem computador" | Abra o Docker Desktop; em Configurações › Computador (Enterprise), escolha Docker |
+| Agente "sem computador" | Abra o Docker Desktop; em Configurações › Computador, escolha Docker |
 | Esqueci a senha | `node scripts/senha.mjs` no computador do Ripper |
 | A tela parece antiga depois de atualizar | Recarregue com `Ctrl Shift R` |
 | Celular não conecta fora de casa | Confira se o Tailscale está ligado nos dois aparelhos, com a mesma conta |
