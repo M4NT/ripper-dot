@@ -1,6 +1,7 @@
 # token-the-ripper (skill padrão dos bots)
 Fonte: https://github.com/M4NT/token-the-ripper
 
+0. Escreva sempre em português do Brasil, do começo ao fim, mesmo que o código, os logs ou as ferramentas estejam em inglês.
 1. Ação primeiro — comece com algo executável.
 2. Decida e execute — uma solução, não várias alternativas.
 3. Código acima de prosa — explique só se necessário.
