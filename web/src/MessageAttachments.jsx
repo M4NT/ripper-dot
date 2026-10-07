@@ -55,13 +55,28 @@ const kindOf = type => (KIND.find(([re]) => re.test(type || '')) || [, 'Arquivo'
 const fmtSize = n => (n > 1 << 20 ? `${(n / (1 << 20)).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
 /** Arquivo que o agente entregou: Abrir (aba ou programa do computador), Baixar e Mostrar na pasta. */
+const IMG = /^image\/(png|jpe?g|webp|gif)$/;
+
 export function DeliveredFiles({ items, onError }) {
   const act = async (f, mode) => {
     try { await api(`/api/files/${f.id}/${mode}`, { method: 'POST' }); }
     catch (e) { onError?.(e.message); }
   };
+  // Várias imagens (carrossel, variações de arte): lado a lado, na ordem; o resto segue em lista.
+  const imgs = items.filter(f => IMG.test(f.type || ''));
+  const gallery = imgs.length > 1;
+  const rest = gallery ? items.filter(f => !imgs.includes(f)) : items;
   return (
-    <ul className="delivered">{items.map(f => {
+    <>
+    {gallery && (
+      <div className="delivered-gallery" aria-label={`${imgs.length} imagens`}>{imgs.map((f, i) => (
+        <a key={f.id} className="delivered-thumb" href={`/api/files/${f.id}?view=1`} target="_blank" rel="noopener" title={f.name}>
+          <img src={`/api/files/${f.id}?view=1`} alt={f.name} loading="lazy" decoding="async" />
+          <span>{i + 1}</span>
+        </a>
+      ))}</div>
+    )}
+    {rest.length > 0 && <ul className="delivered">{rest.map(f => {
       const viewable = VIEWABLE.test(f.type || '');
       return (
         <li key={f.id} className="delivered-file">
@@ -77,7 +92,8 @@ export function DeliveredFiles({ items, onError }) {
           <FilePreview file={f} />
         </li>
       );
-    })}</ul>
+    })}</ul>}
+    </>
   );
 }
 
