@@ -16,8 +16,8 @@ Legenda: ✅ feito · [ ] falta. **P0** = sem isso não dá para confiar.
 - [ ] P1 Escrever durante o trabalho: deixar claro que a mensagem nova entra no próximo passo (fila visível), em vez de parecer ignorada.
 
 ## 2. Respostas em que dá para confiar
-- [ ] **P0** Fechamento padrão em tarefas com ação: **Feito** (o que mudou) · **Como verifiquei** · **Falta / precisa de você**. Sem "passou" sem ter rodado.
-- [ ] **P0** Responder só o que foi pedido, no tom da mensagem — já vale entre agentes; estender a todas as conversas (sem puxar assunto antigo).
+- ✅ **P0** Fechamento padrão em tarefas com ação: **Feito** (o que mudou) · **Como verifiquei** · **Falta / precisa de você**. Sem "passou" sem ter rodado.
+- ✅ **P0** Responder só o que foi pedido, no tom da mensagem — já vale entre agentes; estender a todas as conversas (sem puxar assunto antigo).
 - [ ] P1 Fonte quando pedida (link .gov.br etc.): regra "fonte pedida, fonte entregue" (única falha real nas 50 tarefas).
 - [ ] P1 Erros em linguagem de gente em todo lugar (hoje ainda aparecem "401", nomes de ferramentas, ids).
 
