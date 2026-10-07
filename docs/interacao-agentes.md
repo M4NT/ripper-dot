@@ -11,7 +11,7 @@ Legenda: ✅ feito · [ ] falta. **P0** = sem isso não dá para confiar.
 - ✅ Histórico de ações: uma linha por ação, nomes legíveis, repetidas viram ×N.
 - ✅ Palavras aparecem com opacidade (sem cursor de barra).
 - ✅ Turno sem texto não fica em branco; login expirado vira aviso claro.
-- ✅ **P0** Mensagem recebida na hora: "Ripper viu" em menos de 1 s (hoje você repete a mensagem achando que não chegou).
+- ✅ **P0** Mensagem recebida na hora: "Ripper viu" em menos de 1 s (hoje você repete a mensagem achando que não chegou). "Tentar de novo" reenvia com a mesma Idempotency-Key e o mesmo corpo: se o servidor já tinha recebido, não roda um segundo turno.
 - ✅ **P0** Tarefa longa sem sinal: depois de 20 s no mesmo passo, mostrar "ainda em: rodando o build · 40 s" e permitir parar.
 - [ ] P1 Escrever durante o trabalho: deixar claro que a mensagem nova entra no próximo passo (fila visível), em vez de parecer ignorada.
 
@@ -23,8 +23,8 @@ Legenda: ✅ feito · [ ] falta. **P0** = sem isso não dá para confiar.
 
 ## 3. Delegação
 - ✅ @menção numa conversa 1:1 traz o agente; recado entre agentes responde só ao que foi dito; aviso de "tarefa concluída" não gera "Recebido".
-- ✅ **P0** Cartão de delegação no seu fio (send_message, call_agent e @menção no grupo; resposta do colega fica dentro do cartão): "Pedi ao Donald: ajustar a faixa · trabalhando / feito · ver resultado". Você acompanha sem abrir outra conversa.
-- ✅ **P0** Bloqueio vira pedido para você (skill manda usar ask_owner; se a resposta diz "preciso que você"/"BLOQUEADO" sem ask_owner, o servidor cria o item na Caixa): quando um agente para por falta de algo (VM caiu, senha, aprovação), cria um item "precisa de você" na Caixa com o que fazer — hoje fica escrito no meio do grupo.
+- ✅ **P0** Cartão de delegação no seu fio (send_message, call_agent e @menção no grupo; resposta do colega fica dentro do cartão): "Pedi ao Donald: ajustar a faixa · trabalhando / feito · ver resultado". Você acompanha sem abrir outra conversa. call_agent emite `delegationStatus` ao começar e ao terminar: o cartão mostra "trabalhando"/"feito" na hora, sem esperar o fim do turno.
+- ✅ **P0** Bloqueio vira pedido para você (skill manda usar ask_owner; se a resposta diz "preciso que você"/"BLOQUEADO" sem ask_owner, o servidor cria o item na Caixa): quando um agente para por falta de algo (VM caiu, senha, aprovação), cria um item "precisa de você" na Caixa com o que fazer — hoje fica escrito no meio do grupo. Quando você responde naquela conversa, o item some sozinho da Caixa.
 - [ ] P1 Painel "quem está fazendo o quê": cada agente com a tarefa atual, há quanto tempo e para quem vai o resultado.
 - [ ] P1 @menção tolerante a nome (ex.: "@Ripper" e "@Engenheiro de Software (Ripper)" chamam o mesmo agente).
 - [ ] P1 Agente não responde a confirmações de colega ("ok", "recebido") — encerra a troca.

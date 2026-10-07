@@ -1308,7 +1308,7 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
         save();
         const card = { to: to.id, task: oneLineTask(m.body), messageId: m.id };
         sentDelegations.push(card);
-        emit({ callAgent: { to: to.name, timeoutMs }, delegation: { from: agent.id, ...card } });
+        emit({ callAgent: { to: to.name, timeoutMs }, delegation: { from: agent.id, ...card }, delegationStatus: { messageId: m.id, status: 'delivering' } });
         const ac = new AbortController();
         const timer = setTimeout(() => ac.abort(), timeoutMs);
         let result;
@@ -1328,6 +1328,7 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
         } finally {
           clearTimeout(timer);
           inboxBusy.delete(to.id);
+          emit({ delegationStatus: { messageId: m.id, status: m.status, ...(m.error ? { error: m.error } : {}), ...(m.reply ? { reply: m.reply } : {}) } }); // cartão: "feito"/"falhou" ao vivo
           save();
           setTimeout(dispatchInbox, 50);
         }
@@ -1871,6 +1872,8 @@ async function chatTurn({ chat, text, fileIds, signal, mcpSession, skipUserPush 
       at: Date.now()
     });
     if (chat.run?.status === 'running' && !chat.run.userMessageId) chat.run.userMessageId = uid;
+    // Você respondeu na conversa: o "<Agente> precisa de você" desta conversa sai da Caixa.
+    for (const a of db.systemAlerts || []) if (!a.done && a.key?.startsWith(`blocked:${chat.id}:`)) a.done = true;
   }
   // @Nome de quem não está na conversa (ex.: 1:1) traz o agente para esta rodada, sem virar grupo.
   const base = groupMembers(chat, db.agents);

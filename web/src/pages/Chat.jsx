@@ -430,7 +430,9 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
           model: use.model, effort: use.effort, mcpSession: mcpSession || sessionPayload(), credentialRefs, voice,
           ...(!cid && pendingWs ? { workspace: pendingWs } : {})
         };
-      const res = await fetch(endpoint, { method: 'POST', signal: ac.signal, headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+      // "Tentar de novo" reenvia a MESMA chave e o MESMO corpo: se o servidor já recebeu, não roda o turno de novo.
+      args.idem ||= { key: crypto.randomUUID?.() || `k${Date.now()}${Math.random().toString(36).slice(2)}`, body: JSON.stringify(payload) };
+      const res = await fetch(endpoint, { method: 'POST', signal: ac.signal, headers: { 'content-type': 'application/json', 'idempotency-key': args.idem.key }, body: args.idem.body });
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
         const msg = errBody.error || `Erro ${res.status}`;
@@ -482,6 +484,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
           if (e.turnPlan) plan = e.turnPlan;
           if (e.turnDone) plan = plan.filter(id => id !== e.turnDone);
           if (e.delegated) plan = [...plan, ...e.delegated.filter(id => !plan.includes(id))];
+          if (e.delegationStatus) { const { messageId, ...st } = e.delegationStatus; setLiveInbox(x => ({ ...x, [messageId]: st })); }
           if (e.delegation) building.delegations = [...(building.delegations || []), e.delegation];
           if (e.delegated?.length) {
             const names = e.delegated.map(id => getAgent(id)?.name || 'colega').join(', ');
@@ -538,7 +541,8 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   }
   sendTurnRef.current = send;
   // Cartões de delegação: estado dos pedidos e respostas que já aparecem dentro do cartão (não viram balão à parte).
-  const deleg = useMemo(() => ({ messages: chat?.messages || [], inbox: chat?.inboxStatus || {}, liveAgentId: live?.agentId || null }), [chat?.messages, chat?.inboxStatus, live?.agentId]);
+  const [liveInbox, setLiveInbox] = useState({}); // status de call_agent chegando ao vivo (antes do fim do turno)
+  const deleg = useMemo(() => ({ messages: chat?.messages || [], inbox: { ...chat?.inboxStatus, ...liveInbox }, liveAgentId: live?.agentId || null }), [chat?.messages, chat?.inboxStatus, liveInbox, live?.agentId]);
   const inCard = useMemo(() => new Set((chat?.messages || []).flatMap(m => (m.delegations || []).map(d => d.messageId).filter(Boolean))), [chat?.messages]);
 
   if (loading) return <div className="page-loading" role="status" aria-live="polite" aria-label="Carregando conversa"><ThinkingOrb state="breathing" size={20} /></div>;

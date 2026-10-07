@@ -10,7 +10,10 @@ test('cartão de delegação: aguardando → trabalhando → feito / falhou', ()
   assert.deepEqual(delegationCardState(d, [], { m1: { status: 'failed', error: 'caiu' } }), { status: 'falhou', result: 'caiu' });
   assert.deepEqual(delegationCardState(d, [], { m1: { status: 'delivered', reply: 'ok' } }), { status: 'feito', result: 'ok' });
   const msgs = [{ role: 'assistant', agentId: 'b', content: 'pronto', via: { type: 'inbox', messageId: 'm1' } }];
-  assert.deepEqual(delegationCardState(d, msgs, { m1: { status: 'delivering' } }), { status: 'feito', result: 'pronto' });
+  // evento ao vivo (delegationStatus) por cima do inboxStatus salvo, como o Chat.jsx mescla
+  assert.equal(delegationCardState(d, [], { ...{ m1: { status: 'queued' } }, ...{ m1: { status: 'delivering' } } }).status, 'trabalhando');
+  assert.equal(delegationCardState(d, [], { ...{}, ...{ m1: { status: 'delivered', reply: 'ok' } } }).status, 'feito');
+  assert.deepEqual(delegationCardState(d, msgs,{ m1: { status: 'delivering' } }), { status: 'feito', result: 'pronto' });
   // @menção no grupo
   const g = { to: 'b', task: 'y' };
   const thread = [{ role: 'assistant', agentId: 'a', delegations: [g] }];

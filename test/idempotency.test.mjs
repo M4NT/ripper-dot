@@ -238,3 +238,43 @@ test('413 por http-budget ocorre antes da idempotência; replay ecoa X-Request-I
     await drainSse(r2);
   });
 });
+
+test('"Tentar de novo" com a mesma chave não roda o turno duas vezes', async () => {
+  await withServer({ RIPPER_TEST_PROVIDER: 'slow' }, async (base, auth) => {
+    const st = await (await fetch(base + '/api/state', { headers: auth })).json();
+    const body = JSON.stringify({ agentId: st.agents[0].id, text: 'retry-once', model: 'claude-sonnet-5-5' });
+    const headers = { ...auth, 'content-type': 'application/json', 'idempotency-key': 'retry-same-01' };
+    // 1º envio: o servidor recebeu, o cliente desiste (como o retry do Chat.jsx)
+    const ac = new AbortController();
+    await fetch(base + '/api/chat', { method: 'POST', headers, body, signal: ac.signal });
+    ac.abort();
+    await new Promise(r => setTimeout(r, 300));
+    // retry com a mesma chave e corpo: replay ou 409 "em processamento" — nunca um segundo turno
+    for (let i = 0; i < 50; i++) {
+      const r2 = await fetch(base + '/api/chat', { method: 'POST', headers, body });
+      if (r2.status === 409) { await r2.text(); await new Promise(r => setTimeout(r, 200)); continue; }
+      await drainSse(r2);
+      break;
+    }
+    const chats = (await (await fetch(base + '/api/state', { headers: auth })).json()).chats || [];
+    let users = 0;
+    for (const c of chats) {
+      const full = await (await fetch(base + `/api/chats/${c.id}`, { headers: auth })).json();
+      users += (full.messages || []).filter(m => m.role === 'user' && m.content === 'retry-once').length;
+    }
+    assert.equal(users, 1);
+  });
+});
+
+test('"<Agente> precisa de você" sai da Caixa quando você responde na conversa', async () => {
+  await withServer({}, async (base, auth) => {
+    const st = await (await fetch(base + '/api/state', { headers: auth })).json();
+    const headers = { ...auth, 'content-type': 'application/json' };
+    const blocked = async () => (await (await fetch(base + '/api/inbox', { headers: auth })).json()).items.filter(i => /precisa de você/.test(i.title || ''));
+    const r1 = await fetch(base + '/api/chat', { method: 'POST', headers, body: JSON.stringify({ agentId: st.agents[0].id, text: 'BLOQUEADO: preciso que você me passe a senha.', model: 'claude-sonnet-5-5' }) });
+    const chatId = (await drainSse(r1)).find(e => e.chatId)?.chatId;
+    assert.equal((await blocked()).length, 1);
+    await drainSse(await fetch(base + '/api/chat', { method: 'POST', headers, body: JSON.stringify({ agentId: st.agents[0].id, chatId, text: 'tá aqui', model: 'claude-sonnet-5-5' }) }));
+    assert.equal((await blocked()).length, 0);
+  });
+});
