@@ -11,7 +11,10 @@ test('seenLabel: um, dois e vários agentes', () => {
 
 test('stallLabel: só aparece a partir de 20 s', () => {
   assert.equal(stallLabel('Pensando', 19999), null);
-  assert.equal(stallLabel('Pensando', 20000), 'ainda em: Pensando · 20 s');
-  assert.equal(stallLabel('Rodando o build', 40500), 'ainda em: Rodando o build · 40 s');
-  assert.equal(stallLabel('X', 185000), 'ainda em: X · 3 min');
+  assert.equal(stallLabel('Pensando', 20000), 'Está demorando mais que o habitual · Pensando · 20 s');
+  assert.equal(stallLabel('Rodando o build', 40500), 'Está demorando mais que o habitual · Rodando o build · 40 s');
+  assert.equal(stallLabel('X', 185000), 'Está demorando mais que o habitual · X · 3 min');
+  // imagem costuma levar 2–3 min: só avisa depois disso
+  assert.equal(stallLabel('Gerando imagem com o ChatGPT', 150000, 200000), null);
+  assert.match(stallLabel('Gerando imagem com o ChatGPT', 210000, 200000), /demorando mais que o habitual/);
 });
