@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server.mjs",
     "build": "vite build",
-    "test": "node --test test/*.test.mjs",
+    "test": "node --import ./test/helpers/modes.mjs --test test/*.test.mjs",
     "dev:server": "node --watch server.mjs",
     "dev:web": "vite",
     "julia": "python julia/serve.py",

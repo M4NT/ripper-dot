@@ -5,7 +5,11 @@ import { useApp } from './app.jsx';
 export const UI_MODES = ['simple', 'enterprise'];
 
 /** Modo de interface persistido em settings.ui.mode (padrão: simples). */
+// Uma plataforma só por enquanto (decisão de 07/10/2026): tudo visível. Para voltar a ter modo Simples, troque para false.
+export const SINGLE_MODE = true;
+
 export function getUiMode(settings) {
+  if (SINGLE_MODE) return 'enterprise';
   if (!settings) return 'simple';
   const m = settings.ui?.mode;
   if (m === 'enterprise') return 'enterprise';

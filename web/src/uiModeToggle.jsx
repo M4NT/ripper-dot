@@ -1,8 +1,9 @@
 import { Switch } from './ui.jsx';
-import { useUiMode } from './uiMode.js';
+import { useUiMode, SINGLE_MODE } from './uiMode.js';
 
 /** Alternância visível entre modo simples e enterprise (persiste na API de configurações). */
 export default function UiModeToggle({ compact = false, className = '' }) {
+  if (SINGLE_MODE) return null; // plataforma única: sem seletor
   const { mode, isEnterprise, setMode } = useUiMode();
   const on = isEnterprise;
   return (
@@ -26,6 +27,7 @@ export default function UiModeToggle({ compact = false, className = '' }) {
 
 /** Onde algo é do modo Enterprise: diz o que é e liga com um clique (em vez de esconder). */
 export function EnterpriseHint({ children, className = '' }) {
+  if (SINGLE_MODE) return null;
   const { setMode } = useUiMode();
   return (
     <span className={`enterprise-hint ${className}`}>
