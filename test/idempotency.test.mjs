@@ -252,7 +252,8 @@ test('"Tentar de novo" com a mesma chave não roda o turno duas vezes', async ()
     // retry com a mesma chave e corpo: replay ou 409 "em processamento" — nunca um segundo turno
     for (let i = 0; i < 50; i++) {
       const r2 = await fetch(base + '/api/chat', { method: 'POST', headers, body });
-      if (r2.status === 409) { await r2.text(); await new Promise(r => setTimeout(r, 200)); continue; }
+      // a tela (Chat.jsx) reconhece esta frase para acompanhar ao vivo em vez de mostrar erro
+      if (r2.status === 409) { assert.match((await r2.json()).error, /em processamento/); await new Promise(r => setTimeout(r, 200)); continue; }
       await drainSse(r2);
       break;
     }
