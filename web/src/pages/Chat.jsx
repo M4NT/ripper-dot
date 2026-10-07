@@ -1,7 +1,7 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
 import WorkspaceBar from '../workspaceBar.jsx';
-import { api, go, fmtTime, fmtSize, stepLabel, useMediaQuery, local, nameColor, speak, canSpeak } from '../lib.js';
+import { api, go, fmtTime, fmtSize, stepLabel, seenLabel, useMediaQuery, local, nameColor, speak, canSpeak } from '../lib.js';
 import { markdown, closeOpen } from '../markdown.js';
 import { AgentAvatar, Icon, Menu, MenuItem, StatusDot, useConfirm, EmptyState } from '../ui.jsx';
 import { useApp } from '../app.jsx';
@@ -14,7 +14,7 @@ import ChatPanel, { MiniScreen } from '../chatPanel.jsx';
 import { MentionText } from '../mentions.jsx';
 import { AgentThread, ViaLabel } from '../agentThread.jsx';
 import { ResizeHandle } from '../resize.jsx';
-import ActionLine from '../actionLine.jsx';
+import ActionLine, { StallNote } from '../actionLine.jsx';
 import { useChatMenu } from '../actions.jsx';
 import { useOv } from '../overlay.jsx';
 import { botAvatarPalette } from 'bot-avatars';
@@ -130,7 +130,7 @@ function typingLabel(phase) {
   return 'Escrevendo…';
 }
 
-const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, models, group, showModel, allFiles, onFileError }) {
+const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, onStop, models, group, showModel, allFiles, onFileError }) {
   // ids (resposta salva) ou objetos (chegando ao vivo)
   const { agent: getAgent } = useApp();
   const delivered = (m.files || []).map(x => (typeof x === 'string' ? allFiles?.find(f => f.id === x) : x)).filter(Boolean);
@@ -141,6 +141,7 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, mo
         {group && <span className="speaker" style={{ color: agentColor(agent) }}>{agent.name}</span>}
         <div className="bubble bot-bubble">
           <ActionLine steps={m.steps} live={live} />
+          {live && phase !== 'approval' && <StallNote label={phase === 'text' ? 'Escrevendo' : phase === 'route' || phase === 'think' || !phase ? 'Pensando' : stepLabel(phase)} sig={`${phase}|${m.steps.length}|${m.content.length}|${m.agentId}`} onStop={onStop} />}
           {delivered.length > 0 && <DeliveredFiles items={delivered} onError={onFileError} />}
           {m.content ? (live ? <LiveText text={m.content} /> : <Markdown text={m.content} />)
             : live ? <div className="typing" role="status" aria-live="polite"><span className="typing-dots" aria-hidden="true"><i /><i /><i /></span><span>{typingLabel(phase)}</span></div>
@@ -197,7 +198,7 @@ function InboxMessage({ m, from }) {
   );
 }
 
-const UserMessage = memo(function UserMessage({ m, name, files, onEdit }) {
+const UserMessage = memo(function UserMessage({ m, name, files, onEdit, ack, onRetryAck }) {
   const { S } = useApp();
   // Prévias locais (recém-enviadas) ou os arquivos já salvos no servidor.
   const mine = m.previews || (m.files || []).map(id => files.find(f => f.id === id)).filter(Boolean).map(f => ({ ...f, url: `/api/files/${f.id}` }));
@@ -221,6 +222,8 @@ const UserMessage = memo(function UserMessage({ m, name, files, onEdit }) {
           : m.content && <div className={`bubble user-bubble${m.voice ? ' voice' : ''}`} title={m.voice ? 'Mensagem ditada' : undefined}><MentionText text={m.content} agents={S.agents} /></div>}
         <div className="msg-meta">
           {m.at && <time className="msg-time">{fmtTime(m.at)}</time>}
+          {ack?.state === 'seen' && <span className="msg-ack" role="status">{ack.label}</span>}
+          {ack?.state === 'late' && <span className="msg-ack late" role="status">Ainda não chegou — <button type="button" className="meta-btn" onClick={onRetryAck}>tentar de novo</button></span>}
           {m.content && draft === null && <button className="meta-btn" aria-label="Copiar mensagem" onClick={() => navigator.clipboard.writeText(m.content)}><Icon name="copy" size={14} />Copiar</button>}
           {onEdit && draft === null && <button className="meta-btn" aria-label="Editar e reenviar mensagem" onClick={() => setDraft(m.content || '')}><Icon name="edit" size={14} />Editar</button>}
         </div>
@@ -272,6 +275,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   const defaults = (c, a, group) => ({ model: c?.model || (group ? 'agent' : a?.model || S.settings.defaultModel), effort: c?.effort || a?.effort || 'auto' });
   const [choice, setChoice] = useState(() => defaults(null, agent, isGroup));
   const [interrupted, setInterrupted] = useState(false);
+  const [ack, setAck] = useState(null); // { id, state: 'wait'|'seen'|'late', label, retry } da última mensagem enviada
 
   const idRef = useRef(chatId);
   idRef.current = chatId;
@@ -388,19 +392,25 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   const onScroll = () => { const el = scroller.current; stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120; };
   useEffect(() => { if (stick.current) scroller.current?.scrollTo({ top: 1e9 }); }, [chat?.messages.length, live?.content, live?.steps?.length]);
 
-  async function send({ text, fileIds = [], previews, mcpSession, resume = false, credentialRefs = [], voice = false }, forceChoice) {
+  async function send(args, forceChoice) {
+    const { text, fileIds = [], previews, mcpSession, resume = false, credentialRefs = [], voice = false } = args;
     const use = forceChoice || choice;
+    let ackId = null;
     if (ctrl.current || !agent) return;
     if (resume && !chatId) return;
     if (!resume) {
       const userMsg = { id: 'u' + Date.now(), role: 'user', content: text, files: fileIds, previews, voice, at: Date.now() };
       setChat(c => ({ ...(c || { title: 'Nova conversa', agentId: agent.id, agentIds: isGroup ? memberIds : undefined, projectId }), messages: [...(c?.messages || []), userMsg] }));
+      ackId = userMsg.id; setAck({ id: ackId, state: 'wait' });
     } else setInterrupted(false);
     let building = { role: 'assistant', agentId: agent.id, content: '', steps: [], at: Date.now() };
     let plan = []; // ordem de fala da rodada em grupo (turnPlan + delegados)
     setLive(building); setPhase(['xhigh', 'max'].includes(use.effort) ? 'think' : 'route');
     stick.current = true;
     const ac = new AbortController(); ctrl.current = ac;
+    // Sem nenhum evento do servidor em 5 s: avisa e oferece reenviar (aborta este e manda de novo).
+    const lateTimer = ackId && setTimeout(() => setAck(a => a?.id === ackId && a.state === 'wait' ? { ...a, state: 'late', retry: () => { ac.retry = true; ac.abort(); } } : a), 5000);
+    let seen = !ackId; const seenIds = [];
     let cid = chatId, pending = false, finished = false, sawDone = false;
     const flush = () => { if (pending) return; pending = true; requestAnimationFrame(() => { pending = false; if (!finished) setLive({ ...building, steps: [...building.steps], plan }); }); };
     try {
@@ -428,6 +438,9 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
         for (const p of parts) {
           if (!p.startsWith('data: ')) continue;
           const e = JSON.parse(p.slice(6));
+          // Primeiro evento do servidor = turno começou: "Ripper viu" (em grupo, quem vai falar).
+          for (const id of [...(e.turnPlan || []), e.speaker].filter(Boolean)) if (!seenIds.includes(id)) { seenIds.push(id); seen = false; }
+          if (!seen) { seen = true; clearTimeout(lateTimer); const ids = seenIds.length ? seenIds : [agent.id]; setAck({ id: ackId, state: 'seen', label: seenLabel(ids.map(id => getAgent(id)?.name)) }); }
           if (e.chatId) setBusyChats(b => ({ ...b, [e.chatId]: true }));
           if (e.chatId && !cid) { cid = e.chatId; idRef.current = cid; setChatId(cid); location.hash = `/c/${cid}`; }
           if (e.speaker) {
@@ -489,6 +502,13 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
     } finally {
       finished = true;
       ctrl.current = null;
+      clearTimeout(lateTimer);
+      if (ac.retry) { // nada chegou: tira a mensagem local e manda de novo
+        setLive(null); setPhase(null);
+        setChat(c => ({ ...c, messages: c.messages.filter(x => x.id !== ackId) }));
+        setTimeout(() => send(args, use));
+        return;
+      }
       setBusy(b => { const n = { ...b }; memberIds.forEach(id => delete n[id]); return n; });
       if (cid) setBusyChats(b => { const n = { ...b }; delete n[cid]; return n; });
       // A resposta pronta entra no MESMO render em que a ao vivo sai (mesma posição na lista): sem sumir e voltar.
@@ -517,6 +537,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   const files = S.files.filter(f => f.chatId && f.chatId === chatId);
   const title = chat?.title || 'Nova conversa';
   const lastUser = [...messages].reverse().find(m => m.role === 'user');
+  const stop = () => { queueRef.current?.cancel(); if (chatId) api(`/api/chats/${chatId}/cancel`, { method: 'POST' }).catch(() => {}); ctrl.current?.abort(); };
   const canEdit = !!chatId && !chat?.flowRun && !live; // fluxos rodam no servidor: editar quebraria os passos
   const matches = search ? findChatMatches(messages, search.q) : [];
   const hit = matches.length ? Math.min(search.at, matches.length - 1) : -1;
@@ -588,9 +609,9 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
               </div>
             )}
             {[...messages.map((m, i) => <div key={i} data-mi={i} className={[i >= animateFrom.current && 'is-new', matches.includes(i) && `search-hit${matches[hit] === i ? ' current' : ''}`].filter(Boolean).join(' ') || undefined}>{m.inbox ? <InboxMessage m={m} from={getAgent(m.inbox.from)} /> : m.role === 'user'
-              ? <UserMessage m={m} name={S.settings.name} files={S.files} onEdit={canEdit && m.id && !/^u\d+$/.test(m.id) ? text => editFrom(m, text) : null} />
+              ? <UserMessage m={m} name={S.settings.name} files={S.files} ack={m === lastUser && ack?.id === m.id ? ack : null} onRetryAck={ack?.retry} onEdit={canEdit && m.id && !/^u\d+$/.test(m.id) ? text => editFrom(m, text) : null} />
               : <>{m.via?.type === 'inbox' && m.via.threadChatId && <ViaLabel m={m} onOpen={setThread} />}<BotMessage m={m} agent={getAgent(m.agentId) || agent} group={isGroup || (!!m.agentId && m.agentId !== agent.id)} models={S.models} showModel={isEnterpriseMode(S.settings)} allFiles={S.files} onFileError={msg => toast(msg, 'error')} onRetry={m === messages.at(-1) && lastUser ? () => send({ text: lastUser.content }) : null} /></>}</div>),
-              live && <div key={messages.length} className="is-new"><BotMessage m={live} agent={getAgent(live.agentId) || agent} group={isGroup} live phase={phase} models={S.models} /></div>]}
+              live && <div key={messages.length} className="is-new"><BotMessage m={live} agent={getAgent(live.agentId) || agent} group={isGroup} live phase={phase} onStop={stop} models={S.models} /></div>]}
           </div>
         </div>
 
@@ -602,7 +623,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
             </div>
           )}
           {<WorkspaceBar chat={chat} chatId={chatId} agents={isGroup ? members : [agent]} pending={pendingWs} setPending={setPendingWs} onChanged={c => setChat(x => ({ ...x, ...c }))} />}
-          <Composer agent={agent} chatId={chatId} projectId={projectId} streaming={!!live} onSend={queueSend} onStop={() => { queueRef.current?.cancel(); if (chatId) api(`/api/chats/${chatId}/cancel`, { method: 'POST' }).catch(() => {}); ctrl.current?.abort(); }}
+          <Composer agent={agent} chatId={chatId} projectId={projectId} streaming={!!live} onSend={queueSend} onStop={stop}
             choice={choice} setChoice={setChoice} group={isGroup} mentions={isGroup ? members : S.agents.filter(a => a.id !== agent.id)}
             placeholder={isGroup ? 'Mensagem para o grupo… use @Nome para chamar alguém' : `Mensagem para ${agent.name}…`} autoFocus draftKey={chatId || 'new-' + memberIds.join('-')} />
           {waiting > 0 && <p className="inbox-wait"><Icon name="clock" size={13} />Aguardando {waiting === 1 ? 'resposta de 1 mensagem' : `respostas de ${waiting} mensagens`} enviadas a colegas…</p>}

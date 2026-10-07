@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
-import { stepLabel, TOOL_INFO } from './lib.js';
+import { stallLabel, stepLabel, TOOL_INFO } from './lib.js';
 import { Icon } from './ui.jsx';
 import { ApprovalCard } from './approvals.jsx';
 
@@ -132,6 +132,25 @@ export default function ActionLine({ steps, live }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Passo sem mudança há 20 s+: "ainda em: <passo> · 40 s" + Parar. `sig` muda quando há sinal novo (passo, texto).
+ * setInterval e não requestAnimationFrame: rAF pode não disparar (aba em segundo plano, alguns ambientes).
+ */
+export function StallNote({ label, sig, onStop }) {
+  const since = useRef({ sig, at: Date.now() });
+  if (since.current.sig !== sig) since.current = { sig, at: Date.now() };
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  const text = stallLabel(label, now - since.current.at);
+  if (!text) return null;
+  return (
+    <div className="stall-note" role="status">
+      <span>{text}</span>
+      {onStop && <button type="button" className="meta-btn" onClick={onStop}><Icon name="x" size={13} />Parar</button>}
     </div>
   );
 }
