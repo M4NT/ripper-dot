@@ -38,7 +38,20 @@ function run() {
   start();
 }
 
+const installed = () => {
+  try {
+    if (process.platform === 'win32') { sh('schtasks', ['/Query', '/TN', NAME]); return true; }
+    if (process.platform === 'darwin') return existsSync(unitPath());
+    sh('systemctl', ['--user', 'cat', 'ripper.service']); return true;
+  } catch { return false; }
+};
+
 function restart() {
+  // Sem o vigia do serviço ninguém sobe o servidor de novo: reiniciar aqui só o derrubaria.
+  if (!installed()) {
+    console.log('O serviço não está instalado, então o Ripper não voltaria sozinho. Pare o servidor (Ctrl+C no terminal dele) e rode "npm start" de novo, ou instale o serviço: node scripts/service.mjs install');
+    process.exit(1);
+  }
   const dir = process.env.RIPPER_DATA ? resolve(process.env.RIPPER_DATA) : join(ROOT, 'data');
   writeFileSync(join(dir, 'restart.request'), String(Date.now()));
   console.log('Pedido enviado: o Ripper reinicia assim que os turnos em andamento terminarem (até 2 min).');
