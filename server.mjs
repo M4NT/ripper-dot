@@ -406,6 +406,7 @@ function trackLive(chatId, e) {
   if (e.tool) cur.steps.push({ kind: 'tool', tool: e.tool, detail: e.detail });
   if (e.approval) cur.steps.push({ kind: 'approval', rec: e.approval, status: 'pending' });
   if (e.warn) cur.steps.push({ kind: 'warn', label: e.warn });
+  if (e.campaign) cur.steps.push({ kind: 'campaign', rec: e.campaign });
   if (e.passed) liveByChat.set(chatId, { agentId: null, content: '', steps: [], at: Date.now() });
 }
 
@@ -1208,6 +1209,7 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
     }
   }
   const x9Sources = () => collectX9Sources({ db, settings: s });
+  const cardSteps = []; // cartões que ficam salvos na resposta (campanha de e-mail em demonstração)
   const delivered = []; // arquivos entregues neste turno: viram botões na resposta
   const sentDelegations = []; // pedidos a colegas (send_message/call_agent): viram cartões na resposta
   const ctx = {
@@ -1231,6 +1233,12 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
       const { path, ...pub } = rec;
       emit({ file: pub });
       return `"${name}" entregue: o usuário vê botões para abrir, baixar e mostrar na pasta. Não cite caminho, porta nem link.`;
+    },
+    // Campanha de e-mail em DEMONSTRAÇÃO: só monta o cartão; nenhum e-mail sai daqui.
+    campaign: a => {
+      const rec = { id: id(), subject: String(a.subject), preview: String(a.preview || ''), body: String(a.body || ''), audience: String(a.audience || ''), recipients: Math.max(1, Math.min(100000, a.recipients | 0)), demo: true };
+      cardSteps.push({ kind: 'campaign', rec }); emit({ campaign: rec });
+      return `Campanha "${rec.subject}" montada para ${rec.recipients} destinatários, em modo demonstração: o usuário vê o cartão e pode simular o disparo, mas nenhum e-mail é enviado. Não diga que enviou.`;
     },
     x9: isEnterpriseMode(s) ? {
       context: () => JSON.stringify(x9Sources(), null, 2),
@@ -1719,7 +1727,7 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
   if (!testProvider && order.length === 1 && MODELS[pick.model]?.provider !== 'claude' && claudeBackup) order.push(claudeBackup);
   const push = (out, steps, extra) => chat.messages.push({
     id: id(), role: 'assistant', agentId: agent.id, content: out, at: Date.now(),
-    ...(steps.length || subtaskSteps.length ? { steps: [...subtaskSteps, ...steps] } : {}),
+    ...(steps.length || subtaskSteps.length || cardSteps.length ? { steps: [...subtaskSteps, ...cardSteps, ...steps] } : {}),
     ...(sentDelegations.length ? { delegations: [...sentDelegations] } : {}), ...extra
   });
 

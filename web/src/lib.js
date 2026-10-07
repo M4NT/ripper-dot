@@ -97,7 +97,7 @@ export const STEP_LABEL = {
   remember: 'Guardando na memória', schedule_routine: 'Criando rotina',
   browser_open: 'Abrindo página', browser_click: 'Clicando', browser_type: 'Digitando', browser_scroll: 'Rolando a página', browser_read: 'Lendo a página',
   send_message: 'Mandando mensagem', call_agent: 'Chamando colega', save_artifact: 'Salvando artefato', read_artifact: 'Lendo artefato', use_skill: 'Usando skill', save_skill: 'Guardando skill',
-  post_social: 'Publicando', send_webhook: 'Enviando webhook', list_social_webhooks: 'Listando webhooks',
+  post_social: 'Publicando', email_campaign: 'Montando campanha de e-mail', send_webhook: 'Enviando webhook', list_social_webhooks: 'Listando webhooks',
   deliver_file: 'Entregando arquivo', use_connectors: 'Abrindo conectores', find_script: 'Procurando script pronto', save_script: 'Guardando script', handoff: 'Passando a tarefa',
   ask_owner: 'Perguntando a você', notify_owner: 'Avisando você', github_read: 'Lendo o GitHub', github_clone: 'Clonando o repositório', github_open_pr: 'Abrindo PR', github_comment: 'Comentando no GitHub', github_issue: 'Abrindo issue', email_list: 'Vendo e-mails', email_read: 'Lendo e-mail', email_attachment: 'Baixando anexo', email_send: 'Enviando e-mail', whatsapp_send: 'Enviando WhatsApp', whatsapp_chats: 'Vendo conversas do WhatsApp', whatsapp_read: 'Lendo conversa do WhatsApp', whatsapp_contacts: 'Buscando contato',
   list_skills: 'Listando skills', x9_context: 'Coletando dados', x9_checklist: 'Rodando checklist'
