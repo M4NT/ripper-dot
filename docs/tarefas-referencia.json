@@ -115,7 +115,7 @@
       ],
       "verificar": [
         "\\b3\\b[^.\\n]{0,40}duplicad|duplicad[^.\\n]{0,40}\\b3\\b",
-        "\\(11\\) 9\\d{4}-\\d{4}"
+        "\\(11\\) 9\\d{4}-\\d{4}|telefone"
       ]
     },
     {
@@ -282,7 +282,7 @@
         "Oferece os serviços reais"
       ],
       "verificar": [
-        "n[aã]o (fazemos|trabalhamos|realizamos|oferecemos|prestamos)|infelizmente"
+        "n[aã]o (fazemos|trabalhamos|realizamos|oferecemos|prestamos|est[aá] entre)|infelizmente"
       ]
     },
     {
@@ -473,7 +473,7 @@
       ],
       "verificar": [
         "semana",
-        "pend[eê]n|pr[oó]xim",
+        "pend[eê]n|pr[oó]xim|falta",
         "rafael",
         "juliana",
         "tiago"
@@ -629,7 +629,7 @@
       "id": "t41",
       "categoria": "marketing",
       "titulo": "Responder avaliação",
-      "prompt": "Responda a avaliação de 2 estrelas no Google que reclama da demora na entrega, sem ser defensivo.",
+      "prompt": "Responda a avaliação de 2 estrelas no Google, sem ser defensivo: \"Comprei dia 20 e só chegou dia 30. Produto bom, mas a entrega foi uma decepção.\"",
       "criterios": [
         "Reconhece o problema",
         "Oferece solução"

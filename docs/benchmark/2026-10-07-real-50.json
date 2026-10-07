@@ -1,0 +1,517 @@
+{
+  "quando": "2026-10-07T10:25:32.849Z",
+  "modo": "real",
+  "servidor": "http://127.0.0.1:3999",
+  "agentId": "25bc752a-dc20-4a24-8e6d-8d2be72d0e95",
+  "resumo": {
+    "total": 50,
+    "passou": 45,
+    "precisouDeAjuda": 0,
+    "falhou": 5,
+    "terminaSozinho": 90,
+    "segundosTotal": 789.2,
+    "tokensEstimados": 19998
+  },
+  "resultados": [
+    {
+      "id": "t01",
+      "titulo": "Concorrentes em planilha",
+      "categoria": "pesquisa",
+      "status": "passou",
+      "segundos": 32.6,
+      "tokensEstimados": 508,
+      "pedidosDeAjuda": 0,
+      "resposta": "Salvei a planilha **\"Concorrentes - Clínicas Odontológicas Campinas\"**, que pode ser baixada como .csv. Só 2 das 5 clínicas publicam preço, e o endereço de 2 delas ainda está faltando.\n\n| Nome | Endereço | Site | Faixa de preço |\n|---|---|---|---|\n| Clínica Viotto | Av. Barão de Itapura, 2294 – Jd. Guanabara | clinicaviotto.com.br | Implante R$ 3.500–8.000 por dente; com enxerto ósseo, R$ 5.000–12.000 |\n| Intégra Odontologia e Saúde | Não encontrei | integraodontosaude.com.br | Só a cirurgia do "
+    },
+    {
+      "id": "t02",
+      "titulo": "Fornecedores de embalagem",
+      "categoria": "pesquisa",
+      "status": "passou",
+      "segundos": 43.4,
+      "tokensEstimados": 525,
+      "pedidosDeAjuda": 0,
+      "resposta": "Só a Pixpel publica pedido mínimo e prazo no site. Nos outros dois fornecedores, os sites não trazem esses dados.\n\n| Fornecedor | Pedido mínimo | Prazo | Observação |\n|---|---|---|---|\n| **[Pixpel](https://www.pixpel.com.br/)** (papel personalizado) | 1.000 un. (copos e potes); 2.000 un. (ice tubes) | Produção em 10 dias úteis, com envio para todo o Brasil | O frete não está incluído no prazo. |\n| **[Embalike](https://www.embalike.com.br/biodegradaveis1/)** (loja, linha biodegradável) | Valor mí"
+    },
+    {
+      "id": "t03",
+      "titulo": "Resumo de lei",
+      "categoria": "pesquisa",
+      "status": "falhou",
+      "segundos": 24.7,
+      "tokensEstimados": 501,
+      "pedidosDeAjuda": 0,
+      "resposta": "**Resumo:** até hoje (07/10/2026), nada mudou para o MEI. O limite de faturamento continua em **R$ 81 mil por ano**, cerca de R$ 6.750 por mês.\n\n- **O que está em discussão:** um projeto de lei (PLP 108/21) aumenta o limite para cerca de R$ 145 mil por ano e deixa o MEI contratar até 2 funcionários. Em março de 2026, a Câmara aprovou só a \"urgência\", que acelera a tramitação. Isso não é aprovação final. Há outros projetos que propõem R$ 140 mil ou R$ 150 mil.\n- **Quando passaria a valer:** só de"
+    },
+    {
+      "id": "t04",
+      "titulo": "Preço de mercado",
+      "categoria": "pesquisa",
+      "status": "passou",
+      "segundos": 40.7,
+      "tokensEstimados": 478,
+      "pedidosDeAjuda": 0,
+      "resposta": "Salvei a planilha **\"Aluguel sala comercial 40m² - Av. Paulista (out/2026)\"** com 7 anúncios, 2 referências de mercado e o link da fonte em cada linha.\n\n**Média dos anúncios**\n- **Só o aluguel:** cerca de **R$ 2.950/mês** (R$ 71/m²), média de 4 anúncios que mostram esse valor separado.\n- **Com condomínio e IPTU:** cerca de **R$ 4.100/mês**, média de 7 anúncios.\n- **Faixa total:** de R$ 3.260 a R$ 4.700.\n\n**Relatórios de mercado:** dão R$ 99 a R$ 131/m², o que daria R$ 3.960 a R$ 5.240 para 40 m²"
+    },
+    {
+      "id": "t05",
+      "titulo": "Licitações abertas",
+      "categoria": "pesquisa",
+      "status": "passou",
+      "segundos": 27.3,
+      "tokensEstimados": 406,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não encontrei nenhuma licitação de software de gestão escolar publicada nesta semana (5 a 7/10/2026). A busca direta no PNCP, o portal oficial de compras públicas, falhou (erro de conexão), então pode haver editais que não apareceram.\n\nA única licitação do tema ainda aberta saiu antes desta semana:\n\n| Órgão | Objeto | Valor estimado | Abertura |\n|---|---|---|---|\n| Prefeitura de Itacambira/MG | Diário digital escolar (web/app) para a rede municipal | [?] missing: valor | 09/10/2026, 09:01 (propo"
+    },
+    {
+      "id": "t06",
+      "titulo": "Tendências do setor",
+      "categoria": "pesquisa",
+      "status": "passou",
+      "segundos": 34.5,
+      "tokensEstimados": 890,
+      "pedidosDeAjuda": 0,
+      "resposta": "# 5 tendências de e-commerce de moda para 2027\n\n**Panorama:** o e-commerce de moda global deve passar de **US$ 1,2 trilhão em 2027**, com crescimento de cerca de 10,5% ao ano. A fatia do online no varejo de moda deve subir de 11% em 2023 para cerca de **18% em 2027**.\n\n**1. IA generativa em toda a jornada**\nBusca conversacional, recomendações personalizadas, fotos de produto geradas por IA e previsão de demanda. O mercado de IA em moda deve ir de US$ 1,75 bi em 2025 para **US$ 9,45 bi em 2030**."
+    },
+    {
+      "id": "t07",
+      "titulo": "Comparar ferramentas",
+      "categoria": "pesquisa",
+      "status": "passou",
+      "segundos": 39,
+      "tokensEstimados": 886,
+      "pedidosDeAjuda": 0,
+      "resposta": "## Comparativo para 4 vendedores\n\n| | **Pipedrive** | **RD Station CRM** | **HubSpot Free** |\n|---|---|---|---|\n| **Preço (4 usuários)** | Cobrado em USD por usuário. Lite/Essential: ~US$ 14. Growth/Advanced: US$ 29–39. Professional: US$ 49–64. O anual é mais barato que o mensal. | **Free: R$ 0.** Basic: R$ 73 (R$ 65,70 no anual). Pro: R$ 131 (R$ 117,90 no anual), com mínimo de 4 usuários. Advanced sob consulta. | **R$ 0** |\n| **Total estimado** | Lite: ~US$ 56/mês. Growth: ~US$ 116–156/mês. | F"
+    },
+    {
+      "id": "t08",
+      "titulo": "Limpar base de clientes",
+      "categoria": "planilha",
+      "status": "falhou",
+      "segundos": 12.3,
+      "tokensEstimados": 426,
+      "pedidosDeAjuda": 0,
+      "resposta": "Dedup by lowercased trimmed email, keep first. Phones: all are 11 + 9 digits.Salvei o arquivo limpo como **clientes_limpo.csv**. Ele tem 8 clientes; a planilha original tinha 11.\n\n- **Duplicados removidos:** 3 (Ana Souza, Bruno Lima e Carla Mendes). Considerei o e-mail igual mesmo com diferença de maiúscula/minúscula ou espaço sobrando, e mantive a primeira vez que cada um aparecia.\n- **Telefones:** todos agora estão no formato (11) 9XXXX-XXXX. Tirei o código do país (+55) onde ele aparecia.\n\nOs"
+    },
+    {
+      "id": "t09",
+      "titulo": "Fluxo de caixa",
+      "categoria": "planilha",
+      "status": "passou",
+      "segundos": 18.4,
+      "tokensEstimados": 310,
+      "pedidosDeAjuda": 0,
+      "resposta": "Criei a planilha **\"Fluxo de Caixa - Nov-26 a Abr-27\"**. Você pode baixá-la como .csv.\n\n- **Entradas:** vendas, serviços e outras entradas, com o total calculado por fórmula.\n- **Saídas:** fornecedores, folha de pagamento, aluguel, impostos, marketing e outras saídas, com o total calculado por fórmula.\n- **Saldo do mês:** total de entradas menos total de saídas.\n- **Saldo acumulado:** saldo inicial mais saldo do mês. O saldo inicial de cada mês puxa o saldo acumulado do mês anterior.\n\nTodos os v"
+    },
+    {
+      "id": "t10",
+      "titulo": "Comissão de vendas",
+      "categoria": "planilha",
+      "status": "passou",
+      "segundos": 17.5,
+      "tokensEstimados": 479,
+      "pedidosDeAjuda": 0,
+      "resposta": "Calculei as comissões de setembro: R$ 7.635,00 no total, sobre R$ 229.300,00 vendidos.\n\n| Vendedor | Vendas | Total vendido | 3% (até 50 mil) | 5% (o que passou) | Comissão |\n|---|---|---|---|---|---|\n| Diego | 3 | R$ 75.800,00 | R$ 1.500,00 | R$ 1.290,00 | **R$ 2.790,00** |\n| Ana | 3 | R$ 62.000,00 | R$ 1.500,00 | R$ 600,00 | **R$ 2.100,00** |\n| Carla | 2 | R$ 50.000,00 | R$ 1.500,00 | — | **R$ 1.500,00** |\n| Bruno | 3 | R$ 41.500,00 | R$ 1.245,00 | — | **R$ 1.245,00** |\n| **Total** | 11 | **R$"
+    },
+    {
+      "id": "t11",
+      "titulo": "Conciliação bancária",
+      "categoria": "planilha",
+      "status": "passou",
+      "segundos": 5.5,
+      "tokensEstimados": 339,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não lançados (2 itens, total líquido −1.234,10... conferindo abaixo):\n\n| Data | Descrição | Valor |\n|---|---|---|\n| 12/09/2026 | Tarifa pacote de serviços | −45,90 |\n| 19/09/2026 | PIX recebido Padaria Sol | +1.280,00 |\n\nSaldo líquido não lançado: +1.234,10 (1.280,00 − 45,90).\n\nOs outros 6 lançamentos batem em data e valor."
+    },
+    {
+      "id": "t12",
+      "titulo": "Estoque mínimo",
+      "categoria": "planilha",
+      "status": "passou",
+      "segundos": 14.5,
+      "tokensEstimados": 398,
+      "pedidosDeAjuda": 0,
+      "resposta": "Três produtos estão abaixo do estoque mínimo. Para cobrir 30 dias, calculei o consumo diário × 30 menos o estoque atual.\n\n| Produto | Atual | Mínimo | Abaixo? | Comprar |\n|---|---|---|---|---|\n| Café torrado 500g | 8 | 20 | **SIM** | **52 pacotes** |\n| Açúcar refinado 1kg | 5 | 15 | **SIM** | **40 pacotes** |\n| Filtro de papel 103 | 10 | 30 | **SIM** | **80 caixas** |\n| Leite integral 1L | 48 | 24 | não | 72 caixas |\n| Copo descartável 200ml (cento) | 40 | 10 | não | 0 |\n| Guardanapo (pacote 50)"
+    },
+    {
+      "id": "t13",
+      "titulo": "Gráfico de vendas",
+      "categoria": "planilha",
+      "status": "passou",
+      "segundos": 20.4,
+      "tokensEstimados": 237,
+      "pedidosDeAjuda": 0,
+      "resposta": "Salvei os dois arquivos:\n\n- **Imagem:** `grafico_vendas_2026.svg` é o gráfico de barras de jan a set, com o valor em cima de cada barra. Não tenho como gerar PNG nesta sessão, então entreguei em SVG, que abre em qualquer navegador.\n- **Planilha:** `vendas_2026_por_mes` (.csv) traz os 9 meses e o total de **R$ 493.400**.\n\nO pico foi em setembro (63,4k) e o menor mês foi fevereiro (45,1k).\n\nOs conectores CodeBase e NextCloud precisam ser autorizados nas configurações de conectores do claude.ai. At"
+    },
+    {
+      "id": "t14",
+      "titulo": "Responder orçamento",
+      "categoria": "whatsapp",
+      "status": "passou",
+      "segundos": 6.4,
+      "tokensEstimados": 193,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não tenho acesso de envio ao WhatsApp nesta sessão, então não mandei nada. Segue a mensagem para você colar e enviar:\n\n---\nOlá! 😊 A limpeza de sofá de 3 lugares custa **R$ 180,00**.\n\nTemos estes horários disponíveis:\n• Amanhã (08/10): 9h ou 14h\n• Sexta (09/10): 10h ou 16h\n• Sábado (10/10): 9h\n\nQual fica melhor para você?\n---\n\n[?] Os horários são só exemplos, porque não consultei sua agenda. Se quiser, posso puxar os horários livres do seu Google Calendar e colocar na mensagem."
+    },
+    {
+      "id": "t15",
+      "titulo": "Cliente reclamando",
+      "categoria": "whatsapp",
+      "status": "passou",
+      "segundos": 9.2,
+      "tokensEstimados": 356,
+      "pedidosDeAjuda": 0,
+      "resposta": "Oi, Marina! Pedimos desculpas pela demora com o seu pedido 4521. Sabemos o quanto isso é chato.\n\nJá verifiquei: o pedido saiu pelos Correios (rastreio QB123456789BR) e está parado no centro de distribuição de Cajamar desde 28/09. Já abrimos um chamado com a transportadora (nº 77881) para liberar a entrega.\n\nAgora vamos cobrar uma resposta dos Correios sobre esse chamado e te avisar por aqui assim que tivermos novidade. Se o pedido não for liberado, vamos te apresentar uma solução. Pode contar co"
+    },
+    {
+      "id": "t16",
+      "titulo": "Agendamento",
+      "categoria": "whatsapp",
+      "status": "passou",
+      "segundos": 9.9,
+      "tokensEstimados": 204,
+      "pedidosDeAjuda": 0,
+      "resposta": "A agenda não está acessível agora, então não consigo confirmar se sexta (09/10) às 15h está livre nem localizar a consulta de quinta (08/10).\n\n[?] Faltam: o nome da paciente e a confirmação de que o horário está livre na agenda.\n\nSe você confirmar que sexta às 15h está livre, esta é a mensagem para ela:\n\n> Olá, [nome]! Sua consulta foi remarcada de quinta (08/10) para **sexta-feira, 09/10, às 15h**. Qualquer dúvida, é só chamar. Até lá!\n\nMe passe o nome e eu ajusto o texto. Se a agenda voltar a "
+    },
+    {
+      "id": "t17",
+      "titulo": "Cobrança educada",
+      "categoria": "whatsapp",
+      "status": "passou",
+      "segundos": 6.4,
+      "tokensEstimados": 156,
+      "pedidosDeAjuda": 0,
+      "resposta": "Olá, João! Tudo bem?\n\nPassando para lembrar que a fatura de **R$ 450,00** está vencida há 5 dias. Para regularizar, é só pagar pelo link abaixo:\n\n👉 [LINK DE PAGAMENTO]\n\nSe já tiver pago, desconsidere esta mensagem. Qualquer dúvida, estou à disposição!\n\nObrigado(a)! 😊\n\n---\n[?] Faltam o link de pagamento e a sua assinatura. Me envie os dois para eu finalizar a mensagem."
+    },
+    {
+      "id": "t18",
+      "titulo": "Pergunta fora do escopo",
+      "categoria": "whatsapp",
+      "status": "falhou",
+      "segundos": 4.5,
+      "tokensEstimados": 179,
+      "pedidosDeAjuda": 0,
+      "resposta": "Sugestão de resposta:\n\n> Olá! Obrigado pelo contato. 😊\n> Instalação elétrica não está entre os nossos serviços, então não conseguiremos atender esse pedido.\n> Trabalhamos com **[serviço 1]**, **[serviço 2]** e **[serviço 3]**. Se algum deles puder ajudar, é só me avisar que passo os detalhes.\n> Se precisar de um eletricista, posso indicar um profissional de confiança. 🙂\n\n[?] missing: lista dos nossos serviços. Me envie e eu devolvo a mensagem pronta, sem os colchetes."
+    },
+    {
+      "id": "t19",
+      "titulo": "Pós-venda",
+      "categoria": "whatsapp",
+      "status": "passou",
+      "segundos": 11.7,
+      "tokensEstimados": 261,
+      "pedidosDeAjuda": 0,
+      "resposta": "Ninguém comprou ontem (06/10) segundo os seus arquivos, então não enviei nenhuma mensagem.\n\n- **pedidos.csv:** a compra mais recente é de 25/09 (Lucas Prado).\n- **vendas.csv:** só tem o total de cada mês, sem cliente nem data.\n- **clientes.csv:** tem contatos, mas não tem data de compra.\n\nSe as vendas de ontem estão no Omie ou em outro sistema, me diga onde, que eu busco os compradores e envio por e-mail ou WhatsApp. O texto da mensagem já está pronto:\n\n> Olá, {nome}! Tudo bem? Sua compra de ont"
+    },
+    {
+      "id": "t20",
+      "titulo": "Responder fornecedor",
+      "categoria": "email",
+      "status": "passou",
+      "segundos": 10.5,
+      "tokensEstimados": 223,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não consegui abrir seus e-mails agora, então não achei a mensagem do fornecedor e nada foi enviado. Deixei a resposta pronta para você colar:\n\n---\n\n**Assunto:** Re: Pedido de 200 unidades – condição para pagamento à vista\n\nOlá, [Nome],\n\nObrigado pelo retorno sobre o pedido de 200 unidades.\n\nTemos interesse em fechar o pedido e podemos pagar à vista. Nessa condição, pedimos 5% de desconto sobre o valor total.\n\nSe concordarem, mandem a proposta atualizada com o novo valor e o prazo de entrega para"
+    },
+    {
+      "id": "t21",
+      "titulo": "Proposta comercial",
+      "categoria": "email",
+      "status": "passou",
+      "segundos": 8.9,
+      "tokensEstimados": 245,
+      "pedidosDeAjuda": 0,
+      "resposta": "**Assunto:** Proposta comercial – [nome do projeto] | Multipli\n\nPrezados, equipe Alfa Ltda,\n\nEncaminho a proposta comercial para [nome do projeto], conforme conversamos.\n\n**Escopo**\n- [Entrega 1]\n- [Entrega 2]\n- [Entrega 3]\n\n**Prazo:** 30 dias corridos, contados a partir da aprovação da proposta.\n\n**Investimento:** R$ 12.000,00 ([condição de pagamento, ex.: 50% na aprovação e 50% na entrega]).\n\nA proposta completa segue em anexo. Estou à disposição para tirar dúvidas ou ajustar algum ponto.\n\nAte"
+    },
+    {
+      "id": "t22",
+      "titulo": "Triagem da caixa",
+      "categoria": "email",
+      "status": "passou",
+      "segundos": 8.3,
+      "tokensEstimados": 625,
+      "pedidosDeAjuda": 0,
+      "resposta": "Precisam da sua resposta, do mais urgente para o menos urgente:\n\n1. **Mariana Prado (Grupo Vértice): aceite da proposta de 300 kits.** O prazo era até 12h de 06/10, e hoje já é 07/10. [!] Se você ainda não respondeu, fale com ela agora para tentar salvar a venda antes que o orçamento vá para o próximo trimestre.\n2. **Rodrigo (Distribuidora Alfa): boleto da NF 8812, R$ 2.180,00.** O e-mail é de ontem e diz que vence \"amanhã\", então vence **hoje**. Pague ou peça a prorrogação ainda hoje.\n3. **Juli"
+    },
+    {
+      "id": "t23",
+      "titulo": "Recusar reunião",
+      "categoria": "email",
+      "status": "passou",
+      "segundos": 15.8,
+      "tokensEstimados": 243,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não achei o convite: e-mail e agenda estão indisponíveis agora, e ele não aparece nos e-mails não lidos. Segue o texto pronto para você enviar:\n\n---\n\n**Assunto:** Re: Reunião de quarta-feira\n\nOlá, [Nome],\n\nObrigado pelo convite. Infelizmente não vou conseguir participar na quarta-feira, 14/10, por um conflito de agenda.\n\nPosso em um destes horários na semana seguinte:\n- **Terça-feira, 20/10, às 10h**\n- **Quinta-feira, 22/10, às 15h**\n\nSe nenhum funcionar, me sugira outro horário que eu me ajusto"
+    },
+    {
+      "id": "t24",
+      "titulo": "Revisar PR",
+      "categoria": "codigo",
+      "status": "passou",
+      "segundos": 15.4,
+      "tokensEstimados": 988,
+      "pedidosDeAjuda": 0,
+      "resposta": "**Bloqueantes**\n\n1. **[!] SQL injection** em `src/pedidos.mjs:15` (`buscarPorCliente`). O e-mail é interpolado direto na query: com `' OR '1'='1`, qualquer um lista todos os pedidos. Correção:\n   ```js\n   return db.query('SELECT * FROM pedidos WHERE email = ?', [email]);\n   ```\n2. **[!] Chave do Stripe no código** em `src/pedidos.mjs:30`. Uma chave `sk_live_` commitada fica no histórico do git mesmo depois de apagada. Leve para variável de ambiente (`process.env.STRIPE_KEY`) e, se a chave for re"
+    },
+    {
+      "id": "t25",
+      "titulo": "Corrigir teste quebrado",
+      "categoria": "codigo",
+      "status": "passou",
+      "segundos": 7.1,
+      "tokensEstimados": 414,
+      "pedidosDeAjuda": 0,
+      "resposta": "**Causa:** em `carrinho.mjs`, o desconto divide por `10` em vez de `100`. Com cupom de 10% sobre 200, o desconto vira 200 e o total sai 0, não 180. O teste \"soma itens sem cupom\" passa porque o desconto é 0.\n\n**Correção:**\n```js\nconst desconto = bruto * descontoPercentual / 100;\n```\n\n[!] Não consegui rodar os testes. Aqui não tenho ferramenta para executar comandos nem editar arquivos locais. Salvei o `carrinho.mjs` corrigido como artefato. Substitua o arquivo na sua pasta e rode `node --test ca"
+    },
+    {
+      "id": "t26",
+      "titulo": "Script de backup",
+      "categoria": "codigo",
+      "status": "passou",
+      "segundos": 4.9,
+      "tokensEstimados": 270,
+      "pedidosDeAjuda": 0,
+      "resposta": "```bash\n#!/usr/bin/env bash\n# backup_dados.sh — compacta /work/dados e mantém os 7 backups mais recentes\nset -euo pipefail\n\nORIGEM=\"/work/dados\"\nDESTINO=\"/work/backups\"\nMANTER=7\n\nmkdir -p \"$DESTINO\"\n\nARQUIVO=\"$DESTINO/dados_$(date +%Y%m%d_%H%M%S).tar.gz\"\ntar -czf \"$ARQUIVO\" -C \"$(dirname \"$ORIGEM\")\" \"$(basename \"$ORIGEM\")\"\n\n# Remove os mais antigos, mantendo só os últimos $MANTER\nls -1t \"$DESTINO\"/dados_*.tar.gz | tail -n +$((MANTER + 1)) | xargs -r rm --\n```\n\nInstalar e agendar (todo dia às 02:"
+    },
+    {
+      "id": "t27",
+      "titulo": "Landing page",
+      "categoria": "codigo",
+      "status": "passou",
+      "segundos": 19.9,
+      "tokensEstimados": 237,
+      "pedidosDeAjuda": 0,
+      "resposta": "Criei a landing page e salvei como artefato **landing-curso-confeitaria.html**. Para ver, baixe o arquivo e abra no navegador.\n\n- **Título:** 🧁 Curso de Confeitaria Doce Arte\n- **3 benefícios:** do básico ao profissional, venda o que produz e acesso vitalício com certificado\n- **Preço:** de R$ 497 por R$ 197, ou 12x de R$ 19,70\n- **Botão de WhatsApp:** aparece no topo e no bloco de preço, com mensagem pronta\n\n[?] missing: número de WhatsApp real. Coloquei o provisório `5511999999999`; troque no"
+    },
+    {
+      "id": "t28",
+      "titulo": "Explicar erro",
+      "categoria": "codigo",
+      "status": "passou",
+      "segundos": 6.4,
+      "tokensEstimados": 350,
+      "pedidosDeAjuda": 0,
+      "resposta": "**O que significa**\n\nSeu programa tentou se conectar ao PostgreSQL (porta 5432) no próprio computador (127.0.0.1) e ninguém atendeu. Ou seja: o banco não está rodando, ou não está nessa porta/endereço.\n\n**Como resolver (Windows)**\n\n1. Veja se o serviço está ativo:\n```\nsc query postgresql-x64-16\n```\n(o nome muda conforme a versão; confira em `services.msc` procurando \"postgresql\")\n\n2. Se estiver parado, inicie:\n```\nnet start postgresql-x64-16\n```\n\n3. Se usa Docker:\n```\ndocker ps -a\ndocker start <"
+    },
+    {
+      "id": "t29",
+      "titulo": "Relatório diário de vendas",
+      "categoria": "relatorio",
+      "status": "passou",
+      "segundos": 19.2,
+      "tokensEstimados": 482,
+      "pedidosDeAjuda": 0,
+      "resposta": "O dia 29/09 faturou **R$ 1.997,00**. Foi o melhor dia da semana e ficou **54,0% acima** da média diária.\n\n| Base de comparação | Média diária | Diferença em R$ | Diferença em % |\n|---|---|---|---|\n| Semana inteira (23 a 29/09) | R$ 1.296,43 | +R$ 700,57 | +54,0% |\n| Só os 6 dias anteriores (23 a 28/09) | R$ 1.179,67 | +R$ 817,33 | +69,3% |\n\n**Os 3 produtos que mais venderam em valor:**\n1. Pão francês: 44 kg, R$ 792,00 (39,7% do dia)\n2. Café coado: 120 unidades, R$ 600,00 (30,0%)\n3. Croissant: 25"
+    },
+    {
+      "id": "t30",
+      "titulo": "Resumo semanal da equipe",
+      "categoria": "relatorio",
+      "status": "falhou",
+      "segundos": 5.7,
+      "tokensEstimados": 329,
+      "pedidosDeAjuda": 0,
+      "resposta": "**Resumo da semana (29/09 a 03/10)**\n\n- **Rafael:** publicou a landing page da promoção de outubro (29/09) e corrigiu o checkout no celular (01/10). Ainda falta integrar o frete com o Melhor Envio.\n- **Juliana:** fechou o contrato com o fornecedor de embalagens (30/09) e atualizou a tabela de preços (02/10). Ainda falta negociar o prazo com a Distribuidora Alfa.\n- **Tiago:** respondeu 42 chamados de atendimento (03/10). Ainda falta gravar os vídeos de tutorial de troca.\n\nA equipe concluiu 5 de 8"
+    },
+    {
+      "id": "t31",
+      "titulo": "Indicadores do mês",
+      "categoria": "relatorio",
+      "status": "passou",
+      "segundos": 13.4,
+      "tokensEstimados": 342,
+      "pedidosDeAjuda": 0,
+      "resposta": "Faturamento e ticket médio fechados. Novos clientes e cancelamentos não dá para calcular com os arquivos que tenho.\n\n| Indicador | Setembro/2026 |\n|---|---|\n| Faturamento | **R$ 229.300,00** (11 vendas) |\n| Ticket médio | **R$ 20.845,45** |\n| Novos clientes | [?] missing: data de cadastro |\n| Cancelamentos | [?] missing: status de cancelamento |\n\n- **Clientes:** 9 compraram em setembro. Mercado Bom Preço e Atacadão Norte compraram duas vezes cada. Nenhum dos 9 nomes aparece em `clientes.csv`, en"
+    },
+    {
+      "id": "t32",
+      "titulo": "Relatório de atendimento",
+      "categoria": "relatorio",
+      "status": "passou",
+      "segundos": 9.6,
+      "tokensEstimados": 1186,
+      "pedidosDeAjuda": 0,
+      "resposta": "**Tempo médio da primeira resposta: 11 min** (15 conversas, mínimo 3 min, máximo 25 min, mediana 10 min)\n\n**Top 5 assuntos**\n\n| # | Assunto | Conversas | IDs | Tempo médio |\n|---|---|---|---|---|\n| 1 | Entrega atrasada ou não recebida | 5 | 1, 4, 7, 10, 14 | 9,8 min |\n| 2 | Troca e devolução | 4 | 2, 6, 9, 12 | 16,5 min |\n| 3 | Segunda via de boleto | 3 | 3, 8, 15 | 11,3 min |\n| 4 | Cupom com erro | 2 | 5, 11 | 6 min |\n| 5 | Horário da loja física | 1 | 13 | 4 min |\n\n- Troca e devolução é o assu"
+    },
+    {
+      "id": "t33",
+      "titulo": "Resumo de reunião",
+      "categoria": "relatorio",
+      "status": "passou",
+      "segundos": 7.7,
+      "tokensEstimados": 263,
+      "pedidosDeAjuda": 0,
+      "resposta": "# Ata de Reunião — 07/10/2026\n\n**Participantes:** Ana, Pedro [?] missing: lista completa\n\n## Decisões\n| # | Decisão | Responsável | Prazo |\n|---|---------|-------------|-------|\n| 1 | Aumentar o preço em 8% | [?] missing: responsável | [?] missing: data de início |\n\n## Ações\n| # | Ação | Responsável | Prazo |\n|---|------|-------------|-------|\n| 1 | Fechar contrato com o fornecedor | Ana | 09/10/2026 (sexta) |\n| 2 | Revisar o site | Pedro | 20/10/2026 |\n\n## Pendências\n- Definir quem cuida do aum"
+    },
+    {
+      "id": "t34",
+      "titulo": "Contrato de prestação",
+      "categoria": "documento",
+      "status": "passou",
+      "segundos": 19.3,
+      "tokensEstimados": 941,
+      "pedidosDeAjuda": 0,
+      "resposta": "# CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE DESIGN\n\n**CONTRATANTE:** [Nome/Razão social], [CPF/CNPJ], com endereço em [endereço completo].\n**CONTRATADO(A):** [Nome/Razão social], [CPF/CNPJ], com endereço em [endereço completo].\n\nAs partes acima assinam este contrato de prestação de serviços, que seguirá as cláusulas abaixo.\n\n**Cláusula 1ª – Objeto**\nO(A) CONTRATADO(A) vai prestar serviços de design gráfico, que consistem em [descrever: ex. criação de identidade visual com logotipo, paleta de cores, t"
+    },
+    {
+      "id": "t35",
+      "titulo": "Política de trocas",
+      "categoria": "documento",
+      "status": "passou",
+      "segundos": 11.2,
+      "tokensEstimados": 711,
+      "pedidosDeAjuda": 0,
+      "resposta": "# Política de Trocas e Devoluções\n\n**Última atualização:** 07/10/2026\n\n## 1. Direito de arrependimento (compras online)\nConforme o art. 49 do Código de Defesa do Consumidor (Lei 8.078/90), você pode desistir da compra em até **7 dias corridos**, contados da data de recebimento do produto, sem precisar justificar.\n\n**Como solicitar:**\n1. Envie e-mail para [e-mail de atendimento] ou use o formulário em [link], informando nº do pedido, nome e CPF.\n2. Receberemos sua solicitação e enviaremos o códig"
+    },
+    {
+      "id": "t36",
+      "titulo": "Descrição de vaga",
+      "categoria": "documento",
+      "status": "passou",
+      "segundos": 9.7,
+      "tokensEstimados": 356,
+      "pedidosDeAjuda": 0,
+      "resposta": "**Vaga: Auxiliar Administrativo**\n\n**Sobre a vaga**\nProcuramos uma pessoa organizada e proativa para apoiar as rotinas administrativas da empresa.\n\n**Atividades**\n- Organizar e arquivar documentos físicos e digitais\n- Atender telefone, e-mail e WhatsApp e encaminhar demandas\n- Lançar dados em planilhas e no sistema interno\n- Emitir e conferir notas, boletos e recibos\n- Controlar agenda, materiais de escritório e correspondências\n- Dar apoio aos setores financeiro, RH e comercial\n\n**Requisitos**\n"
+    },
+    {
+      "id": "t37",
+      "titulo": "Manual de onboarding",
+      "categoria": "documento",
+      "status": "passou",
+      "segundos": 31.6,
+      "tokensEstimados": 343,
+      "pedidosDeAjuda": 0,
+      "resposta": "Criei o guia **\"Guia de Primeiro Dia – Novos Funcionários\"** e salvei nos seus artefatos. Ele tem:\n\n- **Agenda do dia**, das 09:00 às 17:00, com o responsável por cada etapa.\n- **Acessos**: e-mail, Drive, chat, Wi-Fi, VPN, sistema de RH e ferramentas da área, com regras básicas de segurança (2FA, troca de senha).\n- **Contatos**: TI, RH, gestor(a), padrinho/madrinha, Financeiro e Facilities.\n- **Checklist** em três blocos: antes do almoço, depois do almoço e fim do dia.\n- **Visão da primeira sema"
+    },
+    {
+      "id": "t38",
+      "titulo": "Apresentação de resultados",
+      "categoria": "documento",
+      "status": "passou",
+      "segundos": 24.6,
+      "tokensEstimados": 378,
+      "pedidosDeAjuda": 0,
+      "resposta": "Montei os 6 slides e salvei como \"Resultados 3T26 – Apresentação aos Sócios\". Os números cobrem só setembro, porque os arquivos não têm dados de julho e agosto. Assim, ainda não é o trimestre completo.\n\n| Slide | Conteúdo principal |\n|---|---|\n| 1. Receita | R$ 229.300 vendidos, mas só R$ 13.390 entraram no banco |\n| 2. Custos | R$ 9.066,40; metade é aluguel |\n| 3. Lucro | Na conta, R$ 220,2 mil; no caixa, R$ 4.323,60 |\n| 4. Destaques | Diego fez 33% das vendas; Atacadão Norte e Mercado Bom Preç"
+    },
+    {
+      "id": "t39",
+      "titulo": "Posts da semana",
+      "categoria": "marketing",
+      "status": "passou",
+      "segundos": 17.8,
+      "tokensEstimados": 470,
+      "pedidosDeAjuda": 0,
+      "resposta": "**Posts da semana de 12 a 16/10**\n\n**1. Segunda (12/10): Dia das Crianças**\n- **Legenda:** Hoje é dia de ser criança! 🧒🍪 Nossos cookies e sonhos recheados chegaram para adoçar o feriado. Traga os pequenos e deixe que eles escolham o lanche! #DiaDasCrianças #Padaria\n- **Imagem:** mãos de criança pegando um cookie numa bandeja, fundo colorido e desfocado.\n\n**2. Terça (13/10): bastidores**\n- **Legenda:** Enquanto a cidade dorme, a gente já está aqui. ⏰ Às 4h da manhã o forno já está quente para o"
+    },
+    {
+      "id": "t40",
+      "titulo": "Campanha de e-mail",
+      "categoria": "marketing",
+      "status": "passou",
+      "segundos": 11.3,
+      "tokensEstimados": 381,
+      "pedidosDeAjuda": 0,
+      "resposta": "**E-mail 1 (1h após o abandono): lembrete**\n**Assunto:** Você esqueceu algo no carrinho 👀\n\nOi, {nome}!\n\nSeus itens ainda estão no carrinho, separados para você:\n\n{produtos + imagem + preço}\n\nÉ só clicar para finalizar em poucos segundos.\n\n[Finalizar minha compra]\n\nFicou com alguma dúvida? Responda este e-mail que a gente ajuda.\n\n---\n\n**E-mail 2 (24h depois): quebra de objeções**\n**Assunto:** {nome}, ainda pensando? Isso pode ajudar\n\nOi, {nome}!\n\nSabemos que às vezes bate a dúvida. Então aqui va"
+    },
+    {
+      "id": "t41",
+      "titulo": "Responder avaliação",
+      "categoria": "marketing",
+      "status": "falhou",
+      "segundos": 8.3,
+      "tokensEstimados": 232,
+      "pedidosDeAjuda": 0,
+      "resposta": "Este é um modelo de resposta. Não recebi o texto da avaliação, então é genérico:\n\n---\n\nOlá, [Nome],\n\nObrigado por nos contar como foi sua experiência. Você tem razão: o prazo de entrega não foi cumprido, e sentimos muito por isso.\n\nJá passamos o seu caso para a equipe de logística, para entender onde houve o atraso e evitar que se repita. Se o pedido ainda não chegou, ou se pudermos ajudar em algo, fale com a gente pelo [WhatsApp/e-mail]. Vamos acompanhar o seu caso pessoalmente.\n\nEsperamos ter "
+    },
+    {
+      "id": "t42",
+      "titulo": "Pesquisa de palavras-chave",
+      "categoria": "marketing",
+      "status": "passou",
+      "segundos": 7.7,
+      "tokensEstimados": 244,
+      "pedidosDeAjuda": 0,
+      "resposta": "**Transacional (pronto para matricular)**\n1. escola de inglês em Belo Horizonte\n2. curso de inglês BH preço\n3. matrícula curso de inglês BH\n4. aulas de inglês presenciais Belo Horizonte\n5. curso de inglês Savassi (troque pelo bairro da escola)\n\n**Comercial (comparando opções)**\n6. melhor escola de inglês em BH\n7. curso de inglês intensivo Belo Horizonte\n8. inglês para adultos BH\n9. curso de inglês para crianças Belo Horizonte\n10. inglês para negócios BH\n\n**Informacional (pesquisando)**\n11. quant"
+    },
+    {
+      "id": "t43",
+      "titulo": "Classificar despesas",
+      "categoria": "financeiro",
+      "status": "passou",
+      "segundos": 8.9,
+      "tokensEstimados": 385,
+      "pedidosDeAjuda": 0,
+      "resposta": "Despesas de setembro por categoria:\n\n| Categoria | Lançamentos | Total (R$) |\n|---|---|---|\n| Folha | Folha de pagamento | 18.750,00 |\n| Aluguel | Aluguel da loja da Rua Augusta | 4.500,00 |\n| Impostos | DAS Simples (2.340,50) + IPTU (380,00) | 2.720,50 |\n| Marketing | Meta Ads (1.200,00) + Google Ads (850,00) | 2.050,00 |\n| Outros | Enel (610,30) + Vivo (199,90) + tarifa bancária (45,90) | 856,10 |\n| **Total** | | **28.876,60** |\n\n[?] Coloquei o IPTU em impostos. Se você controla o IPTU junto c"
+    },
+    {
+      "id": "t44",
+      "titulo": "Lembrete de boletos",
+      "categoria": "financeiro",
+      "status": "passou",
+      "segundos": 25.1,
+      "tokensEstimados": 234,
+      "pedidosDeAjuda": 0,
+      "resposta": "Try local files: lancamentos.xlsx.Não consegui acessar o ERP nem a agenda agora, então usei seus arquivos. Só encontrei **1 boleto** vencendo nos próximos 7 dias:\n\n| Vencimento | Fornecedor | Documento | Valor |\n|---|---|---|---|\n| **07/10/2026 (hoje)** | Distribuidora Alfa | NF 8812 | R$ 2.180,00 |\n\n- Criei um lembrete diário às 09:00. [?] Se já passou das 9h, o primeiro aviso só sai amanhã, depois do vencimento. Pague hoje ou peça prorrogação ao Rodrigo (rodrigo@distalfa.com.br), que pediu uma"
+    },
+    {
+      "id": "t45",
+      "titulo": "Precificação",
+      "categoria": "financeiro",
+      "status": "passou",
+      "segundos": 7.5,
+      "tokensEstimados": 152,
+      "pedidosDeAjuda": 0,
+      "resposta": "**O preço de venda é R$ 71,19.**\n\nCalculei com impostos e margem sobre o preço de venda: **Preço = Custo ÷ (1 − impostos − margem)**\n\nPreço = 42 ÷ (1 − 0,06 − 0,35) = 42 ÷ 0,59 = **R$ 71,19**\n\nConferência:\n- Impostos (6%): R$ 4,27\n- Margem (35%): R$ 24,92\n- Custo: R$ 42,00\n- Soma: 4,27 + 24,92 + 42,00 = R$ 71,19\n\n[?] Se você quis dizer 35% de lucro sobre o custo, a conta é diferente: 42 × 1,35 ÷ 0,94 = R$ 60,32."
+    },
+    {
+      "id": "t46",
+      "titulo": "Organizar a semana",
+      "categoria": "agenda",
+      "status": "passou",
+      "segundos": 12.9,
+      "tokensEstimados": 196,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não consegui acessar sua agenda, então nada foi criado nela e não verifiquei se esses horários conflitam com compromissos que você já tem. Montei uma proposta para a semana de 12 a 16/10 e salvei como planilha em \"Agenda semana 12-16 out 2026\":\n\n- **Foco (2h):** seg e qua, 09:00–11:00\n- **Clientes:** ter 10:00, qua 15:00 e qui 14:00 (1h cada)\n- **Almoço livre:** todo dia, 12:00–13:30\n- **Sexta:** sem compromissos, fica como folga\n\n[?] Faltam os nomes e e-mails dos 3 clientes. Se quiser, eu crio "
+    },
+    {
+      "id": "t47",
+      "titulo": "Rotina diária",
+      "categoria": "agenda",
+      "status": "passou",
+      "segundos": 12.8,
+      "tokensEstimados": 264,
+      "pedidosDeAjuda": 0,
+      "resposta": "Criei a rotina **\"Resumo diário 8h: tarefas + e-mails urgentes\"**. Ela vai rodar todo dia às 08:00, mas ainda não foi testada.\n\nO resumo terá duas partes:\n- **Hoje:** os compromissos do dia no Google Calendar e as tarefas de hoje que estiverem em `tarefas-semana.csv`.\n- **E-mails urgentes:** até 5 e-mails não lidas das últimas 24h que o Gmail marcou como importantes ou que tenham palavras como \"urgente\", \"prazo\" ou \"hoje\". Cada um vem com remetente, assunto e uma linha de resumo. A rotina não re"
+    },
+    {
+      "id": "t48",
+      "titulo": "Pedido de compra",
+      "categoria": "operacoes",
+      "status": "passou",
+      "segundos": 16.2,
+      "tokensEstimados": 285,
+      "pedidosDeAjuda": 0,
+      "resposta": "Montei o pedido de compra com os 3 itens que estão abaixo do estoque mínimo. Ele ainda não tem fornecedor: o `estoque.csv` não indica quem é o fornecedor principal.\n\n| Item | Estoque atual / mínimo | Dura mais | Pedir |\n|---|---|---|---|\n| Café torrado 500g | 8 / 20 | ~4 dias | **42 pacotes** |\n| Açúcar refinado 1kg | 5 / 15 | ~3 dias | **33 pacotes** |\n| Filtro de papel 103 | 10 / 30 | ~3 dias | **65 caixas** |\n\n- **Prazo:** entrega até **09/10/2026 (sexta)**. O açúcar e o filtro acabam em uns "
+    },
+    {
+      "id": "t49",
+      "titulo": "Checklist de abertura",
+      "categoria": "operacoes",
+      "status": "passou",
+      "segundos": 16.9,
+      "tokensEstimados": 260,
+      "pedidosDeAjuda": 0,
+      "resposta": "**Checklist de Abertura**\n- Desativar alarme e destrancar a porta\n- Acender luzes e ligar equipamentos (computador, caixa, maquininhas)\n- Conferir o fundo de troco do caixa\n- Verificar limpeza do piso, vitrines e banheiro\n- Repor produtos nas prateleiras e conferir preços/etiquetas\n- Checar mensagens, pedidos e agenda do dia\n- Testar internet e sistema de vendas\n- Virar placa para \"Aberto\" no horário certo\n\n**Checklist de Fechamento**\n- Virar placa para \"Fechado\" e atender os últimos clientes\n- "
+    },
+    {
+      "id": "t50",
+      "titulo": "Atualizar cadastro",
+      "categoria": "operacoes",
+      "status": "passou",
+      "segundos": 15.7,
+      "tokensEstimados": 237,
+      "pedidosDeAjuda": 0,
+      "resposta": "Não alterei nenhum cadastro: a Maria Souza não está em clientes.csv. Os nomes mais parecidos lá são duas linhas de **Ana Souza**, que é outra pessoa. Não modifiquei esse arquivo.\n\nO sistema de gestão da empresa está fora do ar agora, então também não consegui procurar nem atualizar a cliente por lá.\n\nComo você quer seguir?\n- Se ela está no sistema de gestão, me diga de qual empresa e eu tento de novo quando ele voltar.\n- Se você quer incluí-la em clientes.csv, me passe o e-mail e a cidade dela. "
+    }
+  ]
+}
