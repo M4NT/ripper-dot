@@ -90,7 +90,8 @@ export default function Library() {
           <ul className="rows">{files.map(f => (
             <li key={f.id} className="row-item">
               {isImage(f.type) ? <FileThumb src={`/api/files/${f.id}`} /> : <span className="thumb file-ico"><Icon name="file" size={18} /></span>}
-              <a className="row-main" href={`/api/files/${f.id}`} target="_blank" rel="noreferrer"><b>{f.name}</b><small>{fmtSize(f.size)} · {agent(f.agentId)?.name || 'Agente excluído'} · {fmtAgo(f.createdAt)}</small></a>
+              <a className="row-main" href={`/api/files/${f.id}`} target="_blank" rel="noreferrer"><b>{f.name}</b><small>{fmtSize(f.size)} · {f.team ? 'do time' : agent(f.agentId)?.name || 'Agente excluído'} · {fmtAgo(f.createdAt)}</small></a>
+              <button className={`btn btn-sm ${f.team ? 'btn-primary' : ''}`} title={f.team ? 'Todos os agentes usam este arquivo. Clique para voltar a ser só do agente.' : 'Deixar todos os agentes usarem (ex.: logo, paleta, guia de marca)'} onClick={() => api(`/api/files/${f.id}`, { method: 'PATCH', body: { team: !f.team } }).then(() => { refresh(); toast(f.team ? 'Arquivo voltou a ser só do agente' : 'Agora é do time: todos os agentes usam'); })}><Icon name="group" size={14} />{f.team ? 'Do time' : 'Compartilhar com o time'}</button>
               {f.chatId && <a className="icon-btn sm" href={`#/c/${f.chatId}`} aria-label="Abrir conversa"><Icon name="chat" size={16} /></a>}
               <button className="icon-btn sm" aria-label={`Remover ${f.name}`} onClick={() => api(`/api/files/${f.id}`, { method: 'DELETE' }).then(() => { refresh(); toast('Arquivo removido'); })}><Icon name="trash" size={16} /></button>
             </li>
