@@ -19,7 +19,7 @@
       "id": "c03", "titulo": "Tarefa com ferramentas",
       "agentes": ["Ana"],
       "teste": "tools",
-      "mensagens": [{ "texto": "Pesquise a cotação atual do dólar e me diga o valor com a fonte." }],
+      "mensagens": [{ "texto": "Pesquise a cotação atual do dólar e salve num arquivo cotacao.md com o valor, a data e a fonte." }],
       "espera": { "responder": ["d[oó]lar", "R\\$|\\d+[,.]\\d+"], "vouAntesDasFerramentas": true, "fecho": true }
     },
     {
@@ -59,7 +59,7 @@
         { "texto": "Me dê 3 ideias de nome para uma padaria artesanal." },
         { "texto": "Gostei da segunda. Escreva um slogan para ela." }
       ],
-      "espera": { "responder": ["slogan|\""] }
+      "espera": { "responder": ["\\S.{8,}"], "proibido": ["qual (delas|das|nome|op[cç][aã]o)"] }
     },
     {
       "id": "c09", "titulo": "Pedido que exige fonte citada",

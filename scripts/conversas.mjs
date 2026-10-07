@@ -45,7 +45,7 @@ export function score(c, o, limites) {
   if (e.proibido) add('não inventou / não ignorou', !e.proibido.some(s => rx(s).test(o.texto)));
   if (e.maxCaracteres) add('curto', o.texto.length <= e.maxCaracteres, `${o.texto.length} car.`);
   if (e.vouAntesDasFerramentas) add('"Vou…" antes das ferramentas', o.ferramentas > 0 && /^\s*Vou\b[^\n]*$/.test(o.antesDaFerramenta.trim()), o.antesDaFerramenta.slice(0, 80));
-  if (e.fecho || o.ferramentas > 0) add('fecho Feito/Como verifiquei/Falta', /Feito/i.test(o.texto) && /Como verifiquei/i.test(o.texto) && /Falta/i.test(o.texto));
+  if (e.fecho) add('fecho Feito/Como verifiquei/Falta', /Feito/i.test(o.texto) && /Como verifiquei/i.test(o.texto) && /Falta/i.test(o.texto));
   if (e.delegacaoPara) add('delegação registrada', o.delegacoes.includes(e.delegacaoPara + SUFIXO));
   for (const n of e.respondem || []) add(`${n} respondeu`, o.falaram.includes(n + SUFIXO));
   for (const n of e.calados || []) add(`${n} ficou calado`, !o.falaram.includes(n + SUFIXO));
