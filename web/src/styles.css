@@ -2237,3 +2237,7 @@ body.agent-dragging .side-list { overflow: hidden; }
 /* Texto chegando: cada trecho novo aparece com opacidade, sem cursor piscando */
 .md.streaming > :last-child::after { content: none; }
 .md .fade-in { transition: opacity .45s linear; }
+
+/* imagem sendo gerada (generate_image): efeito img-fx no lugar da arte */
+.img-gen { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.img-gen-card { width: min(280px, 100%); aspect-ratio: 1; border-radius: var(--r-lg); background: var(--surface-2); }

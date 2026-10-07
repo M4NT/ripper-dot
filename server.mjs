@@ -99,6 +99,7 @@ import { listScripts, deleteScript } from './lib/script-pool.mjs';
 import { listClaudeConnectors } from './lib/claude-connectors.mjs';
 import { buildInbox, resolveInboxItem } from './lib/inbox-feed.mjs';
 import { vmPathToData, mimeOf, inlineType } from './lib/deliver-file.mjs';
+import { generateImage, IMAGE_EXT } from './lib/image-gen.mjs';
 import { parseWhatsappMessages, whatsappPrompt, sendWhatsappText, whatsappReady } from './lib/whatsapp.mjs';
 import { evolutionSecrets, connectInstance, instanceState, disconnectInstance, sendText as sendEvolutionText, parseEvolutionAny, parseEvolutionGroup, groupName, evolutionMedia, withMediaText, downloadMedia, contactMode, isAllowed, makeRateLimiter, channelSafeAgent } from './lib/evolution.mjs';
 import { history as waHistory, recordMessage as recordWaMessage, listChats as waListChats, readChat as waReadChat, findContacts as waFindContacts, styleProfile as waStyleProfile, styleHint, stats as waStats, wipeHistory as waWipeHistory } from './lib/whatsapp-store.mjs';
@@ -1232,6 +1233,18 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
       emit({ file: pub });
       return `"${name}" entregue: o usuário vê botões para abrir, baixar e mostrar na pasta. Não cite caminho, porta nem link.`;
     },
+    // Imagem pela assinatura do ChatGPT (Codex): o kit de marca são as imagens anexadas ao agente.
+    images: codexOk && agent.tools.includes('images') ? {
+      generate: async a => {
+        const refs = a.use_brand === false ? [] : db.files.filter(f => canUseFile(f, agent, chat) && !f.delivered && IMAGE_EXT.test(f.name)).slice(-4).map(f => fileURLToPath(dataUrl(f.path)));
+        const slug = String(a.name || a.prompt).toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'imagem';
+        const name = `${slug}-${Date.now().toString(36)}.png`;
+        try {
+          await generateImage({ prompt: a.prompt, refs, outFile: fileURLToPath(new URL(`imagens/${name}`, sandboxDir(agent))), signal });
+        } catch (e) { return `Não consegui gerar a imagem: ${e.message}`; }
+        return ctx.deliverFile({ path: `/work/imagens/${name}` });
+      }
+    } : null,
     x9: isEnterpriseMode(s) ? {
       context: () => JSON.stringify(x9Sources(), null, 2),
       checklist: () => JSON.stringify(runX9Scan({ db, settings: s, sources: x9Sources() }), null, 2)
@@ -1671,7 +1684,7 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
     visibleArtifacts(chat).length && `Artefatos do time (leia com read_artifact; salve entregas com save_artifact): ${visibleArtifacts(chat).slice(-20).map(x => `"${x.title}" (${x.kind}, v${x.version})`).join('; ')}`,
     (() => {
       const files = db.files.filter(f => canUseFile(f, agent, chat)).slice(-20);
-      return files.length ? `Arquivos seus (leia pelo nome com read_artifact, inclusive planilhas xlsx/csv e docx): ${files.map(f => `"${f.name}"`).join('; ')}. Para entregar planilha, use save_artifact com kind "tabela" (conteúdo CSV, baixa como .csv).` : '';
+      return files.length ? `Arquivos seus (leia pelo nome com read_artifact, inclusive planilhas xlsx/csv e docx): ${files.map(f => `"${f.name}"`).join('; ')}. Para entregar planilha, use save_artifact com kind "tabela" (conteúdo CSV, baixa como .csv). No computador eles ficam em ./uploads; se forem logo, paleta, fontes ou guia de marca, siga-os em tudo que criar.` : '';
     })(),
     (() => {
       const others = db.agents.filter(a => a.id !== agent.id && a.status !== 'paused' && peerAllowed(agent, a));
