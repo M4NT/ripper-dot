@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
 import { stallLabel, stepLabel, TOOL_INFO } from './lib.js';
 import { Icon } from './ui.jsx';
+import CampaignCard from './campaignCard.jsx';
 import { ApprovalCard } from './approvals.jsx';
 
 const ORB = { route: 'connecting', WebSearch: 'searching', WebFetch: 'searching', computer_exec: 'working', computer_share: 'working', remember: 'weaving', schedule_routine: 'shaping', generate_image: 'shaping', think: 'solving', text: 'composing' };
@@ -75,7 +76,7 @@ export default function ActionLine({ steps, live }) {
   const subtasks = [];
   for (const raw of steps || []) {
     const s = normStep(raw);
-    if (s.kind === 'approval') approvals.push(s);
+    if (s.kind === 'approval' || s.kind === 'campaign') approvals.push(s);
     else if (s.kind === 'subtask') subtasks.push(s);
     else activity.push(s);
   }
@@ -92,7 +93,7 @@ export default function ActionLine({ steps, live }) {
   return (
     <div className="action-line-wrap">
       {approvals.map((s, i) => (
-        <div key={`a-${i}`} className="step step-approval"><ApprovalCard rec={s.rec} status={s.status} /></div>
+        <div key={`a-${i}`} className="step step-approval">{s.kind === 'campaign' ? <CampaignCard rec={s.rec} /> : <ApprovalCard rec={s.rec} status={s.status} />}</div>
       ))}
       {subtasks.length > 0 && (
         <ul className="subtasks" aria-label="Subtarefas em paralelo">

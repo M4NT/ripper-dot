@@ -2238,6 +2238,17 @@ body.agent-dragging .side-list { overflow: hidden; }
 .md.streaming > :last-child::after { content: none; }
 .md .fade-in { transition: opacity .45s linear; }
 
+/* campanha de e-mail em demonstração (email_campaign): o disparo é só visual */
+.campaign { border: 1px solid var(--line-2); background: var(--surface); border-radius: 14px; padding: 12px 14px; margin: 4px 0; font-size: 13.5px; display: flex; flex-direction: column; gap: 10px; }
+.campaign-head { display: flex; align-items: center; gap: 8px; }
+.campaign-ico { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: var(--ink); color: var(--bg); flex: none; }
+.campaign-mail { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); }
+.campaign-mail p { margin-top: 4px; color: var(--ink-2); white-space: pre-wrap; }
+.campaign-progress { display: flex; flex-direction: column; gap: 6px; }
+.campaign-bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.campaign-bar i { display: block; height: 100%; background: var(--ok); }
+.campaign-note { color: var(--warn); }
+.campaign .btn { align-self: flex-start; }
 /* imagem sendo gerada (generate_image): efeito img-fx no lugar da arte */
 .img-gen { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
 .img-gen-card { width: min(280px, 100%); aspect-ratio: 1; border-radius: var(--r-lg); background: var(--surface-2); }

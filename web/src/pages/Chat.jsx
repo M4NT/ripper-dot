@@ -501,6 +501,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
           if (e.subtask) { const st = building.steps.find(x => x.kind === 'subtask' && x.key === e.subtask.key); st ? Object.assign(st, e.subtask) : building.steps.push({ kind: 'subtask', ...e.subtask }); }
           if (e.memory) building.steps.push({ kind: 'done', label: 'Guardado na memória', detail: e.memory });
           if (e.approval) { building.steps.push({ kind: 'approval', rec: e.approval, status: 'pending' }); setPhase('approval'); }
+          if (e.campaign) building.steps.push({ kind: 'campaign', rec: e.campaign });
           if (e.approvalDone) { const st = building.steps.find(x => x.kind === 'approval' && x.rec.id === e.approvalDone.id); if (st) st.status = e.approvalDone.status; }
           if (e.sent) building.steps.push({ kind: 'done', label: `Mensagem enviada para ${e.sent.to}`, detail: e.sent.priority === 'now' ? 'urgente' : e.sent.priority === 'low' ? 'sem pressa' : 'normal' });
           if (e.artifact) building.steps.push({ kind: 'done', label: `Artefato salvo (v${e.artifact.version})`, detail: e.artifact.title });
