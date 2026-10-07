@@ -7,7 +7,7 @@ import { AgentAvatar, Icon, Menu, MenuItem, StatusDot, useConfirm, EmptyState } 
 import { useApp } from '../app.jsx';
 import Composer, { uploadFile } from '../composer.jsx';
 import { sessionPayload } from '../marketplace/sessionMcp.js';
-import { createInputQueue, normalizeInputQueue } from '../../../lib/input-queue.mjs';
+import { createInputQueue, normalizeInputQueue, coalesceSendParts } from '../../../lib/input-queue.mjs';
 import { effortLabel } from '../modelPicker.jsx';
 import MessageAttachments, { DeliveredFiles } from '../MessageAttachments.jsx';
 import ChatPanel, { MiniScreen } from '../chatPanel.jsx';
@@ -369,7 +369,12 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
     return () => queueRef.current?.cancel();
   }, [S.settings.inputQueue?.enabled, S.settings.inputQueue?.windowMs]);
 
+  // Escreveu enquanto o agente trabalha: a mensagem fica visível "na fila" e sai sozinha quando o passo atual terminar.
+  const [queued, setQueued] = useState([]);
+  const queuedRef = useRef([]);
+  const setQueue = q => { queuedRef.current = q; setQueued(q); };
   function queueSend(payload, { immediate = false } = {}) {
+    if (ctrl.current) { setQueue([...queuedRef.current, payload]); return; }
     if (!queueRef.current) {
       const { enabled, windowMs } = normalizeInputQueue(S.settings);
       queueRef.current = createInputQueue({
@@ -543,6 +548,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
       }
       refresh();
       queueRef.current?.scheduleFlush();
+      if (queuedRef.current.length) { const next = coalesceSendParts(queuedRef.current); setQueue([]); setTimeout(() => send(next)); }
     }
   }
   sendTurnRef.current = send;
@@ -647,6 +653,9 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
           <Composer agent={agent} chatId={chatId} projectId={projectId} streaming={!!live} onSend={queueSend} onStop={stop}
             choice={choice} setChoice={setChoice} group={isGroup} mentions={isGroup ? members : S.agents.filter(a => a.id !== agent.id)}
             placeholder={isGroup ? 'Mensagem para o grupo… use @Nome para chamar alguém' : `Mensagem para ${agent.name}…`} autoFocus draftKey={chatId || 'new-' + memberIds.join('-')} />
+          {queued.length > 0 && <p className="inbox-wait queued-note" role="status"><Icon name="clock" size={13} />
+            {queued.length === 1 ? 'Sua mensagem está na fila' : `${queued.length} mensagens na fila`}: {isGroup ? 'o grupo vai ler' : `${agent.name} vai ler`} depois do passo atual.
+            <button type="button" className="link" onClick={() => setQueue([])}>Cancelar</button></p>}
           {waiting > 0 && <p className="inbox-wait"><Icon name="clock" size={13} />Aguardando {waiting === 1 ? 'resposta de 1 mensagem' : `respostas de ${waiting} mensagens`} enviadas a colegas…</p>}
           <p className="fine">{isGroup ? 'Agentes' : `O ${agent.name}`} pode{isGroup ? 'm' : ''} errar. Confira o que for importante.</p>
         </div>

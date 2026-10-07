@@ -67,7 +67,7 @@ import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './li
 import { isPaidModel, paidBlockReason, addSpend, spendToday, spendLimits, normalizeBilling, useSpendStore, closeSpendStore } from './lib/paid-usage.mjs';
 import { runTestProvider } from './lib/test-provider.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
-import { memoryContext, isDuplicateMemory, canUseFile, selectSpeakers, mentionOrder, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent, turnPlanIds, delegationTasks, oneLineTask, ownerBlockedReason } from './lib/agent-flow.mjs';
+import { memoryContext, isDuplicateMemory, canUseFile, selectSpeakers, mentionOrder, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, ambiguousMentions, isAck, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent, turnPlanIds, delegationTasks, oneLineTask, ownerBlockedReason } from './lib/agent-flow.mjs';
 import { providerAttemptOrder, runProviderAttemptLoop, needsUsageCredits } from './lib/provider-turn.mjs';
 import { normalizeProviderRetry } from './lib/provider-retry.mjs';
 import { patchSettings, settingsMeta, SettingsValidationError } from './lib/settings-patch.mjs';
@@ -649,7 +649,7 @@ async function runInboxDelivery(m, { signal } = {}) {
     at: Date.now()
   });
   const lenBeforeTurn = c.messages.length;
-  await turn({ agent: to, chat: c, text: m.body, prompt, images: [], group: inGroup ? groupMembers(origin, db.agents) : null, hops: m.hops, signal }, () => {});
+  await turn({ agent: to, chat: c, text: m.body, prompt, images: [], group: inGroup ? groupMembers(origin, db.agents) : null, hops: m.hops, signal, forName: from.name }, () => {});
   const parsed = interpretInboxReply(c.messages, lenBeforeTurn);
   c.updatedAt = Date.now(); c.unread = true;
   m.threadChatId = c.id;
@@ -850,7 +850,8 @@ async function deliver(m) {
   const to = db.agents.find(a => a.id === m.to), from = db.agents.find(a => a.id === m.from);
   if (!to || !from) { markInboxDeliveryFailed(m, 'Agente não existe mais.'); save(); return; }
   // Aviso de encerramento é só registro: a resposta já foi para a conversa; rodar um turno nele vira "Recebido" à toa.
-  if (m.taskClosure) { m.status = 'delivered'; m.deliveredAt = Date.now(); save(); return; }
+  // Confirmação de colega ("ok", "recebido", 👍) também encerra a troca: responder a ela vira pingue-pongue.
+  if (m.taskClosure || isAck(m.body)) { m.status = 'delivered'; m.deliveredAt = Date.now(); save(); return; }
   inboxBusy.add(to.id); m.status = 'delivering'; save();
   try {
     const result = await runInboxDelivery(m, {});
@@ -1128,10 +1129,10 @@ async function syncLocalFiles(agent, chat) {
 }
 
 // O que cada agente está fazendo agora (em qualquer conversa, rotina, fluxo ou canal): status ao vivo nos cards.
-const working = new Map(); // agentId → { chatId, chatTitle, since, tool }
+const working = new Map(); // agentId → { chatId, chatTitle, since, tool, task, forName }
 async function turn(args, emit) {
   const { agent, chat } = args;
-  working.set(agent.id, { chatId: chat.channel ? null : chat.id, chatTitle: chat.channel ? 'WhatsApp' : chat.title, since: Date.now(), tool: null });
+  working.set(agent.id, { chatId: chat.channel ? null : chat.id, chatTitle: chat.channel ? 'WhatsApp' : chat.title, since: Date.now(), tool: null, task: oneLineTask(args.text), forName: args.forName || (chat.channel ? 'contato no WhatsApp' : 'você') });
   let asked = false;
   const before = chat.messages.length;
   try {
@@ -1943,6 +1944,9 @@ async function chatTurn({ chat, text, fileIds, signal, mcpSession, skipUserPush 
   // Julia 1 (ou a heurística) escolhe quem abre; @menções definem a ordem; delegações entram na fila.
   const first = await selectSpeakers(turnChat, text, db.agents, (t, ms) => classifySpeaker(t, ms, db.settings, heuristicSpeaker));
   const floor = new Floor(first, members, group ? 5 : 1);
+  // "@Engenheiro" com dois engenheiros: ninguém é chamado no chute; quem responde pergunta qual.
+  const doubt = ambiguousMentions(text, db.agents).map(h => `${h.mention} pode ser ${h.agents.map(a => a.name).join(' ou ')}`);
+  const doubtNote = doubt.length ? `\n\n[Menção ambígua: ${doubt.join('; ')}. Pergunte ao usuário qual deles antes de chamar alguém.]` : '';
   if (group) emit({ turnPlan: turnPlanIds(first, floor) });
   // Ninguém fica sem resposta: se quem abriu passar a vez (PASSO) e ninguém mais falou, chama o próximo membro.
   let answered = false;
@@ -1964,7 +1968,7 @@ async function chatTurn({ chat, text, fileIds, signal, mcpSession, skipUserPush 
     const before = chat.messages.length;
     await turn({
       agent, chat, text,
-      prompt: extra.text ? `${text}\n\n${extra.text}` : text,
+      prompt: (extra.text ? `${text}\n\n${extra.text}` : text) + doubtNote,
       images: extra.images, signal, group, mcpSession, credentialRefs: refs
     }, emit);
     const reply = chat.messages.length > before ? chat.messages.at(-1) : null;

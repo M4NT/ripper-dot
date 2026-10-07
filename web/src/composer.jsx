@@ -59,7 +59,8 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
   }, []);
 
   const uploading = files.some(f => f.status === 'uploading');
-  const canSend = !streaming && !uploading && (text.trim().length > 0 || files.some(f => f.id) || credentials.length > 0);
+  const canSend = !uploading && // com o agente trabalhando, Enter põe a mensagem na fila (o botão continua sendo Parar)
+     (text.trim().length > 0 || files.some(f => f.id) || credentials.length > 0);
 
   async function addFiles(list) {
     setPlus(false);

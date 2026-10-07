@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import { explainError } from '../lib/human-errors.mjs';
 
 const cases = [
+  ['Fable: out of usage credits', 'settings-providers'],
+  ['tool mcp__ripper__web_search failed: boom', 'retry'],
+  ['OAuth invalid_grant', 'settings-channels'],
+  ['ETIMEDOUT 10.0.0.1:443', 'retry'],
   ['429 Too Many Requests', 'retry'],
   ['You have hit your usage limit', 'retry'],
   ['Not logged in · Please run /login', 'reconnect-claude'],

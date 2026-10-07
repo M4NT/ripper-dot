@@ -1,6 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canUseFile, selectSpeakers, routineDue, mayFallback, mentionOrder, Floor, isPass, heuristicSpeaker, trimHistory, turnPlanIds, delegationCardState, ownerBlockedReason, oneLineTask } from '../lib/agent-flow.mjs';
+import { canUseFile, selectSpeakers, routineDue, mayFallback, mentionOrder, Floor, isPass, heuristicSpeaker, trimHistory, turnPlanIds, delegationCardState, ownerBlockedReason, oneLineTask, ambiguousMentions, isAck } from '../lib/agent-flow.mjs';
+
+test('@menção tolerante a nome; ambígua não chama ninguém', () => {
+  const eng = { id: 'e', name: 'Engenheiro de Software (Ripper)' };
+  const ana = { id: 'a', name: 'Ana Souza', nickname: 'Ana' };
+  for (const t of ['@Ripper veja', 'oi @ripper', '@Engenheiro de Software (Ripper), olha', '@Engenheiro ajuda', '@Engenheiro de Software ok?'])
+    assert.deepEqual(mentionOrder(t, [eng, ana]).map(a => a.id), ['e'], t);
+  assert.deepEqual(mentionOrder('@ana e @Ripper', [eng, ana]).map(a => a.id), ['a', 'e']);
+  const eng2 = { id: 'e2', name: 'Engenheiro de Dados' };
+  assert.deepEqual(mentionOrder('@Engenheiro faça', [eng, eng2]), []);
+  assert.deepEqual(ambiguousMentions('@Engenheiro faça', [eng, eng2])[0].agents.map(a => a.id), ['e', 'e2']);
+  assert.deepEqual(mentionOrder('@Engenheiro de Dados faça', [eng, eng2]).map(a => a.id), ['e2']);
+});
+
+test('confirmação de colega encerra a troca', () => {
+  for (const t of ['ok', 'Recebido!', 'valeu', '👍', '@Ana ok, valeu 👍', 'Beleza, obrigado.']) assert.equal(isAck(t), true, t);
+  for (const t of ['ok, mas troque a cor', 'recebido o arquivo? manda de novo', '', 'Feito: salvei em relatorio.xlsx']) assert.equal(isAck(t), false, t);
+  const ana = { id: 'a', name: 'Ana' }, bia = { id: 'b', name: 'Bia' };
+  assert.deepEqual(new Floor([], [ana, bia]).afterReply(bia, '@Ana valeu!'), []);
+});
 
 test('cartão de delegação: aguardando → trabalhando → feito / falhou', () => {
   const d = { to: 'b', task: 'x', messageId: 'm1' };

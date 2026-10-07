@@ -99,3 +99,8 @@ test('scheduleFlush não deixa timer pendente após cancel', () => {
   q.cancel();
   assert.equal(pendingId, null);
 });
+
+test('coalesceSendParts mantém as credenciais (fila durante o trabalho)', () => {
+  assert.deepEqual(coalesceSendParts([{ text: 'a', credentialRefs: ['v1'] }, { text: 'b', credentialRefs: ['v1', 'v2'] }]).credentialRefs, ['v1', 'v2']);
+  assert.deepEqual(coalesceSendParts([{ text: 'a', credentialRefs: ['v1'] }]).credentialRefs, ['v1']);
+});

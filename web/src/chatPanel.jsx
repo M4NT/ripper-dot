@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
-import { api, fmtAgo, TOOL_INFO } from './lib.js';
+import { api, fmtAgo, TOOL_INFO, stepLabel } from './lib.js';
 import { AgentAvatar, Icon, Menu, Segmented, StatusDot } from './ui.jsx';
 import { useApp } from './app.jsx';
 import { uploadFile } from './composer.jsx';
@@ -50,19 +50,29 @@ function AgentBrief({ a, S }) {
   </>;
 }
 
-function Details({ members, project, S }) {
+/** "Quem está fazendo o quê": tarefa atual, há quanto tempo e para quem vai (de /api/agents/working, atualizado a cada 4 s). */
+export function doingLine(w, now = Date.now()) {
+  if (!w) return null;
+  const min = Math.max(0, Math.round((now - w.since) / 60000));
+  const what = w.task || (w.tool ? stepLabel(w.tool) : 'trabalhando');
+  return `${what} · ${min ? `há ${min} min` : 'agora'} · para ${w.forName || 'você'}`;
+}
+
+function Details({ members, project, S, working = {} }) {
   const group = members.length > 1;
+  const solo = !group && doingLine(working[members[0].id]);
   return (
     <div className="panel-tab">
       {group ? <>
         <ul className="member-list">
           {members.map(a => (
-            <li key={a.id}><AgentAvatar agent={a} size={30} paused /><span><b>{a.name}</b><small>{a.description || a.category}</small></span>
+            <li key={a.id}><AgentAvatar agent={a} size={30} paused /><span><b>{a.name}</b><small className={working[a.id] ? 'is-working' : ''} title={doingLine(working[a.id]) || undefined}>{doingLine(working[a.id]) || a.description || a.category}</small></span>
               <a className="icon-btn sm" href={`#/agents/${a.id}/settings`} aria-label={`Configurar ${a.name}`} title="Configurar"><Icon name="gear" size={15} /></a></li>
           ))}
         </ul>
         <p className="panel-note">Quem responde é escolhido pelo pedido. Escreva <b>@Nome</b> para chamar alguém direto; eles também passam tarefas entre si.</p>
       </> : <>
+        {solo && <p className="panel-note is-working" aria-live="polite"><b>Agora:</b> {solo}</p>}
         <p className="panel-desc">{members[0].description || 'Sem descrição.'}</p>
         <AgentBrief a={members[0]} S={S} />
       </>}
@@ -200,7 +210,7 @@ function Computer({ members, messages, busy, S_mode }) {
 }
 
 export default function ChatPanel({ members, project, chatId, messages, files, onCollapse }) {
-  const { S, refresh, toast, busy: busyAgents, busyChats } = useApp();
+  const { S, refresh, toast, busy: busyAgents, busyChats, working: workingNow } = useApp();
   // Nesta tela, "trabalhando" é desta conversa (não de outra em que o agente esteja).
   const busy = chatId && busyChats[chatId] ? busyAgents : {};
   const [tab, setTab] = useState('details');
@@ -224,7 +234,7 @@ export default function ChatPanel({ members, project, chatId, messages, files, o
       </div>
       <Segmented label="Seções do painel" value={tab} onChange={setTab} size="sm" className="panel-tabs"
         items={[['details', 'Detalhes'], ['artifacts', 'Artefatos', arts.length || null], ['files', 'Arquivos', files.length || null], ['computer', 'Computador']]} />
-    {tab === 'details' && <Details members={members} project={project} S={S} />}
+    {tab === 'details' && <Details members={members} project={project} S={S} working={workingNow} />}
       {tab === 'artifacts' && <div className="panel-tab">
         <ArtifactList items={arts} empty={project ? 'Nenhum artefato no projeto ainda. Peça: “salve isso como artefato”. Todos os agentes do projeto veem.' : 'Nenhum artefato ainda. Peça: “salve isso como artefato”.'} />
         {arts.length > 0 && <p className="muted small">{project ? 'Compartilhados com todos os agentes do projeto.' : 'Salvos nesta conversa.'}</p>}
