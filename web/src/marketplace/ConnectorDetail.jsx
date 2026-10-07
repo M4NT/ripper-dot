@@ -4,7 +4,8 @@ import BrandIcon from './BrandIcon.jsx';
 const HOW = {
   oauth: 'Você faz login na conta do serviço numa janela; o Ripper guarda o acesso e renova sozinho.',
   token: 'Usa um token pessoal seu. Ele fica guardado no servidor do Ripper e nunca aparece na interface.',
-  claude: 'Este vem pela sua conta claude.ai: conecte lá uma vez e todos os agentes com "Conectores" ligado passam a usar.'
+  claude: 'Este vem pela sua conta claude.ai: conecte lá uma vez e todos os agentes com "Conectores" ligado passam a usar.',
+  local: 'Roda nesta máquina, numa versão fixa. Ao conectar, o Ripper pede os dados de acesso abaixo.'
 };
 
 export default function ConnectorDetail({ item, onBack, onConnect, connecting, connected }) {
@@ -26,6 +27,7 @@ export default function ConnectorDetail({ item, onBack, onConnect, connecting, c
       </header>
       <p className="mp-detail-body">{item.body}</p>
       {HOW[item.connect?.type] && <p className="mp-detail-body muted">{HOW[item.connect.type]}</p>}
+      {item.connect?.help && <p className="mp-detail-body muted">{item.connect.help}</p>}
       <div className="mp-detail-trust">
         <Icon name="globe" size={16} />
         <p>Use apenas conectores de desenvolvedores em quem você confia. O Ripper não controla as ferramentas de terceiros nem garante o comportamento delas.</p>

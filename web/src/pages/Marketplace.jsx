@@ -220,6 +220,15 @@ export default function Marketplace() {
         if (!token) return;
         extra = { auth: { apiKey: token.trim() } };
       }
+      if (type === 'local') {
+        const env = {};
+        for (const f of detail.connect.fields || []) {
+          const v = await ov.ask({ title: f.label, body: f.hint, action: 'Continuar', placeholder: f.placeholder });
+          if (!v?.trim()) return;
+          env[f.key] = v.trim();
+        }
+        extra = { env };
+      }
       await api('/api/settings', { method: 'PUT', body: { plugins: installPlugin(detail.id, settings, extra) } });
       if (type === 'oauth') await runMcpOAuthLogin({ pluginName: detail.id });
       await refresh();

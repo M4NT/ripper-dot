@@ -4,10 +4,12 @@
  *   'oauth'  — servidor MCP remoto oficial com login e registro automático do cliente (testado: 401 + DCR)
  *   'token'  — servidor MCP remoto que usa token pessoal (ex.: GitHub)
  *   'claude' — vem pela sua conta claude.ai (Google, Slack, Microsoft): conecte lá e os agentes já usam
+ *   'local'  — servidor MCP que roda nesta máquina (versão fixa); pede os campos de `fields` e guarda como variáveis
  */
 const C = (id, name, author, desc, connect, extra = {}) => ({
   id, name, author, icon: extra.icon || id, desc, connect, verified: true,
   ...(connect.url ? { mcp: { name: id, type: 'http', url: connect.url } } : {}),
+  ...(connect.type === 'local' ? { mcp: { name: id, type: 'stdio', command: connect.command, args: connect.args } } : {}),
   ...extra
 });
 
@@ -31,7 +33,14 @@ export const CONNECTORS = [
   C('supabase', 'Supabase', 'Supabase', 'Banco, auth e storage.', { type: 'oauth', url: 'https://mcp.supabase.com/mcp' }),
   C('sentry', 'Sentry', 'Sentry', 'Erros e performance.', { type: 'oauth', url: 'https://mcp.sentry.dev/mcp' }),
   C('github', 'GitHub', 'GitHub', 'Repositórios, issues e pull requests.', { type: 'token', url: 'https://api.githubcopilot.com/mcp/',
-    tokenHelp: 'Crie um token em github.com/settings/tokens (fine-grained) com acesso aos repositórios que o agente pode ver.' }, { featured: true })
+    tokenHelp: 'Crie um token em github.com/settings/tokens (fine-grained) com acesso aos repositórios que o agente pode ver.' }, { featured: true }),
+  // SEO e campanhas: só leitura dos relatórios.
+  C('google-analytics', 'Google Analytics 4', 'Google', 'Relatórios de tráfego, conversões e funis do GA4.', { type: 'local', command: 'pipx', args: ['run', 'analytics-mcp==0.7.0'],
+    help: 'Servidor oficial do Google (Apache 2.0). Precisa de Python com pipx e, uma vez nesta máquina: gcloud auth application-default login --scopes https://www.googleapis.com/auth/analytics.readonly,https://www.googleapis.com/auth/cloud-platform. Ative as APIs Google Analytics Admin e Data no seu projeto do Google Cloud.',
+    fields: [{ key: 'GOOGLE_PROJECT_ID', label: 'ID do projeto no Google Cloud', placeholder: 'meu-projeto-123', hint: 'Aparece no seletor de projetos do console do Google Cloud.' }] }, { forYou: true }),
+  C('search-console', 'Google Search Console', 'Comunidade (ahonn)', 'Posições no Google, cliques, impressões e oportunidades de SEO.', { type: 'local', command: 'npx', args: ['-y', 'mcp-server-gsc@0.3.0'],
+    help: 'Servidor da comunidade (MIT). Crie uma conta de serviço no Google Cloud, baixe o JSON da chave e adicione o e-mail dela como usuário da propriedade no Search Console.',
+    fields: [{ key: 'GOOGLE_APPLICATION_CREDENTIALS', label: 'Caminho do JSON da conta de serviço', placeholder: 'C:\\chaves\\search-console.json', hint: 'O arquivo da chave que você baixou da conta de serviço, nesta máquina.' }] }, { forYou: true })
 ];
 
 /** Compatibilidade com as telas: plugins e "descobrir conectores" são a mesma lista. */
@@ -56,7 +65,7 @@ export function marketplaceDetail(id) {
   if (!c) return null;
   return {
     ...c, installId: c.id, pluginId: c.id, tagline: c.desc, body: c.desc, tools: [],
-    connectorUrl: c.connect.url || 'Conta claude.ai', kind: c.connect.type === 'claude' ? 'claude' : 'connector'
+    connectorUrl: c.connect.url || (c.connect.type === 'local' ? `${c.connect.command} ${c.connect.args.join(' ')}` : 'Conta claude.ai'), kind: c.connect.type === 'claude' ? 'claude' : 'connector'
   };
 }
 
