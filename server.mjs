@@ -1732,7 +1732,13 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
   }
 
   const loopDetector = new ToolLoopDetector(s.tokenBudget);
+  // Texto escrito antes de uma ferramenta é rascunho do agente ("Agora vou…"): vira nota nas atividades; a resposta é o que vem depois da última ferramenta.
+  let turnText = '', cut = 0;
+  const notes = [];
   const emitTurn = ev => {
+    if (ev.handoff) { turnText = ''; cut = 0; notes.length = 0; }
+    if (ev.tool && turnText.length > cut) { const n = turnText.slice(cut).trim(); if (n) notes.push({ kind: 'note', label: n.slice(0, 400), at: Date.now() }); cut = turnText.length; }
+    if (ev.text) turnText += ev.text;
     if (ev.circuitBreaker) {
       logger.warn('provider.circuit_breaker', {
         chatId: chat.id,
@@ -1780,7 +1786,10 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
       if (MODELS[m]?.provider === 'claude') resolveSystemAlert('claude-login'); // entrou de novo: some o aviso
       timing.totalMs = Date.now() - t0;
       logger.info('turn.timing', { agent: agent.name, model: m, ...timing });
-      push(out, steps, { model: m, effort, routedBy, timing, ...(turnCost ? { costUsd: turnCost } : {}), ...(delivered.length ? { files: [...delivered] } : {}) });
+      const finalText = out.slice(out.length - turnText.length + cut).trim();
+      const answer = finalText || out.trim() || `Fiz ${steps.length} ${steps.length === 1 ? 'ação' : 'ações'} e terminei sem escrever um resumo. Veja as atividades acima.`;
+      const allSteps = finalText && notes.length ? [...steps, ...notes].sort((a, b) => (a.at || 0) - (b.at || 0)) : steps;
+      push(answer, allSteps, { model: m, effort, routedBy, timing, ...(turnCost ? { costUsd: turnCost } : {}), ...(delivered.length ? { files: [...delivered] } : {}) });
       recordUsage(db, m, {
         charsIn: (text?.length || 0) + (prompt?.length || 0),
         charsOut: out.length,

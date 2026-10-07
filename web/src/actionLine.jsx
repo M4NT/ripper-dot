@@ -33,8 +33,8 @@ function summarize(steps, live) {
   const last = steps[steps.length - 1];
   const running = live && last && last.kind === 'tool';
   if (running) return last.label || 'Trabalhando…';
-  if (steps.length === 1) return last.label || 'Atividade';
-  const lastLabel = last?.label || 'concluídas';
+  const lastLabel = last?.kind === 'note' ? 'anotação' : last?.label || 'concluídas'; // nota é texto longo: não vira título
+  if (steps.length === 1) return last.kind === 'note' ? 'Anotação' : last.label || 'Atividade';
   return `${steps.length} atividades · ${lastLabel}`;
 }
 
