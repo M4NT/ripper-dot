@@ -165,6 +165,7 @@ import {
   createPluginRecord,
   listConnectorRecords,
   listMcpToolCatalog,
+  rememberReadOnlyTools,
   redactSettingsSecrets,
   refreshConnectorOAuth,
   settingsForMcpSession,
@@ -2140,7 +2141,9 @@ const routes = [
     } else if (b.plugin && typeof b.plugin === 'object') {
       plugin = b.plugin;
     }
-    return verifyMcpConnector(b.url, { plugin, listTools: b.listTools !== false, chaosSettings: db.settings });
+    const out = await verifyMcpConnector(b.url, { plugin, listTools: b.listTools !== false, chaosSettings: db.settings });
+    if (b.pluginName && rememberReadOnlyTools(db.settings, b.pluginName, out)) save();
+    return out;
   }],
   ['GET', /^\/api\/mcp\/connectors$/, () => ({ connectors: listConnectorRecords(db.settings) })],
   ['POST', /^\/api\/mcp\/connectors$/, async req => {
@@ -2194,11 +2197,11 @@ const routes = [
     if (raw) {
       try { mcpSession = JSON.parse(raw); } catch { throw new HttpError(400, 'mcpSession JSON inválido.'); }
     }
-    return listMcpToolCatalog(db.settings, mcpSession, { credentialVault: db.credentialVault });
+    return listMcpToolCatalog(db.settings, mcpSession, { credentialVault: db.credentialVault, onChange: save });
   }],
   ['POST', /^\/api\/mcp\/tools$/, async req => {
     const b = await body(req);
-    return listMcpToolCatalog(db.settings, b.mcpSession, { credentialVault: db.credentialVault });
+    return listMcpToolCatalog(db.settings, b.mcpSession, { credentialVault: db.credentialVault, onChange: save });
   }],
   ['GET', /^\/api\/vault\/entries$/, () => ({
     entries: Object.entries(db.credentialVault || {}).map(([ref, e]) => ({ ref, ...redactVaultEntry(e) }))

@@ -67,8 +67,9 @@ Fonte: `lib/autonomy.mjs`, `lib/permissions.mjs`, `lib/approvals.mjs`, `server.m
 | Salvar artefato/skill, agendar rotina | bloqueado | livre | livre |
 | Mensagem para outro agente (`send_message`) | bloqueado | livre | livre |
 | Postar em rede social / webhook externo | bloqueado | pede | não pede |
+| Ferramenta de conector MCP (plugin do usuário ou conector claude.ai) | **bloqueada**, salvo se o servidor a marcou `readOnlyHint` | livre | livre |
 | GitHub (comentar, issue, PR), e-mail, WhatsApp | conforme a ferramenta | pede (envio passa pelo X9 Guard) | pede |
 
 Em todos os níveis: ação externa aprovada entra no registro imutável; "aprovar sempre nesta conversa" vale só para o mesmo comando, na mesma conversa (até 80); aprovação sem resposta expira como negada.
 
-**Lacuna a decidir:** em "somente leitura" o bloqueio é por nome de ferramenta embutida; ferramentas de conectores MCP não passam por essa lista. Se "somente leitura" deve valer para MCP, o filtro precisa olhar também os conectores.
+**Conectores MCP em somente leitura:** o Ripper guarda em `plugin.readOnlyTools` os nomes que o servidor marcou `annotations.readOnlyHint: true` na última listagem (verificar conector / listar ferramentas). Só esses passam: no Claude viram `allowedTools` explícitos e o `canUseTool` nega o resto; no Codex o servidor entra com `enabled_tools` (ou nem entra, se não houver nenhuma); nos provedores compatíveis com OpenAI o filtro olha a annotation ao vivo. Conector nunca listado e conectores do claude.ai (sem annotations visíveis) ficam bloqueados. A lista não vem do cliente e cai quando a URL/comando do conector muda.

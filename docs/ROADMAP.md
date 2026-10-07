@@ -74,7 +74,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - ✅ Chaves e tokens cifrados no disco e nos backups. ✅ Segredos da Evolution também cifrados (`data/evolution.json`).
 - ✅ Aprovações, autonomia por agente, registro imutável de ações externas, X9 Guard nos envios.
 - ✅ Revisão de segurança completa antes do lançamento (rotas sem autenticação, uploads, caminhos de arquivo, execução de comandos, MCP de terceiros) — ver [seguranca.md](seguranca.md). Corrigidos: `/metrics` aberto sem `RIPPER_TOKEN` (agora exige login; público só com `RIPPER_METRICS_PUBLIC=1`) e XSS refletido nos callbacks OAuth. Pendências no documento.
-- 🔨 Política de permissões dos agentes revisada: rascunho em [seguranca.md](seguranca.md) §4, tirado do que o código aplica. Falta decidir se "somente leitura" vale também para ferramentas de conectores MCP (hoje não vale).
+- ✅ Política de permissões dos agentes revisada ([seguranca.md](seguranca.md) §4). "Somente leitura" também bloqueia ferramentas de conectores MCP (Claude, Codex e compatíveis), exceto as marcadas `readOnlyHint`.
 
 ### B. Confiabilidade (P0)
 - ✅ Recarregar a página não para o agente; a resposta continua no servidor e fica salva.
@@ -84,7 +84,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - ✅ Atualização sem derrubar o que está rodando: aviso "Nova versão — recarregar" nas abas abertas; `node scripts/service.mjs restart` (ou SIGTERM) para de aceitar turnos, espera os em andamento (até `RIPPER_DRAIN_TURNS_MS`, padrão 2 min; o que passar é retomado depois) e o vigia sobe a versão nova na hora.
 - ✅ Backup automático diário, cópia extra em outra pasta, aviso de falha. ✅ Backup manual corrigido (link simbólico criado no Docker derrubava o `tar`; agora fica de fora com aviso). ✅ Teste de restauração automático após cada backup diário (extrai numa pasta temporária e confere o `db.json`; falha vira aviso).
 - ✅ Fila de envios com novas tentativas (WhatsApp, e-mail, publicações).
-- [ ] Contêineres dos agentes: um por agente e por pasta de trabalho (hoje duas conversas do mesmo agente em pastas diferentes se revezam recriando).
+- ✅ Contêineres dos agentes: um por agente e por pasta de trabalho (nome/alias com hash curto da pasta; sem pasta mantém o nome antigo). Tela ao vivo e status olham o último contêiner usado pelo agente.
 - [ ] Agentes trabalhando no código do Ripper em cópia própria (`/work/repos`), nunca trocando o branch da pasta compartilhada.
 - [ ] Branch `ripper/staging` ficou para trás da `main` (06/10/2026) e o `scripts/staging.sh` do Engenheiro está fora do Git: alinhar com ele antes de retomar o staging.
 - ✅ Limites de recursos por contêiner (`computer.dockerMemory`/`dockerCpus`, padrão 2g/2) e limpeza de contêineres parados na subida.
