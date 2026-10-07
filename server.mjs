@@ -67,7 +67,7 @@ import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './li
 import { isPaidModel, paidBlockReason, addSpend, spendToday, spendLimits, normalizeBilling, useSpendStore, closeSpendStore } from './lib/paid-usage.mjs';
 import { runTestProvider } from './lib/test-provider.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
-import { memoryContext, isDuplicateMemory, canUseFile, selectSpeakers, mentionOrder, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent, turnPlanIds, delegationTasks } from './lib/agent-flow.mjs';
+import { memoryContext, isDuplicateMemory, canUseFile, selectSpeakers, mentionOrder, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent, turnPlanIds, delegationTasks, oneLineTask, ownerBlockedReason } from './lib/agent-flow.mjs';
 import { providerAttemptOrder, runProviderAttemptLoop, needsUsageCredits } from './lib/provider-turn.mjs';
 import { normalizeProviderRetry } from './lib/provider-retry.mjs';
 import { patchSettings, settingsMeta, SettingsValidationError } from './lib/settings-patch.mjs';
@@ -390,6 +390,8 @@ function chatDetail(c, cid) {
     streaming: isChatStreaming(cid),
     run: chatRunPublic(c.run),
     interrupted: c.run?.status === 'interrupted',
+    // estado dos pedidos a colegas que saíram desta conversa (cartões de delegação)
+    inboxStatus: Object.fromEntries(db.messages.filter(m => m.originChatId === c.id).map(m => [m.id, { status: m.status, ...(m.error ? { error: m.error } : {}), ...(m.reply ? { reply: m.reply } : {}) }])),
     ...(c.workspace?.kind === 'folder' ? { workspaceBranch: gitBranch(c.workspace.path) } : {})
   };
 }
@@ -1126,9 +1128,17 @@ const working = new Map(); // agentId → { chatId, chatTitle, since, tool }
 async function turn(args, emit) {
   const { agent, chat } = args;
   working.set(agent.id, { chatId: chat.channel ? null : chat.id, chatTitle: chat.channel ? 'WhatsApp' : chat.title, since: Date.now(), tool: null });
+  let asked = false;
+  const before = chat.messages.length;
   try {
-    return await turnInner(args, ev => { if (ev?.tool && working.has(agent.id)) working.get(agent.id).tool = ev.tool; emit(ev); });
-  } finally { working.delete(agent.id); }
+    return await turnInner(args, ev => { if (ev?.tool && /ask_owner$/.test(ev.tool)) asked = true; if (ev?.tool && working.has(agent.id)) working.get(agent.id).tool = ev.tool; emit(ev); });
+  } finally {
+    working.delete(agent.id);
+    // Rede de segurança: parou dizendo que depende de você e não usou ask_owner → item "precisa de você" na Caixa.
+    const reply = chat.messages.slice(before).findLast(m => m.role === 'assistant' && m.agentId === agent.id);
+    const why = !asked && !chat.channel && ownerBlockedReason(reply?.content);
+    if (why) raiseSystemAlert({ key: `blocked:${chat.id}:${agent.id}`, title: `${agent.name} precisa de você`, body: `${why} Responda na conversa para ele continuar.`, href: `/c/${chat.id}`, hrefLabel: 'Abrir conversa' });
+  }
 }
 
 async function turnInner({ agent, chat, text, prompt, images, signal, group, hops = 0, mcpSession, credentialRefs }, emit) {
@@ -1199,6 +1209,7 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
   }
   const x9Sources = () => collectX9Sources({ db, settings: s });
   const delivered = []; // arquivos entregues neste turno: viram botões na resposta
+  const sentDelegations = []; // pedidos a colegas (send_message/call_agent): viram cartões na resposta
   const ctx = {
     db,
     settings: s,
@@ -1264,7 +1275,9 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
         db.messages.push(m);
         trackInboxDelegation(db, m, { id });
         if (db.messages.length > 1000) db.messages.splice(0, db.messages.length - 1000);
-        save(); emit({ sent: { to: to.name, priority: m.priority } }); setTimeout(dispatchInbox, 50);
+        const card = { to: to.id, task: oneLineTask(m.body), messageId: m.id };
+        sentDelegations.push(card);
+        save(); emit({ sent: { to: to.name, priority: m.priority }, delegation: { from: agent.id, ...card } }); setTimeout(dispatchInbox, 50);
         return `Mensagem enviada para ${to.name}${m.priority === 'now' ? ' (urgente)' : ''}. A resposta aparece nesta conversa quando chegar; não espere por ela nem invente o que ${to.name} vai dizer.`;
       },
       call: async a => {
@@ -1293,13 +1306,15 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
         if (db.messages.length > 1000) db.messages.splice(0, db.messages.length - 1000);
         inboxBusy.add(to.id);
         save();
-        emit({ callAgent: { to: to.name, timeoutMs } });
+        const card = { to: to.id, task: oneLineTask(m.body), messageId: m.id };
+        sentDelegations.push(card);
+        emit({ callAgent: { to: to.name, timeoutMs }, delegation: { from: agent.id, ...card } });
         const ac = new AbortController();
         const timer = setTimeout(() => ac.abort(), timeoutMs);
         let result;
         try {
           result = await runInboxDelivery(m, { signal: ac.signal });
-          if (result.ok) { m.status = 'delivered'; m.error = null; }
+          if (result.ok) { m.status = 'delivered'; m.error = null; m.reply = String(result.reply?.content || '').slice(0, 4000); } // cartão "Ver resultado"
           else {
             const err = ac.signal.aborted && !result.error?.includes('interrompida')
               ? `Tempo esgotado (${Math.round(timeoutMs / 1000)}s) aguardando ${to.name}.`
@@ -1703,7 +1718,8 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
   if (!testProvider && order.length === 1 && MODELS[pick.model]?.provider !== 'claude' && claudeBackup) order.push(claudeBackup);
   const push = (out, steps, extra) => chat.messages.push({
     id: id(), role: 'assistant', agentId: agent.id, content: out, at: Date.now(),
-    ...(steps.length || subtaskSteps.length ? { steps: [...subtaskSteps, ...steps] } : {}), ...extra
+    ...(steps.length || subtaskSteps.length ? { steps: [...subtaskSteps, ...steps] } : {}),
+    ...(sentDelegations.length ? { delegations: [...sentDelegations] } : {}), ...extra
   });
 
   const semanticCacheCfg = resolveSemanticCacheConfig(s);
@@ -1914,9 +1930,9 @@ async function chatTurn({ chat, text, fileIds, signal, mcpSession, skipUserPush 
       for (const gate of deniedPeers) emit({ warn: delegationDeniedMessage(gate) });
       if (next.length) {
         const ids = next.map(a => a.id);
-        reply.delegations = delegationTasks(reply.content, next);
+        reply.delegations = [...(reply.delegations || []), ...delegationTasks(reply.content, next)];
         emit({ delegated: ids, agentHandoff: { from: agent.id, to: ids } });
-        for (const d of reply.delegations) emit({ delegation: { from: agent.id, ...d } });
+        for (const d of reply.delegations.filter(x => !x.messageId)) emit({ delegation: { from: agent.id, ...d } });
       }
     }
     emit({ turnDone: agent.id });

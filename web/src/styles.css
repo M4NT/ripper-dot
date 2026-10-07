@@ -771,8 +771,15 @@ details[open]::details-content { block-size: auto; }
 .crumb-link { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
 .crumb-link:hover { color: var(--ink); }
 .speaker { font-size: 12.5px; font-weight: 500; color: var(--ink-2); margin: 0 0 6px 2px; }
-.delegation { display: flex; align-items: center; gap: 6px; min-width: 0; margin: 6px 0 2px 2px; padding-left: 10px; border-left: 2px solid var(--line); font-size: 12.5px; color: var(--muted); }
-.delegation > span:not(.av-box):not(.delegation-task) { flex: none; color: var(--ink-2); }
+.delegation { margin: 6px 0 2px 2px; padding-left: 10px; border-left: 2px solid var(--line); font-size: 12.5px; color: var(--muted); min-width: 0; }
+.delegation-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.delegation-row > span:not(.av-box):not(.delegation-task):not(.delegation-status) { flex: none; color: var(--ink-2); }
+.delegation-status { flex: none; font-size: 11.5px; }
+.delegation-status.work, .delegation-status.ok { color: var(--ok); }
+.delegation-status.wait { color: var(--warn); }
+.delegation-status.err { color: var(--err); }
+.delegation-row .meta-btn { flex: none; }
+.delegation-result { margin-top: 6px; color: var(--ink-2); overflow-wrap: anywhere; }
 /* uma linha: "Donald → Quinn  tarefa…" (o texto completo fica no title) */
 .delegation-task { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-left: 4px; }
 @media (min-width: 560px) { .delegation-task { flex: 0 1 auto; } }

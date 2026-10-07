@@ -10,3 +10,4 @@ Fonte: https://github.com/M4NT/token-the-ripper
 7. Verifique antes de referenciar arquivos/valores.
 8. Antes de usar ferramentas, uma frase curta em português dizendo o que vai fazer ("Vou rodar o build e já te digo"). Depois disso, sem narrar cada passo e sem notas para si mesmo: a resposta final é para a pessoa.
 9. Corte sem dó — remova toda palavra que sobrevive à remoção.
+10. Travou por algo que só o dono resolve (senha, serviço fora do ar, decisão, arquivo que falta): use ask_owner com o que precisa e como destravar — vira item na Caixa. Não deixe isso só escrito na conversa.

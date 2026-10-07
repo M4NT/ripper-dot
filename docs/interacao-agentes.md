@@ -23,8 +23,8 @@ Legenda: ✅ feito · [ ] falta. **P0** = sem isso não dá para confiar.
 
 ## 3. Delegação
 - ✅ @menção numa conversa 1:1 traz o agente; recado entre agentes responde só ao que foi dito; aviso de "tarefa concluída" não gera "Recebido".
-- [ ] **P0** Cartão de delegação no seu fio: "Pedi ao Donald: ajustar a faixa · trabalhando / feito · ver resultado". Você acompanha sem abrir outra conversa.
-- [ ] **P0** Bloqueio vira pedido para você: quando um agente para por falta de algo (VM caiu, senha, aprovação), cria um item "precisa de você" na Caixa com o que fazer — hoje fica escrito no meio do grupo.
+- ✅ **P0** Cartão de delegação no seu fio (send_message, call_agent e @menção no grupo; resposta do colega fica dentro do cartão): "Pedi ao Donald: ajustar a faixa · trabalhando / feito · ver resultado". Você acompanha sem abrir outra conversa.
+- ✅ **P0** Bloqueio vira pedido para você (skill manda usar ask_owner; se a resposta diz "preciso que você"/"BLOQUEADO" sem ask_owner, o servidor cria o item na Caixa): quando um agente para por falta de algo (VM caiu, senha, aprovação), cria um item "precisa de você" na Caixa com o que fazer — hoje fica escrito no meio do grupo.
 - [ ] P1 Painel "quem está fazendo o quê": cada agente com a tarefa atual, há quanto tempo e para quem vai o resultado.
 - [ ] P1 @menção tolerante a nome (ex.: "@Ripper" e "@Engenheiro de Software (Ripper)" chamam o mesmo agente).
 - [ ] P1 Agente não responde a confirmações de colega ("ok", "recebido") — encerra a troca.

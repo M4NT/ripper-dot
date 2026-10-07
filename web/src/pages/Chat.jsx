@@ -13,6 +13,7 @@ import MessageAttachments, { DeliveredFiles } from '../MessageAttachments.jsx';
 import ChatPanel, { MiniScreen } from '../chatPanel.jsx';
 import { MentionText } from '../mentions.jsx';
 import { AgentThread, ViaLabel } from '../agentThread.jsx';
+import { delegationCardState } from '../../../lib/agent-flow.mjs';
 import { ResizeHandle } from '../resize.jsx';
 import ActionLine from '../actionLine.jsx';
 import { useChatMenu } from '../actions.jsx';
@@ -130,7 +131,7 @@ function typingLabel(phase) {
   return 'Escrevendo…';
 }
 
-const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, models, group, showModel, allFiles, onFileError }) {
+const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, models, group, showModel, allFiles, onFileError, deleg }) {
   // ids (resposta salva) ou objetos (chegando ao vivo)
   const { agent: getAgent } = useApp();
   const delivered = (m.files || []).map(x => (typeof x === 'string' ? allFiles?.find(f => f.id === x) : x)).filter(Boolean);
@@ -161,7 +162,7 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, mo
             {onRetry && <button className="meta-btn" onClick={onRetry}><Icon name="retry" size={14} />Refazer</button>}
           </>}
         </div>
-        {group && m.delegations?.map(d => <Delegation key={d.to} from={agent} to={getAgent(d.to)} task={d.task} />)}
+        {m.delegations?.map(d => <Delegation key={d.messageId || d.to} to={getAgent(d.to)} task={d.task} state={delegationCardState(d, deleg?.messages, deleg?.inbox, deleg?.liveAgentId)} />)}
         {live && group && m.plan?.length > 0 && (() => {
           const after = m.plan.filter(id => id !== m.agentId).map(id => getAgent(id)?.name).filter(Boolean);
           return <p className="turn-plan">Agora: {agent.name}{after.length ? ` · depois: ${after.join(', ')}` : ''}</p>;
@@ -169,17 +170,24 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, mo
       </div>
     </div>
   );
-}, (a, b) => a.m === b.m && a.agent === b.agent && a.live === b.live && a.phase === b.phase && a.group === b.group && a.showModel === b.showModel && a.allFiles === b.allFiles && a.models === b.models && !!a.onRetry === !!b.onRetry);
+}, (a, b) => a.m === b.m && a.agent === b.agent && a.live === b.live && a.phase === b.phase && a.group === b.group && a.showModel === b.showModel && a.allFiles === b.allFiles && a.models === b.models && a.deleg === b.deleg && !!a.onRetry === !!b.onRetry);
 
-/** "Ana → Bruno: pesquisar preços" — quem passou a palavra para quem, e para quê. */
-function Delegation({ from, to, task }) {
+const DELEG_TONE = { aguardando: 'wait', trabalhando: 'work', feito: 'ok', falhou: 'err' };
+/** Cartão no fio de quem pediu: "Pedi ao Donald: ajustar a faixa · trabalhando", e o resultado ali mesmo. */
+function Delegation({ to, task, state }) {
+  const [open, setOpen] = useState(false);
   if (!to) return null;
+  const { status, result } = state;
   return (
     <div className="delegation">
-      <AgentAvatar agent={from} size={18} paused /><span>{from?.name}</span>
-      <span aria-label="delegou para">→</span>
-      <AgentAvatar agent={to} size={18} paused /><span>{to.name}</span>
-      {task && <span className="delegation-task" title={task}>{task}</span>}
+      <div className="delegation-row">
+        <AgentAvatar agent={to} size={18} state={status === 'trabalhando' ? 'working' : undefined} paused={status !== 'trabalhando'} />
+        <span>Pedi ao {to.name}:</span>
+        {task && <span className="delegation-task" title={task}>{task}</span>}
+        <span className={`delegation-status ${DELEG_TONE[status]}`} role="status">{status}</span>
+        {result && <button type="button" className="meta-btn" aria-expanded={open} onClick={() => setOpen(o => !o)}>{open ? 'Esconder' : status === 'falhou' ? 'Ver erro' : 'Ver resultado'}</button>}
+      </div>
+      {open && result && <div className="delegation-result"><Markdown text={result} /></div>}
     </div>
   );
 }
@@ -509,6 +517,9 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
     }
   }
   sendTurnRef.current = send;
+  // Cartões de delegação: estado dos pedidos e respostas que já aparecem dentro do cartão (não viram balão à parte).
+  const deleg = useMemo(() => ({ messages: chat?.messages || [], inbox: chat?.inboxStatus || {}, liveAgentId: live?.agentId || null }), [chat?.messages, chat?.inboxStatus, live?.agentId]);
+  const inCard = useMemo(() => new Set((chat?.messages || []).flatMap(m => (m.delegations || []).map(d => d.messageId).filter(Boolean))), [chat?.messages]);
 
   if (loading) return <div className="page-loading" role="status" aria-live="polite" aria-label="Carregando conversa"><ThinkingOrb state="breathing" size={20} /></div>;
   if (notFound || !agent) return <div className="page"><EmptyState title="Conversa não encontrada" body="Ela pode ter sido apagada." action={<a className="btn" href="#/chats">Ver conversas</a>} /></div>;
@@ -587,10 +598,10 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
                 {!isGroup && <FirstRunChecklist settings={S.settings} agentCount={S.agents.length} />}
               </div>
             )}
-            {[...messages.map((m, i) => <div key={i} data-mi={i} className={[i >= animateFrom.current && 'is-new', matches.includes(i) && `search-hit${matches[hit] === i ? ' current' : ''}`].filter(Boolean).join(' ') || undefined}>{m.inbox ? <InboxMessage m={m} from={getAgent(m.inbox.from)} /> : m.role === 'user'
+            {[...messages.map((m, i) => <div key={i} data-mi={i} className={[i >= animateFrom.current && 'is-new', matches.includes(i) && `search-hit${matches[hit] === i ? ' current' : ''}`].filter(Boolean).join(' ') || undefined}>{m.via?.type === 'inbox' && inCard.has(m.via.messageId) ? null : m.inbox ? <InboxMessage m={m} from={getAgent(m.inbox.from)} /> : m.role === 'user'
               ? <UserMessage m={m} name={S.settings.name} files={S.files} onEdit={canEdit && m.id && !/^u\d+$/.test(m.id) ? text => editFrom(m, text) : null} />
-              : <>{m.via?.type === 'inbox' && m.via.threadChatId && <ViaLabel m={m} onOpen={setThread} />}<BotMessage m={m} agent={getAgent(m.agentId) || agent} group={isGroup || (!!m.agentId && m.agentId !== agent.id)} models={S.models} showModel={isEnterpriseMode(S.settings)} allFiles={S.files} onFileError={msg => toast(msg, 'error')} onRetry={m === messages.at(-1) && lastUser ? () => send({ text: lastUser.content }) : null} /></>}</div>),
-              live && <div key={messages.length} className="is-new"><BotMessage m={live} agent={getAgent(live.agentId) || agent} group={isGroup} live phase={phase} models={S.models} /></div>]}
+              : <>{m.via?.type === 'inbox' && m.via.threadChatId && <ViaLabel m={m} onOpen={setThread} />}<BotMessage m={m} agent={getAgent(m.agentId) || agent} group={isGroup || (!!m.agentId && m.agentId !== agent.id)} models={S.models} showModel={isEnterpriseMode(S.settings)} allFiles={S.files} deleg={deleg} onFileError={msg => toast(msg, 'error')} onRetry={m === messages.at(-1) && lastUser ? () => send({ text: lastUser.content }) : null} /></>}</div>),
+              live && <div key={messages.length} className="is-new"><BotMessage m={live} agent={getAgent(live.agentId) || agent} group={isGroup} live phase={phase} models={S.models} deleg={deleg} /></div>]}
           </div>
         </div>
 

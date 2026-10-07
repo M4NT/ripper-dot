@@ -1,6 +1,34 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canUseFile, selectSpeakers, routineDue, mayFallback, mentionOrder, Floor, isPass, heuristicSpeaker, trimHistory, turnPlanIds } from '../lib/agent-flow.mjs';
+import { canUseFile, selectSpeakers, routineDue, mayFallback, mentionOrder, Floor, isPass, heuristicSpeaker, trimHistory, turnPlanIds, delegationCardState, ownerBlockedReason, oneLineTask } from '../lib/agent-flow.mjs';
+
+test('cartão de delegação: aguardando → trabalhando → feito / falhou', () => {
+  const d = { to: 'b', task: 'x', messageId: 'm1' };
+  assert.equal(delegationCardState(d, [], {}).status, 'aguardando');
+  assert.equal(delegationCardState(d, [], { m1: { status: 'queued' } }).status, 'aguardando');
+  assert.equal(delegationCardState(d, [], { m1: { status: 'delivering' } }).status, 'trabalhando');
+  assert.deepEqual(delegationCardState(d, [], { m1: { status: 'failed', error: 'caiu' } }), { status: 'falhou', result: 'caiu' });
+  assert.deepEqual(delegationCardState(d, [], { m1: { status: 'delivered', reply: 'ok' } }), { status: 'feito', result: 'ok' });
+  const msgs = [{ role: 'assistant', agentId: 'b', content: 'pronto', via: { type: 'inbox', messageId: 'm1' } }];
+  assert.deepEqual(delegationCardState(d, msgs, { m1: { status: 'delivering' } }), { status: 'feito', result: 'pronto' });
+  // @menção no grupo
+  const g = { to: 'b', task: 'y' };
+  const thread = [{ role: 'assistant', agentId: 'a', delegations: [g] }];
+  assert.equal(delegationCardState(g, thread, {}, 'b').status, 'trabalhando');
+  assert.equal(delegationCardState(g, thread, {}).status, 'aguardando');
+  assert.equal(delegationCardState(g, [...thread, { role: 'assistant', agentId: 'b', content: 'z' }], {}).status, 'feito');
+  assert.equal(oneLineTask('a\n\n**b**  c'), 'a b c');
+});
+
+test('bloqueio pelo dono: frases claras viram item, resposta normal não', () => {
+  assert.match(ownerBlockedReason('Rodei o build. Preciso que você me passe a senha do servidor. O resto está pronto.'), /^Preciso que você me passe a senha/);
+  assert.ok(ownerBlockedReason('BLOQUEADO: a VM caiu.'));
+  assert.ok(ownerBlockedReason('Não consigo continuar sem o arquivo da planilha.'));
+  assert.ok(ownerBlockedReason('Isso depende de você aprovar o orçamento.'));
+  assert.equal(ownerBlockedReason('Pronto, o build passou e subi a correção.'), null);
+  assert.equal(ownerBlockedReason('O desbloqueio da conta foi feito.'), null);
+  assert.equal(ownerBlockedReason(''), null);
+});
 
 const agents = [
   { id: 'e', name: 'Estrategista', description: 'Define posicionamento e mensagem.' },
