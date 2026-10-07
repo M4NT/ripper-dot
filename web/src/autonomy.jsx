@@ -40,7 +40,7 @@ export function displayAutonomyLevel(level, settings) {
 export function AutonomySemaphore({ level, settings, showLabel = true, size = 'md' }) {
   const m = autonomyMeta(displayAutonomyLevel(level, settings));
   return (
-    <span className={`autonomy-sem autonomy-sem-${m.sem} autonomy-sem-${size}`} title={m.label}>
+    <span className={`autonomy-sem autonomy-sem-${m.sem} autonomy-sem-${size}`} title={`Autonomia: ${m.label.toLowerCase()}`} role="img" aria-label={`Autonomia: ${m.label.toLowerCase()}`}>
       <span className="autonomy-lights" aria-hidden="true">
         <i className={m.sem === 'red' ? 'on' : ''} />
         <i className={m.sem === 'yellow' ? 'on' : ''} />

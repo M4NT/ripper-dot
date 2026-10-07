@@ -30,14 +30,15 @@ export default function AgentCard({ agent, live }) {
           <h3>{agent.name}{agent.nickname && <small className="agent-nick">@{agent.nickname}</small>}</h3>
           <p>{agent.description || 'Sem descrição.'}</p>
           {day?.turns > 0 && (
-            <small className="agent-card-stats" title="Hoje. Tokens e custo são estimativas (catálogo de preços), não a fatura.">
-              Hoje: {day.turns} {day.turns === 1 ? 'resposta' : 'respostas'} · ~{fmtTokens(day.tokens)} tokens · ~US$ {day.usd.toFixed(2).replace('.', ',')}{day.avgMs != null && ` · ${(day.avgMs / 1000).toFixed(1).replace('.', ',')}s em média`}
+            <small className="agent-card-stats">
+              {/* tokens e custo ficam na ficha do agente (§3.1: detalhe técnico só ao abrir) */}
+              Hoje: {day.turns} {day.turns === 1 ? 'resposta' : 'respostas'}
             </small>
           )}
         </div>
         <div className="agent-card-foot">
           <StatusDot status={agent.status} />
-          <AutonomySemaphore level={agent.autonomyLevel} settings={S.settings} showLabel={false} size="sm" />
+          <AutonomySemaphore level={agent.autonomyLevel} settings={S.settings} size="sm" />
           {working && (live?.chatId
             ? <a className="working-label" href={`#/c/${live.chatId}`} title={live.chatTitle ? `Em: ${live.chatTitle}` : undefined}>{live.tool ? stepLabel(live.tool) : 'trabalhando'}</a>
             : <span className="working-label">{live?.tool ? stepLabel(live.tool) : live?.chatTitle === 'WhatsApp' ? 'no WhatsApp' : 'respondendo'}</span>)}
@@ -57,7 +58,6 @@ export default function AgentCard({ agent, live }) {
   );
 }
 
-const fmtTokens = n => n >= 1000 ? `${(n / 1000).toFixed(1).replace('.', ',')} mil` : String(n);
 
 export function NewAgentCard() {
   return (

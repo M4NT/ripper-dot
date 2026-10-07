@@ -14,16 +14,16 @@ const C = (id, name, author, desc, connect, extra = {}) => ({
 });
 
 export const CONNECTORS = [
-  C('google-calendar', 'Google Agenda', 'Google', 'Eventos, disponibilidade e convites.', { type: 'claude' }, { featured: true, forYou: true, claudeNames: ['Google Calendar'] }),
+  C('google-calendar', 'Google Agenda', 'Google', 'Eventos, disponibilidade e convites.', { type: 'claude' }, { forYou: true, claudeNames: ['Google Calendar'] }),
   C('gmail', 'Gmail', 'Google', 'Ler, buscar e rascunhar e-mails.', { type: 'claude' }, { featured: true }),
   C('google-drive', 'Google Drive', 'Google', 'Buscar e ler documentos e planilhas.', { type: 'claude' }, { featured: true }),
   C('slack', 'Slack', 'Slack', 'Canais, mensagens e busca.', { type: 'claude' }),
   C('microsoft-365', 'Microsoft 365', 'Microsoft', 'Outlook, Teams e OneDrive.', { type: 'claude' }, { icon: 'microsoft' }),
-  C('notion', 'Notion', 'Notion', 'Páginas, bases e tarefas.', { type: 'oauth', url: 'https://mcp.notion.com/mcp' }, { featured: true, forYou: true }),
-  C('linear', 'Linear', 'Linear', 'Issues, projetos e ciclos.', { type: 'oauth', url: 'https://mcp.linear.app/mcp' }, { forYou: true }),
+  C('notion', 'Notion', 'Notion', 'Páginas, bases e tarefas.', { type: 'oauth', url: 'https://mcp.notion.com/mcp' }, { forYou: true }),
+  C('linear', 'Linear', 'Linear', 'Tarefas, projetos e ciclos.', { type: 'oauth', url: 'https://mcp.linear.app/mcp' }, { forYou: true }),
   C('asana', 'Asana', 'Asana', 'Projetos e tarefas.', { type: 'oauth', url: 'https://mcp.asana.com/sse' }),
   C('monday', 'monday.com', 'monday.com', 'Quadros, itens e automações.', { type: 'oauth', url: 'https://mcp.monday.com/mcp' }),
-  C('atlassian', 'Jira e Confluence', 'Atlassian', 'Issues do Jira e páginas do Confluence.', { type: 'oauth', url: 'https://mcp.atlassian.com/v1/sse' }),
+  C('atlassian', 'Jira e Confluence', 'Atlassian', 'Tarefas do Jira e páginas do Confluence.', { type: 'oauth', url: 'https://mcp.atlassian.com/v1/sse' }),
   C('canva', 'Canva', 'Canva', 'Criar e exportar designs.', { type: 'oauth', url: 'https://mcp.canva.com/mcp' }),
   C('zapier', 'Zapier', 'Zapier', 'Milhares de apps por ações do Zapier.', { type: 'oauth', url: 'https://mcp.zapier.com/api/mcp/mcp' }, { forYou: true }),
   C('granola', 'Granola', 'Granola', 'Notas e resumos de reuniões.', { type: 'oauth', url: 'https://mcp.granola.ai/mcp' }),
@@ -32,7 +32,7 @@ export const CONNECTORS = [
   C('cloudflare', 'Cloudflare', 'Cloudflare', 'Logs e observabilidade de Workers.', { type: 'oauth', url: 'https://observability.mcp.cloudflare.com/mcp' }),
   C('supabase', 'Supabase', 'Supabase', 'Banco, auth e storage.', { type: 'oauth', url: 'https://mcp.supabase.com/mcp' }),
   C('sentry', 'Sentry', 'Sentry', 'Erros e performance.', { type: 'oauth', url: 'https://mcp.sentry.dev/mcp' }),
-  C('github', 'GitHub', 'GitHub', 'Repositórios, issues e pull requests.', { type: 'token', url: 'https://api.githubcopilot.com/mcp/',
+  C('github', 'GitHub', 'GitHub', 'Repositórios, tarefas e pedidos de mudança.', { type: 'token', url: 'https://api.githubcopilot.com/mcp/',
     tokenHelp: 'Crie um token em github.com/settings/tokens (fine-grained) com acesso aos repositórios que o agente pode ver.' }, { featured: true }),
   // SEO e campanhas: só leitura dos relatórios.
   C('google-analytics', 'Google Analytics 4', 'Google', 'Relatórios de tráfego, conversões e funis do GA4.', { type: 'local', command: 'pipx', args: ['run', 'analytics-mcp==0.7.0'],
@@ -49,7 +49,7 @@ export const CONNECTOR_DISCOVER = CONNECTORS;
 
 /** Presets Ripper (templates de agente, não plugins MCP). */
 export const AGENT_PRESETS = [
-  { id: 'architect', name: 'Architect', author: 'Ripper', color: '#5b6cf0', desc: 'Desenho de times multi-agente — papéis, ferramentas e trade-offs.', templateId: 'architect', hub: 'enterprise' }
+  { id: 'architect', name: 'Architect', author: 'Ripper', color: '#5b6cf0', desc: 'Desenho de times multi-agente — papéis, ferramentas e prós e contras.', templateId: 'architect', hub: 'enterprise' }
 ];
 
 export const BOT_CATALOG = [

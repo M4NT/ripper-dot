@@ -215,7 +215,7 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
           if (e.kind === 'group') return (
             <a {...common} href={`#/c/${c.id}`} className={`row ${parts[1] === c.id ? 'on' : ''} ${unread ? 'unread' : ''} ${dragKey === e.key ? 'lifted' : ''}`} onContextMenu={ev => chatMenu(ev, c)} title={collapsed ? c.title : undefined}>
               <span className="row-av"><ChatAvatar chat={c} size={40} /></span>
-              <span className="row-text"><span className="row-top"><b>{c.title}</b><em className="row-tag">{t('nav.group')}</em></span><small>{c.preview || t('nav.noMessages')}</small></span>
+              <span className="row-text"><span className="row-top"><b>{c.title}</b><em className="row-tag" title={t('nav.group')} aria-label={t('nav.group')}><Icon name="group" size={13} /></em></span><small>{c.preview || t('nav.noMessages')}</small></span>
               {unread ? <span className="unread-dot" /> : <time>{fmtAgo(e.at)}</time>}
             </a>
           );
@@ -334,6 +334,8 @@ function Shell() {
   const [collapsed, setCollapsed] = useState(() => local.get('sideCollapsed', false));
   const toggleCollapsed = () => setCollapsed(c => { local.set('sideCollapsed', !c); return !c; });
   const mobile = useMediaQuery('(max-width: 900px)');
+  // no chat o cabeçalho da conversa já tem ☰ (uma linha só no celular)
+  useEffect(() => { const o = () => setDrawer(true); addEventListener('ripper:open-drawer', o); return () => removeEventListener('ripper:open-drawer', o); }, []);
   useEffect(() => {
     const f = e => {
       const mod = e.ctrlKey || e.metaKey;
@@ -455,7 +457,7 @@ function Shell() {
         collapsed={collapsed && !mobile} onCollapse={mobile ? null : toggleCollapsed} />
       {mobile && <button className="scrim" aria-label={t('shell.closeMenu')} onClick={() => setDrawer(false)} tabIndex={drawer ? 0 : -1} />}
       <main className="main">
-        {mobile && (
+        {mobile && page?.type !== Chat && (
           <div className="mobile-bar">
             <button className="icon-btn" onClick={() => setDrawer(true)} aria-label={t('shell.openMenu')}><Icon name="menu" /></button>
             <span className="mobile-title">{t('shell.brand')}{getUiMode(S.settings) === 'enterprise' ? '' : <span className="mobile-mode-tag">{t('shell.modeSimple')}</span>}</span>
@@ -469,7 +471,7 @@ function Shell() {
       </main>
       {hubPage && (
         <div className="hub-overlay" onMouseDown={e => e.target === e.currentTarget && closeHub()}>
-          <div ref={hubRef} className="hub-modal" role="dialog" aria-modal="true" aria-label={parts[0] === 'settings' ? t('nav.settings') : parts[0] === 'saude' ? 'Saúde do Ripper' : parts[0] === 'ajuda' ? 'Ajuda' : 'Marketplace'}>
+          <div ref={hubRef} className="hub-modal" role="dialog" aria-modal="true" aria-label={parts[0] === 'settings' ? t('nav.settings') : parts[0] === 'saude' ? 'Saúde do Ripper' : parts[0] === 'ajuda' ? 'Ajuda' : 'Conectar aplicativos'}>
             <Suspense fallback={<div className="page-loading"><ThinkingOrb state="breathing" size={20} /></div>}>{hubPage}</Suspense>
           </div>
         </div>
