@@ -159,9 +159,9 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, on
           {/* qual IA respondeu e se o Ripper Auto escolheu: sempre à vista, para ninguém estranhar a troca de modelo */}
           {m.model && <span className="badge model-badge">{m.routedBy && m.routedBy !== 'manual' ? 'Ripper Auto → ' : ''}{models?.[m.model]?.label || m.model}{m.effort && m.effort !== 'auto' ? ` · ${effortLabel(m.effort)}` : ''}</span>}
           {!live && m.content && <>
-            <button className="meta-btn" onClick={() => navigator.clipboard.writeText(m.content)}><Icon name="copy" size={14} />Copiar</button>
-            {canSpeak && <button className="meta-btn" onClick={() => speak(m.content)}><Icon name="volume" size={14} />Ouvir</button>}
-            {onRetry && <button className="meta-btn" onClick={onRetry}><Icon name="retry" size={14} />Refazer</button>}
+            <button className="meta-btn" aria-label="Copiar" onClick={() => navigator.clipboard.writeText(m.content)}><Icon name="copy" size={14} /><span>Copiar</span></button>
+            {canSpeak && <button className="meta-btn" aria-label="Ouvir" onClick={() => speak(m.content)}><Icon name="volume" size={14} /><span>Ouvir</span></button>}
+            {onRetry && <button className="meta-btn" aria-label="Refazer" onClick={onRetry}><Icon name="retry" size={14} /><span>Refazer</span></button>}
           </>}
         </div>
         {m.delegations?.map(d => <Delegation key={d.messageId || d.to} to={getAgent(d.to)} task={d.task} state={delegationCardState(d, deleg?.messages, deleg?.inbox, deleg?.liveAgentId)} />)}
@@ -233,7 +233,7 @@ const UserMessage = memo(function UserMessage({ m, name, files, onEdit, ack, onR
           {m.at && <time className="msg-time">{fmtTime(m.at)}</time>}
           {ack?.state === 'seen' && <span className="msg-ack" role="status">{ack.label}</span>}
           {ack?.state === 'late' && <span className="msg-ack late" role="status">Ainda não chegou — <button type="button" className="meta-btn" onClick={onRetryAck}>tentar de novo</button></span>}
-          {m.content && draft === null && <button className="meta-btn" aria-label="Copiar mensagem" onClick={() => navigator.clipboard.writeText(m.content)}><Icon name="copy" size={14} />Copiar</button>}
+          {m.content && draft === null && <button className="meta-btn" aria-label="Copiar mensagem" onClick={() => navigator.clipboard.writeText(m.content)}><Icon name="copy" size={14} /><span>Copiar</span></button>}
           {onEdit && draft === null && <button className="meta-btn" aria-label="Editar e reenviar mensagem" onClick={() => setDraft(m.content || '')}><Icon name="edit" size={14} />Editar</button>}
         </div>
       </div>

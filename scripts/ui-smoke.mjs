@@ -23,6 +23,7 @@ const fail = [];
 let browser;
 try {
   for (let i = 0; i < 60; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 250)); }
+  await api('/api/settings', { method: 'PUT', body: JSON.stringify({ onboarded: true }) }); // pula o assistente de primeiro uso
   browser = await firefox.launch();
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   let where = 'início';

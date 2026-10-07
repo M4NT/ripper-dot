@@ -2261,3 +2261,19 @@ body.agent-dragging .side-list { overflow: hidden; }
 
 /* qual IA respondeu (sempre à vista, discreto) */
 .msg-meta .model-badge { font-weight: 400; }
+
+/* P0 bandeja de aprovação: pílula recolhida no topo, nunca sobre o campo de mensagem */
+.approval-tray { top: 12px; bottom: auto; right: 16px; width: auto; max-width: min(420px, calc(100vw - 32px)); border-radius: 999px; }
+.approval-tray.open { width: min(420px, calc(100vw - 32px)); border-radius: 18px; }
+.approval-tray:not(.open) .tray-head { padding: 7px 14px; font-size: 13px; white-space: nowrap; }
+.approval-tray .tray-list { max-height: calc(100vh - 240px); }
+.approval-tray button { white-space: nowrap; }
+
+/* P0 linha de ações da resposta no celular: só ícone, sem quebrar letra por letra */
+.msg-meta time, .msg-meta .meta-btn { white-space: nowrap; flex-shrink: 0; }
+@media (max-width: 479px) {
+  .approval-tray:not(.open) { right: 60px; } /* ao lado da busca do cabeçalho, sem cobri-la */
+  .msg-meta { flex-wrap: wrap; }
+  .msg-meta .meta-btn span { display: none; }
+  .msg-meta .model-badge { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}

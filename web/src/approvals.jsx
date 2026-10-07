@@ -141,7 +141,7 @@ export function ApprovalTray() {
   const { parts } = useRoute();
   const t = useT();
   const [pending, setPending] = useState([]);
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false); // recolhida: só a pílula; abre por clique
   useEffect(() => {
     let alive = true, t;
     const load = async () => {
@@ -154,12 +154,11 @@ export function ApprovalTray() {
   const here = parts[0] === 'c' ? parts[1] : null;
   // os da conversa aberta aparecem dentro dela; na Caixa, todos já estão na tela
   const list = parts[0] === 'inbox' ? [] : pending.filter(p => p.chatId !== here);
-  useEffect(() => { if (list.length) setOpen(true); }, [list.length]);
   if (!list.length) return null;
   return (
     <aside className={`approval-tray ${open ? 'open' : ''}`} aria-label={t('approval.tray.label')}>
       <button className="tray-head" onClick={() => setOpen(o => !o)} aria-expanded={open}>
-        <span className="tray-dot" />{list.length === 1 ? t('approval.tray.one', { n: list.length }) : t('approval.tray.many', { n: list.length })}
+        <span className="tray-dot" />{open ? (list.length === 1 ? t('approval.tray.one', { n: list.length }) : t('approval.tray.many', { n: list.length })) : `${list.length} ${list.length === 1 ? 'aprovação' : 'aprovações'}`}
         <Icon name="down" size={14} className={open ? '' : 'flip'} />
       </button>
       {open && <div className="tray-list">

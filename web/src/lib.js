@@ -94,7 +94,7 @@ export const TOOL_INFO = {
   images: { label: 'Gerar imagens', icon: 'image', desc: 'Cria artes e ilustrações pela sua assinatura do ChatGPT, seguindo o kit de marca.' }
 };
 export const STEP_LABEL = {
-  computer_exec: 'Rodando no computador', computer_share: 'Gerando link', WebSearch: 'Pesquisando na web', WebFetch: 'Lendo página',
+  computer_exec: 'Rodando no computador', shell: 'Rodando comando', Bash: 'Rodando comando', computer_share: 'Gerando link', WebSearch: 'Pesquisando na web', WebFetch: 'Lendo página',
   remember: 'Guardando na memória', schedule_routine: 'Criando rotina', generate_image: 'Gerando imagem com o ChatGPT', share_with_team: 'Compartilhando com o time',
   browser_open: 'Abrindo página', browser_click: 'Clicando', browser_type: 'Digitando', browser_scroll: 'Rolando a página', browser_read: 'Lendo a página',
   send_message: 'Mandando mensagem', call_agent: 'Chamando colega', save_artifact: 'Salvando artefato', read_artifact: 'Lendo artefato', use_skill: 'Usando skill', save_skill: 'Guardando skill',
