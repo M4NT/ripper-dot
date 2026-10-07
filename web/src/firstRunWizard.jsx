@@ -3,8 +3,6 @@ import { api, go } from './lib.js';
 import { Dialog } from './ui.jsx';
 import { useApp } from './app.jsx';
 
-const KEY = 'ripper.onboarded';
-const seen = () => { try { return !!localStorage.getItem(KEY); } catch { return false; } };
 
 const AI = [
   ['claude', 'Claude', 'Melhor qualidade para os agentes. Use sua assinatura: rode claude login uma vez nesta máquina.'],
@@ -13,10 +11,10 @@ const AI = [
   ['none', 'Não tenho', 'Um modelo local que roda no seu computador, de graça (Configurações → Ollama → Modelo recomendado). Qualidade menor e depende da sua máquina.']
 ];
 
-/** Assistente de primeiro uso: aparece uma vez, depois do login, enquanto não há agente. */
+/** Assistente de primeiro uso: aparece uma vez por instalação (settings.onboarded=false só no banco novo). */
 export function FirstRunWizard() {
   const { S, refresh, toast } = useApp();
-  const [open, setOpen] = useState(() => !seen() && S.agents.length === 0);
+  const [open, setOpen] = useState(() => S.settings.onboarded === false);
   const [step, setStep] = useState('ai');
   const [ai, setAi] = useState(null);
   const [key, setKey] = useState('');
@@ -28,7 +26,7 @@ export function FirstRunWizard() {
   useEffect(() => { if (step === 'computer') api('/api/computer/docker').then(r => setDocker(r.version || null), () => setDocker(null)); }, [step]);
   if (!open) return null;
 
-  const close = () => { try { localStorage.setItem(KEY, '1'); } catch {} setOpen(false); if (agentId) go(`/a/${agentId}`); };
+  const close = () => { api('/api/settings', { method: 'PUT', body: { onboarded: true } }).catch(() => {}); setOpen(false); if (agentId) go(`/a/${agentId}`); };
   const saveSettings = body => api('/api/settings', { method: 'PUT', body }).then(refresh);
   const run = async fn => { setBusy(true); try { await fn(); } catch (e) { toast(e.message, 'error'); } finally { setBusy(false); } };
 

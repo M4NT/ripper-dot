@@ -685,6 +685,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
   const [docker, setDocker] = useState(undefined);
   const [image, setImage] = useState(null);
   const [julia, setJulia] = useState(null);
+  const [claudeLogged, setClaudeLogged] = useState(null); // mesma fonte da Saúde: /api/claude/accounts (isLoggedIn)
   const [prov, setProv] = useState(null); // provedor aberto em Provedores de IA
   const provQuery = useRoute().query.get('prov'); // #/settings/models?prov=claude abre direto (busca de configurações)
   useEffect(() => { if (provQuery) setProv(provQuery); }, [provQuery]);
@@ -692,7 +693,8 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
   const provCounts = Object.values(S.models).reduce((o, m) => (m.provider && (o[m.provider] = (o[m.provider] || 0) + 1), o), {});
   const provStatus = {
     julia: julia === null ? { tone: 'off', label: 'verificando…' } : julia ? { tone: 'ok', label: 'no ar' } : { tone: 'warn', label: 'fora do ar' },
-    claude: s.claude.mode === 'api' && !s.claude.apiKey ? { tone: 'warn', label: 'falta a chave' } : { tone: 'ok', label: s.claude.mode === 'api' ? 'API key' : 'assinatura' },
+    claude: s.claude.mode === 'api' ? (s.claude.apiKey ? { tone: 'ok', label: 'API key' } : { tone: 'warn', label: 'falta a chave' })
+      : claudeLogged === null ? { tone: 'off', label: 'verificando…' } : claudeLogged ? { tone: 'ok', label: 'assinatura' } : { tone: 'warn', label: 'falta entrar' },
     codex: S.meta?.codexInstalled ? { tone: 'ok', label: 'conectado' } : { tone: 'warn', label: 'não instalado' },
     openrouter: s.openrouter?.apiKey ? { tone: 'ok', label: 'chave salva' } : { tone: 'off', label: 'não conectado' },
     openai: s.openai?.apiKey ? { tone: 'ok', label: 'chave salva' } : { tone: 'off', label: 'não conectado' },
@@ -703,6 +705,7 @@ export default function Settings({ theme, toggleTheme, tab: initial }) {
   useEffect(() => {
     if (tab === 'computer') api('/api/computer/docker').then(r => { setDocker(r.version); setImage(r.outdated && r.image === 'missing' ? 'outdated' : r.image); }).catch(() => setDocker(null));
     if (tab === 'models') api('/api/julia/status').then(r => setJulia(r.online)).catch(() => setJulia(false));
+    if (tab === 'models') api('/api/claude/accounts').then(r => setClaudeLogged(r.find(a => a.id === (S.settings.claude?.defaultAccount || 'principal'))?.loggedIn ?? false)).catch(() => setClaudeLogged(false));
     if (tab === 'security') api('/api/sandbox/status').then(setSandboxSt).catch(() => setSandboxSt(null));
   }, [tab]);
   const current = allowedTabs.find(([k]) => k === tab) || allowedTabs[0];

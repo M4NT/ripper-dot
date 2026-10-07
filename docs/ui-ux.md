@@ -13,18 +13,22 @@ Obs.: textos com `[[ripper:test:…]]` nos prints são o prefixo do provedor de 
 1. **Primeiro uso nunca aparece.** `lib/store.mjs:241` cria o "Assistente" quando não há agentes, e `web/src/firstRunWizard.jsx:19` só abre com `S.agents.length === 0`. Numa instalação nova a pessoa cai direto no chat, sem escolher a IA nem o computador — e a Saúde mostra "Claude · Sem login" em vermelho.
    Print: `docs/ui-ux/wizard-1280-dark.png`, `wizard-375-dark.png`.
    Correção: abrir o assistente pelo `ripper.onboarded` + "nenhum provedor conectado" (não pela contagem de agentes), ou marcar o agente padrão como `seed: true` e ignorá-lo na condição.
+   **Feito (07/10/2026):** `settings.onboarded` no servidor — `false` só num banco novo (`lib/store.mjs`); bancos antigos sem o campo contam como `true`. O assistente abre por ele e grava `true` ao fechar ou pular. Depois: `wizard-1280-dark-depois.png`, `wizard-375-dark-depois.png`.
 
 2. **Bandeja de aprovação cobre a tela.** O cartão flutuante "1 pedido aguardando sua aprovação" fica fixo no canto em todas as telas, por cima do campo de mensagem, de cards de agentes, do formulário da ficha e até do aviso "Agentes podem errar". No celular ocupa metade da tela e o "Recusar" cai para uma terceira linha.
    Print: `grupo-1280-dark.png`, `agentes-1280-dark.png`, `agente-config-1280-dark.png`, `agentes-375-dark.png`.
    Correção: começar recolhida (só a pílula âmbar "1 aprovação" acima do campo de mensagem, como a Caixa já faz); expandir por clique; nunca sobrepor o composer (`bottom` acima da altura do composer). No celular, folha inferior com os 3 botões em uma linha (`Recusar` como botão de ícone ou texto curto) e fechada por padrão. Não mostrar a bandeja quando o mesmo pedido já está visível no fio aberto.
+   **Feito (07/10/2026):** começa recolhida como pílula "1 aprovação" no topo à direita (no celular, ao lado da busca do cabeçalho); abre por clique; a lista cabe acima do composer; botões sem quebra. O pedido do fio aberto já não aparecia na bandeja. Depois: `agentes-1280-dark-depois.png`, `agentes-375-dark-depois.png`.
 
 3. **"Copiar" e "Ouvir" quebram letra por letra no celular.** Na linha de ações da resposta, a 375px, o rótulo vira "Co/pi/ar", "O/u/vir" e o horário "09:/28".
    Print: `chat-1a1-375-dark.png`.
    Correção: nessa linha usar só ícone abaixo de 480px (com `aria-label`) e `white-space: nowrap; flex-shrink: 0` nos botões; o horário com `nowrap`.
+   **Feito (07/10/2026):** abaixo de 480px só ícones (com `aria-label`); horário e botões com `nowrap`. Depois: `chat-1a1-375-dark-depois.png`, `chat-1a1-1280-dark-depois.png`.
 
 4. **Estado contraditório sobre a IA e o computador.** Configurações → Provedores mostra Claude com selo verde "assinatura", enquanto Saúde diz "Claude · Sem login" (vermelho). No chat, a pílula diz "Sem computador" e a atividade da resposta diz "Rodando no computador".
    Print: `config-models-1280-dark.png`, `saude-1280-dark.png`, `chat-1a1-1280-light.png`.
    Correção: uma fonte única de estado por provedor (`conectado` / `sem login` / `fora do ar`), usada no selo e na Saúde; selo âmbar "falta entrar" com botão "Entrar" quando sem login. Rótulo da atividade sem computador: "Rodando aqui no Ripper" (ou o nome real do ambiente).
+   **Feito (07/10/2026):** o selo do Claude em Provedores lê `/api/claude/accounts` (o mesmo `isLoggedIn` da Saúde) e mostra "falta entrar" em âmbar sem login. Causa do "Rodando no computador": o shell do próprio Codex (`command_execution`) era rotulado como `computer_exec` (e o provedor de teste fazia o mesmo); agora é `shell`, "Rodando comando". `computer_exec` só existe com o Computador ligado. Depois: `config-models-1280-dark-depois.png`, `chat-1a1-375-dark-depois.png`.
 
 ## P1 — parece inacabado
 

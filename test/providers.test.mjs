@@ -97,6 +97,8 @@ test('buildClaudeQueryOptions registra MCP ripper e conectores só com plugins',
 
 test('parseCodexJsonEvent: mensagem, shell e mcp ripper', () => {
   assert.deepEqual(parseCodexJsonEvent({ item: { type: 'agent_message', text: 'oi' } }), { text: 'oi' });
+  // shell do Codex não é o Computador do Ripper (a UI dizia "Rodando no computador" com o modo desligado)
+  assert.equal(parseCodexJsonEvent({ item: { type: 'command_execution', command: 'ls' } }).tool, 'shell');
   assert.deepEqual(
     parseCodexJsonEvent({ type: 'item.started', item: { type: 'mcp_tool_call', server: 'ripper', tool: 'remember', arguments: { text: 'x' }, status: 'in_progress' } }),
     describeRipperTool('remember', { text: 'x' })
