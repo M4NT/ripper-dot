@@ -1279,7 +1279,9 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
           out = await generateImages({ prompt: a.prompt, refs, format: a.format, slides: a.slides, outDir: fileURLToPath(new URL('imagens/', sandboxDir(agent))), base, signal });
         } catch (e) { return `Não consegui gerar a imagem: ${e.message}`; }
         for (const f of out) await ctx.deliverFile({ path: `/work/imagens/${basename(f)}` });
-        return out.length > 1 ? `${out.length} slides do carrossel entregues na conversa, em ordem.` : 'Imagem entregue na conversa.';
+        // Dizer exatamente o que foi usado: sem isso o agente supõe que seguiu a marca mesmo sem referência nenhuma.
+        const brand = refs.length ? `Referências de marca usadas: ${refs.map(r => basename(r)).join(', ')}.` : 'Nenhuma referência de marca foi usada (não há logo nem paleta anexados a você): não diga que seguiu a marca; se fizer sentido, sugira anexar logo e cores.';
+        return `${out.length > 1 ? `${out.length} slides do carrossel entregues na conversa, em ordem.` : 'Imagem entregue na conversa.'} ${brand}`;
       }
     } : null,
     x9: isEnterpriseMode(s) ? {
