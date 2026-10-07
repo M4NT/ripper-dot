@@ -5,7 +5,7 @@ import { Icon } from './ui.jsx';
 import CampaignCard from './campaignCard.jsx';
 import { ApprovalCard } from './approvals.jsx';
 
-const ORB = { route: 'connecting', WebSearch: 'searching', WebFetch: 'searching', computer_exec: 'working', computer_share: 'working', remember: 'weaving', schedule_routine: 'shaping', think: 'solving', text: 'composing' };
+const ORB = { route: 'connecting', WebSearch: 'searching', WebFetch: 'searching', computer_exec: 'working', computer_share: 'working', remember: 'weaving', schedule_routine: 'shaping', generate_image: 'shaping', think: 'solving', text: 'composing' };
 
 function normStep(raw) {
   if (raw.kind === 'approval') return raw;

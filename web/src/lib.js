@@ -90,11 +90,12 @@ export const TOOL_INFO = {
   routines: { label: 'Rotinas', icon: 'clock', desc: 'Age sozinho em horários definidos.' },
   files: { label: 'Análise de arquivos', icon: 'file', desc: 'Lê documentos, planilhas e código enviados.' },
   plugins: { label: 'Conectores', icon: 'plug', desc: 'Usa os apps que você conectou: Google Agenda, Gmail, Notion…' },
-  social: { label: 'Publicação social', icon: 'share', desc: 'Envia rascunhos ou posts para webhooks configurados (Slack, HTTP).' }
+  social: { label: 'Publicação social', icon: 'share', desc: 'Envia rascunhos ou posts para webhooks configurados (Slack, HTTP).' },
+  images: { label: 'Gerar imagens', icon: 'image', desc: 'Cria artes e ilustrações pela sua assinatura do ChatGPT, seguindo o kit de marca.' }
 };
 export const STEP_LABEL = {
   computer_exec: 'Rodando no computador', computer_share: 'Gerando link', WebSearch: 'Pesquisando na web', WebFetch: 'Lendo página',
-  remember: 'Guardando na memória', schedule_routine: 'Criando rotina',
+  remember: 'Guardando na memória', schedule_routine: 'Criando rotina', generate_image: 'Gerando imagem',
   browser_open: 'Abrindo página', browser_click: 'Clicando', browser_type: 'Digitando', browser_scroll: 'Rolando a página', browser_read: 'Lendo a página',
   send_message: 'Mandando mensagem', call_agent: 'Chamando colega', save_artifact: 'Salvando artefato', read_artifact: 'Lendo artefato', use_skill: 'Usando skill', save_skill: 'Guardando skill',
   post_social: 'Publicando', email_campaign: 'Montando campanha de e-mail', send_webhook: 'Enviando webhook', list_social_webhooks: 'Listando webhooks',

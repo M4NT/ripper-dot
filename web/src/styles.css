@@ -2249,3 +2249,6 @@ body.agent-dragging .side-list { overflow: hidden; }
 .campaign-bar i { display: block; height: 100%; background: var(--ok); }
 .campaign-note { color: var(--warn); }
 .campaign .btn { align-self: flex-start; }
+/* imagem sendo gerada (generate_image): efeito img-fx no lugar da arte */
+.img-gen { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.img-gen-card { width: min(280px, 100%); aspect-ratio: 1; border-radius: var(--r-lg); background: var(--surface-2); }
