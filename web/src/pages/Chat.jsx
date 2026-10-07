@@ -436,6 +436,10 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
         const msg = errBody.error || `Erro ${res.status}`;
+        // "Tentar de novo" com a 1ª resposta ainda rodando: não é erro. A conversa recarrega abaixo (finally),
+        // vem marcada como respondendo e a tela passa a acompanhar ao vivo até terminar.
+        // ponytail: na 1ª mensagem de uma conversa nova (sem id ainda) não há o que recarregar; a resposta aparece ao reabrir.
+        if (res.status === 409 && /em processamento/.test(msg)) { toast('A resposta anterior ainda está chegando; acompanhando.'); return; }
         if (res.status === 429) throw new Error(msg);
         throw new Error(msg);
       }
