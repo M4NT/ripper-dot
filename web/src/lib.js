@@ -106,7 +106,12 @@ export const STEP_LABEL = {
 export function stepLabel(tool) {
   if (STEP_LABEL[tool]) return STEP_LABEL[tool];
   const m = /^mcp__(?:claude_ai_)?(.+?)__(.+)$/.exec(String(tool || ''));
-  if (m) return `${m[1].replace(/_/g, ' ')}: ${m[2].replace(/_/g, ' ')}`;
+  if (m) {
+    // "Multipli_MCP" + "multipli_listar_minhas_empresas" → "Multipli: listar minhas empresas"
+    const server = m[1].replace(/[_-]+/g, ' ').replace(/\s*mcp$/i, '').trim();
+    const action = m[2].replace(new RegExp(`^${server.split(' ')[0]}[_-]`, 'i'), '').replace(/[_-]+/g, ' ');
+    return `${server.charAt(0).toUpperCase()}${server.slice(1)}: ${action}`;
+  }
   return `Usando ${tool}`;
 }
 export const TONES = [['direto', 'Direto'], ['amigavel', 'Amigável'], ['formal', 'Formal'], ['tecnico', 'Técnico']];

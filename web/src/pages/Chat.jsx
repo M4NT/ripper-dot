@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
 import WorkspaceBar from '../workspaceBar.jsx';
 import { api, go, fmtTime, fmtSize, stepLabel, useMediaQuery, local, nameColor, speak, canSpeak } from '../lib.js';
@@ -61,14 +61,57 @@ function useSmoothText(target, live) {
   return shown;
 }
 
+const FADE_MS = 450;
+/**
+ * Enquanto a resposta chega, cada trecho novo entra transparente e ganha opacidade (sem cursor).
+ * Guarda quando cada pedaço do texto apareceu; a cada render embrulha só os pedaços ainda "jovens".
+ */
+function useFadeIn(ref, html, live) {
+  const born = useRef({ len: 0, spans: [] }); // spans: [{ from, to, t }]
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!live || !el) return;
+    const b = born.current, now = performance.now();
+    const total = el.textContent.length;
+    if (total < b.len) b.spans = [];
+    else if (total > b.len) b.spans.push({ from: b.len, to: total, t: now });
+    b.len = total;
+    b.spans = b.spans.filter(s => now - s.t < FADE_MS);
+    if (!b.spans.length) return;
+    const first = b.spans[0].from;
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    for (let n, pos = 0; (n = walker.nextNode()); pos += n.data.length) if (pos + n.data.length > first) nodes.push([n, pos]);
+    for (const [node, pos] of nodes) {
+      let cur = node, start = pos;
+      for (const s of b.spans) {
+        const a = Math.max(s.from, start), z = Math.min(s.to, pos + node.data.length);
+        if (z <= a) continue;
+        if (a > start) { cur = cur.splitText(a - start); start = a; }
+        const rest = z < start + cur.data.length ? cur.splitText(z - start) : null;
+        const span = document.createElement('span');
+        span.className = 'fade-in';
+        const age = now - s.t;
+        span.style.opacity = String(Math.min(1, age / FADE_MS)); // continua de onde estava no quadro anterior
+        cur.replaceWith(span); span.append(cur);
+        requestAnimationFrame(() => { span.style.transitionDuration = `${Math.max(0, FADE_MS - age)}ms`; span.style.opacity = '1'; });
+        if (!rest) break;
+        cur = rest; start = z;
+      }
+    }
+  }, [html, live]);
+}
+
 function Markdown({ text, live }) {
   // Markdown só é recalculado quando o texto muda; mensagens antigas nunca são refeitas.
   const html = useMemo(() => markdown(text), [text]);
+  const ref = useRef(null);
+  useFadeIn(ref, html, live);
   const onClick = e => {
     const b = e.target.closest('[data-copy]');
     if (b) { navigator.clipboard.writeText(b.closest('.code').querySelector('code').textContent); b.lastChild.textContent = 'Copiado'; setTimeout(() => (b.lastChild.textContent = 'Copiar'), 1400); }
   };
-  return <div className={`md ${live ? 'streaming' : ''}`} onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} />;
+  return <div ref={ref} className={`md ${live ? 'streaming' : ''}`} onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 function LiveText({ text }) {
@@ -401,7 +444,11 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
           // Navegador em uso: a tela aparece em miniatura (só com computador Docker, que tem a tela ao vivo)
           if ((e.screen || /^browser_/.test(e.tool || '')) && S.settings.computer?.mode === 'docker') setPip(p => p || building.agentId);
           if (e.file) building.files = [...(building.files || []), e.file]; // arquivo entregue aparece na hora
-          if (e.tool) { building.steps.push({ kind: 'tool', tool: e.tool, label: stepLabel(e.tool), detail: e.detail }); setPhase(e.tool); }
+          if (e.tool) {
+            // O que o agente escreveu antes da ferramenta ("Vou checar…") vira anotação na hora — igual ao que o servidor grava no fim.
+            if (building.content.trim()) { building.steps.push({ kind: 'note', label: building.content.trim() }); building.content = ''; }
+            building.steps.push({ kind: 'tool', tool: e.tool, label: stepLabel(e.tool), detail: e.detail }); setPhase(e.tool);
+          }
           if (e.handoff) {
             const lbl = S.models[e.handoff]?.label || e.handoff;
             const fromLbl = e.from && (getAgent(e.from)?.name || S.models[e.from]?.label);

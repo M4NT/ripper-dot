@@ -2212,3 +2212,18 @@ body.agent-dragging .side-list { overflow: hidden; }
 .agent-thread-row .bubble { max-width: calc(100% - 34px); }
 .agent-thread-close { align-self: center; margin: 10px 0 16px; border-radius: 999px; }
 @media (prefers-reduced-motion: reduce) { .agent-thread { animation: none; } }
+
+/* Histórico de ações: uma linha por ação, rótulo inteiro, detalhe cortado; anotações como texto discreto */
+.action-line-steps { gap: 2px; }
+.action-line-steps .step { display: grid; grid-template-columns: 18px auto minmax(0, 1fr) auto; align-items: center; column-gap: 10px; padding: 5px 2px; font-size: 13px; line-height: 1.35; }
+.action-line-steps .step-mark { display: grid; place-items: center; width: 18px; height: 18px; overflow: visible; }
+.action-line-steps .step-label { white-space: nowrap; color: var(--ink-2); }
+.action-line-steps .step-detail { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 12px var(--mono); color: var(--muted); }
+.action-line-steps .step-count { font: 500 11.5px var(--mono); color: var(--muted); padding: 1px 7px; border-radius: 999px; background: var(--surface-2); }
+.action-line-steps .step-note { display: block; padding: 6px 2px 6px 28px; }
+.action-line-steps .step-note p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--muted); }
+@media (max-width: 560px) { .action-line-steps .step { grid-template-columns: 18px minmax(0, 1fr) auto; } .action-line-steps .step-detail { display: none; } .action-line-steps .step-label { white-space: normal; } }
+
+/* Texto chegando: cada trecho novo aparece com opacidade, sem cursor piscando */
+.md.streaming > :last-child::after { content: none; }
+.md .fade-in { transition: opacity .45s linear; }

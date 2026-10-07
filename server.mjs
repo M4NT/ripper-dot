@@ -1737,7 +1737,7 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
   const notes = [];
   const emitTurn = ev => {
     if (ev.handoff) { turnText = ''; cut = 0; notes.length = 0; }
-    if (ev.tool && turnText.length > cut) { const n = turnText.slice(cut).trim(); if (n) notes.push({ kind: 'note', label: n.slice(0, 400), at: Date.now() }); cut = turnText.length; }
+    if (ev.tool && turnText.length > cut) { const n = turnText.slice(cut).trim(); if (n) notes.push({ kind: 'note', label: n.slice(0, 400), at: Date.now() - 1 }); cut = turnText.length; } // -1: a nota fica antes da ferramenta que a interrompeu
     if (ev.text) turnText += ev.text;
     if (ev.circuitBreaker) {
       logger.warn('provider.circuit_breaker', {
