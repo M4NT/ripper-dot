@@ -42,6 +42,7 @@ test('navegador: enviar, comprar, apagar e campos sensíveis pedem aprovação',
   assert.ok(browserRisk('click', { target: 'Excluir conta' }));
   assert.ok(browserRisk('type', { target: 'Senha' }));
   assert.ok(browserRisk('type', { target: 'Buscar', submit: true }));
+  for (const t of ['Responder', 'Comentar', 'Curtir', 'Seguir', 'Enviar mensagem', 'Reply']) assert.ok(browserRisk('click', { target: t }), t);
   assert.equal(browserRisk('click', { target: 'Próxima página' }), null);
   assert.equal(browserRisk('type', { target: 'Buscar' }), null);
 });
