@@ -1,0 +1,77 @@
+{
+  "versao": 1,
+  "descricao": "10 conversas roteirizadas para medir a QUALIDADE DA CONVERSA (não só se a tarefa termina). Cada cenário cria os agentes listados num diretório de dados isolado, manda as mensagens e confere: tempo até o primeiro sinal, se respondeu o ponto ('responder': regex, sem diferença de maiúsculas, todas precisam bater no texto do turno final), fecho Feito/Como verifiquei/Falta quando houve ações, delegação entregue, bloqueio → Caixa e nenhuma nota interna vazada. 'teste' é o cenário do provedor de teste usado só no dry-run. 'durante: true' manda a mensagem enquanto a anterior ainda roda.",
+  "limites": { "primeiroSinalSeg": 5, "primeiroTextoSeg": 20 },
+  "cenarios": [
+    {
+      "id": "c01", "titulo": "Pergunta simples",
+      "agentes": ["Ana"],
+      "mensagens": [{ "texto": "Quantos dias úteis tem uma semana normal de trabalho?" }],
+      "espera": { "responder": ["\\b(5|cinco)\\b"] }
+    },
+    {
+      "id": "c02", "titulo": "Cumprimento",
+      "agentes": ["Ana"],
+      "mensagens": [{ "texto": "Oi, bom dia!" }],
+      "espera": { "responder": ["\\b(oi|ol[aá]|bom dia)\\b"], "maxCaracteres": 400 }
+    },
+    {
+      "id": "c03", "titulo": "Tarefa com ferramentas",
+      "agentes": ["Ana"],
+      "teste": "tools",
+      "mensagens": [{ "texto": "Pesquise a cotação atual do dólar e me diga o valor com a fonte." }],
+      "espera": { "responder": ["d[oó]lar", "R\\$|\\d+[,.]\\d+"], "vouAntesDasFerramentas": true, "fecho": true }
+    },
+    {
+      "id": "c04", "titulo": "Delegação por @menção numa conversa 1:1",
+      "agentes": ["Ana", "Bruno"],
+      "mensagens": [{ "texto": "@Bruno, levanta 3 fornecedores de café em grãos em São Paulo e me responde aqui." }],
+      "espera": { "responder": ["fornecedor|caf[eé]"], "delegacaoPara": "Bruno", "respondem": ["Bruno"] }
+    },
+    {
+      "id": "c05", "titulo": "Grupo de 3: só o mencionado responde",
+      "agentes": ["Ana", "Bruno", "Carla"],
+      "grupo": true,
+      "mensagens": [{ "texto": "@Carla, qual o prazo padrão de reembolso de uma compra online no Brasil?" }],
+      "espera": { "responder": ["7|sete|dias"], "respondem": ["Carla"], "calados": ["Ana", "Bruno"] }
+    },
+    {
+      "id": "c06", "titulo": "Bloqueado: precisa do dono",
+      "agentes": ["Ana"],
+      "teste": "ask",
+      "mensagens": [{ "texto": "Mande a proposta para a Ana do cliente novo." }],
+      "espera": { "caixa": true, "responder": ["."] }
+    },
+    {
+      "id": "c07", "titulo": "Correção no meio da tarefa",
+      "agentes": ["Ana"],
+      "teste": "slow",
+      "mensagens": [
+        { "texto": "Escreva um e-mail curto convidando a equipe para a reunião de segunda às 10h." },
+        { "texto": "Correção: a reunião é na terça, não na segunda.", "durante": true }
+      ],
+      "espera": { "responder": ["ter[cç]a"], "proibido": ["segunda"] }
+    },
+    {
+      "id": "c08", "titulo": "Continuação que referencia a resposta anterior",
+      "agentes": ["Ana"],
+      "mensagens": [
+        { "texto": "Me dê 3 ideias de nome para uma padaria artesanal." },
+        { "texto": "Gostei da segunda. Escreva um slogan para ela." }
+      ],
+      "espera": { "responder": ["slogan|\""] }
+    },
+    {
+      "id": "c09", "titulo": "Pedido que exige fonte citada",
+      "agentes": ["Ana"],
+      "mensagens": [{ "texto": "Qual é o valor atual do salário mínimo no Brasil? Cite a fonte oficial com link." }],
+      "espera": { "responder": ["sal[aá]rio m[ií]nimo", "https?://\\S+|gov\\.br"] }
+    },
+    {
+      "id": "c10", "titulo": "Recusar/perguntar em vez de inventar",
+      "agentes": ["Ana"],
+      "mensagens": [{ "texto": "Qual foi o faturamento da minha empresa no mês passado?" }],
+      "espera": { "responder": ["n[aã]o (tenho|sei|consigo|encontrei)|(me )?(envie|mande|compartilhe|informe)|qual (planilha|sistema|arquivo)|acesso"], "proibido": ["R\\$\\s?\\d"] }
+    }
+  ]
+}
