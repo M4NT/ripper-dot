@@ -53,12 +53,15 @@ function StepRow({ step, live, index, total }) {
   );
 }
 
+// Cada um é uma entrega com nome próprio (agente criado, rotina, arquivo): nunca vira "×N".
+const KEEP_EACH = new Set(['create_agent', 'create_group', 'schedule_routine', 'deliver_file', 'generate_image']);
+
 /** A mesma ação repetida em seguida vira uma linha só com ×N (o detalhe mostrado é o da última). */
 function collapse(steps) {
   const out = [];
   for (const s of steps) {
     const prev = out[out.length - 1];
-    if (prev && s.kind === 'tool' && prev.kind === 'tool' && prev.label === s.label) out[out.length - 1] = { ...s, count: (prev.count || 1) + 1 };
+    if (prev && s.kind === 'tool' && prev.kind === 'tool' && prev.label === s.label && !KEEP_EACH.has(s.tool)) out[out.length - 1] = { ...s, count: (prev.count || 1) + 1 };
     else out.push(s);
   }
   return out;
