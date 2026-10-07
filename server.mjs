@@ -100,6 +100,7 @@ import { listClaudeConnectors } from './lib/claude-connectors.mjs';
 import { buildInbox, resolveInboxItem } from './lib/inbox-feed.mjs';
 import { vmPathToData, mimeOf, inlineType } from './lib/deliver-file.mjs';
 import { generateImage, IMAGE_EXT } from './lib/image-gen.mjs';
+import { listMarketSkills, installMarketSkill, uninstallMarketSkill } from './lib/skill-market.mjs';
 import { parseWhatsappMessages, whatsappPrompt, sendWhatsappText, whatsappReady } from './lib/whatsapp.mjs';
 import { evolutionSecrets, connectInstance, instanceState, disconnectInstance, sendText as sendEvolutionText, parseEvolutionAny, parseEvolutionGroup, groupName, evolutionMedia, withMediaText, downloadMedia, contactMode, isAllowed, makeRateLimiter, channelSafeAgent } from './lib/evolution.mjs';
 import { history as waHistory, recordMessage as recordWaMessage, listChats as waListChats, readChat as waReadChat, findContacts as waFindContacts, styleProfile as waStyleProfile, styleHint, stats as waStats, wipeHistory as waWipeHistory } from './lib/whatsapp-store.mjs';
@@ -3196,6 +3197,10 @@ const routes = [
     save(); return m;
   }],
   ['DELETE', /^\/api\/memories\/([\w-]+)$/, (req, [mid]) => { db.memories = db.memories.filter(x => x.id !== mid); save(); return {}; }],
+  // Skills de terceiros do Marketplace: baixadas do repositório do autor, nunca embutidas no Ripper.
+  ['GET', /^\/api\/skills\/market$/, () => listMarketSkills()],
+  ['POST', /^\/api\/skills\/market\/([\w-]+)$/, async (req, [sid]) => { await installMarketSkill(sid); return listMarketSkills(); }],
+  ['DELETE', /^\/api\/skills\/market\/([\w-]+)$/, (req, [sid]) => { uninstallMarketSkill(sid); return listMarketSkills(); }],
   ['POST', /^\/api\/routines$/, async req => {
     const b = await body(req); agentOr404(b.agentId);
     const routineGate = canDelegate(
