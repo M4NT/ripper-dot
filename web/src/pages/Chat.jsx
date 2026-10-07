@@ -21,7 +21,6 @@ import { useChatMenu } from '../actions.jsx';
 import { useOv } from '../overlay.jsx';
 import { botAvatarPalette } from 'bot-avatars';
 import { FirstRunChecklist } from '../firstRunChecklist.jsx';
-import { isEnterpriseMode } from '../uiMode.js';
 import { findChatMatches } from '../../../lib/chat-edit.mjs';
 import ErrorNote from '../errorNote.jsx';
 
@@ -132,7 +131,7 @@ function typingLabel(phase) {
   return 'Escrevendo…';
 }
 
-const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, onStop, models, group, showModel, allFiles, onFileError, deleg }) {
+const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, onStop, models, group, allFiles, onFileError, deleg }) {
   // ids (resposta salva) ou objetos (chegando ao vivo)
   const { agent: getAgent } = useApp();
   const delivered = (m.files || []).map(x => (typeof x === 'string' ? allFiles?.find(f => f.id === x) : x)).filter(Boolean);
@@ -144,7 +143,7 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, on
         <div className="bubble bot-bubble">
           <ActionLine steps={m.steps} live={live} />
           {live && phase === 'generate_image' && <ImageGenLoader />}
-          {live && phase !== 'approval' && <StallNote label={phase === 'text' ? 'Escrevendo' : phase === 'route' || phase === 'think' || !phase ? 'Pensando' : stepLabel(phase)} sig={`${phase}|${m.steps.length}|${m.content.length}|${m.agentId}`} onStop={onStop} />}
+          {live && phase !== 'approval' && <StallNote label={phase === 'text' ? 'Escrevendo' : phase === 'route' || phase === 'think' || !phase ? 'Pensando' : stepLabel(phase)} sig={`${phase}|${m.steps.length}|${m.content.length}|${m.agentId}`} onStop={onStop} slowAfterMs={phase === 'generate_image' ? 200_000 : undefined} />}
           {delivered.length > 0 && <DeliveredFiles items={delivered} onError={onFileError} />}
           {m.content ? (live ? <LiveText text={m.content} /> : <Markdown text={m.content} />)
             : live ? <div className="typing" role="status" aria-live="polite"><span className="typing-dots" aria-hidden="true"><i /><i /><i /></span><span>{typingLabel(phase)}</span></div>
@@ -156,9 +155,9 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, on
           {/* detalhes (tempo, custo, modelo) só ao passar o mouse: no dia a dia é ruído em toda mensagem */}
           <span className="msg-meta-more">
           {m.timing?.totalMs > 0 && <span className="msg-took" title={m.timing.firstMs ? `Começou a responder em ${(m.timing.firstMs / 1000).toFixed(1)}s` : undefined}>· {(m.timing.totalMs / 1000).toFixed(1)}s{m.costUsd ? ` · US$ ${m.costUsd.toFixed(3).replace('.', ',')}` : ''}{m.steps?.length ? ` · ${m.steps.length} ${m.steps.length === 1 ? 'ação' : 'ações'}` : ''}</span>}
-          {/* qual modelo respondeu: só no Enterprise — para os demais é ruído em toda mensagem */}
-          {m.model && showModel && <span className="badge">{m.routed ? 'Auto → ' : ''}{models[m.model]?.label || m.model}{m.effort && m.effort !== 'auto' ? ` · ${effortLabel(m.effort)}` : ''}</span>}
           </span>
+          {/* qual IA respondeu e se o Ripper Auto escolheu: sempre à vista, para ninguém estranhar a troca de modelo */}
+          {m.model && <span className="badge model-badge">{m.routedBy && m.routedBy !== 'manual' ? 'Ripper Auto → ' : ''}{models?.[m.model]?.label || m.model}{m.effort && m.effort !== 'auto' ? ` · ${effortLabel(m.effort)}` : ''}</span>}
           {!live && m.content && <>
             <button className="meta-btn" onClick={() => navigator.clipboard.writeText(m.content)}><Icon name="copy" size={14} />Copiar</button>
             {canSpeak && <button className="meta-btn" onClick={() => speak(m.content)}><Icon name="volume" size={14} />Ouvir</button>}
@@ -173,7 +172,7 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, on
       </div>
     </div>
   );
-}, (a, b) => a.m === b.m && a.agent === b.agent && a.live === b.live && a.phase === b.phase && a.group === b.group && a.showModel === b.showModel && a.allFiles === b.allFiles && a.models === b.models && a.deleg === b.deleg && !!a.onRetry === !!b.onRetry);
+}, (a, b) => a.m === b.m && a.agent === b.agent && a.live === b.live && a.phase === b.phase && a.group === b.group && a.allFiles === b.allFiles && a.models === b.models && a.deleg === b.deleg && !!a.onRetry === !!b.onRetry);
 
 const DELEG_TONE = { aguardando: 'wait', trabalhando: 'work', feito: 'ok', falhou: 'err' };
 /** Cartão no fio de quem pediu: "Pedi ao Donald: ajustar a faixa · trabalhando", e o resultado ali mesmo. */
@@ -632,7 +631,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
             )}
             {[...messages.map((m, i) => <div key={i} data-mi={i} className={[i >= animateFrom.current && 'is-new', matches.includes(i) && `search-hit${matches[hit] === i ? ' current' : ''}`].filter(Boolean).join(' ') || undefined}>{m.via?.type === 'inbox' && inCard.has(m.via.messageId) ? null : m.inbox ? <InboxMessage m={m} from={getAgent(m.inbox.from)} /> : m.role === 'user'
               ? <UserMessage m={m} name={S.settings.name} files={S.files} ack={m === lastUser && ack?.id === m.id ? ack : null} onRetryAck={ack?.retry} onEdit={canEdit && m.id && !/^u\d+$/.test(m.id) ? text => editFrom(m, text) : null} />
-              : <>{m.via?.type === 'inbox' && m.via.threadChatId && <ViaLabel m={m} onOpen={setThread} />}<BotMessage m={m} agent={getAgent(m.agentId) || agent} group={isGroup || (!!m.agentId && m.agentId !== agent.id)} models={S.models} showModel={isEnterpriseMode(S.settings)} allFiles={S.files} deleg={deleg} onFileError={msg => toast(msg, 'error')} onRetry={m === messages.at(-1) && lastUser ? () => send({ text: lastUser.content }) : null} /></>}</div>),
+              : <>{m.via?.type === 'inbox' && m.via.threadChatId && <ViaLabel m={m} onOpen={setThread} />}<BotMessage m={m} agent={getAgent(m.agentId) || agent} group={isGroup || (!!m.agentId && m.agentId !== agent.id)} models={S.models} allFiles={S.files} deleg={deleg} onFileError={msg => toast(msg, 'error')} onRetry={m === messages.at(-1) && lastUser ? () => send({ text: lastUser.content }) : null} /></>}</div>),
               live && <div key={messages.length} className="is-new"><BotMessage m={live} agent={getAgent(live.agentId) || agent} group={isGroup} live phase={phase} onStop={stop} models={S.models} deleg={deleg} /></div>]}
           </div>
         </div>

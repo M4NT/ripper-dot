@@ -95,7 +95,7 @@ export const TOOL_INFO = {
 };
 export const STEP_LABEL = {
   computer_exec: 'Rodando no computador', computer_share: 'Gerando link', WebSearch: 'Pesquisando na web', WebFetch: 'Lendo página',
-  remember: 'Guardando na memória', schedule_routine: 'Criando rotina', generate_image: 'Gerando imagem',
+  remember: 'Guardando na memória', schedule_routine: 'Criando rotina', generate_image: 'Gerando imagem com o ChatGPT',
   browser_open: 'Abrindo página', browser_click: 'Clicando', browser_type: 'Digitando', browser_scroll: 'Rolando a página', browser_read: 'Lendo a página',
   send_message: 'Mandando mensagem', call_agent: 'Chamando colega', save_artifact: 'Salvando artefato', read_artifact: 'Lendo artefato', use_skill: 'Usando skill', save_skill: 'Guardando skill',
   post_social: 'Publicando', email_campaign: 'Montando campanha de e-mail', send_webhook: 'Enviando webhook', list_social_webhooks: 'Listando webhooks',
@@ -112,10 +112,10 @@ export function seenLabel(names) {
 }
 
 /** Passo parado há 20 s ou mais: "ainda em: Rodando o build · 40 s"; antes disso, null. */
-export function stallLabel(label, ms) {
+export function stallLabel(label, ms, slowAfterMs = 20_000) {
+  if (ms < slowAfterMs) return null;
   const s = Math.floor(ms / 1000);
-  if (s < 20) return null;
-  return `ainda em: ${label} · ${s < 120 ? `${s} s` : `${Math.floor(s / 60)} min`}`;
+  return `Está demorando mais que o habitual · ${label} · ${s < 120 ? `${s} s` : `${Math.floor(s / 60)} min`}`;
 }
 
 /** Rótulo humano de uma ferramenta; conectores (mcp__claude_ai_Google_Calendar__list_events) viram "Google Calendar: list events". */

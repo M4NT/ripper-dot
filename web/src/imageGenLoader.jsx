@@ -11,7 +11,7 @@ export default function ImageGenLoader() {
       <Suspense fallback={<div className="img-gen-card" />}>
         <ImageGeneration preset="pixels-organic" theme={dark ? 'dark' : 'light'}><div className="img-gen-card" /></ImageGeneration>
       </Suspense>
-      <span className="muted small">Gerando a imagem. Leva alguns minutos.</span>
+      <span className="muted small">Gerando a imagem com o ChatGPT. Costuma levar de 2 a 3 minutos.</span>
     </div>
   );
 }
