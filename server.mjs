@@ -1120,7 +1120,7 @@ async function syncLocalFiles(agent, chat) {
   const m = db.settings.computer.mode;
   if (!(m === 'docker' || (m === 'local' && db.settings.computer.allowLocalCommands))) return;
   const uploads = new URL('uploads/', sandboxDir(agent));
-  for (const f of db.files.filter(f => f.agentId === agent.id || (chat.projectId && f.projectId === chat.projectId))) {
+  for (const f of db.files.filter(f => canUseFile(f, agent, chat))) {
     const source = dataUrl(f.path);
     const target = new URL(basename(f.path), uploads);
     if (source.href !== target.href) await copyFile(source, target).catch(() => {});
@@ -1202,7 +1202,7 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
   const rawComputer = computer; // o Ripper usa sem pedir aprovação (ex.: git com token do Guardião); o agente só vê o guardado
   if (computer) computer = guarded(computer, { agent, chat, emit, signal });
   if (computer?.kind === 'boat') {
-    for (const f of db.files.filter(f => f.agentId === agent.id || (chat.projectId && f.projectId === chat.projectId))) {
+    for (const f of db.files.filter(f => canUseFile(f, agent, chat))) {
       const key = `${agent.id}:${agent.vmId || 'new'}:${f.id}`;
       if (syncedBoatFiles.has(key)) continue;
       try {
@@ -1267,6 +1267,13 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
         onProgress: p => { Object.assign(camp, { sent: p.sent, failed: p.failed, errors: p.errors, status: camp.status === 'parando' && p.status === 'enviando' ? 'parando' : p.status }); save(); }
       }).catch(e => { camp.status = 'falhou'; camp.errors = [e.message]; save(); });
       return `Campanha aprovada: ${emails.length} e-mails saindo agora, um a cada poucos segundos (o cartão mostra o andamento e tem o botão Parar envio).`;
+    },
+    // Compartilha com o time um arquivo que o agente pode usar (logo, paleta, fontes, guia de marca).
+    shareWithTeam: a => {
+      const f = db.files.find(x => canUseFile(x, agent, chat) && x.name.toLowerCase() === String(a.name || '').trim().toLowerCase());
+      if (!f) return `Não achei "${a.name}" entre os seus arquivos. Confira o nome exato.`;
+      f.team = true; save();
+      return `"${f.name}" agora é do time: todos os agentes usam como referência (ex.: nas artes). O usuário pode desfazer na Biblioteca.`;
     },
     // Imagem pela assinatura do ChatGPT (Codex): o kit de marca são as imagens anexadas ao agente.
     images: codexOk && agent.tools.includes('images') ? {
@@ -1723,7 +1730,7 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
     visibleArtifacts(chat).length && `Artefatos do time (leia com read_artifact; salve entregas com save_artifact): ${visibleArtifacts(chat).slice(-20).map(x => `"${x.title}" (${x.kind}, v${x.version})`).join('; ')}`,
     (() => {
       const files = db.files.filter(f => canUseFile(f, agent, chat)).slice(-20);
-      return files.length ? `Arquivos seus (leia pelo nome com read_artifact, inclusive planilhas xlsx/csv e docx): ${files.map(f => `"${f.name}"`).join('; ')}. Para entregar planilha, use save_artifact com kind "tabela" (conteúdo CSV, baixa como .csv). No computador eles ficam em ./uploads; se forem logo, paleta, fontes ou guia de marca, siga-os em tudo que criar.` : '';
+      return files.length ? `Arquivos seus (leia pelo nome com read_artifact, inclusive planilhas xlsx/csv e docx): ${files.map(f => `"${f.name}"${f.team ? ' (do time)' : ''}`).join('; ')}. Para entregar planilha, use save_artifact com kind "tabela" (conteúdo CSV, baixa como .csv). No computador eles ficam em ./uploads; se forem logo, paleta, fontes ou guia de marca, siga-os em tudo que criar.` : '';
     })(),
     (() => {
       const others = db.agents.filter(a => a.id !== agent.id && a.status !== 'paused' && peerAllowed(agent, a));
@@ -3550,6 +3557,12 @@ const routes = [
       : ['xdg-open', [mode === 'reveal' ? dirname(full) : full]];
     spawn(cmd, args, { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
     return { ok: true };
+  }],
+  // "Do time": o arquivo (ex.: logo, paleta, guia de marca) passa a valer para todos os agentes.
+  ['PATCH', /^\/api\/files\/([\w-]+)$/, async (req, [fid]) => {
+    const f = db.files.find(x => x.id === fid); if (!f) throw new HttpError(404, 'Arquivo não encontrado.');
+    const b = await body(req); f.team = b.team === true; save();
+    const { path, ...pub } = f; return pub;
   }],
   ['DELETE', /^\/api\/files\/([\w-]+)$/, async (req, [fid]) => {
     const f = db.files.find(x => x.id === fid); if (!f) return {};
