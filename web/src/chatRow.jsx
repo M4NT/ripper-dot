@@ -23,7 +23,7 @@ export default function ChatRow({ c, showProject }) {
           <span className="crow-top">
             <b>{c.title}</b>
             {c.unread && <span className="unread-dot" title="Novidade" />}
-            {group && <span className="group-pill"><Icon name="group" size={12} />Grupo</span>}
+            {group && <span className="group-pill" title="Grupo" aria-label="Grupo"><Icon name="group" size={12} /></span>}
             {project && <span className="proj-pill"><Icon name="folder" size={11} />{project.name}</span>}
             {(c.tags || []).map(t => <span key={t} className="tag-pill">#{t}</span>)}
           </span>

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { api } from './lib.js';
 
+const Logo = () => <h1 className="login-logo"><svg viewBox="0 0 32 32" width="40" height="40" aria-hidden="true"><rect width="32" height="32" rx="9" className="brand-bg" /><path d="M11 23V9h6.2a4.3 4.3 0 0 1 .9 8.5L22 23" className="brand-r" /></svg>Ripper</h1>;
+
 /** Senha única do Ripper: cria na primeira vez (só no próprio computador), depois só entra. */
 export default function Login({ status, onDone }) {
   const setup = !status.configured;
@@ -14,19 +16,19 @@ export default function Login({ status, onDone }) {
     catch (x) { setErr(x.message); setBusy(false); }
   };
   if (setup && !status.canSetup) return (
-    <div className="boot login"><h1>Ripper</h1><p className="muted">Crie a senha abrindo o Ripper no computador onde ele roda.</p></div>
+    <div className="boot login"><Logo /><p className="muted">Crie a senha abrindo o Ripper no computador onde ele roda.</p></div>
   );
   return (
     <form className="boot login" onSubmit={submit}>
-      <h1>Ripper</h1>
+      <Logo />
       <p className="muted">{setup ? 'Crie a senha que vai proteger o seu Ripper.' : 'Digite a senha para entrar.'}</p>
-      <label className="field"><span>Senha</span>
-        <input type="password" autoFocus autoComplete={setup ? 'new-password' : 'current-password'} value={pw} onChange={e => setPw(e.target.value)} minLength={8} required />
-      </label>
       {setup && <label className="field"><span>Código de configuração (aparece no terminal)</span>
-        <input autoComplete="off" spellCheck={false} placeholder="XXXX-XXXX-XXXX" value={code} onChange={e => setCode(e.target.value)} required />
+        <input autoFocus autoComplete="off" spellCheck={false} placeholder="XXXX-XXXX-XXXX" value={code} onChange={e => setCode(e.target.value)} required />
         <small className="muted">Também fica em <code>data/setup-code.txt</code>, na pasta do Ripper.</small>
       </label>}
+      <label className="field"><span>Senha</span>
+        <input type="password" autoFocus={!setup} autoComplete={setup ? 'new-password' : 'current-password'} value={pw} onChange={e => setPw(e.target.value)} minLength={8} required />
+      </label>
       {setup && <label className="field"><span>Repita a senha</span>
         <input type="password" autoComplete="new-password" value={pw2} onChange={e => setPw2(e.target.value)} minLength={8} required />
       </label>}

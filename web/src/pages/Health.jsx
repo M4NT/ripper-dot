@@ -33,6 +33,7 @@ export default function Health({ onClose }) {
               <i className={`dot health-${i.status}`} aria-hidden />
               <b>{i.label}</b>
               <small>{i.detail}</small>
+              {i.action && <a className="btn btn-sm health-action" href={i.action.href}>{i.action.label}</a>}
             </li>
           ))}
         </ul>

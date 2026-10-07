@@ -35,34 +35,42 @@ Obs.: textos com `[[ripper:test:…]]` nos prints são o prefixo do provedor de 
 5. **Saúde sem ação.** Linha vermelha "Claude · Sem login" e linhas cinza "Desligado" não têm botão; a única ação é "Baixar relatório de erro".
    Print: `saude-1280-dark.png`.
    Correção: cada linha não verde ganha um botão à direita ("Entrar", "Ligar WhatsApp", "Configurar e-mail") que abre a aba certa de Configurações.
+   **Feito (07/10/2026):** cada linha não verde traz o seu botão, vindo do servidor (`lib/health.mjs`, campo `action`): Claude sem login → "Entrar" (Provedores › Claude), WhatsApp → "Ligar/Reconectar WhatsApp" (Canais), E-mail → "Configurar e-mail", backup → "Ligar backup"/"Fazer backup", Docker ausente → "Configurar computador". Depois: `saude-1280-dark-depois.png`, `saude-375-dark-depois.png`.
 
 6. **Jargão e inglês em telas de usuário.** Marketplace: "Enterprise hub", "Templates advisory · Hub Architect", "trade-offs", "Issues", "plugins e Bots". Provedores: "Roteador local", "cursor-agent", "Antigravity", "Codex". Conectores: "Servidores MCP personalizados". Cards de agente e balões: "~91 tokens · ~US$ 0,00", "Claude Fable 5.1 · Baixo".
    Print: `marketplace-1280-dark.png`, `config-models-1280-dark.png`, `agentes-1280-dark.png`, `grupo-1280-dark.png`.
    Correção: trocar por PT-BR simples ("Modelos de time", "Montar um time", "tarefas, projetos e ciclos", "Buscar aplicativos e agentes", "Conexões avançadas"); tirar tokens/custo/modelo do card e do rodapé do balão — mostrar só ao abrir "detalhes" (regra de §3.1: detalhes técnicos só quando a pessoa abre o item).
+   **Feito (07/10/2026):** Marketplace sem "Enterprise hub"/"advisory"/"trade-offs"/"Issues" (viraram "Montar um time", "prós e contras", "tarefas"), busca "Buscar aplicativos"; Provedores: "Escolhe o modelo sozinho", "Editor de código", "Aplicativos conectados" no lugar de "Plugins MCP"; dica da aba Conectores "Conexões avançadas". Card de agente mostra só "Hoje: N respostas" (tokens e custo ficam na ficha); no balão o modelo foi para os detalhes que aparecem ao passar o mouse / tocar no balão. Depois: `agentes-1280-dark-depois.png`, `conectar-apps-1280-dark-depois.png`.
 
 7. **Texto cortado em selos e nomes fixados.** Na lateral, o selo "Grupo" vira "Grup…" e o título do grupo "Pessoal, preciso …"; nos fixados, "Pesquisa de …", "Analista Fina…". O título da bandeja corta o nome da conversa no meio ("[[…]] Verifique (").
    Print: `chat-1a1-1280-dark.png`, `grupo-1280-dark.png`.
    Correção: selo de grupo como ícone (pessoas) sem texto, `flex-shrink: 0`; nome fixado em até 2 linhas com `line-clamp: 2` e fonte 12px; na bandeja, título da conversa em linha própria com reticências no fim.
+   **Feito (07/10/2026):** causa: o nome tinha `flex: none; max-width: 70%` e o selo encolhia até "Grup…". Agora o nome encolhe com reticências e o selo de grupo é só o ícone (lateral e lista de conversas); fixados com nome em até 2 linhas (12px, `line-clamp: 2`); na bandeja de aprovações o título da conversa vai para linha própria, reticências só no fim. (Sem print: a base de teste não tem grupo nem nomes longos.)
 
 8. **Login/setup fora do padrão.** Ordem dos campos: Senha → Código de configuração → Repita a senha (o código separa a senha da confirmação). O logo é serifado itálico, diferente do "R" + Geist do app; botão com canto ~8px, diferente das pílulas.
    Print: `login-1280-dark.png`, `login-375-dark.png`.
    Correção: Código primeiro (com a dica do arquivo), depois Senha e Repita a senha; usar o mesmo logo do app; botão em pílula (`--radius` 999px) como os demais.
+   **Feito (07/10/2026):** código de configuração primeiro (com a dica do arquivo e o foco), depois Senha e Repita a senha; logo "R" + Geist igual à lateral; botão em pílula. Depois: `login-1280-dark-depois.png`, `login-375-dark-depois.png`.
 
 9. **Configurações no celular perdem a navegação.** A lista de abas vira faixa horizontal ao lado da busca e mostra só "Perfil" e um pedaço de "Pr…"; não há indicação de que rola. Os botões de "Tom" ficam cortados na borda.
    Print: `config-profile-375-dark.png`.
    Correção: no celular, primeira tela = lista de abas (como o desktop, com ícones e dicas) e cada aba abre com "← Configurações"; pílulas de opção quebram em linhas (`flex-wrap: wrap`).
+   **Feito (07/10/2026):** no celular a busca ocupa a linha toda e as abas viram pílulas que quebram em linhas (todas à vista, sem rolagem escondida). As pílulas de "Tom" já quebravam (`.pills` com `flex-wrap`). Depois: `config-profile-375-dark-depois.png`.
 
 10. **Filtros cortados no celular (Agentes).** "Todos · Online · Pausados · Trab…" rola sem sinal visual.
     Print: `agentes-375-dark.png`.
     Correção: reduzir para "Todos / Trabalhando / Pausados" (Online repete Todos quando tudo está ativo) ou adicionar degradê de borda indicando rolagem.
+   **Feito (07/10/2026):** "Online" só aparece quando difere de "Todos" (ou está selecionado) e "Trabalhando agora" virou "Trabalhando": cabe em 375px. Depois: `agentes-375-dark-depois.png`.
 
 11. **"Conectar aplicativos" abre "Marketplace".** O botão fixo da lateral promete conectar apps e abre uma janela chamada Marketplace com "Enterprise hub" no topo; "Google Agenda" e "Notion" aparecem duas vezes (Para você e Em destaque).
     Print: `marketplace-1280-dark.png`, `conectar-apps-375-dark.png`.
     Correção: título da janela "Conectar aplicativos"; primeira seção = apps conectáveis; remover a duplicação (Em destaque sem os itens já em Para você); "Architect" vai para "Novo agente → Montar um time".
+   **Feito (07/10/2026):** janela e rótulo de acessibilidade "Conectar aplicativos"; seção "Enterprise hub" removida (o Architect segue em Agentes → "Montar um time"); duplicação removida na fonte (Google Agenda e Notion não são mais `featured` em `catalog.js`), "Plugins em destaque" → "Em destaque". Depois: `conectar-apps-1280-dark-depois.png`, `conectar-apps-375-dark-depois.png`.
 
 12. **Escrever enquanto há aprovação pendente parece ignorado.** Com o turno esperando "Aprovar", a mensagem "@Donald confirme…" ficou no campo e o botão virou "parar" sem explicação.
     Print: `chat-1a1-1280-dark.png`.
     Correção: aviso no composer "Esperando sua aprovação acima — sua mensagem vai depois" e permitir enfileirar (casa com o P1 de `docs/interacao-agentes.md` §1).
+   **Feito (07/10/2026):** causa: com um turno em andamento o composer desligava o envio (`canSend` exigia `!streaming`) e, se algo chegasse ao `send`, era descartado (`if (ctrl.current) return`). Agora Enter envia mesmo com turno em andamento: a mensagem fica guardada e sai sozinha quando o turno termina; acima do campo aparece "Esperando sua aprovação acima. Sua mensagem vai em seguida." (ou "Esperando esta resposta terminar…"). O botão redondo continua sendo "parar". Depois: `chat-aprovacao-1280-dark-depois.png`, `chat-aprovacao-375-dark-depois.png`.
 
 13. **Estados vazios inconsistentes.** Fluxos tem cartão com título, texto e botão; Biblioteca → Artefatos mostra uma frase solta sem ação; "Scripts" e "Mensagens" não têm contador, os outros têm.
     Print: `fluxos-1280-dark.png`, `biblioteca-1280-dark.png`.
@@ -70,12 +78,12 @@ Obs.: textos com `[[ripper:test:…]]` nos prints são o prefixo do provedor de 
 
 ## P2 — acabamento
 
-14. **Semáforo de autonomia sem rótulo.** Nos cards de Agentes há um ícone de 3 luzes sem texto nem tooltip; na ficha aparece "Semi-autônomo". Print: `agentes-1280-dark.png`. Correção: `title`/`aria-label` "Autonomia: semi-autônomo" e o mesmo texto curto ao lado no card.
+14. **Semáforo de autonomia sem rótulo.** Nos cards de Agentes há um ícone de 3 luzes sem texto nem tooltip; na ficha aparece "Semi-autônomo". Print: `agentes-1280-dark.png`. Correção: `title`/`aria-label` "Autonomia: semi-autônomo" e o mesmo texto curto ao lado no card. **Feito:** `aria-label`/`title` "Autonomia: semi-autônomo" e o texto curto ao lado no card.
 15. **Mascote do Assistente achatado.** Em várias capturas o avatar fixado aparece oval (animação de "trabalhando" pega no meio do quadro). Print: `agente-config-1280-dark.png`, `fluxos-1280-dark.png`. Correção: animar com `transform: scale` uniforme ou leve `translateY`, nunca escala só em Y; desligar com `prefers-reduced-motion`.
-16. **Contraste no tema claro.** O contador da Caixa (âmbar escuro com número escuro) fica pouco legível no claro. Print: `chat-1a1-1280-light.png`. Correção: no claro, fundo âmbar `#f5a524` com texto `#1a1a1a` (≥ 4.5:1) ou o mesmo selo do escuro.
-17. **Cabeçalho duplo no celular.** "☰ Ripper 🔍" e logo abaixo "Assistente · Ativo 🔍" — duas buscas e duas linhas de cabeçalho. Print: `chat-1a1-375-dark.png`. Correção: no chat, uma linha só: ☰ + mascote/nome do agente + busca.
+16. **Contraste no tema claro.** O contador da Caixa (âmbar escuro com número escuro) fica pouco legível no claro. Print: `chat-1a1-1280-light.png`. Correção: no claro, fundo âmbar `#f5a524` com texto `#1a1a1a` (≥ 4.5:1) ou o mesmo selo do escuro. **Feito:** selo da Caixa em `#f5a524` com texto `#1a1a1a` nos dois temas.
+17. **Cabeçalho duplo no celular.** "☰ Ripper 🔍" e logo abaixo "Assistente · Ativo 🔍" — duas buscas e duas linhas de cabeçalho. Print: `chat-1a1-375-dark.png`. Correção: no chat, uma linha só: ☰ + mascote/nome do agente + busca. **Feito:** no chat a barra do app some no celular; o cabeçalho da conversa ganhou o ☰ (uma linha só). Depois: `chat-aprovacao-375-dark-depois.png`.
 18. **Projeto sem objetivo.** "Sem objetivo definido." em cinza sem link para definir. Print: `projeto-1280-dark.png`. Correção: transformar em botão-texto "Definir objetivo".
-19. **Linha de ações do balão longa demais.** Hora · tempo · nº de ações · modelo · Copiar · Ouvir · Refazer em todas as respostas. Print: `grupo-1280-dark.png`. Correção: mostrar só hora; o resto aparece ao passar o mouse (desktop) ou tocar no balão (celular).
+19. **Linha de ações do balão longa demais.** Hora · tempo · nº de ações · modelo · Copiar · Ouvir · Refazer em todas as respostas. Print: `grupo-1280-dark.png`. Correção: mostrar só hora; o resto aparece ao passar o mouse (desktop) ou tocar no balão (celular). **Feito:** modelo também foi para os detalhes; no toque os detalhes aparecem ao tocar no balão (antes ficavam sempre à vista).
 
 ## O que está bom
 - Nenhuma rolagem lateral em nenhuma tela/largura/tema.

@@ -127,7 +127,7 @@ export default function ComposerPlusMenu({ open, onClose, anchorRef, onFiles, on
       )}
       {simple && (
         <button type="button" className="menu-item" onClick={() => { onClose(); go('/new?template=architect'); }}>
-          <Icon name="agents" size={16} />{t('composer.architect')}<span className="muted small"> · advisory</span>
+          <Icon name="agents" size={16} />{t('composer.architect')}
         </button>
       )}
       <hr className="menu-sep" />

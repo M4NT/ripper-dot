@@ -37,7 +37,7 @@ export default function Agents() {
         </div>
       </header>
       <div className="toolbar">
-        <Segmented label="Filtrar por status" value={filter} onChange={setFilter} items={[['all', t('agents.filterAll'), count('all')], ['online', t('agents.filterOnline'), count('online')], ['paused', t('agents.filterPaused'), count('paused')], ...(count('working') || filter === 'working' ? [['working', 'Trabalhando agora', count('working')]] : [])]} />
+        <Segmented label="Filtrar por status" value={filter} onChange={setFilter} items={[['all', t('agents.filterAll'), count('all')], ...(count('online') !== count('all') || filter === 'online' ? [['online', t('agents.filterOnline'), count('online')]] : []), ['paused', t('agents.filterPaused'), count('paused')], ...(count('working') || filter === 'working' ? [['working', 'Trabalhando', count('working')]] : [])]} />
         <label className="search-field"><Icon name="search" size={16} /><input value={q} onChange={e => setQ(e.target.value)} placeholder={t('agents.search')} aria-label={t('agents.search')} /></label>
       </div>
       {list.length === 0

@@ -140,7 +140,7 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, on
       <div className="msg-av"><AgentAvatar agent={agent} size={36} state={live ? 'working' : undefined} paused={!live} /></div>
       <div className="msg-col">
         {group && <span className="speaker" style={{ color: agentColor(agent) }}>{agent.name}</span>}
-        <div className="bubble bot-bubble">
+        <div className="bubble bot-bubble" tabIndex={-1}>
           <ActionLine steps={m.steps} live={live} />
           {live && phase === 'generate_image' && <ImageGenLoader />}
           {live && phase !== 'approval' && <StallNote label={phase === 'text' ? 'Escrevendo' : phase === 'route' || phase === 'think' || !phase ? 'Pensando' : stepLabel(phase)} sig={`${phase}|${m.steps.length}|${m.content.length}|${m.agentId}`} onStop={onStop} slowAfterMs={phase === 'generate_image' ? 200_000 : undefined} />}
@@ -155,9 +155,9 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, on
           {/* detalhes (tempo, custo, modelo) só ao passar o mouse: no dia a dia é ruído em toda mensagem */}
           <span className="msg-meta-more">
           {m.timing?.totalMs > 0 && <span className="msg-took" title={m.timing.firstMs ? `Começou a responder em ${(m.timing.firstMs / 1000).toFixed(1)}s` : undefined}>· {(m.timing.totalMs / 1000).toFixed(1)}s{m.costUsd ? ` · US$ ${m.costUsd.toFixed(3).replace('.', ',')}` : ''}{m.steps?.length ? ` · ${m.steps.length} ${m.steps.length === 1 ? 'ação' : 'ações'}` : ''}</span>}
-          </span>
-          {/* qual IA respondeu e se o Ripper Auto escolheu: sempre à vista, para ninguém estranhar a troca de modelo */}
+          {/* qual IA respondeu (e se o Ripper Auto escolheu): detalhe técnico, só ao abrir (§3.1) */}
           {m.model && <span className="badge model-badge">{m.routedBy && m.routedBy !== 'manual' ? 'Ripper Auto → ' : ''}{models?.[m.model]?.label || m.model}{m.effort && m.effort !== 'auto' ? ` · ${effortLabel(m.effort)}` : ''}</span>}
+          </span>
           {!live && m.content && <>
             <button className="meta-btn" aria-label="Copiar" onClick={() => navigator.clipboard.writeText(m.content)}><Icon name="copy" size={14} /><span>Copiar</span></button>
             {canSpeak && <button className="meta-btn" aria-label="Ouvir" onClick={() => speak(m.content)}><Icon name="volume" size={14} /><span>Ouvir</span></button>}
@@ -261,6 +261,8 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   const [panel, setPanel] = useState(() => local.get('panel.v2', typeof matchMedia === 'function' && matchMedia('(min-width: 1440px)').matches));
   const wide = useMediaQuery('(min-width: 1200px)');
   const ctrl = useRef(null), scroller = useRef(null), stick = useRef(true);
+  // mensagens enviadas com um turno em andamento (ex.: esperando aprovação): antes eram descartadas em silêncio
+  const heldRef = useRef([]); const [held, setHeld] = useState(0);
   const queueRef = useRef(null);
   const sendTurnRef = useRef(null);
   const [confirm, confirmNode] = useConfirm();
@@ -410,7 +412,8 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
     const { text, fileIds = [], previews, mcpSession, resume = false, credentialRefs = [], voice = false } = args;
     const use = forceChoice || choice;
     let ackId = null;
-    if (ctrl.current || !agent) return;
+    if (!agent) return;
+    if (ctrl.current) { if (!resume) { heldRef.current.push([args, forceChoice]); setHeld(heldRef.current.length); } return; }
     if (resume && !chatId) return;
     if (!resume) {
       const userMsg = { id: 'u' + Date.now(), role: 'user', content: text, files: fileIds, previews, voice, at: Date.now() };
@@ -549,6 +552,10 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
       refresh();
       queueRef.current?.scheduleFlush();
       if (queuedRef.current.length) { const next = coalesceSendParts(queuedRef.current); setQueue([]); setTimeout(() => send(next)); }
+      else {
+        const next = heldRef.current.shift(); setHeld(heldRef.current.length);
+        if (next) setTimeout(() => sendTurnRef.current?.(...next));
+      }
     }
   }
   sendTurnRef.current = send;
@@ -597,6 +604,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
     <div className={`chat ${showPanel ? 'with-panel' : ''}`} onKeyDown={onChatKey}>
       <div className="chat-main">
         <header className="chat-head" onContextMenu={openMenu}>
+          <button type="button" className="icon-btn chat-menu-btn" aria-label="Abrir menu" onClick={() => dispatchEvent(new Event('ripper:open-drawer'))}><Icon name="menu" /></button>
           <div className="chat-who">
             {project && <><a href={`#/p/${project.id}`} className="crumb-link project-crumb"><Icon name="folder" size={15} />{project.name}</a><Icon name="arrowR" size={13} className="crumb-sep" /></>}
             {isGroup
@@ -649,6 +657,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
               <button type="button" className="btn sm" onClick={() => send({ resume: true })}>Retomar resposta</button>
             </div>
           )}
+          {(held > 0 || phase === 'approval') && <p className="inbox-wait" role="status"><Icon name="clock" size={13} />{phase === 'approval' ? 'Esperando sua aprovação acima. ' : 'Esperando esta resposta terminar. '}{held > 0 ? (held === 1 ? 'Sua mensagem vai em seguida.' : `Suas ${held} mensagens vão em seguida.`) : 'O que você escrever agora vai depois.'}</p>}
           {<WorkspaceBar chat={chat} chatId={chatId} agents={isGroup ? members : [agent]} pending={pendingWs} setPending={setPendingWs} onChanged={c => setChat(x => ({ ...x, ...c }))} />}
           <Composer agent={agent} chatId={chatId} projectId={projectId} streaming={!!live} onSend={queueSend} onStop={stop}
             choice={choice} setChoice={setChoice} group={isGroup} mentions={isGroup ? members : S.agents.filter(a => a.id !== agent.id)}
