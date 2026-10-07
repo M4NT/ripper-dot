@@ -91,7 +91,7 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 
 ### C. Instalação e atualização (P0)
 - ✅ **Modelos locais para quem não tem conta de IA** (base): detecta RAM, GPU NVIDIA (nvidia-smi) e Apple Silicon, recomenda o maior Qwen3 que cabe (tabela curta em `lib/local-models.mjs`), detecta o Ollama e baixa com 1 clique mostrando o progresso (Configurações → Ollama); o modelo entra direto nos agentes pelo provedor Ollama já existente. Avaliados llmfit (MIT, binário Rust, `llmfit recommend --json`) e whichllm (MIT, Python, notas de benchmark do HF): ficou a ideia do llmfit sem embutir código. Falta: instalar o Ollama pelo Ripper, AMD/Intel GPU, chamar o llmfit se instalado.
-- [ ] **Instalador para Windows e Mac** que traz Node, cria o serviço e abre o app — sem terminal. *(Windows feito: `scripts\instalar-windows.cmd`; falta Mac.)*
+- ✅ **Instalador para Windows e Mac** que traz Node, cria o serviço e abre o app — sem terminal: `scripts\instalar-windows.cmd` e `scripts/instalar-mac.command` (dois cliques; no Mac, na 1ª vez: botão direito → Abrir). [ ] Testar o do Mac numa máquina real.
 - ✅ Assistente de primeiro uso: conta do Claude (login), Docker (detecta e orienta), primeiro agente em 1 frase, WhatsApp opcional.
 - ✅ Funcionar sem Docker (modo "sem computador" claro, com o que o agente perde).
 - ✅ Assistente de primeiro uso pergunta "Você tem conta de IA?" → Claude / ChatGPT / chave de API / "não tenho" (modelo local), explicando o que muda em qualidade. *("Não tenho" aponta para o modelo recomendado em Configurações → Ollama.)*

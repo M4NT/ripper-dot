@@ -116,6 +116,8 @@ Esta parte descreve o que o repositório oferece hoje: scripts npm em `package.j
 
 **Windows, sem terminal:** dois cliques em `scripts\instalar-windows.cmd`. Ele instala o Node 22 pelo winget se faltar, roda `npm ci` e `npm run build`, cria o serviço (`scripts/service.mjs install`) e abre `http://127.0.0.1:3000`. Na primeira entrada, um assistente pergunta qual conta de IA usar, detecta o Docker e cria o primeiro agente a partir de uma frase.
 
+**Mac, sem terminal:** dois cliques em `scripts/instalar-mac.command` (na primeira vez, botão direito → Abrir). Ele instala o Node 22+ pelo Homebrew ou pelo instalador oficial (pede a senha do Mac), roda `npm ci` e `npm run build`, cria o serviço (launchd) e abre `http://127.0.0.1:3000`. Para desinstalar mantendo os dados: `scripts/desinstalar-mac.command`.
+
 **Sem Docker:** o Ripper funciona em "modo sem computador": os agentes conversam, pesquisam na web e lembram, mas não rodam comandos, não abrem navegador nem criam arquivos. Para ligar depois: abra o Docker Desktop e escolha Docker em Configurações → Computador.
 
 Manual:
