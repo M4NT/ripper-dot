@@ -84,7 +84,7 @@ async function send(body, obs, signal, onChat) {
       const ev = JSON.parse(p.slice(6)), dt = (Date.now() - t0) / 1000;
       if (ev.chatId && !ev.text) { onChat?.(ev.chatId); }
       else obs.primeiroSinalSeg ??= +dt.toFixed(2); // o primeiro evento além do "recebi" (route, speaker, texto…)
-      if (ev.tool) { obs.ferramentas++; if (!toolSeen) { obs.antesDaFerramenta = turno; toolSeen = true; } }
+      if (ev.tool) { obs.ferramentas++; (obs.nomesFerramentas ||= []).push(ev.tool); if (!toolSeen) { obs.antesDaFerramenta = turno; toolSeen = true; } }
       if (typeof ev.text === 'string' && ev.text) { obs.primeiroTextoSeg ??= +dt.toFixed(2); turno += ev.text; }
       if (ev.speaker) turno = ''; // novo orador: o texto final é o do último turno
       if (ev.error) obs.erro = String(ev.error).slice(0, 300);
@@ -135,7 +135,7 @@ async function runScenario(c, ids) {
   const checks = score(c, obs, ref.limites);
   const nota = +(checks.filter(x => x.ok).length / checks.length * 100).toFixed(1);
   return { id: c.id, titulo: c.titulo, nota, segundos: +((Date.now() - t0) / 1000).toFixed(1),
-    primeiroSinalSeg: obs.primeiroSinalSeg, primeiroTextoSeg: obs.primeiroTextoSeg, falaram: obs.falaram, caixa: obs.caixa,
+    primeiroSinalSeg: obs.primeiroSinalSeg, primeiroTextoSeg: obs.primeiroTextoSeg, falaram: obs.falaram, caixa: obs.caixa, ferramentas: obs.nomesFerramentas || [],
     checks, ...(obs.erro ? { erro: obs.erro } : {}), resposta: obs.texto.slice(0, 600) };
 }
 
