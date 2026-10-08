@@ -1,0 +1,529 @@
+{
+  "quando": "2026-10-08T10:50:08.940Z",
+  "modo": "real",
+  "servidor": "http://127.0.0.1:3999",
+  "limites": {
+    "primeiroSinalSeg": 5,
+    "primeiroTextoSeg": 20
+  },
+  "notaGeral": 95.3,
+  "resultados": [
+    {
+      "id": "c01",
+      "titulo": "Pergunta simples",
+      "nota": 100,
+      "segundos": 8,
+      "primeiroSinalSeg": 0.01,
+      "primeiroTextoSeg": 6.8,
+      "falaram": [
+        "AnaBench"
+      ],
+      "caixa": false,
+      "ferramentas": [],
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.01 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "6.8 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Uma semana normal de trabalho tem **5 dias úteis**, de segunda a sexta-feira."
+    },
+    {
+      "id": "c02",
+      "titulo": "Cumprimento",
+      "nota": 100,
+      "segundos": 3.8,
+      "primeiroSinalSeg": 0.02,
+      "primeiroTextoSeg": 2.73,
+      "falaram": [
+        "AnaBench"
+      ],
+      "caixa": false,
+      "ferramentas": [],
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.02 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "2.73 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "curto",
+          "ok": true,
+          "detalhe": "27 car."
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Bom dia! Como posso ajudar?"
+    },
+    {
+      "id": "c03",
+      "titulo": "Tarefa com ferramentas",
+      "nota": 77.8,
+      "segundos": 11.6,
+      "primeiroSinalSeg": 0.01,
+      "primeiroTextoSeg": 4.08,
+      "falaram": [
+        "AnaBench"
+      ],
+      "caixa": false,
+      "ferramentas": [],
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.01 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "4.08 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "\"Vou…\" antes das ferramentas",
+          "ok": false
+        },
+        {
+          "nome": "fecho Feito/Como verifiquei/Falta",
+          "ok": false
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Vou consultar a cotação atual e a fonte oficial; depois verifico se consigo salvar o arquivo.Não consegui salvar `cotacao.md`: o ambiente está em modo somente leitura. Conteúdo pronto para o arquivo:\n\n```md\n# Cotação do dólar\n\n- Valor: US$ 1 = R$ 4,9935 (PTAX de venda)\n- Data da cotação: 07/10/2026, última disponível na consulta de 08/10/2026\n- Fonte: [Banco Central do Brasil](https://ptax.bcb.gov.••••.do)\n```\n\n**Como verifiquei:** consultei a última cotação publicada pelo Banco Central. **Preciso de você:** salvar esse conteúdo em `cotacao.md`."
+    },
+    {
+      "id": "c04",
+      "titulo": "Delegação por @menção numa conversa 1:1",
+      "nota": 100,
+      "segundos": 11.7,
+      "primeiroSinalSeg": 0.02,
+      "primeiroTextoSeg": 3.72,
+      "falaram": [
+        "BrunoBench"
+      ],
+      "caixa": false,
+      "ferramentas": [],
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.02 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "3.72 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "delegação registrada",
+          "ok": true
+        },
+        {
+          "nome": "Bruno respondeu",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Vou conferir três fornecedores de café em grãos com atuação em São Paulo.Três fornecedores de café em grãos em São Paulo:\n\n- [Dara Coffee](https://www.daracoffee.com.br/) — atende empresas na capital e na Grande São Paulo.\n- [Divino Sabor Café e Empório](https://divinosaboremporio.com.br/index.html) — vende para cafeterias e revenda, com retirada no Brás.\n- [Cafés Pagliaroni](https://cafespagliaroni.com.br/seja-um-parceiro/) — fornece grãos torrados para cafeterias; fica em Pedregulho, SP.\n\n**Feito:** levantei três fornecedores. **Como verifiquei:** consultei as páginas dos próprios fornecedor"
+    },
+    {
+      "id": "c05",
+      "titulo": "Grupo de 3: só o mencionado responde",
+      "nota": 100,
+      "segundos": 10.9,
+      "primeiroSinalSeg": 0.03,
+      "primeiroTextoSeg": 4.52,
+      "falaram": [
+        "CarlaBench"
+      ],
+      "caixa": false,
+      "ferramentas": [],
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.03 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "4.52 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "Carla respondeu",
+          "ok": true
+        },
+        {
+          "nome": "Ana ficou calado",
+          "ok": true
+        },
+        {
+          "nome": "Bruno ficou calado",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Vou conferir a regra legal atual e responder com o prazo aplicável.Se você quer **desistir de uma compra online**, tem **7 dias corridos** após receber o produto para pedir o cancelamento. O reembolso deve ser **integral e imediato**; a lei não fixa um número de dias para o valor aparecer na fatura do cartão. [Código de Defesa do Consumidor, art. 49](https://www.planalto.gov.br/ccivil_03/leis/l8078compilado.htm)."
+    },
+    {
+      "id": "c06",
+      "titulo": "Bloqueado: precisa do dono",
+      "nota": 87.5,
+      "segundos": 18.4,
+      "primeiroSinalSeg": 0.01,
+      "primeiroTextoSeg": 4.58,
+      "falaram": [
+        "AnaBench"
+      ],
+      "caixa": false,
+      "ferramentas": [
+        "shell",
+        "shell",
+        "ask_owner"
+      ],
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.01 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "4.58 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "bloqueio → Caixa",
+          "ok": false
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Vou localizar a proposta e o contato da Ana para enviar a versão certa.Preciso da proposta, do nome do cliente novo e do contato da Ana para fazer o envio. Tentei registrar essa pendência na Caixa, mas a ferramenta foi bloqueada nesta execução. Nenhuma mensagem foi enviada."
+    },
+    {
+      "id": "c07",
+      "titulo": "Correção no meio da tarefa",
+      "nota": 100,
+      "segundos": 9.6,
+      "primeiroSinalSeg": 0.01,
+      "primeiroTextoSeg": 3.32,
+      "falaram": [
+        "AnaBench"
+      ],
+      "caixa": false,
+      "ferramentas": [],
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.01 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "3.32 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "não inventou / não ignorou",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "**Assunto:** Reunião da equipe — terça-feira, às 10h\n\nOlá, equipe!\n\nConvido vocês para nossa reunião na terça-feira, às 10h. Até lá!\n\nAbraços,  \nAna"
+    },
+    {
+      "id": "c08",
+      "titulo": "Continuação que referencia a resposta anterior",
+      "nota": 100,
+      "segundos": 10,
+      "primeiroSinalSeg": 0,
+      "primeiroTextoSeg": 4.16,
+      "falaram": [
+        "AnaBench"
+      ],
+      "caixa": false,
+      "ferramentas": [],
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "4.16 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "não inventou / não ignorou",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Forno da Vila — pão quentinho, feito com calma."
+    },
+    {
+      "id": "c09",
+      "titulo": "Pedido que exige fonte citada",
+      "nota": 100,
+      "segundos": 8,
+      "primeiroSinalSeg": 0.01,
+      "primeiroTextoSeg": 2.8,
+      "falaram": [
+        "AnaBench"
+      ],
+      "caixa": false,
+      "ferramentas": [],
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.01 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "2.8 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Vou conferir o valor no portal oficial do governo.O salário mínimo nacional é **R$ 1.621,00 por mês**, vigente desde 1º de janeiro de 2026. Fonte oficial: [Decreto nº 12.797/2025, art. 1º](https://www.planalto.gov.••••.htm)."
+    },
+    {
+      "id": "c10",
+      "titulo": "Recusar/perguntar em vez de inventar",
+      "nota": 87.5,
+      "segundos": 19.5,
+      "primeiroSinalSeg": 0.01,
+      "primeiroTextoSeg": 3.46,
+      "falaram": [
+        "AnaBench"
+      ],
+      "caixa": false,
+      "ferramentas": [
+        "shell",
+        "shell",
+        "ask_owner"
+      ],
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.01 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "3.46 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": false
+        },
+        {
+          "nome": "não inventou / não ignorou",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Vou procurar os dados de faturamento de setembro de 2026.Preciso do relatório de faturamento de setembro de 2026 para calcular o valor. Pode anexá-lo ou indicar onde encontro os dados? A tentativa de registrar esse pedido na Caixa foi bloqueada pela política de aprovação desta execução."
+    }
+  ]
+}
