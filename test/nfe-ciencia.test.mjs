@@ -152,7 +152,7 @@ test('só notas recebidas da empresa e emitidas nos últimos 30 dias; qualquer u
   const s = stubPost([]);
   const r = await runner(db, { approve: ap.approve, post: s.post }).run('nfe_manifestar_ciencia', { empresa: CNPJ, chaves: [K(1), K(3)] });
   assert.match(r, /Nada foi enviado/);
-  assert.match(r, new RegExp(`${K(3)}: emitida há mais de 30 dias`));
+  assert.match(r, new RegExp(`${K(3)}: emitida em 01/08/2026, fora do prazo de 10 dias`));
   const desconhecida = await runner(db, { approve: ap.approve, post: s.post }).run('nfe_manifestar_ciencia', { empresa: CNPJ, chaves: [K(999)] });
   assert.match(desconhecida, /não está entre as NF-e recebidas/);
   assert.equal(ap.asked.length, 0, 'recusada antes da aprovação');
@@ -304,6 +304,46 @@ test('sem certificado: o executor recusa e nunca pergunta', withVault(async db =
   assert.deepEqual(dfe.dfeCompanies(db), []);
   await assert.rejects(runner(db, { approve: ap.approve, post: stubPost([]).post }).run('nfe_manifestar_ciencia', { empresa: CNPJ, chaves: [K(1)] }), /não tem certificado/);
   assert.equal(ap.asked.length, 0);
+}));
+
+// ---------- prazo de 10 dias; ambiente padrão homologação ----------
+
+test('prazo de 10 dias: nota de 9 dias entra; de 11 dias é recusada com mensagem clara, sem envio', withVault(async db => {
+  const c = makeCert({ name: 'prazo' });
+  await dfe.saveCertificate(db, CNPJ, { pfxBase64: c.pfxBase64, password: PASS });
+  comNotas(db);
+  db.dfe.companies[CNPJ].notes[K(2)].dhEmi = '2026-09-27T10:00:00-03:00'; // 11 dias
+  db.dfe.companies[CNPJ].notes[K(1)].dhEmi = '2026-09-29T10:00:00-03:00'; // 9 dias
+  const ap = aprova(true);
+  const s = stubPost([]);
+  const r = await runner(db, { approve: ap.approve, post: s.post }).run('nfe_manifestar_ciencia', { empresa: CNPJ, chaves: [K(1), K(2)] });
+  assert.match(r, new RegExp(`${K(2)}: emitida em 27/09/2026, fora do prazo de 10 dias da Ciência`));
+  assert.equal(ap.asked.length, 0, 'recusada antes da aprovação');
+  assert.equal(s.calls.length, 0, 'nada enviado');
+}));
+
+test('ambiente: padrão é homologação (hom1) e a aprovação diz HOMOLOGAÇÃO — teste; tpAmb 1 vai à produção e diz PRODUÇÃO — efeito real', withVault(async db => {
+  const c = makeCert({ name: 'amb' });
+  await dfe.saveCertificate(db, CNPJ, { pfxBase64: c.pfxBase64, password: PASS });
+  comNotas(db);
+  const apHom = aprova(true);
+  const sHom = stubPost([135]);
+  await runner(db, { approve: apHom.approve, post: sHom.post }).run('nfe_manifestar_ciencia', { empresa: CNPJ, chaves: [K(1)] });
+  assert.equal(sHom.calls[0].url, 'https://hom1.nfe.fazenda.gov.br/NFeRecepcaoEvento4/NFeRecepcaoEvento4.asmx');
+  assert.match(apHom.asked[0].command, /^HOMOLOGAÇÃO — teste\n/);
+  assert.match(apHom.asked[0].reason, /^\[HOMOLOGAÇÃO — teste\]/);
+  assert.match(sHom.calls[0].xml, /<tpAmb>2<\/tpAmb>/);
+
+  db.dfe.companies[CNPJ].notes[K(1)].ciencia = undefined;
+  const apProd = aprova(true);
+  const sProd = stubPost([135]);
+  await runner(db, { approve: apProd.approve, post: sProd.post }).run('nfe_manifestar_ciencia', { empresa: CNPJ, chaves: [K(1)], tpAmb: 1 });
+  assert.equal(sProd.calls[0].url, 'https://www.nfe.fazenda.gov.br/NFeRecepcaoEvento4/NFeRecepcaoEvento4.asmx');
+  assert.match(apProd.asked[0].command, /^PRODUÇÃO — efeito real\n/);
+  assert.match(apProd.asked[0].reason, /^\[PRODUÇÃO — efeito real\]/);
+  assert.match(sProd.calls[0].xml, /<tpAmb>1<\/tpAmb>/);
+  assert.equal(cien.ambienteDe(undefined), 2);
+  assert.equal(cien.ambienteDe(1), 1);
 }));
 
 // ---------- assinatura antes do envio; URLs confirmadas no Portal da NF-e ----------

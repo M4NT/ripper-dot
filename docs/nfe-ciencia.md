@@ -31,6 +31,11 @@ Fontes conferidas em 2026-10-08, todas do Portal da NF-e (`www.nfe.fazenda.gov.b
 
 Nada disso foi testado em homologação: os testes usam um servidor local e a verificação é feita só com node:crypto.
 
+## Regras do Ripper (decididas pelo dono)
+
+- Prazo: a nota precisa ter sido emitida há no máximo 10 dias (NT 2020.001 §4). Fora disso, a ferramenta recusa a nota sem enviar nada.
+- Ambiente padrão: homologação (tpAmb 2). Só tpAmb 1 explícito vai à produção, e a aprovação na Caixa mostra "HOMOLOGAÇÃO — teste" ou "PRODUÇÃO — efeito real".
+
 ## Código
 
 - `lib/nfe-assinatura.mjs`: lê o `.pfx` com node-forge (senha errada → `DfeError`), assina com `node:crypto`.
