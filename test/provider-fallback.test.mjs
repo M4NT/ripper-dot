@@ -172,3 +172,13 @@ test('providerAttemptOrder: Fable fora da assinatura cai no Opus antes do Codex'
   assert.equal(needsUsageCredits(new Error('Fable 5.1 requires usage credits. Switch to another model')), true);
   assert.equal(needsUsageCredits(new Error('rate limit')), false);
 });
+
+test('texto antes e depois de uma ferramenta não cola na resposta', async () => {
+  const { runProviderAttemptLoop: loop } = await import('../lib/provider-turn.mjs');
+  const r = await loop({
+    order: ['claude-sonnet-5-5'],
+    getCircuitBreaker: () => null,
+    runModel: async function* () { yield { text: 'Vou buscar.' }; yield { tool: 'x' }; yield { text: 'Tenho os dados.' }; }
+  });
+  assert.equal(r.out, 'Vou buscar.\n\nTenho os dados.');
+});
