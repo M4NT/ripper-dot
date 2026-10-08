@@ -65,6 +65,7 @@ import { emailReady, listEmails, readEmail, sendEmail, newEmailsSince, testEmail
 import { createDfeRunner, dfeCompanies, saveCertificate, removeCertificate, certificadosList, certificateAlerts, DfeError } from './lib/dfe.mjs';
 import { createNfseRunner } from './lib/nfse.mjs';
 import { createEloRunner } from './lib/elo-compras.mjs';
+import { createNfeCienciaRunner } from './lib/nfe-ciencia.mjs';
 import { createOmieRunner, omieCompanyList, omieAddCompany, omieRemoveCompany, omieCredentials, omieTestConnection } from './lib/omie.mjs';
 import { gh, githubReady, normalizeRepo, repoChanges, describeChange, prBranch, gitAuthArg, hideToken } from './lib/github.mjs';
 import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './lib/event-triggers.mjs';
@@ -1534,6 +1535,12 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
     nfse: !chat.channel && dfeCompanies(db).length ? createNfseRunner({ getDb: () => db, save }) : null,
     // Elo de compras: precisa de certificado (notas) e de Omie conectado (conta e pedido); só leitura.
     elo: !chat.channel && dfeCompanies(db).length && omieCompanyList(db.settings).some(c => c.status === 'conectada') ? createEloRunner({ getDb: () => db }) : null,
+    // Ciência da Operação (210210): escrita na Receita; toda vez pede a sua aprovação na Caixa antes de enviar.
+    nfeCiencia: !chat.channel && dfeCompanies(db).length ? createNfeCienciaRunner({
+      getDb: () => db, save,
+      approve: (command, reason) => askApproval({ agent, chat, emit, signal }, 'nfe-ciencia', command, reason, false),
+      record: m => recordExternal({ ...m, agentId: agent.id, chatId: chat.id })
+    }) : null,
     email: !chat.channel && emailReady(s.email) ? {
       list: async a => {
         recordCorporateAudit(db.settings, { category: 'email', action: 'email.list', agentId: agent.id, chatId: chat.id, at: Date.now() });
