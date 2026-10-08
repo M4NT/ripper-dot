@@ -62,6 +62,7 @@ import * as outbox from './lib/outbox.mjs';
 import { guardOutbound } from './lib/x9-guard.mjs';
 import { SECRET_PATHS } from './lib/local-secret.mjs';
 import { emailReady, listEmails, readEmail, sendEmail, newEmailsSince, testEmail, getAttachment, safeName, attachmentText, readHint } from './lib/email.mjs';
+import { createOmieRunner, omieCompanyList, omieAddCompany, omieRemoveCompany, omieCredentials, omieTestConnection } from './lib/omie.mjs';
 import { gh, githubReady, normalizeRepo, repoChanges, describeChange, prBranch, gitAuthArg, hideToken } from './lib/github.mjs';
 import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './lib/event-triggers.mjs';
 import { isPaidModel, paidBlockReason, addSpend, spendToday, spendLimits, normalizeBilling, useSpendStore, closeSpendStore } from './lib/paid-usage.mjs';
@@ -1518,6 +1519,12 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
       };
     })() : null,
     // E-mail (IMAP/SMTP): lê ao vivo, sem cópia local; enviar sempre com a sua aprovação. Só em conversa sua.
+    // Omie ERP (conexão direta, uma empresa por chave): toda escrita pede a sua aprovação, em qualquer autonomia.
+    omie: !chat.channel && omieCompanyList(db.settings).some(c => c.status === 'conectada') ? createOmieRunner({
+      getSettings: () => db.settings,
+      approve: (command, reason) => askApproval({ agent, chat, emit, signal }, 'omie', command, reason, false),
+      record: m => recordExternal({ ...m, agentId: agent.id, chatId: chat.id })
+    }) : null,
     email: !chat.channel && emailReady(s.email) ? {
       list: async a => {
         recordCorporateAudit(db.settings, { category: 'email', action: 'email.list', agentId: agent.id, chatId: chat.id, at: Date.now() });
@@ -2771,6 +2778,21 @@ const routes = [
     db.settings.github = { ...g, agentId: a.id, me, since: g.since || Date.now() };
     save();
     return { agentId: a.id, login: me, repos: g.repos };
+  }],
+  // Omie ERP: empresas por nome Omie; chave e segredo vão para o cofre cifrado (a API nunca devolve o segredo).
+  ["GET", /^\/api\/omie$/, () => ({ companies: omieCompanyList(db.settings), vaultConfigured: vaultConfigured() })],
+  ["POST", /^\/api\/omie\/companies$/, async req => {
+    try { omieAddCompany(db.settings, await body(req)); } catch (e) { throw new HttpError(vaultConfigured() ? 400 : 503, e.message); }
+    save();
+    return { companies: omieCompanyList(db.settings) };
+  }],
+  ["DELETE", /^\/api\/omie\/companies\/([a-z0-9-]{2,60})$/, (req, [slug]) => {
+    omieRemoveCompany(db.settings, slug);
+    save();
+    return { companies: omieCompanyList(db.settings) };
+  }],
+  ["POST", /^\/api\/omie\/companies\/([a-z0-9-]{2,60})\/test$/, async (req, [slug]) => {
+    try { return await omieTestConnection(omieCredentials(slug)); } catch (e) { throw new HttpError(400, `Não conectou: ${e.message}`); }
   }],
   // Testa login IMAP + SMTP com o que está salvo (ou com o que veio no corpo, antes de salvar)
   ['POST', /^\/api\/email\/test$/, async req => {

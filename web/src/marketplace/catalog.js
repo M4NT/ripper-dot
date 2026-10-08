@@ -34,6 +34,9 @@ export const CONNECTORS = [
   C('sentry', 'Sentry', 'Sentry', 'Erros e performance.', { type: 'oauth', url: 'https://mcp.sentry.dev/mcp' }),
   C('github', 'GitHub', 'GitHub', 'Repositórios, tarefas e pedidos de mudança.', { type: 'token', url: 'https://api.githubcopilot.com/mcp/',
     tokenHelp: 'Crie um token em github.com/settings/tokens (fine-grained) com acesso aos repositórios que o agente pode ver.' }, { featured: true }),
+  // Omie ERP: conexão direta por empresa (lib/omie.mjs), sem servidor MCP.
+  C('omie-erp', 'Omie ERP', 'Omie', 'Contas, pedidos, notas e cadastros do Omie, empresa por empresa.', { type: 'native',
+    help: 'Você precisa da chave e do segredo do aplicativo, gerados pelo administrador de cada empresa no Omie.' }, { featured: true, icon: 'cube' }),
   // SEO e campanhas: só leitura dos relatórios.
   C('google-analytics', 'Google Analytics 4', 'Google', 'Relatórios de tráfego, conversões e funis do GA4.', { type: 'local', command: 'pipx', args: ['run', 'analytics-mcp==0.7.0'],
     help: 'Servidor oficial do Google (Apache 2.0). Precisa de Python com pipx e, uma vez nesta máquina: gcloud auth application-default login --scopes https://www.googleapis.com/auth/analytics.readonly,https://www.googleapis.com/auth/cloud-platform. Ative as APIs Google Analytics Admin e Data no seu projeto do Google Cloud.',

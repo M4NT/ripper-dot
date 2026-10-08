@@ -168,6 +168,14 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - [ ] Modelo de cobrança (se houver) e licença.
 - [ ] Marketplace de agentes e skills prontos com instalação de 1 clique.
 
+### L. Omie ERP por API direta (integração nativa)
+- [x] Conector "Omie ERP" no Marketplace: empresas por nome Omie, chave e segredo no cofre cifrado, "Testar conexão" por empresa (`lib/omie.mjs`, `web/src/marketplace/OmiePanel.jsx`).
+- [x] 48 ferramentas `omie_*` (28 leituras, 20 escritas) + `omie_listar_empresas`; catálogo completo em `OMIE_CAPS`.
+- [x] Escritas sempre pedem aprovação na Caixa (qualquer autonomia); cadastros conferem o CNPJ antes; pedido e conta a pagar conferem o fornecedor no cadastro.
+- [x] REDUNDANT do Omie: espera o tempo pedido e tenta de novo.
+- [ ] Conferir os nomes de método e caminhos de endpoint de cada capacidade contra a documentação oficial do Omie (feito por dedução, sem teste real).
+- [ ] Teste com uma empresa real de homologação (leitura primeiro; escrita só com a Caixa e combinado com o dono).
+
 ---
 
 ## 3.1 Como fazer o design (regras para qualquer tela nova ou mudada)

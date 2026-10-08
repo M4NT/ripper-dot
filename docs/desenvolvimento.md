@@ -76,6 +76,8 @@ Siga o padrão de e-mail (`lib/email.mjs`) ou GitHub (`lib/github.mjs`):
 6. **Tela** — formulário em `web/src` (Conectores/Configurações), em PT-BR simples.
 7. **Teste** — um `test/<nome>.test.mjs` cobrindo pelo menos: segredo mascarado na API, configuração incompleta não fica "pronta" e o envio pede aprovação. Use um servidor HTTP falso local para o serviço externo (como `WHATSAPP_GRAPH_URL` / `EVOLUTION_URL` fazem).
 
+**Exemplo completo: Omie ERP** (API direta, uma empresa por chave). `lib/omie.mjs` tem o cliente HTTP (`omieCall`, com REDUNDANT), o catálogo `OMIE_CAPS` (uma linha por capacidade: método, caminho, leitura ou escrita, risco e pré-checagem), o executor `createOmieRunner` e o cofre (`omieAddCompany`, `omieCredentials`). O contexto do turno está em `server.mjs` (`omie:`), as rotas em `/api/omie`, a tela em `web/src/marketplace/OmiePanel.jsx`. Nos testes, `OMIE_API_URL` aponta para um servidor falso (`test/omie.test.mjs`). Para uma capacidade nova, acrescente uma linha em `OMIE_CAPS`; a ferramenta, a aprovação e o bloqueio em modo somente leitura saem sozinhos. Antes de usar em produção, confira o método e o caminho de cada linha na documentação oficial do Omie.
+
 Canais que recebem mensagens de fora (WhatsApp) rodam o agente **sem** computador, navegador e plugins, e só respondem contatos permitidos — mantenha essas travas em integrações novas desse tipo (`lib/evolution.mjs`, `lib/whatsapp.mjs`).
 
 ## Outros pontos úteis

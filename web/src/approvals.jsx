@@ -4,7 +4,7 @@ import { AgentAvatar, Icon } from './ui.jsx';
 import { useApp } from './app.jsx';
 import { useT } from './i18n/index.jsx';
 
-const KIND = { exec: 'quer rodar um comando', share: 'quer publicar um link', social: 'quer publicar em webhook', whatsapp: 'quer enviar um WhatsApp', email: 'quer enviar um e-mail', github: 'quer publicar no GitHub', agent: 'quer criar um agente', flow: 'terminou um passo do fluxo' };
+const KIND = { exec: 'quer rodar um comando', share: 'quer publicar um link', social: 'quer publicar em webhook', whatsapp: 'quer enviar um WhatsApp', email: 'quer enviar um e-mail', github: 'quer publicar no GitHub', omie: 'quer alterar o Omie', agent: 'quer criar um agente', flow: 'terminou um passo do fluxo' };
 /** O que o agente está pedindo, em uma frase (a Caixa mostra isso na linha do mascote). */
 export const approvalAsk = rec => rec.kind === 'question' ? 'precisa de você' : rec.kind === 'setting' ? 'sugere uma configuração' : KIND[rec.kind] || 'pede aprovação';
 
