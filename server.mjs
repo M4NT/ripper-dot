@@ -64,6 +64,7 @@ import { SECRET_PATHS } from './lib/local-secret.mjs';
 import { emailReady, listEmails, readEmail, sendEmail, newEmailsSince, testEmail, getAttachment, safeName, attachmentText, readHint } from './lib/email.mjs';
 import { createDfeRunner, dfeCompanies, saveCertificate, removeCertificate, certificadosList, certificateAlerts, DfeError } from './lib/dfe.mjs';
 import { createNfseRunner } from './lib/nfse.mjs';
+import { createEloRunner } from './lib/elo-compras.mjs';
 import { createOmieRunner, omieCompanyList, omieAddCompany, omieRemoveCompany, omieCredentials, omieTestConnection } from './lib/omie.mjs';
 import { gh, githubReady, normalizeRepo, repoChanges, describeChange, prBranch, gitAuthArg, hideToken } from './lib/github.mjs';
 import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './lib/event-triggers.mjs';
@@ -1531,6 +1532,8 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
     dfe: !chat.channel && dfeCompanies(db).length ? createDfeRunner({ getDb: () => db, save }) : null,
     // NFS-e recebidas (ADN Nacional): mesmo certificado por empresa; só leitura.
     nfse: !chat.channel && dfeCompanies(db).length ? createNfseRunner({ getDb: () => db, save }) : null,
+    // Elo de compras: precisa de certificado (notas) e de Omie conectado (conta e pedido); só leitura.
+    elo: !chat.channel && dfeCompanies(db).length && omieCompanyList(db.settings).some(c => c.status === 'conectada') ? createEloRunner({ getDb: () => db }) : null,
     email: !chat.channel && emailReady(s.email) ? {
       list: async a => {
         recordCorporateAudit(db.settings, { category: 'email', action: 'email.list', agentId: agent.id, chatId: chat.id, at: Date.now() });
