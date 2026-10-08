@@ -62,6 +62,7 @@ import * as outbox from './lib/outbox.mjs';
 import { guardOutbound } from './lib/x9-guard.mjs';
 import { SECRET_PATHS } from './lib/local-secret.mjs';
 import { emailReady, listEmails, readEmail, sendEmail, newEmailsSince, testEmail, getAttachment, safeName, attachmentText, readHint } from './lib/email.mjs';
+import { createDfeRunner, dfeCompanies, saveCertificate, removeCertificate, certificadosList, certificateAlerts, DfeError } from './lib/dfe.mjs';
 import { createOmieRunner, omieCompanyList, omieAddCompany, omieRemoveCompany, omieCredentials, omieTestConnection } from './lib/omie.mjs';
 import { gh, githubReady, normalizeRepo, repoChanges, describeChange, prBranch, gitAuthArg, hideToken } from './lib/github.mjs';
 import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './lib/event-triggers.mjs';
@@ -1525,6 +1526,8 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
       approve: (command, reason) => askApproval({ agent, chat, emit, signal }, 'omie', command, reason, false),
       record: m => recordExternal({ ...m, agentId: agent.id, chatId: chat.id })
     }) : null,
+    // NF-e recebidas (DF-e): só com certificado A1 cadastrado em alguma empresa; só leitura.
+    dfe: !chat.channel && dfeCompanies(db).length ? createDfeRunner({ getDb: () => db, save }) : null,
     email: !chat.channel && emailReady(s.email) ? {
       list: async a => {
         recordCorporateAudit(db.settings, { category: 'email', action: 'email.list', agentId: agent.id, chatId: chat.id, at: Date.now() });
@@ -2793,6 +2796,26 @@ const routes = [
   }],
   ["POST", /^\/api\/omie\/companies\/([a-z0-9-]{2,60})\/test$/, async (req, [slug]) => {
     try { return await omieTestConnection(omieCredentials(slug)); } catch (e) { throw new HttpError(400, `Não conectou: ${e.message}`); }
+  }],
+  // Certificado A1 por empresa (NF-e/DF-e): o .pfx e a senha vão ao cofre cifrado; a resposta só traz metadados.
+  ["GET", /^\/api\/certificados$/, () => ({ certificados: certificadosList(db), vaultConfigured: vaultConfigured() })],
+  ["POST", /^\/api\/certificados\/(\d{14})$/, async (req, [cnpj]) => {
+    const payload = await body(req);
+    let cert;
+    try { cert = await saveCertificate(db, cnpj, payload); } catch (e) {
+      if (e instanceof DfeError) throw new HttpError(400, e.message);
+      throw new HttpError(500, 'Não consegui guardar o certificado.');
+    }
+    recordCorporateAudit(db.settings, { category: 'dfe', action: 'certificado.enviado', detail: { cnpj, titular: cert.titular } });
+    save();
+    checkCertificateAlerts();
+    return { certificado: cert, certificados: certificadosList(db) };
+  }],
+  ["DELETE", /^\/api\/certificados\/(\d{14})$/, (req, [cnpj]) => {
+    removeCertificate(db, cnpj);
+    resolveSystemAlert(`cert:${cnpj}`);
+    save();
+    return { certificados: certificadosList(db) };
   }],
   // Testa login IMAP + SMTP com o que está salvo (ou com o que veio no corpo, antes de salvar)
   ['POST', /^\/api\/email\/test$/, async req => {
@@ -4162,6 +4185,19 @@ async function checkAgentImage() {
   else if (await imageStatus() === 'ready') { resolveSystemAlert('agent-image'); save(); }
 }
 setTimeout(checkAgentImage, 20_000).unref?.();
+
+// Certificado A1 (DF-e): aviso na Caixa quando vence em menos de 30 dias ou já venceu; some quando é trocado.
+function checkCertificateAlerts() {
+  const alerts = certificateAlerts(db);
+  for (const c of alerts) {
+    const title = c.status === 'vencido' ? `Certificado de ${c.titular} venceu` : `Certificado de ${c.titular} vence em ${c.diasRestantes} dia${c.diasRestantes === 1 ? '' : 's'}`;
+    raiseSystemAlert({ key: `cert:${c.cnpj}`, title, body: 'Sem certificado válido, as notas recebidas (DF-e) desta empresa param de chegar. Envie o certificado novo no Marketplace, em Omie ERP.', href: '/marketplace', hrefLabel: 'Trocar certificado' });
+  }
+  for (const c of certificadosList(db)) if (c.status === 'ok') resolveSystemAlert(`cert:${c.cnpj}`);
+  save();
+}
+setTimeout(checkCertificateAlerts, 25_000).unref?.();
+setInterval(checkCertificateAlerts, 6 * 3600_000).unref?.();
 setInterval(checkAgentImage, 6 * 3600_000).unref?.();
 
 // Guardião do GitHub: a cada N min (5 por padrão) pergunta ao GitHub o que mudou; cada novidade vira um evento da rotina.

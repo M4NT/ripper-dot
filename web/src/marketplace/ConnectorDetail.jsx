@@ -1,6 +1,7 @@
 import { Icon } from '../ui.jsx';
 import BrandIcon from './BrandIcon.jsx';
 import OmiePanel from './OmiePanel.jsx';
+import CertificadosPanel from './CertificadosPanel.jsx';
 
 const HOW = {
   oauth: 'Você faz login na conta do serviço numa janela; o Ripper guarda o acesso e renova sozinho.',
@@ -32,6 +33,7 @@ export default function ConnectorDetail({ item, onBack, onConnect, connecting, c
       {HOW[item.connect?.type] && <p className="mp-detail-body muted">{HOW[item.connect.type]}</p>}
       {item.connect?.help && <p className="mp-detail-body muted">{item.connect.help}</p>}
       {item.connect?.type === 'native' && <OmiePanel />}
+      {item.connect?.type === 'native' && <CertificadosPanel />}
       <div className="mp-detail-trust">
         <Icon name="globe" size={16} />
         <p>Use apenas conectores de desenvolvedores em quem você confia. O Ripper não controla as ferramentas de terceiros nem garante o comportamento delas.</p>

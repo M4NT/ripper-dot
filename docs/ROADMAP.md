@@ -176,6 +176,16 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 - [ ] Conferir os nomes de método e caminhos de endpoint de cada capacidade contra a documentação oficial do Omie (feito por dedução, sem teste real).
 - [ ] Teste com uma empresa real de homologação (leitura primeiro; escrita só com a Caixa e combinado com o dono).
 
+### M. Certificado digital A1 e notas recebidas (DF-e)
+- [x] Certificado A1 por empresa no Omie ERP: envio do `.pfx` + senha, conferência de senha, CNPJ e validade, guardado no cofre cifrado (`lib/dfe.mjs`, `CertificadosPanel.jsx`).
+- [x] Aviso na Caixa quando o certificado vence em menos de 30 dias ou já venceu.
+- [x] Consulta somente leitura à Distribuição DF-e (mTLS), NSU guardado por empresa, notas deduplicadas por chave, regra do 656 (1 h, sem loop).
+- [x] Ferramentas `dfe_listar_notas_recebidas` e `dfe_sincronizar` (só com certificado cadastrado).
+- [x] Testes com certificado gerado por openssl e Receita local (mTLS de ponta a ponta).
+- [ ] Conferir com o certificado real da empresa cliente em homologação (`tpAmb` 2) antes de usar em produção.
+- [ ] Decidir o que fazer com a nota de resumo (resNFe): buscar a NF-e completa (procNFe) por manifestação ou consulta por chave.
+- [ ] Sincronização automática periódica (hoje só quando o agente pede ou o dono roda a ferramenta).
+
 ---
 
 ## 3.1 Como fazer o design (regras para qualquer tela nova ou mudada)

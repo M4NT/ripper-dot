@@ -73,3 +73,17 @@ Fonte: `lib/autonomy.mjs`, `lib/permissions.mjs`, `lib/approvals.mjs`, `server.m
 Em todos os níveis: ação externa aprovada entra no registro imutável; "aprovar sempre nesta conversa" vale só para o mesmo comando, na mesma conversa (até 80); aprovação sem resposta expira como negada.
 
 **Conectores MCP em somente leitura:** o Ripper guarda em `plugin.readOnlyTools` os nomes que o servidor marcou `annotations.readOnlyHint: true` na última listagem (verificar conector / listar ferramentas). Só esses passam: no Claude viram `allowedTools` explícitos e o `canUseTool` nega o resto; no Codex o servidor entra com `enabled_tools` (ou nem entra, se não houver nenhuma); nos provedores compatíveis com OpenAI o filtro olha a annotation ao vivo. Conector nunca listado e conectores do claude.ai (sem annotations visíveis) ficam bloqueados. A lista não vem do cliente e cai quando a URL/comando do conector muda.
+
+## 5. Certificado digital A1 (NF-e recebidas, DF-e)
+
+Código: `lib/dfe.mjs`, rotas `/api/certificados`, tela `web/src/marketplace/CertificadosPanel.jsx` (dentro do Omie ERP). Testes: `test/dfe.test.mjs`.
+
+- **O que é guardado:** o arquivo `.pfx`/`.p12` (em base64) e a senha, cifrados no cofre (`connection-vault.json`, chave `cert.<CNPJ>`). O `db.json` guarda só metadados (titular, CNPJ, validade) e as notas recebidas.
+- **Nunca em claro:** a senha não vai para log, para a resposta da API nem para a tela (o campo é `type=password` e é limpo depois de uma tentativa com erro). A resposta do cadastro traz só titular, CNPJ e validade.
+- **Conferências ao enviar:** senha correta (a leitura do certificado é feita pela própria TLS do Node, sem parser PKCS#12 extra), CNPJ do certificado igual ao da empresa (ou a mesma raiz de 8 dígitos, filial), não vencido e já válido. Se falhar, nada é guardado.
+- **Validade:** "vence em menos de 30 dias" e "vencido" viram aviso na Caixa (`cert:<CNPJ>`), que some quando o certificado é trocado ou removido.
+- **Uso:** só leitura. O certificado entra como cliente TLS (mTLS) na Distribuição DF-e (`NFeDistribuicaoDFe`, Ambiente Nacional), em `hom1` (tpAmb 2) ou `www1` (tpAmb 1). Nenhuma escrita na Receita.
+- **Regra de consumo da Receita:** cStat 656 para a consulta e guarda `nextAllowedAt` = agora + 1 h. Enquanto isso, nenhuma chamada sai. Cada sincronização faz no máximo 5 chamadas e para no maxNSU.
+- **Ferramentas dos agentes:** `dfe_listar_notas_recebidas` (do banco) e `dfe_sincronizar` (consulta a Receita). Aparecem só se alguma empresa tiver certificado cadastrado. Nenhuma das duas escreve em sistema externo.
+- **Teste sem rede:** o certificado de teste é gerado com `openssl` numa pasta temporária e nunca é commitado; a Receita é simulada por servidor HTTPS local (`RIPPER_DFE_URL`). Nenhum teste chama a Receita real.
+- **Pendências:** conferir com o certificado real da empresa em homologação antes de usar em produção; o owner envia o `.pfx` pela tela, nunca por arquivo no repositório.
