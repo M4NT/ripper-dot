@@ -157,7 +157,7 @@ test('sincronização: continua do último NSU, guarda notas e não repete por c
   assert.equal(db.dfe.companies[CNPJ].ultNSU, '000000000000002', 'NSU guardado por empresa');
   // nova rodada: a Receita devolve a mesma nota (e nada novo): não duplica
   const again = stubPost([retorno({ ultNSU: '000000000000002', maxNSU: '000000000000002', docs: [{ nsu: '000000000000001', xml: resNFe }] })]);
-  const r2 = await dfe.dfeSincronizar({ cnpj: CNPJ, db, tpAmb: 2, post: again.post, url: 'x', now: 2 });
+  const r2 = await dfe.dfeSincronizar({ cnpj: CNPJ, db, tpAmb: 2, post: again.post, url: 'x', now: 2 + dfe.DFE_HOUR + 1 });
   assert.equal(r2.novas, 0);
   assert.equal(r2.total, 2);
   const lista = dfe.dfeListarNotas(db, CNPJ);
