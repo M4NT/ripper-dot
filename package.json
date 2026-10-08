@@ -29,6 +29,7 @@
     "liquid-gooey": "^0.2.2",
     "mailparser": "^3.9.36",
     "metal-fx": "^2.0.11",
+    "node-forge": "^1.4.0",
     "nodemailer": "^10.0.15",
     "qrcode-generator": "^2.0.4",
     "react": "^19.3.0",

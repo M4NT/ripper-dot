@@ -305,3 +305,22 @@ test('sem certificado: o executor recusa e nunca pergunta', withVault(async db =
   await assert.rejects(runner(db, { approve: ap.approve, post: stubPost([]).post }).run('nfe_manifestar_ciencia', { empresa: CNPJ, chaves: [K(1)] }), /não tem certificado/);
   assert.equal(ap.asked.length, 0);
 }));
+
+// ---------- assinatura antes do envio; URLs confirmadas no Portal da NF-e ----------
+
+test('o envio sempre leva o evento assinado (infEvento + Signature válidos) e a URL de homologação confere', withVault(async db => {
+  const { verificaAssinatura } = await import('./helpers/xmldsig.mjs');
+  const c = makeCert({ name: 'assina' });
+  await dfe.saveCertificate(db, CNPJ, { pfxBase64: c.pfxBase64, password: PASS });
+  comNotas(db);
+  const s = stubPost([135]);
+  const r = JSON.parse(await runner(db, { approve: aprova(true).approve, post: s.post }).run('nfe_manifestar_ciencia', { empresa: CNPJ, chaves: [K(1)], tpAmb: 2 }));
+  assert.equal(r.ok, true);
+  assert.equal(s.calls.length, 1);
+  const v = verificaAssinatura(s.calls[0].xml);
+  assert.equal(v.ok, true, 'assinatura válida no XML enviado');
+  assert.equal(v.id, `ID210210${K(1)}01`);
+  assert.equal(s.calls[0].url, 'https://hom1.nfe.fazenda.gov.br/NFeRecepcaoEvento4/NFeRecepcaoEvento4.asmx');
+  assert.equal(cien.nfeEventoUrl(2), 'https://hom1.nfe.fazenda.gov.br/NFeRecepcaoEvento4/NFeRecepcaoEvento4.asmx');
+  assert.equal(cien.nfeEventoUrl(1), 'https://www.nfe.fazenda.gov.br/NFeRecepcaoEvento4/NFeRecepcaoEvento4.asmx');
+}));
