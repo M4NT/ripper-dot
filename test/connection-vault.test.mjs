@@ -42,12 +42,12 @@ function withVaultDir(fn) {
   }
 }
 
-test('vaultConfigured exige RIPPER_VAULT_KEY ou RIPPER_TOKEN', () => {
+test('vaultConfigured: sem variável usa a chave local do Ripper (não exige configuração)', () => {
   const prevKey = process.env.RIPPER_VAULT_KEY;
   const prevTok = process.env.RIPPER_TOKEN;
   delete process.env.RIPPER_VAULT_KEY;
   delete process.env.RIPPER_TOKEN;
-  assert.equal(vaultConfigured(), false);
+  assert.equal(vaultConfigured(), true);
   process.env.RIPPER_VAULT_KEY = VAULT_KEY;
   assert.equal(vaultConfigured(), true);
   process.env.RIPPER_VAULT_KEY = prevKey;
