@@ -63,6 +63,7 @@ import { guardOutbound } from './lib/x9-guard.mjs';
 import { SECRET_PATHS } from './lib/local-secret.mjs';
 import { emailReady, listEmails, readEmail, sendEmail, newEmailsSince, testEmail, getAttachment, safeName, attachmentText, readHint } from './lib/email.mjs';
 import { createDfeRunner, dfeCompanies, saveCertificate, removeCertificate, certificadosList, certificateAlerts, DfeError } from './lib/dfe.mjs';
+import { createNfseRunner } from './lib/nfse.mjs';
 import { createOmieRunner, omieCompanyList, omieAddCompany, omieRemoveCompany, omieCredentials, omieTestConnection } from './lib/omie.mjs';
 import { gh, githubReady, normalizeRepo, repoChanges, describeChange, prBranch, gitAuthArg, hideToken } from './lib/github.mjs';
 import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './lib/event-triggers.mjs';
@@ -1528,6 +1529,8 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
     }) : null,
     // NF-e recebidas (DF-e): só com certificado A1 cadastrado em alguma empresa; só leitura.
     dfe: !chat.channel && dfeCompanies(db).length ? createDfeRunner({ getDb: () => db, save }) : null,
+    // NFS-e recebidas (ADN Nacional): mesmo certificado por empresa; só leitura.
+    nfse: !chat.channel && dfeCompanies(db).length ? createNfseRunner({ getDb: () => db, save }) : null,
     email: !chat.channel && emailReady(s.email) ? {
       list: async a => {
         recordCorporateAudit(db.settings, { category: 'email', action: 'email.list', agentId: agent.id, chatId: chat.id, at: Date.now() });
