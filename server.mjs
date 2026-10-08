@@ -755,7 +755,7 @@ function alertSpendLimit(agent, which) {
 }
 
 function channelModel(s) {
-  return ['claude-haiku-4-5', 'claude-sonnet-5-5'].find(m => enabledModels(s).includes(m)) || enabledModels(s)[0];
+  return ['claude-haiku-5-5', 'claude-sonnet-5-5'].find(m => enabledModels(s).includes(m)) || enabledModels(s)[0];
 }
 function channelChat(kind, msg, agent) {
   return {

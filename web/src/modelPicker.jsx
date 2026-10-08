@@ -25,7 +25,7 @@ export const MODEL_DESC = {
   'claude-sonnet-5-5': 'Rápido para o dia a dia',
   'claude-opus-5-5': 'O mais capaz para raciocínio longo',
   'claude-fable-5-1': 'Voltado para escrita criativa',
-  'claude-haiku-4-5': 'O mais econômico, para mensagens curtas',
+  'claude-haiku-5-5': 'O mais econômico, para mensagens curtas',
   codex: 'Código e terminal, pela assinatura do ChatGPT'
 };
 

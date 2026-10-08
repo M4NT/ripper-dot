@@ -18,7 +18,7 @@ test('conector instalado no Ripper passa; plugin local do Claude Code e ferramen
 });
 
 test('SDK em modo default com decisão por chamada (dontAsk negava conectores em silêncio)', async () => {
-  const o = buildClaudeQueryOptions({ agent: agent(['plugins']), model: 'claude-haiku-4-5', system: '', settings: s(), ctx: {}, web: false, env: {} });
+  const o = buildClaudeQueryOptions({ agent: agent(['plugins']), model: 'claude-haiku-5-5', system: '', settings: s(), ctx: {}, web: false, env: {} });
   assert.equal(o.permissionMode, 'default');
   assert.deepEqual(await o.canUseTool('mcp__claude_ai_Gmail__search', { q: 'x' }), { behavior: 'allow', updatedInput: { q: 'x' } });
   const deny = await o.canUseTool('mcp__inspo__x', {});

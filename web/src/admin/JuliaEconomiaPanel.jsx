@@ -36,7 +36,7 @@ function CascadeTable({ rows }) {
 
 /** Economia Julia (medida) — somente Admin; sem US$ ou % inventados. */
 const CHOOSER = { 'julia-1': 'Julia 1', heuristic: 'Regra de reserva', learned: 'Aprendido com você', policy: 'Único modelo liberado', cascade: 'Cascata' };
-const MODEL_LABEL = { 'claude-sonnet-5-5': 'Sonnet 5.5', 'claude-opus-5-5': 'Opus 5.5', 'claude-fable-5-1': 'Fable 5.1', 'claude-haiku-4-5': 'Haiku 4.5', codex: 'Codex' };
+const MODEL_LABEL = { 'claude-sonnet-5-5': 'Sonnet 5.5', 'claude-opus-5-5': 'Opus 5.5', 'claude-fable-5-1': 'Fable 5.1', 'claude-haiku-5-5': 'Haiku 5.5', codex: 'Codex' };
 const EFFORT_LABEL = { auto: 'Automático', low: 'Baixo', medium: 'Médio', high: 'Alto', xhigh: 'Muito alto', max: 'Máximo' };
 const PURPOSE = { route: 'Modelo', effort: 'Esforço', speaker: 'Quem fala no grupo', risk: 'Risco de comando', notify: 'Avisar ou silenciar', memory: 'Memória', unknown: 'Outras' };
 
