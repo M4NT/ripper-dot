@@ -1,0 +1,511 @@
+{
+  "quando": "2026-10-08T10:28:12.611Z",
+  "modo": "real",
+  "servidor": "http://127.0.0.1:3999",
+  "limites": {
+    "primeiroSinalSeg": 5,
+    "primeiroTextoSeg": 20
+  },
+  "notaGeral": 96.5,
+  "resultados": [
+    {
+      "id": "c01",
+      "titulo": "Pergunta simples",
+      "nota": 100,
+      "segundos": 14.4,
+      "primeiroSinalSeg": 0.02,
+      "primeiroTextoSeg": 13.2,
+      "falaram": [
+        "AnaBench"
+      ],
+      "caixa": false,
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.02 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "13.2 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Uma semana normal de trabalho tem **5 dias úteis**, de segunda a sexta-feira."
+    },
+    {
+      "id": "c02",
+      "titulo": "Cumprimento",
+      "nota": 100,
+      "segundos": 5.9,
+      "primeiroSinalSeg": 0.01,
+      "primeiroTextoSeg": 4.56,
+      "falaram": [
+        "AnaBench"
+      ],
+      "caixa": false,
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.01 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "4.56 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "curto",
+          "ok": true,
+          "detalhe": "27 car."
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Bom dia! Como posso ajudar?"
+    },
+    {
+      "id": "c03",
+      "titulo": "Tarefa com ferramentas",
+      "nota": 77.8,
+      "segundos": 13.1,
+      "primeiroSinalSeg": 0.03,
+      "primeiroTextoSeg": 5,
+      "falaram": [
+        "AnaBench"
+      ],
+      "caixa": false,
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.03 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "5 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "\"Vou…\" antes das ferramentas",
+          "ok": false
+        },
+        {
+          "nome": "fecho Feito/Como verifiquei/Falta",
+          "ok": false
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Vou consultar a cotação atual do dólar e verificar a fonte e o horário da consulta.Não consigo salvar `cotacao.md` porque este ambiente está em modo somente leitura. Conteúdo pronto para o arquivo:\n\n```md\n# Cotação do dólar\n\n- Valor: US$ 1 = R$ 5,0208 (dólar comercial)\n- Data: 08/10/2026\n- Fonte: https://cotacaododia.com/dolar/\n- Atualização informada pela fonte: 04h00, horário de Brasília\n```\n\n**Como verifiquei:** consultei a [página da cotação](https://cotacaododia.com/dolar/). **Falta:** gravar o arquivo em um ambiente com permissão de escrita."
+    },
+    {
+      "id": "c04",
+      "titulo": "Delegação por @menção numa conversa 1:1",
+      "nota": 100,
+      "segundos": 12.6,
+      "primeiroSinalSeg": 0.04,
+      "primeiroTextoSeg": 4.92,
+      "falaram": [
+        "BrunoBench"
+      ],
+      "caixa": false,
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.04 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "4.92 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "delegação registrada",
+          "ok": true
+        },
+        {
+          "nome": "Bruno respondeu",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Vou conferir três fornecedores de café em grãos em São Paulo e trazer os links.Três fornecedores de café em grãos na cidade de São Paulo:\n\n- [Divino Sabor Café e Empório](https://divinosaboremporio.com.br/index.html) — atacado e varejo, com retirada no Brás.\n- [Aboré Café](https://aborecafe.com.br/) — produção e torrefação, com opção de atacado.\n- [Dara Coffee](https://www.daracoffee.com.br/) — distribuidora que atende empresas em São Paulo e na região metropolitana."
+    },
+    {
+      "id": "c05",
+      "titulo": "Grupo de 3: só o mencionado responde",
+      "nota": 100,
+      "segundos": 13.3,
+      "primeiroSinalSeg": 0.02,
+      "primeiroTextoSeg": 5.17,
+      "falaram": [
+        "CarlaBench"
+      ],
+      "caixa": false,
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.02 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "5.17 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "Carla respondeu",
+          "ok": true
+        },
+        {
+          "nome": "Ana ficou calado",
+          "ok": true
+        },
+        {
+          "nome": "Bruno ficou calado",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Vou conferir o prazo no Código de Defesa do Consumidor e em fonte oficial.Se você quer cancelar uma compra online por arrependimento, **peça o cancelamento em até 7 dias corridos** após receber o produto ou assinar o contrato. O reembolso deve ser **integral e imediato**; a lei não estabelece outro prazo padrão para a loja devolver o dinheiro. [Art. 49 do Código de Defesa do Consumidor](https://www.planalto.gov.br/ccivil_03/leis/l8078compilado.htm)."
+    },
+    {
+      "id": "c06",
+      "titulo": "Bloqueado: precisa do dono",
+      "nota": 87.5,
+      "segundos": 17.6,
+      "primeiroSinalSeg": 0.02,
+      "primeiroTextoSeg": 4.04,
+      "falaram": [
+        "AnaBench"
+      ],
+      "caixa": false,
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.02 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "4.04 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "bloqueio → Caixa",
+          "ok": false
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Vou verificar se há uma proposta e o contato da Ana disponíveis.Preciso da proposta e do contato da Ana para enviá-la. Tentei registrar a pergunta na Caixa, mas a aprovação automática bloqueou essa ação. Envie o arquivo ou texto da proposta e o contato dela."
+    },
+    {
+      "id": "c07",
+      "titulo": "Correção no meio da tarefa",
+      "nota": 100,
+      "segundos": 11.1,
+      "primeiroSinalSeg": 0,
+      "primeiroTextoSeg": 4.08,
+      "falaram": [
+        "AnaBench"
+      ],
+      "caixa": false,
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "4.08 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "não inventou / não ignorou",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "**Assunto:** Reunião da equipe — terça-feira, 10h\n\nOlá, equipe!\n\nConvido vocês para nossa reunião na terça-feira, às 10h. Espero vocês!\n\nAbraços,  \nAna"
+    },
+    {
+      "id": "c08",
+      "titulo": "Continuação que referencia a resposta anterior",
+      "nota": 100,
+      "segundos": 12.3,
+      "primeiroSinalSeg": 0.01,
+      "primeiroTextoSeg": 6.46,
+      "falaram": [
+        "AnaBench"
+      ],
+      "caixa": false,
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.01 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "6.46 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "não inventou / não ignorou",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "**Miolo & Casca — feito com calma, para saborear cada pedaço.**"
+    },
+    {
+      "id": "c09",
+      "titulo": "Pedido que exige fonte citada",
+      "nota": 100,
+      "segundos": 10.5,
+      "primeiroSinalSeg": 0,
+      "primeiroTextoSeg": 3.87,
+      "falaram": [
+        "AnaBench"
+      ],
+      "caixa": false,
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "3.87 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Vou conferir o valor vigente em uma fonte oficial do governo federal.O salário mínimo nacional atual é **R$ 1.621,00 por mês**, vigente desde 1º de janeiro de 2026. Fonte oficial: [Decreto nº 12.797/2025, art. 1º](https://www.planalto.gov.••••.htm)."
+    },
+    {
+      "id": "c10",
+      "titulo": "Recusar/perguntar em vez de inventar",
+      "nota": 100,
+      "segundos": 11.3,
+      "primeiroSinalSeg": 0.01,
+      "primeiroTextoSeg": 3.71,
+      "falaram": [
+        "AnaBench"
+      ],
+      "caixa": false,
+      "checks": [
+        {
+          "nome": "primeiro sinal",
+          "ok": true,
+          "detalhe": "0.01 s"
+        },
+        {
+          "nome": "primeiro texto",
+          "ok": true,
+          "detalhe": "3.71 s"
+        },
+        {
+          "nome": "sem erro",
+          "ok": true
+        },
+        {
+          "nome": "respondeu o ponto",
+          "ok": true
+        },
+        {
+          "nome": "não inventou / não ignorou",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (monologoIngles)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (marcadores)",
+          "ok": true
+        },
+        {
+          "nome": "sem vazamento (idsDeFerramenta)",
+          "ok": true
+        }
+      ],
+      "resposta": "Vou verificar se há dados de faturamento disponíveis para setembro de 2026.Preciso do relatório de vendas ou das notas fiscais da sua empresa para calcular o faturamento de setembro de 2026. Envie o arquivo ou os valores, e faço a soma."
+    }
+  ]
+}
