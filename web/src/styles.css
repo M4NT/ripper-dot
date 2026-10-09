@@ -2332,3 +2332,30 @@ body.agent-dragging .side-list { overflow: hidden; }
 
 /* Medida de leitura: parágrafos e listas com largura confortável; código e tabelas seguem a largura toda. */
 .md > p, .md > ul, .md > ol, .md > blockquote { max-width: 42rem; }
+
+/* Janela de contexto: o anel vem com a porcentagem ao lado, para não parecer um botão sem função. */
+.usage-btn-ctx { width: auto; min-width: 34px; height: 34px; padding: 0 10px 0 4px; border-radius: 999px; gap: 6px; display: inline-flex; align-items: center; }
+.usage-btn-pct { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }
+
+/* Esqueleto de carregamento de listas. Pulso suave; parado quando a pessoa pede menos movimento. */
+.skeleton-list { display: flex; flex-direction: column; gap: 10px; padding: 8px 0; }
+.skeleton-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r); }
+.skeleton-dot { width: 32px; height: 32px; border-radius: 50%; background: var(--surface-2); flex: none; }
+.skeleton-lines { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0; }
+.skeleton-line { height: 10px; border-radius: 5px; background: var(--surface-2); width: 70%; }
+.skeleton-line.short { width: 40%; }
+.skeleton-dot, .skeleton-line { animation: skeleton-pulse 1.4s ease-in-out infinite; }
+@keyframes skeleton-pulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .skeleton-dot, .skeleton-line { animation: none; } }
+
+/* Celular: título de página grande, no estilo iOS (os mesmos títulos das telas principais). */
+@media (max-width: 900px) {
+  .page-head h1, .v2 .page-head h1 { font-size: 32px; font-weight: 650; letter-spacing: -.03em; line-height: 1.1; }
+}
+
+/* Fila de mensagens: cada uma com o texto e o botão de cancelar, sem perder as outras. */
+.queued-list { margin: 0 0 8px; }
+.queued-list ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.queued-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font-size: 13px; }
+.queued-list li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; color: var(--ink-2); }
+.queued-list li .link { flex: none; }

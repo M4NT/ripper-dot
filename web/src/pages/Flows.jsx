@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, go, fmtAgo } from '../lib.js';
 import { useApp } from '../app.jsx';
-import { AgentAvatar, Icon, Select, Switch, EmptyState, useConfirm } from '../ui.jsx';
+import { AgentAvatar, Icon, Select, Switch, EmptyState, Skeleton, useConfirm } from '../ui.jsx';
 import { RoutineList, RoutineForm } from '../routines.jsx';
 
 const blankStep = agentId => ({ agentId, instruction: '', approve: false });
@@ -47,7 +47,7 @@ export default function Flows() {
         <div><h1>Fluxos</h1><p className="lede">Agentes em sequência: um pesquisa, o outro escreve, o próximo publica. Cada um trabalha em cima do anterior, e você aprova onde quiser.</p></div>
         <button type="button" className="btn btn-primary" disabled={!agents.length} onClick={() => setEdit({ name: '', steps: [blankStep(agents[0]?.id)] })}><Icon name="plus" size={16} />Novo fluxo</button>
       </header>
-      {flows === null ? <p className="muted">Carregando…</p>
+      {flows === null ? <Skeleton rows={3} label="Carregando fluxos" />
         : !flows.length ? <EmptyState title="Nenhum fluxo ainda" body="Monte uma sequência de agentes para um trabalho que se repete: pesquisa → texto → revisão, por exemplo." action={agents.length > 1 && <button type="button" className="btn btn-primary" onClick={() => setEdit({ name: '', steps: [blankStep(agents[0].id), blankStep(agents[1].id)] })}><Icon name="plus" size={16} />Criar o primeiro</button>} />
         : <ul className="flow-list">{flows.map(f => (
           <li key={f.id} className="flow-card">

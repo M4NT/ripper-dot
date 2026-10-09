@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, go, useRoute, fmtAgo } from './lib.js';
-import { AgentAvatar, Icon } from './ui.jsx';
+import { AgentAvatar, Icon, Skeleton } from './ui.jsx';
 import { useApp } from './app.jsx';
 import { useT } from './i18n/index.jsx';
 
@@ -123,7 +123,7 @@ export function ApprovalHistory({ limit = 20 }) {
   useEffect(() => {
     api('/api/approvals').then(r => setRows((r.recent || []).slice(0, limit))).catch(() => setRows([]));
   }, [limit]);
-  if (rows === null) return <p className="muted">Carregando histórico…</p>;
+  if (rows === null) return <Skeleton rows={3} label="Carregando histórico" />;
   if (!rows.length) return <p className="muted">Nenhuma decisão registrada ainda.</p>;
   return (
     <ul className="rows flat approval-history">

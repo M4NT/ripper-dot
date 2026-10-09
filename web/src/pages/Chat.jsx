@@ -672,9 +672,17 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
           <Composer agent={agent} chatId={chatId} projectId={projectId} streaming={!!live} onSend={queueSend} onStop={stop}
             choice={choice} setChoice={setChoice} group={isGroup} mentions={isGroup ? members : S.agents.filter(a => a.id !== agent.id)}
             placeholder={isGroup ? 'Mensagem para o grupo… use @Nome para chamar alguém' : `Mensagem para ${agent.name}…`} autoFocus draftKey={chatId || 'new-' + memberIds.join('-')} />
-          {queued.length > 0 && <p className="inbox-wait queued-note" role="status"><Icon name="clock" size={13} />
-            {queued.length === 1 ? 'Sua mensagem está na fila' : `${queued.length} mensagens na fila`}: {isGroup ? 'o grupo vai ler' : `${agent.name} vai ler`} depois do passo atual.
-            <button type="button" className="link" onClick={() => setQueue([])}>Cancelar</button></p>}
+          {queued.length > 0 && <div className="queued-list" role="status">
+            <p className="inbox-wait queued-note"><Icon name="clock" size={13} />
+              {queued.length === 1 ? 'Sua mensagem está na fila' : `${queued.length} mensagens na fila`}: {isGroup ? 'o grupo vai ler' : `${agent.name} vai ler`} depois do passo atual.
+              {queued.length > 1 && <button type="button" className="link" onClick={() => setQueue([])}>Cancelar todas</button>}</p>
+            <ul>
+              {queued.map((p, i) => (
+                <li key={i}><span>{(p.text || '').trim().slice(0, 120) || 'Anexo'}</span>
+                  <button type="button" className="link" aria-label={`Cancelar a mensagem ${i + 1} da fila`} onClick={() => setQueue(queuedRef.current.filter((_, j) => j !== i))}>Cancelar</button></li>
+              ))}
+            </ul>
+          </div>}
           {waiting > 0 && <p className="inbox-wait"><Icon name="clock" size={13} />Aguardando {waiting === 1 ? 'resposta de 1 mensagem' : `respostas de ${waiting} mensagens`} enviadas a colegas…</p>}
           <p className="fine">{isGroup ? 'Agentes' : `O ${agent.name}`} pode{isGroup ? 'm' : ''} errar. Confira o que for importante.</p>
         </div>

@@ -22,7 +22,7 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 
 1. **Barra de abas no celular:** Início (Conversas), Agentes, Caixa e Mais. *Feito (PR #112 e lote 1 em #113).* [rápido] Ref.: `NativeTabs` do DESIGN.md.
 2. **Busca dentro da barra de navegação do celular:** o campo aparece no topo ao tocar, em vez de um ícone que abre outra tela. [médio] Ref.: `Stack.SearchBar`. Onde: `app.jsx` (barra do celular).
-3. **Título grande que encolhe ao rolar** nas telas principais do celular (Agentes, Conversas, Caixa). [médio] Ref.: título grande do iOS. Onde: `pages/Agents.jsx`, `pages/Chats.jsx`.
+3. **Título grande que encolhe ao rolar** nas telas principais do celular (Agentes, Conversas, Caixa). [médio] Ref.: título grande do iOS. Onde: `pages/Agents.jsx`, `pages/Chats.jsx`. *Lote 2: título grande no celular (32 px, conferido na foto). Falta o encolhimento ao rolar.*
 4. **Menu de ações do topo como folha de baixo** no celular, em vez de janela no meio da tela. [médio] Ref.: `Stack.Toolbar` e menus nativos. Onde: `ui.jsx` (`Menu`).
 5. **Seletor de empresa/time no topo da lateral**, com ícone e nome, para trocar de contexto sem sair da tela. [grande] Ref.: "OpenBot team ⌄" e §3.3 da especificação. Onde: `app.jsx` (`Sidebar`).
 6. **Faixa de contas à esquerda** com um ícone por empresa, quando houver mais de uma. [médio] Ref.: barra vertical do OpenBot. Depende do item 5.
@@ -30,8 +30,8 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 ## Chat e campo de mensagem (7–18)
 
 7. **Campo de mensagem enxuto:** "+", campo de texto, microfone e enviar. Computador, pasta e modelo vão para uma folha de opções. [médio] Ref.: campo de mensagem do OpenBot. Onde: `composer.jsx`, `composerPlusMenu.jsx`.
-8. **Círculo sem texto ao lado do seletor de modelo** no campo de mensagem. Confirmar o que ele faz e dar um nome, ou remover. [rápido] *verificar.* Onde: `composer.jsx`.
-9. **Fila de mensagens visível**, com cancelar, editar e "enviar agora". [médio] Ref.: `QueuedMessage` (cancelar, atualizar, steer). Onde: `createInputQueue` em `lib/input-queue.mjs`. *Verificar se a fila aparece na tela.*
+8. **Círculo sem texto ao lado do seletor de modelo** no campo de mensagem. Confirmar o que ele faz e dar um nome, ou remover. [rápido] *Identificado: é o anel da janela de contexto (abre "Uso e limites"). Lote 2: mostra a porcentagem ao lado e um rótulo claro.*
+9. **Fila de mensagens visível**, com cancelar, editar e "enviar agora". [médio] Ref.: `QueuedMessage` (cancelar, atualizar, steer). Onde: `createInputQueue` em `lib/input-queue.mjs`. *Lote 2: cada mensagem da fila aparece com texto e botão "Cancelar" próprio. Faltam editar e "enviar agora".*
 10. **Copiar tabela como Markdown ou CSV** nas tabelas do chat, inclusive as de OpenUI. [rápido] Ref.: "Copiar como Markdown / Copiar como CSV". Onde: `Chat.jsx`, `openui/library.jsx`.
 11. **Arquivos de origem como chips com ícone por tipo** (MD, CSV) no fim da resposta. [médio] Ref.: "Source files". Onde: `MessageAttachments.jsx`, `fileThumb.jsx`.
 12. **"Enviada a [agente]" discreto** em mensagens repassadas entre agentes. [rápido] Ref.: "Mensagem enviada a Launch". Onde: `agentThread.jsx`.
@@ -46,7 +46,7 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 
 19. **Lista de agentes com prévia da última mensagem e hora**, em duas linhas por agente. [rápido] *verificar: `chatRow.jsx` já tem parte disso.* Ref.: lista de agentes do OpenBot.
 20. **Cargo do agente como etiqueta** ao lado do nome, por exemplo "Gerente de projeto". [rápido] Ref.: etiqueta "Chief of staff". Onde: `app.jsx` (linha do agente).
-21. **Esqueletos no carregamento** de listas e cartões, no lugar do spinner. [médio] Ref.: `Skeleton`. Medido hoje: 0 usos.
+21. **Esqueletos no carregamento** de listas e cartões, no lugar do spinner. [médio] Ref.: `Skeleton`. Medido hoje: 0 usos. *Lote 2: componente `Skeleton` criado e usado no histórico de aprovações e nos fluxos. Faltam as outras listas.*
 22. **Cartão de documento de compra no chat** (nota fiscal ou pedido): cabeçalho, etiquetas de validação, botões de ação e estado "processando" no próprio cartão. [grande] Ref.: §3.2 da especificação e o `Card` do OpenUI.
 23. **Confirmação com `AlertDialog`** para toda ação irreversível, mostrando o nome do alvo. [rápido] Ref.: `AlertDialog` do `ui-foundation.md`. Onde: `useConfirm` (8 arquivos). *Feito no lote 1: os 4 `confirm()` do navegador que sobravam (Clientes, Certificados, Omie, Webhooks) agora usam o diálogo do app.*
 24. **Desfazer em toda ação reversível** (aviso com botão "Desfazer"). [médio] Ref.: padrão de aviso do OpenBot. Onde: 9 arquivos já têm algo parecido; padronizar.

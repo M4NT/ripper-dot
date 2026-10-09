@@ -138,8 +138,9 @@ export default function ModelUsage({ chatId }) {
 
   return (
     <Menu align="up" className="usage-menu" onOpenChange={loadDetail} trigger={({ toggle, open }) => (
-      <button type="button" className="usage-btn" aria-expanded={open} aria-label="Uso e limites" onClick={toggle} title="Uso e limites">
+      <button type="button" className="usage-btn usage-btn-ctx" aria-expanded={open} aria-label={ctxPct != null ? `Janela de contexto: ${ctxPct}% usada. Abrir uso e limites` : 'Uso e limites'} onClick={toggle} title={ctxPct != null ? `Janela de contexto: ${ctxPct}% usada` : 'Uso e limites'}>
         <ContextRing pct={ctxPct} size={30} />
+        {ctxPct != null && <span className="usage-btn-pct">{ctxPct}%</span>}
       </button>
     )}>
       <div className="usage-pop usage-account usage-pop-compact" role="dialog" aria-label="Uso resumido">

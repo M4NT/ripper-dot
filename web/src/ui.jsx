@@ -297,6 +297,20 @@ export const StatusDot = ({ status }) => {
   );
 };
 
+/** Esqueleto de lista: linhas com forma da lista real, no lugar do texto "Carregando…". */
+export function Skeleton({ rows = 3, label = 'Carregando' }) {
+  return (
+    <div className="skeleton-list" role="status" aria-label={label}>
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className="skeleton-row" aria-hidden="true">
+          <span className="skeleton-dot" />
+          <span className="skeleton-lines"><span className="skeleton-line" /><span className="skeleton-line short" /></span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function EmptyState({ title, body, action }) {
   return <div className="empty"><p className="empty-title">{title}</p>{body && <p className="empty-body">{body}</p>}{action}</div>;
 }
