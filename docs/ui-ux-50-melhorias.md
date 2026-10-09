@@ -21,7 +21,7 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 ## Navegação (1–6)
 
 1. **Barra de abas no celular:** Início (Conversas), Agentes, Caixa e Mais. *Feito (PR #112 e lote 1 em #113).* [rápido] Ref.: `NativeTabs` do DESIGN.md.
-2. **Busca dentro da barra de navegação do celular:** o campo aparece no topo ao tocar, em vez de um ícone que abre outra tela. [médio] Ref.: `Stack.SearchBar`. Onde: `app.jsx` (barra do celular). *Não feito. Hoje a lupa abre a busca rápida (paleta). Decisão: campo fixo no topo ou manter a paleta?*
+2. **Busca dentro da barra de navegação do celular:** o campo aparece no topo ao tocar, em vez de um ícone que abre outra tela. [médio] Ref.: `Stack.SearchBar`. Onde: `app.jsx` (barra do celular). *Decidido: manter a busca rápida atual (sem mudança).*
 3. **Título grande que encolhe ao rolar** nas telas principais do celular (Agentes, Conversas, Caixa). [médio] Ref.: título grande do iOS. Onde: `pages/Agents.jsx`, `pages/Chats.jsx`. *Lote 2: título grande no celular (32 px, conferido na foto). Falta o encolhimento ao rolar.*
 4. **Menu de ações do topo como folha de baixo** no celular, em vez de janela no meio da tela. [médio] Ref.: `Stack.Toolbar` e menus nativos. Onde: `ui.jsx` (`Menu`).
 5. **Seletor de empresa/time no topo da lateral**, com ícone e nome, para trocar de contexto sem sair da tela. [grande] Ref.: "OpenBot team ⌄" e §3.3 da especificação. Onde: `app.jsx` (`Sidebar`).
@@ -29,16 +29,16 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 
 ## Chat e campo de mensagem (7–18)
 
-7. **Campo de mensagem enxuto:** "+", campo de texto, microfone e enviar. Computador, pasta e modelo vão para uma folha de opções. [médio] Ref.: campo de mensagem do OpenBot. Onde: `composer.jsx`, `composerPlusMenu.jsx`. *Não feito. Hoje há a faixa de computador e pasta acima do campo (`workspaceBar.jsx`), e o menu "+" já tem pasta. Decisão: esconder a faixa no celular?*
+7. **Campo de mensagem enxuto:** "+", campo de texto, microfone e enviar. Computador, pasta e modelo vão para uma folha de opções. [médio] Ref.: campo de mensagem do OpenBot. Onde: `composer.jsx`, `composerPlusMenu.jsx`. *Lote 4: no celular a faixa de computador e pasta foi escondida (decisão sua). A escolha da pasta continua no computador. Falta o restante do campo enxuto (chips de modelo).*
 8. **Círculo sem texto ao lado do seletor de modelo** no campo de mensagem. Confirmar o que ele faz e dar um nome, ou remover. [rápido] *Identificado: é o anel da janela de contexto (abre "Uso e limites"). Lote 2: mostra a porcentagem ao lado e um rótulo claro.*
 9. **Fila de mensagens visível**, com cancelar, editar e "enviar agora". [médio] Ref.: `QueuedMessage` (cancelar, atualizar, steer). Onde: `createInputQueue` em `lib/input-queue.mjs`. *Lote 2: cada mensagem da fila aparece com texto e botão "Cancelar" próprio. Faltam editar e "enviar agora".*
 10. **Copiar tabela como Markdown ou CSV** nas tabelas do chat, inclusive as de OpenUI. [rápido] Ref.: "Copiar como Markdown / Copiar como CSV". Onde: `Chat.jsx`, `openui/library.jsx`.
 11. **Arquivos de origem como chips com ícone por tipo** (MD, CSV) no fim da resposta. [médio] Ref.: "Source files". Onde: `MessageAttachments.jsx`, `fileThumb.jsx`.
-12. **"Enviada a [agente]" discreto** em mensagens repassadas entre agentes. [rápido] Ref.: "Mensagem enviada a Launch". Onde: `agentThread.jsx`.
+12. **"Enviada a [agente]" discreto** em mensagens repassadas entre agentes. [rápido] Ref.: "Mensagem enviada a Launch". Onde: `agentThread.jsx`. *Parcial: já existe o inverso ("Mensagem de [agente]", `ViaLabel`). Falta o rótulo na mensagem que sai; depende de saber, na mensagem, para quem ela foi enviada.*
 13. **Medida de leitura** de cerca de 680 px para texto corrido. Cartões e tabelas usam a largura toda. [rápido] *Feito no lote 1 (parágrafos e listas, 42 rem; código e tabelas seguem a largura toda). Visual ainda não conferido.* Ref.: layout do OpenBot. Onde: `styles.css` (`.md`).
 14. **Ações da resposta** (copiar, ouvir, refazer) aparecem ao passar o mouse no desktop e ficam sempre visíveis no toque. [rápido] Ref.: hover só com ponteiro fino (`ui-foundation.md`). Onde: `actionLine.jsx`. *Já existe no toque (`@media (hover: none)`); conferido no CSS.*
-15. **Botão "ir para o fim" com contagem** de mensagens novas quando a pessoa rola para cima. [rápido] *verificar se já existe.* Onde: `Chat.jsx`.
-16. **Mensagens longas recolhíveis** ("Mostrar mais") acima de cerca de 20 linhas. [rápido] *verificar.* Onde: `Chat.jsx`.
+15. **Botão "ir para o fim" com contagem** de mensagens novas quando a pessoa rola para cima. [rápido] *Lote 4: feito e testado (aparece ao rolar para cima, conta as novas, leva ao fim).*
+16. **Mensagens longas recolhíveis** ("Mostrar mais") acima de cerca de 20 linhas. [rápido] *Lote 4: feito e testado (recolhe acima de 460 px, "Mostrar mais" abre). Falta conferir o visual do esmaecimento.*
 17. **Estado do turno em uma linha** ("Pesquisando na web · 12 s"), com botão de parar sempre visível. [médio] Ref.: `AgentActivity`. Onde: `actionLine.jsx`, `stepLabel` em `lib/`.
 18. **Erro do campo de mensagem como faixa acima do campo**, com "Tentar de novo". [rápido] Ref.: `ComposerErrorBanner`. Onde: `errorNote.jsx`. *Verificar se já é assim.*
 
@@ -76,7 +76,7 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 
 40. **Transições de até 250 ms.** Hoje há 17 com 0,3 s ou mais. [rápido] Ref.: "animations stay below 300 ms". *Feito no lote 1: 21 ajustes.*
 41. **Reduzir transparência:** fundo sólido quando o sistema pedir. Hoje há 6 usos de desfoque e nenhuma regra para isso. [rápido] Ref.: `DESIGN.md`, "reduced transparency". *Feito no lote 1 (barras do topo e da navegação).*
-42. **Foco visível em todo controle** para uso com teclado. [rápido] *Verificar a cobertura.* Ref.: `focus-visible`.
+42. **Foco visível em todo controle** para uso com teclado. [rápido] *Lote 4: regra geral de contorno para `:focus-visible` em botões, links, campos e controles. Componentes que já definem o próprio foco continuam valendo.*
 43. **Rótulo acessível em todo botão só com ícone.** Hoje há 104 `aria-label`; falta checar a cobertura. [médio] Ref.: `IconButton` com `label` obrigatório.
 44. **Contraste verificado por script** nos dois temas, com 4,5:1 para texto. [médio] Ref.: `DESIGN.md`, "Theme and visual consistency".
 45. **Deslizar na lista de conversas para arquivar**, com "Desfazer". Não usar deslize para aprovar nada. [médio] Ref.: decisão da especificação (ação irreversível exige confirmação). *Lote 3: lógica feita e testada (arquiva, "Desfazer" restaura, sem erro). Falta testar o gesto num celular de verdade: no navegador de teste o toque é cancelado antes de chegar ao fim.*
@@ -87,7 +87,7 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 47. **Virtualizar a lista de mensagens** em conversas longas, depois de medir uma conversa com 500 mensagens. [grande] Ref.: `createChatVirtualizer`.
 48. **Miniaturas de imagem com tamanho fixo e carregamento preguiçoso**, sem salto de layout. [rápido] *Carregamento preguiçoso já existe nas miniaturas de mensagem; falta tamanho fixo.* Ref.: `MediaLightbox`, `fileThumb`. Onde: `fileThumb.jsx`, `MediaLightbox.jsx`.
 49. **Reduzir o CSS global** (107 KB hoje), separando o que só algumas telas usam. [médio] Onde: `styles.css`.
-50. **Medir INP e LCP no celular** e definir limites antes de cada rodada de mudança. [rápido] Ref.: `ANALYTICS.md` do OpenBot.
+50. **Medir INP e LCP no celular** e definir limites antes de cada rodada de mudança. [rápido] Ref.: `ANALYTICS.md` do OpenBot. *Lote 4: `scripts/medir-web.mjs`. Referência local: LCP de 0,9 s nas conversas, 0,9 s nos agentes, 0,9 s na caixa; toque de 48 ms. Emulado no Chromium, não é aparelho real.*
 
 ---
 

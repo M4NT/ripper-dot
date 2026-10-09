@@ -2373,3 +2373,19 @@ body.agent-dragging .side-list { overflow: hidden; }
   .na-back { min-width: 44px; min-height: 44px; justify-content: center; }
   .na-create { min-width: 44px; min-height: 44px; padding: 0 12px; gap: 6px; }
 }
+
+/* Celular: a faixa de computador e pasta some acima do campo (a escolha da pasta fica no computador). */
+@media (max-width: 900px) { .ws-bar { display: none; } }
+
+/* Foco visível para teclado em todo controle. :where() não pesa na cascata: componentes que definem o próprio foco continuam valendo. */
+:where(a, button, [role="button"], [role="radio"], [role="tab"], input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--ink); outline-offset: 2px;
+}
+
+/* Ir para o fim: fica grudado no pé da conversa enquanto a pessoa lê mensagens antigas. */
+.jump-end-wrap { position: sticky; bottom: 12px; display: flex; justify-content: center; pointer-events: none; height: 0; overflow: visible; }
+.jump-end { pointer-events: auto; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border-radius: 999px; background: var(--ink); color: var(--bg); font-size: 13px; box-shadow: var(--shadow-2); transform: translateY(-48px); }
+
+/* Resposta longa recolhida: corta a altura e esmaece o fim; "Mostrar mais" abre o resto. */
+.recolhivel.is-collapsed > div:first-child { max-height: 460px; overflow: hidden; -webkit-mask-image: linear-gradient(#000 75%, transparent); mask-image: linear-gradient(#000 75%, transparent); }
+.recolher-btn { margin-top: 6px; font-size: 13px; }

@@ -141,6 +141,22 @@ function typingLabel(phase) {
   return 'Escrevendo…';
 }
 
+// Resposta longa: recolhida com "Mostrar mais" (resposta já pronta; a que está chegando não recolhe).
+const ALTURA_RECOLHIDA = 460;
+function Recolhivel({ children }) {
+  const conteudo = useRef(null);
+  const [alto, setAlto] = useState(0);
+  const [aberto, setAberto] = useState(false);
+  useLayoutEffect(() => { setAlto(conteudo.current?.scrollHeight || 0); }, [children]);
+  const longo = alto > ALTURA_RECOLHIDA + 40;
+  return (
+    <div className={`recolhivel ${longo && !aberto ? 'is-collapsed' : ''}`}>
+      <div ref={conteudo}>{children}</div>
+      {longo && <button type="button" className="link recolher-btn" aria-expanded={aberto} onClick={() => setAberto(v => !v)}>{aberto ? 'Mostrar menos' : 'Mostrar mais'}</button>}
+    </div>
+  );
+}
+
 const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, onStop, models, group, allFiles, onFileError, deleg }) {
   // ids (resposta salva) ou objetos (chegando ao vivo)
   const { agent: getAgent } = useApp();
@@ -155,7 +171,7 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, on
           {live && phase === 'generate_image' && <ImageGenLoader />}
           {live && phase !== 'approval' && <StallNote label={phase === 'text' ? 'Escrevendo' : phase === 'route' || phase === 'think' || !phase ? 'Pensando' : stepLabel(phase)} sig={`${phase}|${m.steps.length}|${m.content.length}|${m.agentId}`} onStop={onStop} slowAfterMs={phase === 'generate_image' ? 200_000 : undefined} />}
           {delivered.length > 0 && <DeliveredFiles items={delivered} onError={onFileError} />}
-          {m.content ? (live ? <LiveText text={m.content} /> : <Markdown text={m.content} />)
+          {m.content ? (live ? <LiveText text={m.content} /> : <Recolhivel><Markdown text={m.content} /></Recolhivel>)
             : live ? <div className="typing" role="status" aria-live="polite"><span className="typing-dots" aria-hidden="true"><i /><i /><i /></span><span>{typingLabel(phase)}</span></div>
             : m.error ? <ErrorNote raw={m.error} onRetry={onRetry} />
             : m.stopped ? <p className="muted">{STOP_REASON[m.stopReason] || 'Resposta interrompida.'}</p> : null}
@@ -415,8 +431,17 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
     if (p.agentId === initialAgent) { const ch = { model: p.model, effort: p.effort || 'auto' }; setChoice(ch); send(p, ch); }
   }, [initialAgent]);
 
-  const onScroll = () => { const el = scroller.current; stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120; };
-  useEffect(() => { if (stick.current) scroller.current?.scrollTo({ top: 1e9 }); }, [chat?.messages.length, live?.content, live?.steps?.length]);
+  // Botão "Ir para o fim": aparece quando a pessoa rola para cima; conta as mensagens que chegaram lá de cima.
+  const [longe, setLonge] = useState(false);
+  const [novas, setNovas] = useState(0);
+  const ultimoTamanho = useRef(0);
+  const onScroll = () => { const el = scroller.current; stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120; setLonge(!stick.current); if (stick.current) setNovas(0); };
+  useEffect(() => {
+    const n = chat?.messages.length || 0;
+    if (stick.current) scroller.current?.scrollTo({ top: 1e9 });
+    else if (ultimoTamanho.current && n > ultimoTamanho.current) setNovas(v => v + (n - ultimoTamanho.current));
+    ultimoTamanho.current = n;
+  }, [chat?.messages.length, live?.content, live?.steps?.length]);
 
   async function send(args, forceChoice) {
     const { text, fileIds = [], previews, mcpSession, resume = false, credentialRefs = [], voice = false } = args;
@@ -433,7 +458,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
     let building = { role: 'assistant', agentId: agent.id, content: '', steps: [], at: Date.now() };
     let plan = []; // ordem de fala da rodada em grupo (turnPlan + delegados)
     setLive(building); setPhase(['xhigh', 'max'].includes(use.effort) ? 'think' : 'route');
-    stick.current = true;
+    stick.current = true; setLonge(false); setNovas(0);
     const ac = new AbortController(); ctrl.current = ac;
     // Sem nenhum evento do servidor em 5 s: avisa e oferece reenviar (aborta este e manda de novo).
     const lateTimer = ackId && setTimeout(() => setAck(a => a?.id === ackId && a.state === 'wait' ? { ...a, state: 'late', retry: () => { ac.retry = true; ac.abort(); } } : a), 5000);
@@ -658,6 +683,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
               : <>{m.via?.type === 'inbox' && m.via.threadChatId && <ViaLabel m={m} onOpen={setThread} />}<BotMessage m={m} agent={getAgent(m.agentId) || agent} group={isGroup || (!!m.agentId && m.agentId !== agent.id)} models={S.models} allFiles={S.files} deleg={deleg} onFileError={msg => toast(msg, 'error')} onRetry={m === messages.at(-1) && lastUser ? () => send({ text: lastUser.content }) : null} /></>}</div>),
               live && <div key={messages.length} className="is-new"><BotMessage m={live} agent={getAgent(live.agentId) || agent} group={isGroup} live phase={phase} onStop={stop} models={S.models} deleg={deleg} /></div>]}
           </div>
+          {longe && <div className="jump-end-wrap"><button type="button" className="jump-end" onClick={() => { stick.current = true; setLonge(false); setNovas(0); scroller.current?.scrollTo({ top: 1e9, behavior: 'smooth' }); }}>{novas ? `${novas} ${novas === 1 ? 'nova' : 'novas'} · ` : ''}Ir para o fim</button></div>}
         </div>
 
         <div className="chat-dock">
