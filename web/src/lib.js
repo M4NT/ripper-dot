@@ -41,7 +41,19 @@ export function useRoute() {
   const [path, qs] = hash.slice(1).split('?');
   return { parts: path.split('/').filter(Boolean), query: new URLSearchParams(qs) };
 }
-export const go = to => { if (location.hash !== '#' + to) location.hash = to; };
+// Guardas de saída: uma tela com alterações não salvas registra uma função que recebe o destino e
+// devolve true para bloquear a navegação (ela decide depois, com o diálogo do app, e navega de novo se a pessoa confirmar).
+const guardas = new Set();
+export function guardaSaida(fn) { guardas.add(fn); return () => guardas.delete(fn); }
+const bloqueadoPorGuarda = destino => [...guardas].some(g => g(destino));
+export const go = to => { if (location.hash !== '#' + to && !bloqueadoPorGuarda(to)) location.hash = to; };
+// Links internos (#/...) também passam pela guarda, antes de a tela trocar.
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', e => {
+    const a = e.target.closest?.('a[href^="#/"]');
+    if (a && bloqueadoPorGuarda(a.getAttribute('href').slice(1))) e.preventDefault();
+  }, true);
+}
 
 /* ---------- armazenamento local seguro ---------- */
 export const local = {

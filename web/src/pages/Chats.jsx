@@ -38,9 +38,14 @@ export default function Chats() {
     if (!sel.size) return;
     if (action === 'delete' && !(await confirm({ title: `Apagar ${sel.size} ${sel.size === 1 ? 'conversa' : 'conversas'}?`, body: 'Não dá para desfazer.', action: 'Apagar', danger: true }))) return;
     try {
-      const r = await api('/api/chats/bulk', { method: 'POST', body: { ids: [...sel], action, ...extra } });
+      const ids = [...sel];
+      const r = await api('/api/chats/bulk', { method: 'POST', body: { ids, action, ...extra } });
       await refresh();
-      toast({ archive: 'Arquivadas', unarchive: 'De volta às ativas', tag: `Etiqueta “${extra.tag}” aplicada`, delete: 'Apagadas' }[action] + (r.skipped ? ` · ${r.skipped} respondendo agora ficou de fora` : ''));
+      const texto = { archive: 'Arquivadas', unarchive: 'De volta às ativas', tag: `Etiqueta “${extra.tag}” aplicada`, delete: 'Apagadas' }[action] + (r.skipped ? ` · ${r.skipped} respondendo agora ficou de fora` : '');
+      // Arquivar e desarquivar se desfazem com um toque (apagar não tem volta, por isso não oferece "Desfazer")
+      const oposto = { archive: 'unarchive', unarchive: 'archive' }[action];
+      if (oposto && r.changed) toast(texto, 'info', { label: 'Desfazer', run: async () => { await api('/api/chats/bulk', { method: 'POST', body: { ids, action: oposto } }); await refresh(); toast(oposto === 'archive' ? 'Arquivadas de novo' : 'De volta às ativas'); } });
+      else toast(texto);
       stopSelecting();
     } catch (e) { toast(e.message, 'error'); }
   }

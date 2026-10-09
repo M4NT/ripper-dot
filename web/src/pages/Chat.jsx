@@ -2,7 +2,7 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'rea
 import { ThinkingOrb } from 'thinking-orbs';
 import WorkspaceBar from '../workspaceBar.jsx';
 import { api, go, fmtTime, fmtSize, stepLabel, seenLabel, useMediaQuery, local, nameColor, speak, canSpeak } from '../lib.js';
-import { markdown, closeOpen } from '../markdown.js';
+import { markdown, closeOpen, tabelaParaCsv } from '../markdown.js';
 import { AgentAvatar, Icon, Menu, MenuItem, StatusDot, useConfirm, EmptyState } from '../ui.jsx';
 import { useApp } from '../app.jsx';
 import Composer, { uploadFile } from '../composer.jsx';
@@ -112,6 +112,14 @@ function MarkdownText({ text, live }) {
   const onClick = e => {
     const b = e.target.closest('[data-copy]');
     if (b) { navigator.clipboard.writeText(b.closest('.code').querySelector('code').textContent); b.lastChild.textContent = 'Copiado'; setTimeout(() => (b.lastChild.textContent = 'Copiar'), 1400); }
+    // Tabela: copia o texto original em Markdown ou convertido para CSV
+    const t = e.target.closest('[data-copy-table]');
+    if (t) {
+      const csv = t.dataset.copyTable === 'csv';
+      navigator.clipboard.writeText(csv ? tabelaParaCsv(t.closest('.table')?.dataset.table) : (t.closest('.table')?.dataset.table || ''));
+      const rotulo = csv ? 'Copiar como CSV' : 'Copiar como Markdown';
+      t.textContent = 'Copiado'; setTimeout(() => (t.textContent = rotulo), 1400);
+    }
   };
   return <div ref={ref} className={`md ${live ? 'streaming' : ''}`} onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} />;
 }
