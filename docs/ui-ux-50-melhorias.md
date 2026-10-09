@@ -2,6 +2,8 @@
 
 Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS e app mobile em Expo/HeroUI, com o guia `apps/mobile/DESIGN.md` e o `docs/ui-foundation.md`.
 
+**Situação final:** 46 itens feitos ou decididos, 3 descartados (5, 6 e 25) e 1 aguardando o teste do Yan no celular (45). O item 4 foi testado pelo Yan e ficou bom. O item 22 está implementado (lote 14).
+
 **Uso:** o OpenBot é licenciado como PolyForm Noncommercial 1.0.0. Esta lista usa só as ideias de design. Nenhum código ou recurso visual dele deve ser copiado.
 
 **Medições feitas nesta rodada (web/src):**
@@ -23,7 +25,7 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 1. **Barra de abas no celular:** Início (Conversas), Agentes, Caixa e Mais. *Feito (PR #112 e lote 1 em #113).* [rápido] Ref.: `NativeTabs` do DESIGN.md.
 2. **Busca dentro da barra de navegação do celular:** o campo aparece no topo ao tocar, em vez de um ícone que abre outra tela. [médio] Ref.: `Stack.SearchBar`. Onde: `app.jsx` (barra do celular). *Decidido: manter a busca rápida atual (sem mudança).*
 3. **Título grande que encolhe ao rolar** nas telas principais do celular (Agentes, Conversas, Caixa). [médio] Ref.: título grande do iOS. Onde: `pages/Agents.jsx`, `pages/Chats.jsx`. *Feito e verificado no celular: título de 32 px no topo e 20 px depois de rolar; volta ao tamanho cheio ao voltar ao topo.*
-4. **Menu de ações do topo como folha de baixo** no celular, em vez de janela no meio da tela. [médio] Ref.: `Stack.Toolbar` e menus nativos. Onde: `ui.jsx` (`Menu`). *Lote 7: feito. No celular, o menu abre como folha de baixo para cima, com fundo escurecido que fecha ao tocar fora (testado).*
+4. **Menu de ações do topo como folha de baixo** no celular, em vez de janela no meio da tela. [médio] Ref.: `Stack.Toolbar` e menus nativos. Onde: `ui.jsx` (`Menu`). *Testado pelo Yan no celular: ficou bom. Lote 7: feito. No celular, o menu abre como folha de baixo para cima, com fundo escurecido que fecha ao tocar fora (testado).*
 5. **Seletor de empresa/time no topo da lateral**, com ícone e nome, para trocar de contexto sem sair da tela. [grande] Ref.: "OpenBot team ⌄" e §3.3 da especificação. Onde: `app.jsx` (`Sidebar`). *Descartado: não haverá seletor de empresas; a organização fica em projetos.*
 6. **Faixa de contas à esquerda** com um ícone por empresa, quando houver mais de uma. [médio] Ref.: barra vertical do OpenBot. Depende do item 5. *Descartado junto com o 5.*
 
