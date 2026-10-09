@@ -5,6 +5,7 @@ import { useApp } from './app.jsx';
 import { useChatMenu } from './actions.jsx';
 import ChatAvatar, { isGroupChat } from './chatAvatar.jsx';
 import { botAvatarPalette } from 'bot-avatars';
+import './styles/telas/chatRow.css';
 
 const color = a => nameColor(a, botAvatarPalette);
 

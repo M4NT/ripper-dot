@@ -1,0 +1,11 @@
+/* Estilos de web/src/pages/Chats.jsx. Carregados junto com a tela. */
+
+.chat-group { margin-bottom: 26px; }
+
+.group-label { font-size: var(--fs-xs); font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+
+.tag-filter { display: flex; flex-wrap: wrap; gap: 6px; margin: -8px 0 18px; }
+
+.crow-select-title { flex: 1; min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.bulk-count { font-size: var(--fs-base); color: var(--ink-2); font-variant-numeric: tabular-nums; }

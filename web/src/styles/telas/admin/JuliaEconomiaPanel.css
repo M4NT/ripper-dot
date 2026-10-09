@@ -1,0 +1,5 @@
+/* Estilos de web/src/admin/JuliaEconomiaPanel.jsx. Carregados junto com a tela. */
+
+.roi-breakdown { display: flex; flex-direction: column; gap: 12px; margin: 16px 0 8px; }
+
+.roi-row { display: flex; flex-direction: column; gap: 6px; }

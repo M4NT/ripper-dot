@@ -1,0 +1,17 @@
+/* Estilos de web/src/agenda.jsx. Carregados junto com a tela. */
+
+.agenda-titulo { font-size: var(--fs-md); font-weight: 600; margin: 0; }
+
+.agenda-dia { display: flex; flex-direction: column; gap: 6px; }
+
+.agenda-dia h3 { font-size: var(--fs-sm); font-weight: 600; color: var(--muted); margin: 0; }
+
+.agenda-dia ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+
+.agenda-dia li { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; gap: 4px 10px; padding: 9px 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); font-size: var(--fs-base); }
+
+.agenda-dia time { font-variant-numeric: tabular-nums; color: var(--ink-2); font-weight: 600; }
+
+.agenda-nome { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+
+.agenda-agente { grid-column: 2; font-size: var(--fs-xs); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

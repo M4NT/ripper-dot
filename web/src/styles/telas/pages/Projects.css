@@ -1,0 +1,13 @@
+/* Estilos de web/src/pages/Projects.jsx. Carregados junto com a tela. */
+
+.picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+
+.project-dialog { padding: 24px; max-width: min(640px, calc(100vw - 32px)); }
+
+.project-dialog h2 { font-size: var(--fs-lg); }
+
+.project-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+
+.project-meta { display: flex; gap: 14px; font-size: var(--fs-sm); color: var(--muted); }
+
+.project-meta time { margin-left: auto; color: var(--faint); }

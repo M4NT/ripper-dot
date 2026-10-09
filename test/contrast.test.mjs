@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { lerCssDaInterface } from '../lib/css-interface.mjs';
 
-// Lê as variáveis de cor de styles.css na ordem em que o navegador aplica (o que vem depois ganha)
-const css = readFileSync(new URL('../web/src/styles.css', import.meta.url), 'utf8');
+// Lê as variáveis de cor do CSS da interface na ordem em que o navegador aplica (o que vem depois ganha)
+const css = lerCssDaInterface();
 function tokens(theme) {
   const out = {};
   for (const m of css.matchAll(/(:root(?:\[data-theme="dark"\]|:not\(\[data-theme="light"\]\))?)\s*\{([^}]*)\}/g)) {

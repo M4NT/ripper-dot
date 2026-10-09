@@ -1,0 +1,11 @@
+/* Estilos de web/src/x9Auditor.jsx. Carregados junto com a tela. */
+
+.side-label { font-size: var(--fs-xs); font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 18px 10px 6px; }
+
+.x9-findings { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 10px; }
+
+.x9-finding { border: 1px solid var(--line); border-radius: var(--raio-controle); padding: 10px 12px; }
+
+.x9-finding code { font-size: var(--fs-xs); opacity: 0.85; }
+
+.x9-finding p { margin: 6px 0 4px; }

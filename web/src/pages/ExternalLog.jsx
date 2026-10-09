@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, fmtAgo } from '../lib.js';
 import { useApp } from '../app.jsx';
 import { AgentAvatar, Select, EmptyState, Skeleton } from '../ui.jsx';
+import '../styles/telas/pages/ExternalLog.css';
 
 const APPROVED = { user: 'aprovado por você', auto: 'automático (contato liberado)', rule: 'liberado pela autonomia' };
 const PERIODS = [['1', 'Últimas 24 h'], ['7', '7 dias'], ['30', '30 dias'], ['0', 'Tudo']];

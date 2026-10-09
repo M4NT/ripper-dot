@@ -1,0 +1,3 @@
+/* Estilos de web/src/pages/Outbox.jsx. Carregados junto com a tela. */
+
+.outbox-err { color: var(--err); overflow-wrap: anywhere; }

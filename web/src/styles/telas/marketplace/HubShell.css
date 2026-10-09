@@ -1,0 +1,7 @@
+/* Estilos de web/src/marketplace/HubShell.jsx. Carregados junto com a tela. */
+
+.mp-head-left { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; min-width: 0; }
+
+.mp-head-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+.mp-body { display: flex; flex-direction: column; gap: 32px; }

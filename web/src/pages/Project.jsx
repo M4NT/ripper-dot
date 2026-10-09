@@ -7,6 +7,7 @@ import { uploadFile } from '../composer.jsx';
 import ChatRow from '../chatRow.jsx';
 import { ArtifactList } from '../actions.jsx';
 import ProjectBoard from './ProjectBoard.jsx';
+import '../styles/telas/pages/Project.css';
 
 export default function Project({ id }) {
   const { S, agent, refresh, toast } = useApp();

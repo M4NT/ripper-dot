@@ -6,6 +6,7 @@ import { Icon, Menu, MenuItem } from '../ui.jsx';
 import HubShell from '../marketplace/HubShell.jsx';
 import { PARTNER_SKILLS } from '../marketplace/catalog.js';
 import { useSkillEditor } from '../skills.jsx';
+import '../styles/telas/pages/SkillsHub.css';
 
 function Mine({ S }) {
   const edit = useSkillEditor();

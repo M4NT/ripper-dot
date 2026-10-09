@@ -1,4 +1,5 @@
 import { Icon } from '../ui.jsx';
+import '../styles/telas/marketplace/HubShell.css';
 
 /** Layout fullscreen estilo Marketplace / Conectores / Habilidades. */
 export default function HubShell({ title, tabs, tab, onTab, search, onSearch, searchPlaceholder, actions, onClose, children }) {

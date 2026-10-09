@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, fmtAgo } from '../lib.js';
 import { useApp } from '../app.jsx';
 import { Icon, EmptyState, Segmented } from '../ui.jsx';
+import '../styles/telas/pages/Outbox.css';
 
 const KIND = { 'wa-qr': ['WhatsApp', 'chat'], 'wa-meta': ['WhatsApp (oficial)', 'chat'], email: ['E-mail', 'inbox'], webhook: ['Publicação', 'share'] };
 

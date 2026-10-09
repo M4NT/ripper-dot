@@ -4,6 +4,7 @@ import { useApp } from '../app.jsx';
 import { AgentAvatar, Icon, Select, Switch, EmptyState, Skeleton, useConfirm } from '../ui.jsx';
 import { RoutineList, RoutineForm } from '../routines.jsx';
 import { AgendaRotinas } from '../agenda.jsx';
+import '../styles/telas/pages/Flows.css';
 
 const blankStep = agentId => ({ agentId, instruction: '', approve: false });
 

@@ -1,10 +1,9 @@
-// Verifica o contraste de texto nos dois temas, lendo as cores direto de web/src/styles.css.
+// Verifica o contraste de texto nos dois temas, lendo as cores direto do CSS da interface (styles.css e web/src/styles/telas/).
 // Regra: texto normal precisa de 4,5:1 (WCAG AA). Uso: node scripts/contraste.mjs
 // Sai com código 1 se algum par ficar abaixo do mínimo, para servir de guarda no CI.
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { lerCssDaInterface } from '../lib/css-interface.mjs';
 
-const css = readFileSync(fileURLToPath(new URL('../web/src/styles.css', import.meta.url)), 'utf8');
+const css = lerCssDaInterface();
 
 /** Pega os valores de variáveis de um bloco de regra (ex.: ":root { ... }"). */
 function variaveis(bloco) {

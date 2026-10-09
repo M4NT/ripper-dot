@@ -1,0 +1,19 @@
+/* Estilos de web/src/pages/Marketplace.jsx. Carregados junto com a tela. */
+
+.mp-installed-icons { display: flex; gap: 2px; }
+
+.mp-row-text small { display: block; color: var(--muted); font-size: var(--fs-sm); }
+
+.mp-row-text .mp-desc { margin-top: 4px; }
+
+.mp-show-all { margin-top: 12px; }
+
+.mp-discover-card { position: relative; padding: 16px; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); min-height: 140px; }
+
+.mp-discover-card h3 { font-size: var(--fs-md); display: flex; align-items: center; gap: 6px; margin: 10px 0 6px; }
+
+.mp-discover-card p { font-size: var(--fs-sm); color: var(--muted); line-height: 1.45; margin: 0 0 8px; }
+
+.mp-discover-card small { color: var(--faint); font-size: var(--fs-xs); }
+
+.mp-discover-hit { width: 100%; text-align: left; background: none; border: 0; padding: 0; margin-top: 8px; }

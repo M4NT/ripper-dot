@@ -3,11 +3,11 @@
 // Para aceitar uma redução de propósito, rode com --atualizar (reescreve a base com o número atual).
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { lerCssDaInterface } from '../lib/css-interface.mjs';
 
-const CSS = fileURLToPath(new URL('../web/src/styles.css', import.meta.url));
 const BASE = fileURLToPath(new URL('./cores-literais.base.json', import.meta.url));
 
-const css = readFileSync(CSS, 'utf8');
+const css = lerCssDaInterface();
 // Tira os blocos de tema (definições de variáveis) e os comentários; o que sobra são cores literais de uso.
 const semTemas = css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/:root(:not\([^)]*\))?\s*\{[\s\S]*?\n\}/g, '');
 const literais = [...semTemas.matchAll(/#[0-9a-fA-F]{3,8}\b/g)].map(m => m[0].toLowerCase());

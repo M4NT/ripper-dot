@@ -1,0 +1,61 @@
+/* Estilos de web/src/pages/Flows.jsx. Carregados junto com a tela. */
+
+.flow-list { display: grid; gap: 14px; padding: 0; margin: 0; list-style: none; }
+
+.flow-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+
+.flow-card-head b { display: block; font-weight: 500; font-size: var(--fs-md); }
+
+.flow-card-head small { color: var(--muted); font-size: var(--fs-sm); }
+
+.flow-chain { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 14px 0 0; padding: 0; list-style: none; }
+
+.flow-chain li { display: flex; align-items: center; gap: 6px; }
+
+.flow-chain-arrow { color: var(--faint); }
+
+.flow-chip-gate { color: var(--ok); }
+
+.flow-name { margin-top: 8px; font-size: var(--fs-xl); font-weight: 400; letter-spacing: -.02em; border-color: transparent; background: transparent; padding-left: 0; }
+
+.flow-name:focus { border-color: var(--line); background: var(--surface); padding-left: 12px; }
+
+.flow-canvas { display: flex; align-items: stretch; gap: 0; margin: 8px -4px 18px; padding: 8px 4px 18px; list-style: none; overflow-x: auto; scroll-snap-type: x proximity; }
+
+.flow-node { display: flex; align-items: center; flex: none; scroll-snap-align: start; }
+
+.flow-gate { position: absolute; top: calc(50% - 30px); left: 50%; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: var(--raio-pilula); background: color-mix(in srgb, var(--ok) 12%, var(--surface)); color: var(--ok); font-size: var(--fs-xs); white-space: nowrap; }
+
+.flow-step { display: grid; gap: 10px; width: 300px; padding: 14px; border-radius: var(--r-lg); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-1); animation: pop .25s var(--out) both; }
+
+.flow-step:focus-within { border-color: var(--line-2); box-shadow: var(--shadow-2); }
+
+.flow-num { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--ink); color: var(--bg); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; flex: none; }
+
+.flow-step textarea { resize: vertical; min-height: 96px; font-size: var(--fs-base); }
+
+.flow-step-tools { display: flex; justify-content: flex-end; gap: 2px; margin-top: -4px; }
+
+.flow-add { display: grid; place-items: center; align-content: center; gap: 6px; width: 120px; min-height: 180px; border-radius: var(--r-lg); border: 1px dashed var(--line-2); color: var(--muted); font-size: var(--fs-base); transition: border-color .2s, color .2s; }
+
+.flow-add:hover { border-color: var(--ink-2); color: var(--ink); }
+
+@media (max-width: 720px) {
+  .flow-canvas { flex-direction: column; overflow-x: visible; }
+
+  .flow-node { flex-direction: column; align-items: stretch; }
+
+  .flow-gate { top: 50%; left: calc(50% + 14px); transform: translateY(-50%); }
+
+  .flow-step, .flow-add { width: 100%; }
+
+  .flow-add { min-height: 64px; grid-auto-flow: column; }
+}
+
+.flow-cond { position: absolute; top: calc(50% + 10px); left: 50%; transform: translateX(-50%); padding: 1px 7px; border-radius: var(--raio-pilula); background: var(--surface); border: 1px solid var(--line); color: var(--ink-2); font-size: var(--fs-xs); white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+
+.flow-chip-cond { color: var(--muted); font-size: var(--fs-xs); }
+
+@media (max-width: 720px) {
+  .flow-cond { top: 50%; left: auto; right: calc(50% + 14px); transform: translateY(-50%); }
+}

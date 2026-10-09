@@ -4,6 +4,7 @@ import { useApp } from '../app.jsx';
 import { AgentAvatar, Icon, Segmented, EmptyState } from '../ui.jsx';
 import ErrorNote from '../errorNote.jsx';
 import { ApprovalCard, approvalAsk } from '../approvals.jsx';
+import '../styles/telas/pages/Inbox.css';
 
 const FILTERS = [['all', 'Tudo'], ['approval', 'Aprovações'], ['notice', 'Recados'], ['routine', 'Rotinas'], ['spend', 'Gasto'], ['system', 'Sistema']];
 

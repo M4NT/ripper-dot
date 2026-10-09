@@ -1,0 +1,31 @@
+/* Estilos de web/src/pages/Connectors.jsx. Carregados junto com a tela. */
+
+.mp-conn-table { border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; background: var(--surface); }
+
+.mp-conn-head, .mp-conn-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 120px; gap: 12px; align-items: center; padding: 12px 16px; }
+
+.mp-conn-head { font-size: var(--fs-xs); color: var(--muted); border-bottom: 1px solid var(--line); background: var(--surface-2); }
+
+.mp-conn-row { border-bottom: 1px solid var(--line); }
+
+.mp-conn-row:last-child { border-bottom: 0; }
+
+.mp-conn-name { display: flex; align-items: center; gap: 12px; min-width: 0; }
+
+.mp-conn-name b { display: block; font-weight: 500; }
+
+.mp-conn-name small { display: block; color: var(--muted); font-size: var(--fs-xs); }
+
+.mp-conn-type { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: var(--fs-sm); }
+
+.mp-conn-status { display: flex; justify-content: flex-end; color: var(--ok); }
+
+@media (max-width: 720px) {
+  .mp-conn-head { display: none; }
+
+  .mp-conn-row { grid-template-columns: 1fr; }
+}
+
+.mp-conn-empty { padding: 24px; border: 1px dashed var(--line); border-radius: var(--r-lg); display: flex; flex-direction: column; gap: 12px; }
+
+.mp-conn-empty p { margin: 0; color: var(--ink-2); }

@@ -1,0 +1,9 @@
+/* Estilos de web/src/pages/Library.jsx. Carregados junto com a tela. */
+
+.msg-pair { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); flex: none; }
+
+.mem-head { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; flex-wrap: wrap; }
+
+.mem-head p { flex: 1; min-width: 220px; }
+
+.lib-search { margin-bottom: 16px; }

@@ -4,6 +4,7 @@ import { api, go } from '../lib.js';
 import { isEnterpriseMode } from '../uiMode.js';
 import { Icon, EmptyState } from '../ui.jsx';
 import X9AuditorCard from '../x9Auditor.jsx';
+import '../styles/telas/pages/AdminCenter.css';
 
 function StatusTag({ ok, label, warn }) {
   const cls = ok ? 'tag tag-ok' : (warn ? 'tag tag-warn' : 'tag');

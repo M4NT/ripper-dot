@@ -7,6 +7,7 @@ import geminiSvg from './assets/providers/gemini-color.svg?raw';
 import cursorSvg from './assets/providers/cursor.svg?raw';
 import ollamaSvg from './assets/providers/ollama.svg?raw';
 import antigravitySvg from './assets/providers/antigravity-color.svg?raw';
+import './styles/telas/providersCatalog.css';
 
 // SVGs vendorizados (lobehub, MIT): mono usam currentColor e acompanham o tema.
 const svg = raw => raw.replace(/ (width|height)="1em"/g, '');

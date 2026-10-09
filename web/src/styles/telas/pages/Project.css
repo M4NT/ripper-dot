@@ -1,0 +1,19 @@
+/* Estilos de web/src/pages/Project.jsx. Carregados junto com a tela. */
+
+.project-actions { display: flex; align-items: center; gap: 14px; }
+
+.project-edit { display: flex; flex-direction: column; gap: 8px; max-width: 560px; }
+
+.title-input-lg { font-size: var(--fs-xl) !important; font-weight: 500 !important; letter-spacing: -.02em; }
+
+.project-body { margin-top: 24px; }
+
+.start-strip { margin-bottom: 20px; }
+
+.start-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+
+.member-check input { width: 18px; height: 18px; accent-color: var(--ink); }
+
+@media (max-width: 900px) {
+  .project-actions { justify-content: space-between; }
+}

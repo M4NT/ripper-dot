@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { go } from './lib.js';
 import { Icon } from './ui.jsx';
+import './styles/telas/settingsSearch.css';
 
 // Onde cada configuração mora: [aba, texto que aparece na tela, palavras que as pessoas digitam].
 // O texto é usado para rolar até a opção e destacá-la depois de abrir a aba.

@@ -1,0 +1,5 @@
+/* Estilos de web/src/disclosure.jsx. Carregados junto com a tela. */
+
+.help-tip { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; margin-left: 6px; border-radius: 50%; font-size: var(--fs-xs); font-weight: 600; color: var(--muted); border: 1px solid var(--line-2); cursor: help; vertical-align: middle; }
+
+.adv-disclosure-hint { font-weight: 400; font-size: var(--fs-xs); color: var(--muted); }

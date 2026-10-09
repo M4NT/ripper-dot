@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib.js';
 import { Icon, EmptyState, Skeleton } from '../ui.jsx';
+import '../styles/telas/admin/MeteringPanel.css';
 
 function ProviderUsageBar({ label, pct, resetAt }) {
   if (pct == null) return null;

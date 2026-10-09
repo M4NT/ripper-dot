@@ -1,0 +1,7 @@
+/* Estilos de web/src/routines.jsx. Carregados junto com a tela. */
+
+.hook-url { display: flex; align-items: center; gap: 8px; margin: 6px 0 2px; }
+
+.hook-url code { flex: 1; min-width: 0; font-size: var(--fs-xs); padding: 6px 8px; border-radius: var(--raio-controle); background: var(--surface-2); border: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.wrap-row { flex-wrap: wrap; }

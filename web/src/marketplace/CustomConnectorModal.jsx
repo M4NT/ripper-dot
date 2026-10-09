@@ -3,6 +3,7 @@ import { api } from '../lib.js';
 import { Dialog, Icon } from '../ui.jsx';
 import { runMcpOAuthLogin } from './mcpOAuth.js';
 import BlindCredentialInput, { isSensitiveFieldName } from '../vault/BlindCredentialInput.jsx';
+import '../styles/telas/marketplace/CustomConnectorModal.css';
 
 const AUTH_MODES = [
   ['oauth_now', 'Entrar agora', 'Cada usuário faz login pelo fluxo OAuth do servidor antes de usar ferramentas.'],

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useApp } from '../app.jsx';
 import { api, go, fmtAgo } from '../lib.js';
 import { AgentAvatar, Dialog, Icon, EmptyState, useErroCampo } from '../ui.jsx';
+import '../styles/telas/pages/Projects.css';
 
 export function AgentPicker({ agents, value, onChange }) {
   const toggle = id => onChange(value.includes(id) ? value.filter(x => x !== id) : [...value, id]);

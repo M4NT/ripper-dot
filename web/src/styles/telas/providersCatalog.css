@@ -1,0 +1,41 @@
+/* Estilos de web/src/providersCatalog.jsx. Carregados junto com a tela. */
+
+.prov-grid { list-style: none; margin: 0 0 16px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+
+.prov-card { width: 100%; height: 100%; text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 16px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); color: var(--ink); cursor: pointer; transition: border-color .15s, transform .15s; }
+
+.prov-card:hover { border-color: var(--ink-2); }
+
+.prov-card:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+.prov-card:active { transform: scale(.99); }
+
+.prov-card.is-soon { opacity: .72; }
+
+.prov-card-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
+
+.prov-card b { font-size: var(--fs-md); }
+
+.prov-kind { font-size: var(--fs-xs); color: var(--faint); }
+
+.prov-tagline { font-size: var(--fs-sm); color: var(--muted); margin-top: 4px; }
+
+.prov-logo { display: inline-flex; align-items: center; justify-content: center; flex: none; color: var(--ink); }
+
+.prov-julia { border-radius: var(--raio-controle); background: var(--ink); color: var(--surface); font-weight: 700; letter-spacing: -.02em; }
+
+.prov-logo svg { width: 100%; height: 100%; }
+
+.prov-detail { display: flex; flex-direction: column; gap: 12px; }
+
+.prov-back { align-self: flex-start; }
+
+.prov-detail-head { display: flex; align-items: center; gap: 14px; }
+
+.prov-detail-head > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+@media (prefers-reduced-motion: reduce) {
+  .prov-card { transition: none; }
+
+  .prov-card:active { transform: none; }
+}

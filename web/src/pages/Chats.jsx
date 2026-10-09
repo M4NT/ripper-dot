@@ -3,6 +3,7 @@ import { useApp } from '../app.jsx';
 import { AgentAvatar, Icon, EmptyState, useConfirm, Select, Segmented } from '../ui.jsx';
 import { api } from '../lib.js';
 import ChatRow from '../chatRow.jsx';
+import '../styles/telas/pages/Chats.css';
 
 export default function Chats() {
   const { S, refresh, toast } = useApp();

@@ -3,6 +3,7 @@ import { api, fmtAgo } from './lib.js';
 import { Dialog, Icon, AgentAvatar, EmptyState, Select } from './ui.jsx';
 import { useOv } from './overlay.jsx';
 import { useApp } from './app.jsx';
+import './styles/telas/skills.css';
 
 function SkillEditor({ skill, close }) {
   const { S, refresh, toast } = useApp();

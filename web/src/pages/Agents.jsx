@@ -5,6 +5,7 @@ import { Segmented, Icon, EmptyState } from '../ui.jsx';
 import AgentCard, { NewAgentCard } from '../agentCard.jsx';
 import { useT } from '../i18n/index.jsx';
 import { isEnterpriseMode } from '../uiMode.js';
+import '../styles/telas/pages/Agents.css';
 
 export default function Agents() {
   const { S } = useApp();
