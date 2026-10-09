@@ -2359,3 +2359,17 @@ body.agent-dragging .side-list { overflow: hidden; }
 .queued-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font-size: 13px; }
 .queued-list li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; color: var(--ink-2); }
 .queued-list li .link { flex: none; }
+
+/* Deslizar para arquivar: a linha acompanha o dedo; a rolagem vertical da lista continua funcionando. */
+.crow { touch-action: pan-y; transition: transform .25s var(--out), border-color .15s, box-shadow .25s var(--out); }
+/* Aviso com botão (ex.: "Desfazer"): o botão precisa receber toque, mesmo com o aviso sem clique. */
+.toast-action { pointer-events: auto; margin-left: 8px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; color: inherit; padding: 2px 4px; }
+
+/* Criação de agente no celular: "×" à esquerda, "✓" à direita (padrão de folha). No computador, o layout segue igual. */
+.na-mob-icon { display: none; }
+@media (max-width: 720px) {
+  .na-desk-icon, .na-back-text, .na-cancel { display: none; }
+  .na-mob-icon { display: inline-flex; }
+  .na-back { min-width: 44px; min-height: 44px; justify-content: center; }
+  .na-create { min-width: 44px; min-height: 44px; padding: 0 12px; gap: 6px; }
+}

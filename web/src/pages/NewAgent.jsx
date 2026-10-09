@@ -40,6 +40,7 @@ export default function NewAgent() {
   }));
   const [files, setFiles] = useState([]);
   const [look, setLook] = useState(false);
+  const [nomeTocado, setNomeTocado] = useState(false); // o erro do nome só aparece depois que a pessoa sai do campo
   const [more, setMore] = useState(!!first?.instructions);
   const [saving, setSaving] = useState(false);
   const [sentence, setSentence] = useState('');
@@ -100,11 +101,11 @@ export default function NewAgent() {
   return (
     <form className="na" onSubmit={create}>
       <header className="na-top">
-        <button type="button" className="link" onClick={() => (history.length > 1 ? history.back() : go('/agents'))}><Icon name="arrowL" size={16} />Voltar</button>
+        <button type="button" className="link na-back" aria-label="Voltar" onClick={() => (history.length > 1 ? history.back() : go('/agents'))}><Icon name="arrowL" size={16} className="na-desk-icon" /><Icon name="x" size={18} className="na-mob-icon" /><span className="na-back-text">Voltar</span></button>
         <h1>Novo agente</h1>
         <div className="grow" />
-        <button type="button" className="btn" onClick={() => go('/agents')}>Cancelar</button>
-        <button className="btn btn-primary" disabled={saving || !v.name.trim()} title={!v.name.trim() ? 'Falta o nome do agente' : undefined}>{saving ? 'Criando…' : 'Criar agente'}</button>
+        <button type="button" className="btn na-cancel" onClick={() => go('/agents')}>Cancelar</button>
+        <button className="btn btn-primary na-create" disabled={saving || !v.name.trim()} title={!v.name.trim() ? 'Falta o nome do agente' : undefined}><Icon name="check" size={16} className="na-mob-icon" />{saving ? 'Criando…' : 'Criar agente'}</button>
       </header>
 
       <div className="na-grid">
@@ -185,8 +186,9 @@ export default function NewAgent() {
                 <span className="na-avatar-edit"><Icon name="edit" size={13} /></span>
               </button>
               <div className="na-fields">
-                <input ref={nameRef} className="na-name" value={v.name} maxLength={60} onChange={e => set({ name: e.target.value })} placeholder="Nome do agente" aria-label="Nome do agente" autoFocus={!first} />
+                <input ref={nameRef} className="na-name" value={v.name} maxLength={60} onChange={e => set({ name: e.target.value })} onBlur={() => setNomeTocado(true)} aria-invalid={nomeTocado && !v.name.trim()} aria-describedby={nomeTocado && !v.name.trim() ? 'na-name-erro' : undefined} placeholder="Nome do agente" aria-label="Nome do agente" autoFocus={!first} />
                 <input className="input" value={v.description} maxLength={200} onChange={e => set({ description: e.target.value })} placeholder="Ex.: Analisa planilhas e explica os números em linguagem simples." aria-label="O que ele faz" />
+                {nomeTocado && !v.name.trim() && <p className="form-error" id="na-name-erro" role="alert">Dê um nome ao agente para continuar.</p>}
               </div>
             </div>
             {look && (

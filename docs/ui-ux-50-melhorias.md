@@ -21,7 +21,7 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 ## Navegação (1–6)
 
 1. **Barra de abas no celular:** Início (Conversas), Agentes, Caixa e Mais. *Feito (PR #112 e lote 1 em #113).* [rápido] Ref.: `NativeTabs` do DESIGN.md.
-2. **Busca dentro da barra de navegação do celular:** o campo aparece no topo ao tocar, em vez de um ícone que abre outra tela. [médio] Ref.: `Stack.SearchBar`. Onde: `app.jsx` (barra do celular).
+2. **Busca dentro da barra de navegação do celular:** o campo aparece no topo ao tocar, em vez de um ícone que abre outra tela. [médio] Ref.: `Stack.SearchBar`. Onde: `app.jsx` (barra do celular). *Não feito. Hoje a lupa abre a busca rápida (paleta). Decisão: campo fixo no topo ou manter a paleta?*
 3. **Título grande que encolhe ao rolar** nas telas principais do celular (Agentes, Conversas, Caixa). [médio] Ref.: título grande do iOS. Onde: `pages/Agents.jsx`, `pages/Chats.jsx`. *Lote 2: título grande no celular (32 px, conferido na foto). Falta o encolhimento ao rolar.*
 4. **Menu de ações do topo como folha de baixo** no celular, em vez de janela no meio da tela. [médio] Ref.: `Stack.Toolbar` e menus nativos. Onde: `ui.jsx` (`Menu`).
 5. **Seletor de empresa/time no topo da lateral**, com ícone e nome, para trocar de contexto sem sair da tela. [grande] Ref.: "OpenBot team ⌄" e §3.3 da especificação. Onde: `app.jsx` (`Sidebar`).
@@ -29,7 +29,7 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 
 ## Chat e campo de mensagem (7–18)
 
-7. **Campo de mensagem enxuto:** "+", campo de texto, microfone e enviar. Computador, pasta e modelo vão para uma folha de opções. [médio] Ref.: campo de mensagem do OpenBot. Onde: `composer.jsx`, `composerPlusMenu.jsx`.
+7. **Campo de mensagem enxuto:** "+", campo de texto, microfone e enviar. Computador, pasta e modelo vão para uma folha de opções. [médio] Ref.: campo de mensagem do OpenBot. Onde: `composer.jsx`, `composerPlusMenu.jsx`. *Não feito. Hoje há a faixa de computador e pasta acima do campo (`workspaceBar.jsx`), e o menu "+" já tem pasta. Decisão: esconder a faixa no celular?*
 8. **Círculo sem texto ao lado do seletor de modelo** no campo de mensagem. Confirmar o que ele faz e dar um nome, ou remover. [rápido] *Identificado: é o anel da janela de contexto (abre "Uso e limites"). Lote 2: mostra a porcentagem ao lado e um rótulo claro.*
 9. **Fila de mensagens visível**, com cancelar, editar e "enviar agora". [médio] Ref.: `QueuedMessage` (cancelar, atualizar, steer). Onde: `createInputQueue` em `lib/input-queue.mjs`. *Lote 2: cada mensagem da fila aparece com texto e botão "Cancelar" próprio. Faltam editar e "enviar agora".*
 10. **Copiar tabela como Markdown ou CSV** nas tabelas do chat, inclusive as de OpenUI. [rápido] Ref.: "Copiar como Markdown / Copiar como CSV". Onde: `Chat.jsx`, `openui/library.jsx`.
@@ -55,10 +55,10 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 
 ## Formulários e folhas (27–33)
 
-27. **Folhas de criação com "×" à esquerda e "✓ Salvar" à direita**, no mesmo padrão do OpenBot. [médio] Ref.: `DESIGN.md`, "Save and create actions". Onde: `agentForm.jsx`, `pages/NewAgent.jsx`.
+27. **Folhas de criação com "×" à esquerda e "✓ Salvar" à direita**, no mesmo padrão do OpenBot. [médio] Ref.: `DESIGN.md`, "Save and create actions". Onde: `agentForm.jsx`, `pages/NewAgent.jsx`. *Lote 3: no celular, "×" à esquerda e "✓ Criar agente" à direita (conferido na foto). Ainda é página, não folha.*
 28. **O "✓ Salvar" só aparece quando algo foi alterado.** [rápido] Ref.: `SheetSaveAction`. *Feito no lote 1 (ficha do agente).*
 29. **Fechar com alterações não salvas pede confirmação.** [médio] *Verificar em Configurações e na ficha do agente.* Ref.: guardas de alterações não salvas.
-30. **Erro de campo ao sair do campo**, embaixo dele, com rótulo e descrição ligados ao campo. [médio] Ref.: componente `Field`. Onde: 12 arquivos já usam o padrão; padronizar.
+30. **Erro de campo ao sair do campo**, embaixo dele, com rótulo e descrição ligados ao campo. [médio] Ref.: componente `Field`. Onde: 12 arquivos já usam o padrão; padronizar. *Lote 3: feito no nome do agente (erro ao sair do campo vazio, com `aria-invalid`). Falta padronizar nos outros formulários.*
 31. **Botão desabilitado explica o motivo** ("Falta o nome do agente"). [rápido] Ref.: `DESIGN.md`, "disabled checkmark". *Parcial no lote 1: dica no botão "Criar agente" (tooltip). Falta texto visível para toque.*
 32. **Enter envia formulários simples** (um campo). [rápido] Ref.: "preserve keyboard submission". *Já funciona no "Criar agente" (formulário nativo).*
 33. **Estado de "salvando" sem duplicar o envio:** o botão fica desabilitado, com rótulo acessível de pendente. [rápido] Ref.: `DESIGN.md`, estado pendente.
@@ -79,7 +79,7 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 42. **Foco visível em todo controle** para uso com teclado. [rápido] *Verificar a cobertura.* Ref.: `focus-visible`.
 43. **Rótulo acessível em todo botão só com ícone.** Hoje há 104 `aria-label`; falta checar a cobertura. [médio] Ref.: `IconButton` com `label` obrigatório.
 44. **Contraste verificado por script** nos dois temas, com 4,5:1 para texto. [médio] Ref.: `DESIGN.md`, "Theme and visual consistency".
-45. **Deslizar na lista de conversas para arquivar**, com "Desfazer". Não usar deslize para aprovar nada. [médio] Ref.: decisão da especificação (ação irreversível exige confirmação).
+45. **Deslizar na lista de conversas para arquivar**, com "Desfazer". Não usar deslize para aprovar nada. [médio] Ref.: decisão da especificação (ação irreversível exige confirmação). *Lote 3: lógica feita e testada (arquiva, "Desfazer" restaura, sem erro). Falta testar o gesto num celular de verdade: no navegador de teste o toque é cancelado antes de chegar ao fim.*
 46. **Verificação automática de estilo no build**, que bloqueia cor, tamanho e raio literais novos. [médio] Ref.: `bun run check:ui` do OpenBot.
 
 ## Desempenho (47–50)
