@@ -115,7 +115,7 @@ function Who({ it, label, picked, onPick }) {
     <div className="inbox-who">
       {picked != null && <input type="checkbox" className="inbox-pick" checked={picked} onChange={onPick} aria-label={`Selecionar o pedido de ${it.agentName}`} />}
       {a && <AgentAvatar agent={a} size={28} paused />}
-      <span><b>{it.agentName}</b> {label}</span>
+      <span><b>{it.approval?.kind === 'documento' ? 'Cartão de compra' : it.agentName}</b> {label}</span>
       <time>{fmtAgo(it.at)}</time>
     </div>
   );

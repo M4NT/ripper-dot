@@ -6,7 +6,7 @@ import { useT } from './i18n/index.jsx';
 
 const KIND = { exec: 'quer rodar um comando', share: 'quer publicar um link', social: 'quer publicar em webhook', whatsapp: 'quer enviar um WhatsApp', email: 'quer enviar um e-mail', github: 'quer publicar no GitHub', omie: 'quer alterar o Omie', agent: 'quer criar um agente', flow: 'terminou um passo do fluxo' };
 /** O que o agente está pedindo, em uma frase (a Caixa mostra isso na linha do mascote). */
-export const approvalAsk = rec => rec.kind === 'question' ? 'precisa de você' : rec.kind === 'setting' ? 'sugere uma configuração' : KIND[rec.kind] || 'pede aprovação';
+export const approvalAsk = rec => rec.kind === 'question' ? 'precisa de você' : rec.kind === 'setting' ? 'sugere uma configuração' : rec.kind === 'documento' ? 'aguarda a sua confirmação' : KIND[rec.kind] || 'pede aprovação';
 
 /** Cartão de aprovação: mostra exatamente o que vai acontecer e por que precisa do seu ok. */
 export function ApprovalCard(props) {
@@ -94,8 +94,8 @@ function DecisionCard({ rec, status, compact, onDone }) {
   return (
     <div className={`approval ${st} ${compact ? 'compact' : ''}`} role="group" aria-label="Pedido de aprovação">
       <div className="approval-head">
-        <span className="approval-ico"><Icon name={rec.kind === 'share' || rec.kind === 'social' ? 'share' : rec.kind === 'whatsapp' ? 'chat' : rec.kind === 'email' ? 'inbox' : rec.kind === 'github' ? 'plug' : rec.kind === 'flow' ? 'retry' : 'terminal'} size={15} /></span>
-        <span className="approval-title"><b>{a?.name || rec.agentName || 'Agente'}</b> {KIND[rec.kind] || 'pede aprovação'}</span>
+        <span className="approval-ico"><Icon name={rec.kind === 'share' || rec.kind === 'social' ? 'share' : rec.kind === 'whatsapp' ? 'chat' : rec.kind === 'email' ? 'inbox' : rec.kind === 'github' ? 'plug' : rec.kind === 'flow' ? 'retry' : rec.kind === 'documento' ? 'grid' : 'terminal'} size={15} /></span>
+        <span className="approval-title">{rec.kind === 'documento' ? <><b>Nota de compra</b> · você aprovou no cartão</> : <><b>{a?.name || rec.agentName || 'Agente'}</b> {KIND[rec.kind] || 'pede aprovação'}</>}</span>
         {compact && rec.chatTitle && <button className="link approval-chat" onClick={() => go(`/c/${rec.chatId}`)}>{rec.chatTitle}</button>}
       </div>
       <pre className="approval-cmd"><code>{rec.command}</code></pre>
@@ -103,7 +103,7 @@ function DecisionCard({ rec, status, compact, onDone }) {
       {st === 'pending' ? (
         <div className="approval-actions">
           <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => decide(true)}><Icon name="check" size={14} />Aprovar</button>
-          <button className="btn btn-sm" disabled={busy} onClick={() => decide(true, true)} title="Não pergunta de novo por este mesmo comando nesta conversa">Aprovar sempre aqui</button>
+          {rec.kind !== 'documento' && <button className="btn btn-sm" disabled={busy} onClick={() => decide(true, true)} title="Não pergunta de novo por este mesmo comando nesta conversa">Aprovar sempre aqui</button>}
           <div className="grow" />
           <button className="btn btn-sm btn-danger" disabled={busy} onClick={() => decide(false)}>Recusar</button>
         </div>

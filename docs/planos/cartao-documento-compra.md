@@ -1,6 +1,8 @@
 # Plano: cartão de documento de compra no chat (item 22)
 
-Status: aprovado em parte. Decisões 1 e 2 respondidas (ver fim do documento). Nada foi implementado.
+Status: implementado no lote 14 (fases 1 a 4). Decisões 1 e 2 respondidas pelo usuário. Decisões 3 e 4 foram adotadas como padrão, a confirmar (ver fim do documento).
+
+Como ficou, em resumo: a ferramenta `mostrar_documento` (só leitura) monta o cartão a partir do elo de compras; "Aprovar" cria um pedido de kind `documento` na Caixa, que o usuário confirma lá; "Rejeitar" grava a decisão em `db.documentos`, sem Caixa e sem aviso. Código: `lib/documento-compra.mjs`, `web/src/documentoCard.jsx`, rotas `/api/documentos/...` em `server.mjs`.
 
 ## O que é
 
