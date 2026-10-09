@@ -13,9 +13,27 @@ import { sessionPayload } from './marketplace/sessionMcp.js';
 const SpeechRec = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
 
 /** Envia arquivos para o agente e devolve os registros criados. */
-export async function uploadFile(agentId, chatId, file, projectId, { batch } = {}) {
+export async function uploadFile(agentId, chatId, file, projectId, { batch, onProgress } = {}) {
   if (file.size > 25 << 20) throw new Error(`${file.name} passa de 25 MB.`);
-  const qs = new URLSearchParams({ name: file.name, ...(agentId ? { agentId } : {}), ...(chatId ? { chatId } : {}), ...(projectId ? { projectId } : {}), ...(batch ? { batch: String(batch) } : {}) });
+  // Com progresso (item 3): envio por XMLHttpRequest, que avisa quanto já subiu. Sem isso, o fetch não mostra nada.
+  if (onProgress) {
+    const qs0 = new URLSearchParams({ name: file.name, ...(agentId ? { agentId } : {}), ...(chatId ? { chatId } : {}), ...(projectId ? { projectId } : {}), ...(batch ? { batch: String(batch) } : {}) });
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/files?' + qs0);
+      xhr.setRequestHeader('content-type', file.type || 'application/octet-stream');
+      xhr.upload.onprogress = e => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+      xhr.onload = () => {
+        let data = {};
+        try { data = JSON.parse(xhr.responseText || '{}'); } catch { /* resposta sem JSON: erro genérico abaixo */ }
+        if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+        else reject(new Error(data.error || `Erro ${xhr.status}`));
+      };
+      xhr.onerror = () => reject(new Error('Sem conexão para enviar o arquivo.'));
+      xhr.send(file);
+    });
+  }
+  const qs = new URLSearchParams({ name: file.name, ...(agentId ? { agentId } : {}), ...(chatId ? { chatId } : {}), ...(projectId ? { projectId } : {}), ...(batch ? { batch: String(batch) } : {})});
   return api('/api/files?' + qs, { method: 'POST', raw: file, headers: { 'content-type': file.type || 'application/octet-stream' } });
 }
 
@@ -41,6 +59,8 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
   const [credentials, setCredentials] = useState([]); // { ref, label }
   const [credOpen, setCredOpen] = useState(false);
   const [listening, setListening] = useState(false);
+  // Dica de atalhos: aparece até a pessoa enviar a primeira mensagem (ou clicar em "Entendi"). Fica neste aparelho.
+  const [dicaOk, setDicaOk] = useState(() => !!local.get('dica.atalhos', false));
   const [transcribing, setTranscribing] = useState(false);
   const [handsFree, setHandsFree] = useState(() => local.get('handsFree', false));
   const ta = useRef(null), fileInput = useRef(null), folderInput = useRef(null), plusBtn = useRef(null), rec = useRef(null), base = useRef(''), spoke = useRef(false); // spoke: a mensagem teve trecho ditado
@@ -77,7 +97,7 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
   async function enviaArquivo(key, file, batch = 1) {
     setFiles(fs => fs.map(f => f.key === key ? { ...f, status: 'uploading', erro: null } : f));
     try {
-      const rec = await uploadFile(agent.id, chatId, file, projectId, { batch });
+      const rec = await uploadFile(agent.id, chatId, file, projectId, { batch, onProgress: p => setFiles(fs => fs.map(f => (f.key === key ? { ...f, progresso: p } : f))) });
       setFiles(fs => fs.map(f => f.key === key ? { ...f, id: rec.id, status: 'ready', erro: null } : f));
     } catch (e) {
       setFiles(fs => fs.map(f => f.key === key ? { ...f, status: 'error', erro: e.message } : f));
@@ -102,6 +122,7 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
       voice: spoke.current && !!text.trim()
     }, { immediate });
     spoke.current = false;
+    if (!dicaOk) { local.set('dica.atalhos', true); setDicaOk(true); }
     setText(''); setFiles([]); setCredentials([]); setCredOpen(false); setTagged([]);
     if (listening) toggleVoice();
   }
@@ -222,7 +243,7 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
               <div className="attach-row">
                 {files.map(f => (
                   <span key={f.key} className={`attach ${f.status} ${f.url ? 'attach-img' : ''}`}>
-                    {f.url ? <img src={f.url} alt="" /> : <Icon name="file" size={14} />}<span className="attach-name">{f.name}</span><small>{f.status === 'uploading' ? 'enviando…' : f.status === 'error' ? 'não enviou' : fmtSize(f.size)}</small>
+                    {f.url ? <img src={f.url} alt="" /> : <Icon name="file" size={14} />}<span className="attach-name">{f.name}</span><small>{f.status === 'uploading' ? (f.progresso != null ? `enviando ${Math.round(f.progresso * 100)}%` : 'enviando…') : f.status === 'error' ? 'não enviou' : fmtSize(f.size)}</small>
                     {f.status === 'error' && <button type="button" className="attach-retry" onClick={() => enviaArquivo(f.key, f.arquivo)} title={f.erro}>Tentar de novo</button>}
                     <button type="button" aria-label={`Remover ${f.name}`} onClick={() => { setFiles(fs => fs.filter(x => x.key !== f.key)); f.id && api(`/api/files/${f.id}`, { method: 'DELETE' }).catch(() => {}); }}><Icon name="x" size={13} /></button>
                   </span>
@@ -236,6 +257,8 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
               aria-label="Mensagem" onChange={e => setText(e.target.value)}
               onPaste={e => { const fs = [...e.clipboardData.files]; if (fs.length) { e.preventDefault(); addFiles(fs); } }}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); sendFromComposer(false); } if (e.key === 'Escape' && streaming) onStop(); }} />
+            {!dicaOk && !text.trim() && !streaming && <p className="composer-tip">Enter envia · Shift+Enter quebra a linha. <button type="button" className="link" onClick={() => { local.set('dica.atalhos', true); setDicaOk(true); }}>Entendi</button></p>}
+            {streaming && text.trim() && <p className="composer-tip" role="status">Vai para a fila: o agente ainda responde. Ela segue quando ele terminar.</p>}
             <div className="composer-row">
               <button ref={plusBtn} type="button" className={`round-btn ${plus ? 'open' : ''}`} aria-expanded={plus} aria-label="Mais opções" onClick={() => setPlus(p => !p)}>
                 <Icon name="plus" size={17} />
@@ -252,6 +275,7 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
                 {setChoice && <ModelPicker value={choice} onChange={setChoice} group={group} chatId={chatId} />}
               </div>
               <div className="grow" />
+              {text.length > 2000 && <small className="composer-count" aria-live="polite">{text.length.toLocaleString('pt-BR')} caracteres</small>}
               {canSpeak && (
                 <button type="button" className={`icon-btn ${handsFree ? 'live' : ''}`} aria-pressed={handsFree} title={handsFree ? 'Mãos livres: as respostas são lidas em voz alta' : 'Ler as respostas em voz alta'}
                   aria-label="Ler respostas em voz alta" onClick={() => { const v = !handsFree; setHandsFree(v); local.set('handsFree', v); if (!v) speechSynthesis.cancel(); }}><Icon name="volume" /></button>

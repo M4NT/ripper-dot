@@ -5,6 +5,8 @@ import { Icon } from './ui.jsx';
 import CampaignCard from './campaignCard.jsx';
 import DocumentoCard from './documentoCard.jsx';
 import { ApprovalCard } from './approvals.jsx';
+import { fmtDuracao, fonteDoPasso, fontesDoPasso, horaCurta } from './agentesInteracao.js';
+import './styles/telas/agentesInteracao.css';
 
 const ORB = { route: 'connecting', WebSearch: 'searching', WebFetch: 'searching', computer_exec: 'working', computer_share: 'working', remember: 'weaving', schedule_routine: 'shaping', generate_image: 'shaping', think: 'solving', text: 'composing' };
 
@@ -31,6 +33,17 @@ function stepIcon(step) {
   return 'bolt';
 }
 
+export function Fontes({ steps }) {
+  const fontes = fontesDoPasso(steps);
+  if (!fontes.length) return null;
+  return (
+    <details className="fontes-resposta">
+      <summary>Fontes consultadas ({fontes.length})</summary>
+      <ul>{fontes.map(f => <li key={f.url}><a href={f.url} target="_blank" rel="noopener noreferrer">{f.host}</a></li>)}</ul>
+    </details>
+  );
+}
+
 function summarize(all, live) {
   const steps = all.some(s => s.kind !== 'note') ? all.filter(s => s.kind !== 'note') : all; // anotação não é ação: não conta nem vira título
   const last = steps[steps.length - 1];
@@ -42,14 +55,29 @@ function summarize(all, live) {
 }
 
 function StepRow({ step, live, index, total }) {
+  const [verDetalhe, setVerDetalhe] = useState(false);
   const running = live && index === total - 1 && step.kind === 'tool';
   if (step.kind === 'note') return <li className="step step-note"><p>{step.label}</p></li>;
+  // Tela ao vivo disponível: avisa, sem abrir sozinha (item 17). Abre quando a pessoa quiser.
+  if (step.kind === 'screen') return (
+    <li className="step step-screen">
+      <span className="step-mark"><Icon name="compass" size={13} /></span>
+      <span className="step-label">{step.label}</span>
+      <button type="button" className="meta-btn" onClick={() => window.dispatchEvent(new CustomEvent('ripper:computer'))}>Abrir tela</button>
+    </li>
+  );
+  const fonte = fonteDoPasso(step);
+  const quando = fonte && step.at ? `${fonte} · lido às ${horaCurta(step.at)}` : null;
+  const dur = fmtDuracao(step.dur);
   return (
-    <li className={`step step-${step.kind} ${running ? 'running' : ''}`} title={step.detail || undefined}>
+    <li className={`step step-${step.kind} ${running ? 'running' : ''}`}>
       <span className="step-mark">{running ? <ThinkingOrb state={ORB[step.tool] || 'working'} size={20} /> : <Icon name={step.kind === 'warn' ? 'x' : 'check'} size={13} />}</span>
       <span className="step-label">{step.label}</span>
-      {step.detail && <span className="step-detail">{step.detail}</span>}
+      {dur && <span className="step-tempo">{dur}</span>}
+      {quando && <span className="step-fonte">{quando}</span>}
       {step.count > 1 && <span className="step-count">×{step.count}</span>}
+      {step.detail && <button type="button" className="step-ver" aria-expanded={verDetalhe} onClick={() => setVerDetalhe(v => !v)}>{verDetalhe ? 'Ocultar detalhe' : 'Ver detalhe'}</button>}
+      {verDetalhe && step.detail && <code className="step-detail">{step.detail}</code>}
     </li>
   );
 }
@@ -80,7 +108,7 @@ function Tempo({ desde }) {
   return <span className="action-line-tempo"> · {s < 60 ? `${s} s` : `${Math.floor(s / 60)} min`}</span>;
 }
 
-export default function ActionLine({ steps, live }) {
+export default function ActionLine({ steps, live, onStop }) {
   const [open, setOpen] = useState(false);
 
   const approvals = [];
@@ -92,10 +120,12 @@ export default function ActionLine({ steps, live }) {
     else if (s.kind === 'subtask') subtasks.push(s);
     else activity.push(s);
   }
+  // Duração de cada etapa: vai do início dela até o início da seguinte (item 11).
+  const comDur = activity.map((s, i) => { const prox = activity[i + 1]; return s.kind === 'tool' && s.at && prox?.at ? { ...s, dur: prox.at - s.at } : s; });
 
   const last = activity[activity.length - 1];
   const running = live && last?.kind === 'tool';
-  const canExpand = activity.length > 1 || activity.some(s => s.detail);
+  const canExpand = activity.length > 1 || activity.some(s => s.detail || fonteDoPasso(s));
 
   if (!activity.length && !approvals.length && !subtasks.length) return null;
 
@@ -116,7 +146,7 @@ export default function ActionLine({ steps, live }) {
             return (
               <li key={t.key} className={`subtask subtask-${st}`}>
                 <span className="subtask-title">{t.title}</span>
-                <span className="subtask-state">{st === 'done' ? 'pronto' : st === 'error' ? 'falhou' : 'trabalhando…'}</span>
+                <span className="subtask-state">{st === 'done' ? 'pronto' : st === 'error' ? 'falhou' : 'trabalhando…'}{st === 'running' && live && t.at && <Tempo desde={t.at} />}</span>
                 <span className="subtask-bar" role="progressbar" aria-label={t.title} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}><i style={{ width: `${pct}%` }} /></span>
               </li>
             );
@@ -138,19 +168,25 @@ export default function ActionLine({ steps, live }) {
             {(() => { const n = activity.filter(s => s.kind !== 'note').length; return n > 1 && <span className="action-line-badge">{n}</span>; })()}
             {canExpand && <Icon name="down" size={14} className={`action-line-chevron ${open ? 'open' : ''}`} />}
           </button>
+          {running && onStop && <button type="button" className="meta-btn action-line-parar" onClick={onStop}><Icon name="x" size={13} />Parar</button>}
           {open && (
             <ol className="steps action-line-steps">
-              {collapse(activity).map((s, i, all) => <StepRow key={i} step={s} live={live} index={i} total={all.length} />)}
+              {collapse(comDur).map((s, i, all) => <StepRow key={i} step={s} live={live} index={i} total={all.length} />)}
             </ol>
           )}
         </div>
       )}
+      {/* Leitor de tela: anuncia a etapa que começou agora, uma vez por etapa (item 50). */}
+      {running && <span className="sr-only" aria-live="polite">{last.label}</span>}
     </div>
   );
 }
 
+/** Ícone por fase da espera: pensando, escrevendo ou trabalhando (item 18). */
+const iconeDaFase = label => (/pensando/i.test(label || '') ? 'clock' : /escrev/i.test(label || '') ? 'chat' : 'bolt');
+
 /**
- * Passo sem mudança há 20 s+: "ainda em: <passo> · 40 s" + Parar. `sig` muda quando há sinal novo (passo, texto).
+ * Passo sem mudança há 20 s+: "<passo>: <motivo> · 40 s" + Parar. `sig` muda quando há sinal novo (passo, texto).
  * setInterval e não requestAnimationFrame: rAF pode não disparar (aba em segundo plano, alguns ambientes).
  */
 export function StallNote({ label, sig, onStop, slowAfterMs }) {
@@ -162,6 +198,7 @@ export function StallNote({ label, sig, onStop, slowAfterMs }) {
   if (!text) return null;
   return (
     <div className="stall-note" role="status">
+      <Icon name={iconeDaFase(label)} size={13} />
       <span>{text}</span>
       {onStop && <button type="button" className="meta-btn" onClick={onStop}><Icon name="x" size={13} />Parar</button>}
     </div>

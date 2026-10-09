@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, go, fmtAgo } from '../lib.js';
 import { useApp } from '../app.jsx';
-import { AgentAvatar, Icon, Segmented, EmptyState } from '../ui.jsx';
+import { AgentAvatar, Icon, Segmented, EmptyState, useConfirm } from '../ui.jsx';
 import ErrorNote from '../errorNote.jsx';
-import { ApprovalCard, approvalAsk } from '../approvals.jsx';
+import { ApprovalCard, approvalAsk, fraseDaAprovacao, verbosDaAprovacao } from '../approvals.jsx';
 import '../styles/telas/pages/Inbox.css';
 
 const FILTERS = [['all', 'Tudo'], ['approval', 'Aprovações'], ['notice', 'Recados'], ['routine', 'Rotinas'], ['spend', 'Gasto'], ['system', 'Sistema']];
@@ -38,6 +38,32 @@ export default function Inbox() {
   // a seleção só vale para o que ainda está pendente na tela
   const chosen = pend.filter(it => sel.has(it.id));
   const toggle = id => setSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const [confirmar, confirmNode] = useConfirm();
+  // Verbo do botão: o do tipo quando todos são iguais ("Enviar e-mail 3"); senão, Aprovar/Recusar.
+  const verboLote = (list, approve) => {
+    const iguais = list.length && list.every(it => it.approval?.kind === list[0].approval?.kind);
+    const v = iguais ? verbosDaAprovacao(list[0].approval) : { sim: 'Aprovar', nao: 'Recusar' };
+    return approve ? v.sim : v.nao;
+  };
+  // Lote: mostra a lista antes (o que cada um faz) e só então decide (item 37).
+  async function confirmarLote(list, approve) {
+    if (!list.length) return;
+    const linhas = list.slice(0, 8).map(it => `• ${fraseDaAprovacao(it.approval)}`);
+    const extra = list.length > 8 ? `\n… e mais ${list.length - 8}` : '';
+    const verbo = verbosDaAprovacao(list[0].approval);
+    const ok = await confirmar({
+      title: `${approve ? verbo.sim : verbo.nao}: ${list.length} ${list.length === 1 ? 'pedido' : 'pedidos'}?`,
+      body: linhas.join('\n') + extra,
+      action: approve ? verbo.sim : verbo.nao,
+      danger: !approve
+    });
+    if (ok) decideMany(list, approve);
+  }
+  // Seleciona todos os pedidos do mesmo tipo dos que já estão marcados.
+  const mesmoTipo = () => {
+    const tipos = new Set(chosen.map(it => it.approval?.kind));
+    setSel(new Set(pend.filter(it => tipos.has(it.approval?.kind)).map(it => it.id)));
+  };
 
   async function decideMany(list, approve) {
     if (!list.length || busy) return;
@@ -72,6 +98,7 @@ export default function Inbox() {
   const count = k => box.items.filter(i => k === 'all' || i.kind === k).length;
   return (
     <div className="page v2 inbox-page">
+      {confirmNode}
       <header className="page-head">
         <div><h1>Caixa</h1><p className="lede">O que os agentes precisam de você: aprovações, recados de clientes e novidades das rotinas.</p></div>
         <div className="row"><a className="btn" href="#/outbox" title="Mensagens, e-mails e publicações que falharam e vão tentar de novo">Fila de envios</a><a className="btn" href="#/log">Ações externas</a></div>
@@ -86,8 +113,9 @@ export default function Inbox() {
             onChange={e => setSel(new Set(e.target.checked ? pend.map(it => it.id) : []))} />
             <span>{chosen.length ? `${chosen.length} de ${pend.length} selecionadas` : `Selecionar as ${pend.length} aprovações`}</span></label>
           {chosen.length > 0 && <div className="bulk-approvals-actions">
-            <button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => decideMany(chosen, true)}><Icon name="check" size={14} />Aprovar {chosen.length}</button>
-            <button type="button" className="btn btn-sm btn-danger" disabled={busy} onClick={() => decideMany(chosen, false)}>Recusar {chosen.length}</button>
+            <button type="button" className="btn btn-sm" disabled={busy} onClick={mesmoTipo}>Selecionar os de mesmo tipo</button>
+            <button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={() => confirmarLote(chosen, true)}><Icon name="check" size={14} />{verboLote(chosen, true)} {chosen.length}</button>
+            <button type="button" className="btn btn-sm btn-danger" disabled={busy} onClick={() => confirmarLote(chosen, false)}>{verboLote(chosen, false)} {chosen.length}</button>
           </div>}
         </div>
       )}

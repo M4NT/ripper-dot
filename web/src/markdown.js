@@ -14,14 +14,36 @@ export function closeOpen(text) {
 /** Texto puro para prévias (listas, barra lateral). */
 export const plain = s => String(s || '').replace(/```[\s\S]*?```/g, ' ').replace(/[*_`#>]+/g, '').replace(/\s+/g, ' ').trim();
 
-export function markdown(src) {
+/**
+ * Números escritos com ponto ou vírgula de milhar viram o formato do Brasil: 2000.5 -> 2.000,50; 1,234.56 -> 1.234,56.
+ * Versões e datas não entram (precisam de 4 dígitos antes do ponto, sem ponto depois de três casas).
+ */
+export function ptNumeros(t) {
+  return t
+    .replace(/(?<![\w./:,-])(\d{1,3}(?:,\d{3})+)\.(\d{2})(?![\w./:-])/g, (_, i, d) => `${i.replace(/,/g, '.')},${d}`)
+    .replace(/(?<![\w./:,-])(\d{4,})\.(\d{1,2})(?![\w./:-])/g, (_, i, d) => `${i.replace(/\B(?=(\d{3})+(?!\d))/g, '.')},${d.padEnd(2, '0')}`);
+}
+
+/** Títulos do texto, na mesma ordem em que markdown() os numera (h0, h1, …). Para o índice da resposta. */
+export function titulosDo(src) {
+  const sem = String(src).replace(/```[\s\S]*?(```|$)/g, '');
+  const out = [];
+  for (const line of sem.split('\n')) {
+    const m = line.match(/^(#{1,3})\s+(.*)/);
+    if (m) out.push({ id: `h${out.length}`, nivel: m[1].length, texto: plain(m[2]) });
+  }
+  return out;
+}
+
+export function markdown(src, prefix = '') {
   const blocks = [];
+  let hn = 0; // títulos numerados em ordem: a âncora de cada um é ${prefix}h${n}
   let s = String(src).replace(/```([\w+-]*)\n?([\s\S]*?)(```|$)/g, (_, lang, code) => {
     blocks.push(`<div class="code"><div class="code-head"><span>${esc(lang || 'código')}</span><button type="button" data-copy>${COPY}Copiar</button></div><pre><code>${esc(code.replace(/\n$/, ''))}</code></pre></div>`);
     return `\u0000${blocks.length - 1}\u0000`;
   });
   s = esc(s);
-  const inline = t => t
+  const inline = t => t.split(/(`[^`]*`)/).map((seg, i) => (i % 2 ? seg : ptNumeros(seg))).join('')
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*(?=\S)(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/__(?=\S)(.+?)__/g, '<strong>$1</strong>')
@@ -39,7 +61,7 @@ export function markdown(src) {
     const line = lines[i];
     let m;
     if ((m = line.match(/^\u0000(\d+)\u0000$/))) { flushPara(); flushList(); out.push(blocks[m[1]]); continue; }
-    if ((m = line.match(/^(#{1,3})\s+(.*)/))) { flushPara(); flushList(); out.push(`<h${m[1].length + 1}>${inline(m[2])}</h${m[1].length + 1}>`); continue; }
+    if ((m = line.match(/^(#{1,3})\s+(.*)/))) { flushPara(); flushList(); const n = m[1].length + 1; out.push(`<h${n} id="${prefix}h${hn++}">${inline(m[2])}</h${n}>`); continue; }
     if ((m = line.match(/^\s*([-*•]|\d+\.)\s+(.*)/))) { flushPara(); const t = /\d/.test(m[1]) ? 'ol' : 'ul'; if (list?.t !== t) { flushList(); list = { t, items: [] }; } list.items.push(m[2]); continue; }
     if (/^\s*(---|\*\*\*)\s*$/.test(line)) { flushPara(); flushList(); out.push('<hr>'); continue; }
     if ((m = line.match(/^&gt;\s?(.*)/))) { flushPara(); flushList(); out.push(`<blockquote>${inline(m[1])}</blockquote>`); continue; }
@@ -52,7 +74,7 @@ export function markdown(src) {
       i += 2;
       while (i < lines.length && /^\|.*\|$/.test(lines[i])) { bruto.push(lines[i]); corpo += row(lines[i++], 'td'); }
       i--;
-      out.push(`<div class="table" data-table="${bruto.join('\n')}"><div class="table-tools"><button type="button" class="link" data-copy-table="md">Copiar como Markdown</button><button type="button" class="link" data-copy-table="csv">Copiar como CSV</button></div><div class="table-scroll"><table><thead>${row(line, 'th')}</thead><tbody>${corpo}</tbody></table></div></div>`);
+      out.push(`<div class="table" data-table="${bruto.join('\n')}"><div class="table-tools"><button type="button" class="link" data-copy-table="md">Copiar como Markdown</button><button type="button" class="link" data-copy-table="csv">Copiar como CSV</button><button type="button" class="link tabela-expandir" data-expand-table>Tela cheia</button></div><div class="table-scroll"><table><thead>${row(line, 'th')}</thead><tbody>${corpo}</tbody></table></div></div>`);
       continue;
     }
     if (!line.trim()) { flushPara(); flushList(); continue; }

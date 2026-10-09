@@ -1,8 +1,8 @@
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
 import WorkspaceBar from '../workspaceBar.jsx';
 import { api, go, fmtTime, fmtSize, stepLabel, seenLabel, useMediaQuery, local, nameColor, speak, canSpeak } from '../lib.js';
-import { markdown, closeOpen, tabelaParaCsv } from '../markdown.js';
+import { markdown, closeOpen, plain, tabelaParaCsv, titulosDo } from '../markdown.js';
 import { AgentAvatar, Icon, Menu, MenuItem, StatusDot, useConfirm, EmptyState } from '../ui.jsx';
 import { useApp } from '../app.jsx';
 import Composer, { uploadFile } from '../composer.jsx';
@@ -17,7 +17,7 @@ import { AgentThread, ViaLabel } from '../agentThread.jsx';
 import { delegationCardState } from '../../../lib/agent-flow.mjs';
 import { ResizeHandle } from '../resize.jsx';
 import { OpenUIBlock, splitOpenUi } from '../openui/library.jsx';
-import ActionLine, { StallNote } from '../actionLine.jsx';
+import ActionLine, { Fontes, StallNote } from '../actionLine.jsx';
 import { useChatMenu } from '../actions.jsx';
 import { useOv } from '../overlay.jsx';
 import { botAvatarPalette } from 'bot-avatars';
@@ -105,10 +105,19 @@ function useFadeIn(ref, html, live) {
 }
 
 function MarkdownText({ text, live }) {
+  // Âncoras únicas por texto (o índice aponta para elas). Só letras, números e hífen.
+  const pid = useId().replace(/[^\w-]/g, '') + '-';
   // Markdown só é recalculado quando o texto muda; mensagens antigas nunca são refeitas.
-  const html = useMemo(() => markdown(text), [text]);
+  const html = useMemo(() => markdown(text, pid), [text, pid]);
+  const titulos = useMemo(() => (live ? [] : titulosDo(text)), [text, live]);
   const ref = useRef(null);
+  const [tabela, setTabela] = useState(null); // tabela aberta em tela cheia (HTML já pronto)
   useFadeIn(ref, html, live);
+  useEffect(() => {
+    if (!tabela) return;
+    const k = e => { if (e.key === 'Escape') setTabela(null); };
+    addEventListener('keydown', k); return () => removeEventListener('keydown', k);
+  }, [tabela]);
   const onClick = e => {
     const b = e.target.closest('[data-copy]');
     if (b) { navigator.clipboard.writeText(b.closest('.code').querySelector('code').textContent); b.lastChild.textContent = 'Copiado'; setTimeout(() => (b.lastChild.textContent = 'Copiar'), 1400); }
@@ -120,8 +129,25 @@ function MarkdownText({ text, live }) {
       const rotulo = csv ? 'Copiar como CSV' : 'Copiar como Markdown';
       t.textContent = 'Copiado'; setTimeout(() => (t.textContent = rotulo), 1400);
     }
+    // Tabela larga em tela cheia (no celular, a rolagem lateral fica apertada)
+    if (e.target.closest('[data-expand-table]')) setTabela(e.target.closest('.table')?.querySelector('table')?.outerHTML || null);
   };
-  return <div ref={ref} className={`md ${live ? 'streaming' : ''}`} onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} />;
+  const irPara = id => document.getElementById(pid + id)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  return <>
+    {titulos.length >= 4 && (
+      <nav className="indice-resposta" aria-label="Índice desta resposta">
+        <b>Neste texto</b>
+        <ol>{titulos.map(t => <li key={t.id} className={`nivel-${t.nivel}`}><button type="button" className="link" onClick={() => irPara(t.id)}>{t.texto}</button></li>)}</ol>
+      </nav>
+    )}
+    <div ref={ref} className={`md ${live ? 'streaming' : ''}`} onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} />
+    {tabela && (
+      <div className="tabela-tela-cheia" role="dialog" aria-modal="true" aria-label="Tabela em tela cheia">
+        <div className="tabela-tela-cheia-topo"><button type="button" className="btn btn-sm" onClick={() => setTabela(null)}>Fechar</button></div>
+        <div className="tabela-tela-cheia-corpo" dangerouslySetInnerHTML={{ __html: tabela }} />
+      </div>
+    )}
+  </>;
 }
 
 // Blocos ```openui viram componentes visuais; o resto segue o markdown de sempre.
@@ -165,7 +191,43 @@ function Recolhivel({ children }) {
   );
 }
 
-const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, onStop, models, group, allFiles, onFileError, deleg }) {
+/** O que a pessoa precisa para reportar um erro: a hora, a última ação e quantas já tinham terminado (itens 39 e 44). */
+function contextoDoErro(m) {
+  const acoes = (m.steps || []).filter(s => s.kind === 'tool');
+  const ultima = acoes.at(-1);
+  return { quando: m.at, etapa: ultima ? stepLabel(ultima.tool) : null, feitas: acoes.length };
+}
+
+/** "Outro modelo" e "Mais curta" para refazer a última resposta (item 25). */
+function RefazerEscolha({ models, onPick }) {
+  const [aberto, setAberto] = useState(false);
+  const opcoes = Object.entries(models || {}).slice(0, 8);
+  return (
+    <>
+      <button type="button" className="meta-btn" aria-expanded={aberto} onClick={() => setAberto(v => !v)}><Icon name="retry" size={14} /><span>Outro modelo</span></button>
+      <button type="button" className="meta-btn" onClick={() => onPick({ curta: true })}><Icon name="down" size={14} /><span>Mais curta</span></button>
+      {aberto && (
+        <div className="refazer-modelos" role="menu" aria-label="Refazer com outro modelo">
+          {opcoes.map(([id, mo]) => <button key={id} type="button" role="menuitem" className="link" onClick={() => { setAberto(false); onPick({ modelo: id }); }}>{mo?.label || id}</button>)}
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Pedidos desta conversa, para achar o começo de uma conversa longa (item 47). Resumo automático, sem modelo. */
+function ResumoConversa({ messages }) {
+  const pedidos = messages.filter(m => m.role === 'user' && m.content).map(m => plain(m.content).slice(0, 140));
+  if (!pedidos.length) return null;
+  return (
+    <details className="resumo-conversa">
+      <summary>Começo desta conversa · {pedidos.length} {pedidos.length === 1 ? 'pedido' : 'pedidos'}</summary>
+      <ol>{pedidos.slice(0, 25).map((p, i) => <li key={i}>{p}</li>)}</ol>
+    </details>
+  );
+}
+
+const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, onStop, models, group, allFiles, onFileError, deleg, onContinue, onRetryWith, onPin }) {
   // ids (resposta salva) ou objetos (chegando ao vivo)
   const { agent: getAgent } = useApp();
   const delivered = (m.files || []).map(x => (typeof x === 'string' ? allFiles?.find(f => f.id === x) : x)).filter(Boolean);
@@ -175,15 +237,23 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, on
       <div className="msg-col">
         {group && <span className="speaker" style={{ color: agentColor(agent) }}>{agent.name}</span>}
         <div className="bubble bot-bubble" tabIndex={-1}>
-          <ActionLine steps={m.steps} live={live} />
+          <ActionLine steps={m.steps} live={live} onStop={live ? onStop : undefined} />
+          {live && phase === 'approval' && <p className="action-status" role="status"><Icon name="clock" size={13} />Esperando você responder acima</p>}
           {(m.steps || []).filter(s => s.tool === 'send_message' && s.detail).map((s, i) => <span key={i} className="enviada-a">Enviada a {String(s.detail).replace(/^→\s*/, '')}</span>)}
           {live && phase === 'generate_image' && <ImageGenLoader />}
-          {live && phase !== 'approval' && <StallNote label={phase === 'text' ? 'Escrevendo' : phase === 'route' || phase === 'think' || !phase ? 'Pensando' : stepLabel(phase)} sig={`${phase}|${m.steps.length}|${m.content.length}|${m.agentId}`} onStop={onStop} slowAfterMs={phase === 'generate_image' ? 200_000 : undefined} />}
+          {live && phase !== 'approval' && <StallNote label={phase === 'text' ? 'Escrevendo' : phase === 'route' || phase === 'think' || !phase ? 'Pensando' : stepLabel(phase)} sig={`${phase}|${m.steps.length}|${m.content.length}|${m.agentId}`} slowAfterMs={phase === 'generate_image' ? 200_000 : undefined} />}
           {delivered.length > 0 && <DeliveredFiles items={delivered} onError={onFileError} />}
           {m.content ? (live ? <LiveText text={m.content} /> : <Recolhivel><Markdown text={m.content} /></Recolhivel>)
             : live ? <div className="typing" role="status" aria-live="polite"><span className="typing-dots" aria-hidden="true"><i /><i /><i /></span><span>{typingLabel(phase)}</span></div>
-            : m.error ? <ErrorNote raw={m.error} onRetry={onRetry} />
+            : m.error ? <ErrorNote raw={m.error} onRetry={onRetry} contexto={contextoDoErro(m)} />
             : m.stopped ? <p className="muted">{STOP_REASON[m.stopReason] || 'Resposta interrompida.'}</p> : null}
+          {!live && <Fontes steps={m.steps} />}
+          {(m.stopped || m.truncated) && !live && onContinue && (
+            <div className="continuar-resposta">
+              <p>{m.truncated ? 'A resposta parou no limite de tamanho.' : 'Você interrompeu a resposta.'}</p>
+              <button type="button" className="btn btn-sm" onClick={onContinue}>Continuar de onde parou</button>
+            </div>
+          )}
         </div>
         <div className="msg-meta">
           {m.at && <time>{fmtTime(m.at)}</time>}
@@ -197,6 +267,8 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, on
             <button className="meta-btn" aria-label="Copiar" onClick={() => navigator.clipboard.writeText(m.content)}><Icon name="copy" size={14} /><span>Copiar</span></button>
             {canSpeak && <button className="meta-btn" aria-label="Ouvir" onClick={() => speak(m.content)}><Icon name="volume" size={14} /><span>Ouvir</span></button>}
             {onRetry && <button className="meta-btn" aria-label="Refazer" onClick={onRetry}><Icon name="retry" size={14} /><span>Refazer</span></button>}
+            {onRetryWith && <RefazerEscolha models={models} onPick={onRetryWith} />}
+            {onPin && <button className="meta-btn" aria-pressed={!!m.fixada} onClick={onPin}><Icon name="star" size={14} /><span>{m.fixada ? 'Desafixar' : 'Fixar'}</span></button>}
           </>}
         </div>
         {m.delegations?.map(d => <Delegation key={d.messageId || d.to} to={getAgent(d.to)} task={d.task} state={delegationCardState(d, deleg?.messages, deleg?.inbox, deleg?.liveAgentId)} />)}
@@ -207,7 +279,7 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, on
       </div>
     </div>
   );
-}, (a, b) => a.m === b.m && a.agent === b.agent && a.live === b.live && a.phase === b.phase && a.group === b.group && a.allFiles === b.allFiles && a.models === b.models && a.deleg === b.deleg && !!a.onRetry === !!b.onRetry);
+}, (a, b) => a.m === b.m && a.agent === b.agent && a.live === b.live && a.phase === b.phase && a.group === b.group && a.allFiles === b.allFiles && a.models === b.models && a.deleg === b.deleg && !!a.onRetry === !!b.onRetry && !!a.onContinue === !!b.onContinue && !!a.onRetryWith === !!b.onRetryWith && !!a.onPin === !!b.onPin);
 
 const DELEG_TONE = { aguardando: 'wait', trabalhando: 'work', feito: 'ok', falhou: 'err' };
 /** Cartão no fio de quem pediu: "Pedi ao Donald: ajustar a faixa · trabalhando", e o resultado ali mesmo. */
@@ -263,7 +335,7 @@ const UserMessage = memo(function UserMessage({ m, name, files, onEdit, ack, onR
               </div>
               <p className="fine">As respostas a partir daqui serão substituídas.</p>
             </div>
-          : m.content && <div className={`bubble user-bubble${m.voice ? ' voice' : ''}`} title={m.voice ? 'Mensagem ditada' : undefined}><MentionText text={m.content} agents={S.agents} /></div>}
+          : m.content && <Recolhivel><div className={`bubble user-bubble${m.voice ? ' voice' : ''}`} title={m.voice ? 'Mensagem ditada' : undefined}><MentionText text={m.content} agents={S.agents} /></div></Recolhivel>}
         <div className="msg-meta">
           {m.at && <time className="msg-time">{fmtTime(m.at)}</time>}
           {ack?.state === 'seen' && <span className="msg-ack" role="status">{ack.label}</span>}
@@ -321,6 +393,23 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   const defaults = (c, a, group) => ({ model: c?.model || (group ? 'agent' : a?.model || S.settings.defaultModel), effort: c?.effort || a?.effort || 'auto' });
   const [choice, setChoice] = useState(() => defaults(null, agent, isGroup));
   const [interrupted, setInterrupted] = useState(false);
+  const [aviso, setAviso] = useState(null); // aviso do servidor no topo da conversa (orçamento, limite do provedor)
+  const [pendAprov, setPendAprov] = useState(0); // pedidos da Caixa esperando você nesta conversa
+  // "Novo desde a sua última visita": guarda quando esta conversa foi vista pela última vez, neste aparelho.
+  const vistoAnterior = useMemo(() => (chatId ? Number(local.get('visto.' + chatId, 0)) || 0 : 0), [chatId]);
+  useEffect(() => {
+    if (!chatId) return;
+    local.set('visto.' + chatId, Date.now());
+    return () => local.set('visto.' + chatId, Date.now());
+  }, [chatId]);
+  useEffect(() => {
+    if (!chatId) return;
+    let on = true;
+    const t = () => api('/api/approvals').then(r => { if (on) setPendAprov(r.pending.filter(a => a.chatId === chatId).length); }).catch(() => {});
+    t();
+    const h = setInterval(t, 10000);
+    return () => { on = false; clearInterval(h); };
+  }, [chatId, live]);
   const [ack, setAck] = useState(null); // { id, state: 'wait'|'seen'|'late', label, retry } da última mensagem enviada
 
   const idRef = useRef(chatId);
@@ -454,6 +543,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
 
   async function send(args, forceChoice) {
     const { text, fileIds = [], previews, mcpSession, resume = false, credentialRefs = [], voice = false } = args;
+    setAviso(null);
     const use = forceChoice || choice;
     let ackId = null;
     if (!agent) return;
@@ -520,14 +610,15 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
           if (e.turnDone) setBusy(b => { const n = { ...b }; delete n[e.turnDone]; return n; });
           if (e.route) { building.model = e.route.model; building.effort = e.route.effort; building.routed = e.route.by !== 'manual'; }
           // Primeiro uso do computador/navegador nesta resposta: o painel abre a tela ao vivo.
-          if (e.tool && /^(computer_|browser_)/.test(e.tool) && !building.steps.some(s => /^(computer_|browser_)/.test(s.tool || ''))) dispatchEvent(new CustomEvent('ripper:computer'));
+          // Tela ao vivo: avisa na conversa (com botão "Abrir tela"), sem abrir o painel sozinha.
+          if (e.tool && /^(computer_|browser_)/.test(e.tool) && !building.steps.some(s => s.kind === 'screen')) building.steps.push({ kind: 'screen', label: 'Tela ao vivo disponível' });
           // Navegador em uso: a tela aparece em miniatura (só com computador Docker, que tem a tela ao vivo)
           if ((e.screen || /^browser_/.test(e.tool || '')) && S.settings.computer?.mode === 'docker') setPip(p => p || building.agentId);
           if (e.file) building.files = [...(building.files || []), e.file]; // arquivo entregue aparece na hora
           if (e.tool) {
             // O que o agente escreveu antes da ferramenta ("Vou checar…") vira anotação na hora — igual ao que o servidor grava no fim.
             if (building.content.trim()) { building.steps.push({ kind: 'note', label: building.content.trim() }); building.content = ''; }
-            building.steps.push({ kind: 'tool', tool: e.tool, label: stepLabel(e.tool), detail: e.detail }); setPhase(e.tool);
+            building.steps.push({ kind: 'tool', tool: e.tool, label: stepLabel(e.tool), detail: e.detail, at: Date.now() }); setPhase(e.tool);
           }
           if (e.handoff) {
             const lbl = S.models[e.handoff]?.label || e.handoff;
@@ -536,7 +627,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
           }
           if (e.providerRetry) {
             const sec = Math.max(1, Math.round(e.providerRetry.waitMs / 1000));
-            building.steps.push({ kind: 'warn', label: `Limite do provedor — tentativa ${e.providerRetry.attempt}/${e.providerRetry.maxAttempts} em ~${sec}s` });
+            setAviso(`Limite do provedor: tentando de novo (${e.providerRetry.attempt} de ${e.providerRetry.maxAttempts}) em cerca de ${sec} s.`);
           }
           if (e.turnPlan) plan = e.turnPlan;
           if (e.turnDone) plan = plan.filter(id => id !== e.turnDone);
@@ -547,20 +638,21 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
             const names = e.delegated.map(id => getAgent(id)?.name || 'colega').join(', ');
             building.steps.push({ kind: 'done', label: 'Palavra delegada', detail: names });
           }
-          if (e.tokenBudget?.message) building.steps.push({ kind: 'warn', label: e.tokenBudget.message });
+          if (e.tokenBudget?.message) setAviso(e.tokenBudget.message); // aviso no topo da conversa, antes de estourar
           if (e.warn) building.steps.push({ kind: 'warn', label: e.warn });
-          if (e.subtask) { const st = building.steps.find(x => x.kind === 'subtask' && x.key === e.subtask.key); st ? Object.assign(st, e.subtask) : building.steps.push({ kind: 'subtask', ...e.subtask }); }
+          if (e.subtask) { const st = building.steps.find(x => x.kind === 'subtask' && x.key === e.subtask.key); st ? Object.assign(st, e.subtask) : building.steps.push({ kind: 'subtask', ...e.subtask, at: Date.now() }); }
           if (e.memory) building.steps.push({ kind: 'done', label: 'Guardado na memória', detail: e.memory });
           if (e.approval) { building.steps.push({ kind: 'approval', rec: e.approval, status: 'pending' }); setPhase('approval'); }
           if (e.campaign) building.steps.push({ kind: 'campaign', rec: e.campaign });
           if (e.documento) building.steps.push({ kind: 'documento', rec: e.documento });
-          if (e.approvalDone) { const st = building.steps.find(x => x.kind === 'approval' && x.rec.id === e.approvalDone.id); if (st) st.status = e.approvalDone.status; }
+          if (e.approvalDone) { const st = building.steps.find(x => x.kind === 'approval' && x.rec.id === e.approvalDone.id); if (st) { st.status = e.approvalDone.status; st.rec = { ...st.rec, decidedAt: Date.now() }; } }
           if (e.sent) building.steps.push({ kind: 'done', label: `Mensagem enviada para ${e.sent.to}`, detail: e.sent.priority === 'now' ? 'urgente' : e.sent.priority === 'low' ? 'sem pressa' : 'normal' });
           if (e.artifact) building.steps.push({ kind: 'done', label: `Artefato salvo (v${e.artifact.version})`, detail: e.artifact.title });
           if (e.skill) building.steps.push({ kind: 'done', label: 'Skill guardada', detail: e.skill });
           if (e.routine) building.steps.push({ kind: 'done', label: 'Rotina criada', detail: e.routine });
           if (e.text) { building.content += e.text; setPhase('text'); }
           if (e.stopped) building.stopped = true;
+          if (e.truncated) building.truncated = true; // o modelo parou no limite de tamanho
           if (e.interrupted) { building.interrupted = true; setInterrupted(true); }
           if (e.done) sawDone = true;
           flush();
@@ -613,9 +705,30 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   if (notFound || !agent) return <div className="page"><EmptyState title="Conversa não encontrada" body="Ela pode ter sido apagada." action={<a className="btn" href="#/chats">Ver conversas</a>} /></div>;
 
   const messages = chat?.messages || [];
+  const fixadas = messages.map((m, i) => ({ m, i })).filter(x => x.m.fixada);
+  const primeiroNovo = vistoAnterior ? messages.findIndex(m => m.at && m.at > vistoAnterior) : -1;
   const files = S.files.filter(f => f.chatId && f.chatId === chatId);
   const title = chat?.title || 'Nova conversa';
   const lastUser = [...messages].reverse().find(m => m.role === 'user');
+  // Continuar: pede que a resposta siga de onde parou (vira uma nova mensagem da pessoa, sem apagar a anterior).
+  const continuar = () => send({ text: 'Continue de onde você parou.' });
+  // Refazer com outro modelo ou mais curta: a mesma pergunta, com a escolha desta vez.
+  const refazerCom = o => (o.curta ? send({ text: 'Responda de forma mais curta, mantendo o essencial.' }) : send({ text: lastUser.content }, { ...choice, model: o.modelo }));
+  async function fixar(m) {
+    try {
+      const r = await api(`/api/chats/${chatId}/messages/${m.id}/fixar`, { method: 'POST' });
+      setChat(c => ({ ...c, messages: c.messages.map(x => (x.id === m.id ? { ...x, fixada: r.fixada || undefined } : x)) }));
+    } catch (e) { toast(e.message, 'error'); }
+  }
+  async function renomear() {
+    const t = await ov.ask({ title: 'Renomear conversa', value: title, action: 'Renomear' });
+    if (!t || !chatId) return;
+    try {
+      await api(`/api/chats/${chatId}`, { method: 'PUT', body: { title: t } });
+      setChat(c => ({ ...c, title: t }));
+      refresh();
+    } catch (e) { toast(e.message, 'error'); }
+  }
   const stop = () => { queueRef.current?.cancel(); if (chatId) api(`/api/chats/${chatId}/cancel`, { method: 'POST' }).catch(() => {}); ctrl.current?.abort(); };
   const canEdit = !!chatId && !chat?.flowRun && !live; // fluxos rodam no servidor: editar quebraria os passos
   const matches = search ? findChatMatches(messages, search.q) : [];
@@ -658,6 +771,8 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
                   <span className="who-names">{members.map((a, i) => <span key={a.id} style={{ color: agentColor(a) }}>{a.name}{i < members.length - 1 ? ', ' : ''}</span>)}</span>
                 </span>
               : <span className="who-one"><AgentAvatar agent={agent} size={24} state={live ? 'working' : undefined} paused={!live} /><b>{agent.name}</b><StatusDot status={agent.status} /></span>}
+            {chatId && <button type="button" className="chat-title-btn" onClick={renomear} aria-label={`Renomear a conversa: ${title}`} title="Renomear conversa"><span>{title}</span><Icon name="edit" size={12} /></button>}
+            {pendAprov > 0 && <span className="chip-aprovacao" role="status">{pendAprov === 1 ? '1 pedido seu' : `${pendAprov} pedidos seus`}</span>}
           </div>
           {messages.length > 0 && <button type="button" className="icon-btn chat-search-btn" aria-label="Buscar na conversa" title="Buscar na conversa (Ctrl F)" aria-expanded={!!search}
             onClick={() => { setSearch(s => s ? null : { q: '', at: 0 }); setTimeout(() => searchRef.current?.focus()); }}><Icon name="search" size={16} /></button>}
@@ -667,7 +782,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
             <Icon name="search" size={14} />
             <input ref={searchRef} className="chat-search-input" aria-label="Buscar na conversa" placeholder="Buscar na conversa…" value={search.q}
               onChange={e => setSearch({ q: e.target.value, at: 0 })}
-              onKeyDown={e => { if (e.key === 'Escape') setSearch(null); else if (e.key === 'Enter' && matches.length) { e.preventDefault(); goHit(e.shiftKey ? -1 : 1); } }} />
+              onKeyDown={e => { if (e.key === 'Escape') setSearch(null); else if (e.key === 'Enter' && matches.length) { e.preventDefault(); goHit(e.shiftKey ? -1 : 1); } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && matches.length) { e.preventDefault(); goHit(e.key === 'ArrowDown' ? 1 : -1); } }} />
             <span className="chat-search-count" aria-live="polite">{search.q.trim() ? (matches.length ? `${hit + 1} de ${matches.length}` : 'Nada encontrado') : ''}</span>
             <button type="button" className="icon-btn sm" aria-label="Resultado anterior" disabled={!matches.length} onClick={() => goHit(-1)}><Icon name="arrowUp" size={14} /></button>
             <button type="button" className="icon-btn sm" aria-label="Próximo resultado" disabled={!matches.length} onClick={() => goHit(1)}><Icon name="down" size={14} /></button>
@@ -688,15 +803,23 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
                 {!isGroup && <FirstRunChecklist settings={S.settings} agentCount={S.agents.length} />}
               </div>
             )}
-            {[...messages.map((m, i) => <div key={i} data-mi={i} className={[i >= animateFrom.current && 'is-new', matches.includes(i) && `search-hit${matches[hit] === i ? ' current' : ''}`].filter(Boolean).join(' ') || undefined}>{m.via?.type === 'inbox' && inCard.has(m.via.messageId) ? null : m.inbox ? <InboxMessage m={m} from={getAgent(m.inbox.from)} /> : m.role === 'user'
+            {messages.length >= 30 && <ResumoConversa messages={messages} />}
+            {fixadas.length > 0 && (
+              <nav className="fixadas" aria-label="Respostas fixadas">
+                <b>Fixadas</b>
+                {fixadas.map(({ m, i }) => <button key={m.id || i} type="button" className="link" onClick={() => document.querySelector(`[data-mi="${i}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })}>{plain(m.content).slice(0, 70) || 'Resposta'}</button>)}
+              </nav>
+            )}
+            {[...messages.map((m, i) => <div key={i} data-mi={i} className={[i >= animateFrom.current && 'is-new', matches.includes(i) && `search-hit${matches[hit] === i ? ' current' : ''}`].filter(Boolean).join(' ') || undefined}>{i === primeiroNovo && primeiroNovo > 0 && <div className="novas-divider" role="separator"><span>Novo desde a sua última visita</span></div>}{m.via?.type === 'inbox' && inCard.has(m.via.messageId) ? null : m.inbox ? <InboxMessage m={m} from={getAgent(m.inbox.from)} /> : m.role === 'user'
               ? <UserMessage m={m} name={S.settings.name} files={S.files} ack={m === lastUser && ack?.id === m.id ? ack : null} onRetryAck={ack?.retry} onEdit={canEdit && m.id && !/^u\d+$/.test(m.id) ? text => editFrom(m, text) : null} />
-              : <>{m.via?.type === 'inbox' && m.via.threadChatId && <ViaLabel m={m} onOpen={setThread} />}<BotMessage m={m} agent={getAgent(m.agentId) || agent} group={isGroup || (!!m.agentId && m.agentId !== agent.id)} models={S.models} allFiles={S.files} deleg={deleg} onFileError={msg => toast(msg, 'error')} onRetry={m === messages.at(-1) && lastUser ? () => send({ text: lastUser.content }) : null} /></>}</div>),
+              : <>{m.via?.type === 'inbox' && m.via.threadChatId && <ViaLabel m={m} onOpen={setThread} />}<BotMessage m={m} agent={getAgent(m.agentId) || agent} group={isGroup || (!!m.agentId && m.agentId !== agent.id)} models={S.models} allFiles={S.files} deleg={deleg} onFileError={msg => toast(msg, 'error')} onRetry={m === messages.at(-1) && lastUser ? () => send({ text: lastUser.content }) : null} onContinue={m === messages.at(-1) ? continuar : null} onRetryWith={m === messages.at(-1) && lastUser ? refazerCom : null} onPin={m.id && !m.inbox ? () => fixar(m) : null} /></>}</div>),
               live && <div key={messages.length} className="is-new"><BotMessage m={live} agent={getAgent(live.agentId) || agent} group={isGroup} live phase={phase} onStop={stop} models={S.models} deleg={deleg} /></div>]}
           </div>
           {longe && <div className="jump-end-wrap"><button type="button" className="jump-end" onClick={() => { stick.current = true; setLonge(false); setNovas(0); scroller.current?.scrollTo({ top: 1e9, behavior: 'smooth' }); }}>{novas ? `${novas} ${novas === 1 ? 'nova' : 'novas'} · ` : ''}Ir para o fim</button></div>}
         </div>
 
         <div className="chat-dock">
+          {aviso && <p className="aviso-banner" role="status"><Icon name="clock" size={13} />{aviso}<button type="button" className="link" onClick={() => setAviso(null)}>Fechar</button></p>}
           {interrupted && !live && (
             <div className="chat-recovery-banner" role="status">
               <p>Conexão interrompida — retome ou reenvie.</p>
