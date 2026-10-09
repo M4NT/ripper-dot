@@ -4,6 +4,7 @@ import { Icon, EmptyState, useConfirm } from '../ui.jsx';
 
 /** Empresas do Omie: uma entrada por empresa, com chave e segredo guardados no cofre cifrado. */
 export default function OmiePanel() {
+  const [confirm, confirmNode] = useConfirm();
   const [data, setData] = useState(null); // { companies: [{ slug, status }], vaultConfigured }
   const [form, setForm] = useState(null); // { slug, appKey, appSecret } ou null
   const [busy, setBusy] = useState(''); // '' | 'save' | 'test:<nome>' | 'remove:<nome>'
@@ -45,7 +46,6 @@ export default function OmiePanel() {
 
   const companies = data?.companies || [];
 
-  const [confirm, confirmNode] = useConfirm();
   return (
     <>
       {confirmNode}

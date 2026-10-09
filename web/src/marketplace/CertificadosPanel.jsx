@@ -22,6 +22,7 @@ function readBase64(file) {
 
 /** Certificado digital A1 por empresa (NF-e recebidas). O .pfx e a senha vão cifrados ao cofre e nunca voltam para a tela. */
 export default function CertificadosPanel() {
+  const [confirm, confirmNode] = useConfirm();
   const [data, setData] = useState(null); // { certificados, vaultConfigured }
   const [form, setForm] = useState(null); // { cnpj, file, password } ou null
   const [busy, setBusy] = useState(''); // '' | 'save' | 'remove:<cnpj>'
@@ -65,7 +66,6 @@ export default function CertificadosPanel() {
 
   const certs = data?.certificados || [];
 
-  const [confirm, confirmNode] = useConfirm();
   return (
     <>
       {confirmNode}

@@ -8,6 +8,7 @@ function newHook() {
 }
 
 export default function SocialWebhooksPanel() {
+  const [confirm, confirmNode] = useConfirm();
   const { S, refresh, toast } = useApp();
   const hooks = S.settings.social?.webhooks || [];
   const [draft, setDraft] = useState(null);
@@ -50,7 +51,6 @@ export default function SocialWebhooksPanel() {
     await saveWebhooks(hooks.map(h => h.id === hook.id ? { ...h, enabled } : h));
   }
 
-  const [confirm, confirmNode] = useConfirm();
   return (
     <>
       {confirmNode}

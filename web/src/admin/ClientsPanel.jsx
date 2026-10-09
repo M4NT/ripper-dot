@@ -12,6 +12,7 @@ const readRate = () => { try { return Number(localStorage.getItem(RATE_KEY)) || 
 
 /** Clientes (FinOps): quem é cada cliente, como as conversas chegam nele e margem estimada dos últimos 30 dias. */
 export default function ClientsPanel() {
+  const [confirm, confirmNode] = useConfirm();
   const [data, setData] = useState(null);
   const [costs, setCosts] = useState({});
   const [draft, setDraft] = useState(null); // null = fechado; { id? , ...campos }
@@ -45,7 +46,6 @@ export default function ClientsPanel() {
   const set = (k, v) => setDraft(d => ({ ...d, [k]: v }));
   const projName = id => data.projects.find(p => p.id === id)?.name || 'projeto excluído';
 
-  const [confirm, confirmNode] = useConfirm();
   return (
     <>
       {confirmNode}
