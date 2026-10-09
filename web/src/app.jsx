@@ -353,6 +353,15 @@ function Shell() {
     return () => removeEventListener('ripper:open-palette', open);
   }, []);
   useEffect(() => { setDrawer(false); document.querySelector('.main')?.scrollTo(0, 0); }, [parts.join('/')]);
+  // Título grande que encolhe ao rolar (celular): marca a casca quando a página sai do topo.
+  useEffect(() => {
+    const principal = document.querySelector('.main');
+    if (!principal) return;
+    // No elemento raiz (fora do que o React desenha), para a marca não sumir numa nova renderização.
+    const ao = () => document.documentElement.toggleAttribute('data-rolou', principal.scrollTop > 36);
+    principal.addEventListener('scroll', ao, { passive: true });
+    return () => { principal.removeEventListener('scroll', ao); document.documentElement.removeAttribute('data-rolou'); };
+  }, []);
   useEffect(() => {
     if (!S) return;
     if (parts[0] === 'enterprise') {

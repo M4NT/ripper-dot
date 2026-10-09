@@ -58,8 +58,8 @@ export default function ModelPicker({ value, onChange, group, chatId }) {
   return (
     <div className="model-bar">
     <Menu align="up" className="model-picker" trigger={({ toggle, open }) => (
-      <button type="button" className="model-pill" aria-expanded={open} aria-haspopup="dialog" onClick={toggle}>
-        <span className="model-pill-main"><Icon name="bolt" size={14} />{label}</span>
+      <button type="button" className="model-pill" aria-expanded={open} aria-haspopup="dialog" aria-label={`Modelo: ${label}${effort ? `, esforço ${effort}` : ''}`} onClick={toggle}>
+        <span className="model-pill-main"><Icon name="bolt" size={14} /><span className="model-pill-texto">{label}</span></span>
         {effort && <span className="model-pill-sub">{effort}<Icon name="down" size={12} /></span>}
         {!effort && <Icon name="down" size={13} className="model-pill-caret" />}
       </button>

@@ -176,6 +176,7 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, on
         {group && <span className="speaker" style={{ color: agentColor(agent) }}>{agent.name}</span>}
         <div className="bubble bot-bubble" tabIndex={-1}>
           <ActionLine steps={m.steps} live={live} />
+          {(m.steps || []).filter(s => s.tool === 'send_message' && s.detail).map((s, i) => <span key={i} className="enviada-a">Enviada a {String(s.detail).replace(/^→\s*/, '')}</span>)}
           {live && phase === 'generate_image' && <ImageGenLoader />}
           {live && phase !== 'approval' && <StallNote label={phase === 'text' ? 'Escrevendo' : phase === 'route' || phase === 'think' || !phase ? 'Pensando' : stepLabel(phase)} sig={`${phase}|${m.steps.length}|${m.content.length}|${m.agentId}`} onStop={onStop} slowAfterMs={phase === 'generate_image' ? 200_000 : undefined} />}
           {delivered.length > 0 && <DeliveredFiles items={delivered} onError={onFileError} />}
@@ -713,7 +714,11 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
             <ul>
               {queued.map((p, i) => (
                 <li key={i}><span>{(p.text || '').trim().slice(0, 120) || 'Anexo'}</span>
-                  <button type="button" className="link" aria-label={`Cancelar a mensagem ${i + 1} da fila`} onClick={() => setQueue(queuedRef.current.filter((_, j) => j !== i))}>Cancelar</button></li>
+                  <span className="queued-acoes">
+                    <button type="button" className="link" aria-label={`Editar a mensagem ${i + 1} da fila`} onClick={() => { setQueue(queuedRef.current.filter((_, j) => j !== i)); window.dispatchEvent(new CustomEvent('ripper:compose', { detail: { text: p.text || '', anexar: true } })); }}>Editar</button>
+                    <button type="button" className="link" aria-label={`Interromper a resposta e enviar a mensagem ${i + 1} agora`} onClick={() => { const alvo = queuedRef.current[i]; setQueue(queuedRef.current.filter((_, j) => j !== i)); stop(); setTimeout(() => send(coalesceSendParts([alvo])), 300); }}>Interromper e enviar</button>
+                    <button type="button" className="link" aria-label={`Cancelar a mensagem ${i + 1} da fila`} onClick={() => setQueue(queuedRef.current.filter((_, j) => j !== i))}>Cancelar</button>
+                  </span></li>
               ))}
             </ul>
           </div>}

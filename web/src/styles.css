@@ -2427,3 +2427,24 @@ body.agent-dragging .side-list { overflow: hidden; }
 
 /* Cargo do agente fixado: etiqueta pequena logo abaixo do nome. */
 .pin-tag { display: block; max-width: 100%; font-style: normal; font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Celular: o título grande encolhe quando a página rola para longe do topo. */
+@media (max-width: 900px) {
+  .page-head h1, .v2 .page-head h1 { transition: font-size .2s var(--out); }
+  html[data-rolou] .page-head h1, html[data-rolou] .v2 .page-head h1 { font-size: 20px; letter-spacing: -.02em; }
+}
+
+/* Fila: as ações de cada mensagem ficam numa linha só; no celular quebram sem cortar. */
+.queued-acoes { display: flex; gap: 10px; flex: none; flex-wrap: wrap; justify-content: flex-end; }
+
+/* "Enviada a X": aparece sob a resposta do agente que mandou uma mensagem a outro agente. */
+.enviada-a { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; color: var(--muted); }
+
+/* Celular: o campo mostra só o ícone do modelo; nome e esforço ficam no toque (a folha que abre). */
+@media (max-width: 900px) {
+  .model-pill-texto, .model-pill-sub { display: none; }
+  .model-pill-main { padding: 0 10px; }
+}
+
+/* Celular: a pílula de modelo, só com o ícone, continua com o alvo de toque de 44 px. */
+@media (max-width: 900px) { .model-pill { min-width: 44px; justify-content: center; } }
