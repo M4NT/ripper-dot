@@ -2421,3 +2421,9 @@ body.agent-dragging .side-list { overflow: hidden; }
 /* Dica do nome do agente no celular (o desktop usa a dica da prévia, ao lado). */
 .na-falta-movel { display: none; }
 @media (max-width: 900px) { .na-falta-movel { display: block; margin: 4px 2px 0; } }
+
+/* Cargo do agente na lista: etiqueta pequena ao lado do nome, sem empurrar a linha. */
+.row-top .row-tag { margin-left: 6px; font-size: 11px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+
+/* Cargo do agente fixado: etiqueta pequena logo abaixo do nome. */
+.pin-tag { display: block; max-width: 100%; font-style: normal; font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

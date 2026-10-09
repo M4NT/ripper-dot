@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib.js';
+import { Skeleton } from '../ui.jsx';
 
 const iso = d => d.toISOString().slice(0, 10);
 const daysAgo = n => iso(new Date(Date.now() - n * 86400_000));
@@ -84,7 +85,7 @@ export default function UsageReportPanel() {
 
       {data?.month && <MonthCost m={data.month} />}
       {err && <p className="form-error" role="alert">{err}</p>}
-      {!data && !err && <p className="muted" role="status">Carregando…</p>}
+      {!data && !err && <Skeleton rows={3} label="Carregando relatório" />}
       {empty && <p className="muted">Nenhum uso registrado neste período.</p>}
 
       {data && !empty && (

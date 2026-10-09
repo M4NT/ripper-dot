@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib.js';
-import { EmptyState } from '../ui.jsx';
+import { EmptyState, Skeleton } from '../ui.jsx';
 
 function fmtTok(n) {
   if (n == null) return '—';
@@ -62,7 +62,7 @@ export default function JuliaEconomiaPanel() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p className="muted">Carregando economia Julia…</p>;
+  if (loading) return <Skeleton rows={3} label="Carregando economia" />;
   if (err) return <p className="form-error">{err}</p>;
   if (!tokenRoi) return null;
 

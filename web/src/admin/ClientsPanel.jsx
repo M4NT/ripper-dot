@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib.js';
-import { useConfirm } from '../ui.jsx';
+import { useConfirm, Skeleton } from '../ui.jsx';
 
 const iso = d => d.toISOString().slice(0, 10);
 const brl = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -42,7 +42,7 @@ export default function ClientsPanel() {
     try { await api(`/api/admin/clients/${c.id}`, { method: 'DELETE' }); load(); } catch (e) { setErr(e.message); }
   };
 
-  if (!data) return err ? <p className="form-error" role="alert">{err}</p> : <p className="muted" role="status">Carregando…</p>;
+  if (!data) return err ? <p className="form-error" role="alert">{err}</p> : <Skeleton rows={3} label="Carregando clientes" />;
   const set = (k, v) => setDraft(d => ({ ...d, [k]: v }));
   const projName = id => data.projects.find(p => p.id === id)?.name || 'projeto excluído';
 
