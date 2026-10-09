@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib.js';
-import { Icon, EmptyState, useConfirm } from '../ui.jsx';
+import { Icon, EmptyState, useConfirm, useErroCampo } from '../ui.jsx';
 
 /** Empresas do Omie: uma entrada por empresa, com chave e segredo guardados no cofre cifrado. */
 export default function OmiePanel() {
@@ -10,6 +10,9 @@ export default function OmiePanel() {
   const [busy, setBusy] = useState(''); // '' | 'save' | 'test:<nome>' | 'remove:<nome>'
   const [err, setErr] = useState('');
   const [note, setNote] = useState('');
+  const erroSlug = useErroCampo(form?.slug ?? '', v => (v.trim() ? null : 'Dê o nome da empresa como está no Omie.'));
+  const erroKey = useErroCampo(form?.appKey ?? '', v => (v.trim() ? null : 'Cole a chave do aplicativo.'));
+  const erroSecret = useErroCampo(form?.appSecret ?? '', v => (v.trim() ? null : 'Cole o segredo do aplicativo.'));
 
   useEffect(() => {
     api('/api/omie').then(setData).catch(e => setErr(e.message));
@@ -80,9 +83,12 @@ export default function OmiePanel() {
         )}
       {form && (
         <form className="mp-social-form" onSubmit={add}>
-          <label className="field">Nome Omie da empresa<input className="input" value={form.slug} onChange={e => setForm({ ...form, slug: e.target.value })} placeholder="ecmach" autoComplete="off" maxLength={60} /></label>
-          <label className="field">Chave do aplicativo<input className="input" value={form.appKey} onChange={e => setForm({ ...form, appKey: e.target.value })} autoComplete="off" /></label>
-          <label className="field">Segredo do aplicativo<input className="input" type="password" value={form.appSecret} onChange={e => setForm({ ...form, appSecret: e.target.value })} autoComplete="new-password" /></label>
+          <label className="field">Nome Omie da empresa<input className="input" value={form.slug} onChange={e => setForm({ ...form, slug: e.target.value })} onBlur={erroSlug.onBlur} {...erroSlug.attrs} placeholder="ecmach" autoComplete="off" maxLength={60} /></label>
+          {erroSlug.erro}
+          <label className="field">Chave do aplicativo<input className="input" value={form.appKey} onChange={e => setForm({ ...form, appKey: e.target.value })} onBlur={erroKey.onBlur} {...erroKey.attrs} autoComplete="off" /></label>
+          {erroKey.erro}
+          <label className="field">Segredo do aplicativo<input className="input" type="password" value={form.appSecret} onChange={e => setForm({ ...form, appSecret: e.target.value })} onBlur={erroSecret.onBlur} {...erroSecret.attrs} autoComplete="new-password" /></label>
+          {erroSecret.erro}
           <div className="set-actions">
             <button type="button" className="btn" disabled={!!busy} onClick={() => setForm(null)}>Cancelar</button>
             <button type="submit" className="btn btn-primary" disabled={!!busy}>{busy === 'save' ? 'Salvando…' : 'Salvar empresa'}</button>

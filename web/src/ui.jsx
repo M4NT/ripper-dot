@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { BotAvatar } from 'bot-avatars';
 import { Liquid } from 'liquid-gooey';
@@ -326,6 +326,23 @@ export function Skeleton({ rows = 3, label = 'Carregando' }) {
       ))}
     </div>
   );
+}
+
+/**
+ * Erro de campo padrão (30): só aparece depois que a pessoa sai do campo.
+ * Uso: const nome = useErroCampo(valor, v => (v.trim() ? null : 'Mensagem')); ...onBlur={nome.onBlur} {...nome.attrs} ... {nome.erro}
+ * O erro fica depois do label (não dentro), para não mudar o nome acessível do campo.
+ */
+export function useErroCampo(valor, validar) {
+  const [tocado, setTocado] = useState(false);
+  const id = useId();
+  const msg = validar(valor) || null;
+  const mostra = tocado && msg;
+  return {
+    onBlur: () => setTocado(true),
+    attrs: mostra ? { 'aria-invalid': true, 'aria-describedby': id } : {},
+    erro: mostra ? <p className="campo-erro" id={id} role="alert">{msg}</p> : null,
+  };
 }
 
 export function EmptyState({ title, body, action }) {

@@ -96,6 +96,7 @@ import {
 } from './lib/corporate-audit.mjs';
 import { newHookToken, verifySignature, eventMeta } from './lib/hooks.mjs';
 import { startTelaVigia } from './lib/tela-vigia.mjs';
+import { proximasExecucoes } from './lib/routine-agenda.mjs';
 import { recordUsage, usageSummary, accountLimits, contextBreakdown, checkSendQuota, compactChat, parseProviderLimitFromError, recordProviderSignal } from './lib/usage.mjs';
 import { checkRunBudget, ToolLoopDetector, tokenBudgetAlertFromCheck } from './lib/token-budget-governor.mjs';
 import { buildUsageContract, normalizeContextWindow } from './lib/usage-api.mjs';
@@ -3312,6 +3313,11 @@ const routes = [
   ['GET', /^\/api\/skills\/market$/, () => listMarketSkills()],
   ['POST', /^\/api\/skills\/market\/([\w-]+)$/, async (req, [sid]) => { await installMarketSkill(sid); return listMarketSkills(); }],
   ['DELETE', /^\/api\/skills\/market\/([\w-]+)$/, (req, [sid]) => { uninstallMarketSkill(sid); return listMarketSkills(); }],
+  // Agenda: o que vai disparar nos próximos dias (7 por padrão). Mesma regra do agendador.
+  ['GET', /^\/api\/routines\/agenda$/, (req, _, url) => {
+    const dias = Math.min(14, Math.max(1, Number(url.searchParams.get('dias')) || 7));
+    return proximasExecucoes(db.routines, new Date(), { dias, agentes: db.agents });
+  }],
   ['POST', /^\/api\/routines$/, async req => {
     const b = await body(req); agentOr404(b.agentId);
     const routineGate = canDelegate(

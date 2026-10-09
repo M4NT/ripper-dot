@@ -143,11 +143,36 @@ export default function AgentConfig({ id }) {
   const sujo = useRef(false); sujo.current = !!dirty;
   const confirmRef = useRef(confirm); confirmRef.current = confirm;
   useEffect(() => guardaSaida(destino => {
-    if (!sujo.current) return false;
+    if (saindo.current || !sujo.current) return false;
     confirmRef.current({ title: 'Sair sem salvar?', body: 'As alterações deste agente ainda não foram salvas.', action: 'Sair sem salvar', danger: true })
-      .then(sair => { if (sair) { sujo.current = false; go(destino); } });
+      .then(sair => { if (sair) sairPara(destino); });
     return true;
   }), []);
+  // Botão "voltar" do navegador com alterações não salvas: uma entrada extra no histórico segura a tela enquanto a pergunta está aberta.
+  const seguraHistorico = useRef(false);
+  const saindo = useRef(false);
+  const sairPara = destino => {
+    saindo.current = true; // a renderização seguinte não pode voltar a travar a saída
+    if (seguraHistorico.current) {
+      seguraHistorico.current = false;
+      addEventListener('popstate', () => go(destino), { once: true });
+      history.back(); // tira a entrada extra e depois segue para o destino
+    } else go(destino);
+  };
+  useEffect(() => {
+    if (dirty && !seguraHistorico.current) { history.pushState({ ripperSaida: true }, '', location.href); seguraHistorico.current = true; }
+    if (!dirty && seguraHistorico.current) { seguraHistorico.current = false; history.back(); } // salvou: tira a entrada extra
+  }, [dirty]);
+  useEffect(() => {
+    const aoVoltar = async () => {
+      if (saindo.current || !sujo.current) return;
+      history.pushState({ ripperSaida: true }, '', location.href); // segura de novo enquanto pergunta
+      const sair = await confirmRef.current({ title: 'Sair sem salvar?', body: 'As alterações deste agente ainda não foram salvas.', action: 'Sair sem salvar', danger: true });
+      if (sair) { saindo.current = true; seguraHistorico.current = false; history.go(-2); }
+    };
+    addEventListener('popstate', aoVoltar);
+    return () => removeEventListener('popstate', aoVoltar);
+  }, []);
   if (!agent || !v) return <div className="page"><EmptyState title="Agente não encontrado" action={<a className="btn" href="#/agents">Ver agentes</a>} /></div>;
   const set = p => setV(x => ({ ...x, ...p }));
 

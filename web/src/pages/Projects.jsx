@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useApp } from '../app.jsx';
 import { api, go, fmtAgo } from '../lib.js';
-import { AgentAvatar, Dialog, Icon, EmptyState } from '../ui.jsx';
+import { AgentAvatar, Dialog, Icon, EmptyState, useErroCampo } from '../ui.jsx';
 
 export function AgentPicker({ agents, value, onChange }) {
   const toggle = id => onChange(value.includes(id) ? value.filter(x => x !== id) : [...value, id]);
@@ -22,6 +22,7 @@ export function NewProjectDialog({ open, onClose }) {
   const { S, refresh, toast } = useApp();
   const [v, setV] = useState({ name: '', description: '', agentIds: S.agents.slice(0, 3).map(a => a.id) });
   const [saving, setSaving] = useState(false);
+  const erroNome = useErroCampo(v.name, x => (x.trim() ? null : 'Dê um nome ao projeto.'));
   async function create(e) {
     e.preventDefault();
     if (!v.name.trim()) return;
@@ -34,7 +35,8 @@ export function NewProjectDialog({ open, onClose }) {
     <Dialog open={open} onClose={onClose} className="project-dialog" label="Novo projeto">
       <form onSubmit={create}>
         <div className="dialog-head"><h2>Novo projeto</h2><button type="button" className="icon-btn" onClick={onClose} aria-label="Fechar"><Icon name="x" /></button></div>
-        <label className="field">Nome<input autoFocus value={v.name} maxLength={80} onChange={e => setV({ ...v, name: e.target.value })} placeholder="Ex.: Lançamento do app" required /></label>
+        <label className="field">Nome<input autoFocus value={v.name} maxLength={80} onChange={e => setV({ ...v, name: e.target.value })} onBlur={erroNome.onBlur} {...erroNome.attrs} placeholder="Ex.: Lançamento do app" required /></label>
+        {erroNome.erro}
         <label className="field">Objetivo<textarea rows={2} value={v.description} maxLength={300} onChange={e => setV({ ...v, description: e.target.value })} placeholder="O que este projeto precisa entregar." /></label>
         <div className="field"><span>Agentes do projeto</span><AgentPicker agents={S.agents} value={v.agentIds} onChange={agentIds => setV({ ...v, agentIds })} /></div>
         <div className="row end"><button type="button" className="btn" onClick={onClose}>Cancelar</button><button className="btn btn-primary" disabled={!v.name.trim() || saving}>{saving ? 'Criando…' : 'Criar projeto'}</button></div>

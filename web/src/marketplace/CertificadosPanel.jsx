@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib.js';
-import { Icon, EmptyState, useConfirm } from '../ui.jsx';
+import { Icon, EmptyState, useConfirm, useErroCampo } from '../ui.jsx';
 
 const fmtCnpj = d => String(d).replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
 const fmtData = iso => new Date(iso).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
@@ -28,6 +28,8 @@ export default function CertificadosPanel() {
   const [busy, setBusy] = useState(''); // '' | 'save' | 'remove:<cnpj>'
   const [err, setErr] = useState('');
   const [note, setNote] = useState('');
+  const erroCnpj = useErroCampo(form?.cnpj ?? '', v => (v.replace(/\D/g, '').length === 14 ? null : 'O CNPJ tem 14 números.'));
+  const erroSenha = useErroCampo(form?.password ?? '', v => (v ? null : 'Digite a senha do certificado.'));
 
   useEffect(() => {
     api('/api/certificados').then(setData).catch(e => setErr(e.message));
@@ -103,9 +105,11 @@ export default function CertificadosPanel() {
         )}
       {form && (
         <form className="mp-social-form" onSubmit={save}>
-          <label className="field">CNPJ da empresa<input className="input" inputMode="numeric" value={form.cnpj} onChange={e => setForm({ ...form, cnpj: e.target.value })} placeholder="00.000.000/0001-00" autoComplete="off" maxLength={18} /></label>
+          <label className="field">CNPJ da empresa<input className="input" inputMode="numeric" value={form.cnpj} onChange={e => setForm({ ...form, cnpj: e.target.value })} onBlur={erroCnpj.onBlur} {...erroCnpj.attrs} placeholder="00.000.000/0001-00" autoComplete="off" maxLength={18} /></label>
+          {erroCnpj.erro}
           <label className="field">Arquivo do certificado (.pfx ou .p12)<input className="input" type="file" accept=".pfx,.p12,application/x-pkcs12" onChange={e => setForm({ ...form, file: e.target.files?.[0] || null })} /></label>
-          <label className="field">Senha do certificado<input className="input" type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} autoComplete="off" /></label>
+          <label className="field">Senha do certificado<input className="input" type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} onBlur={erroSenha.onBlur} {...erroSenha.attrs} autoComplete="off" /></label>
+          {erroSenha.erro}
           <div className="set-actions">
             <button type="button" className="btn" disabled={!!busy} onClick={() => { setForm(null); setErr(''); }}>Cancelar</button>
             <button type="submit" className="btn btn-primary" disabled={!!busy}>{busy === 'save' ? 'Conferindo…' : 'Guardar certificado'}</button>
