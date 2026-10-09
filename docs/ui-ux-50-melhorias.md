@@ -84,7 +84,7 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 
 ## Desempenho (47–50)
 
-47. **Virtualizar a lista de mensagens** em conversas longas, depois de medir uma conversa com 500 mensagens. [grande] Ref.: `createChatVirtualizer`.
+47. **Virtualizar a lista de mensagens** em conversas longas, depois de medir uma conversa com 500 mensagens. [grande] Ref.: `createChatVirtualizer`. *Medido (lote 6): uma conversa de 500 mensagens abre em 0,47 s, com 8.505 elementos no DOM, e subir ao topo leva menos de 0,3 s. Por enquanto a virtualização não compensa; reavaliar com cerca de 2.000 mensagens.*
 48. **Miniaturas de imagem com tamanho fixo e carregamento preguiçoso**, sem salto de layout. [rápido] *Carregamento preguiçoso já existe nas miniaturas de mensagem; falta tamanho fixo.* Ref.: `MediaLightbox`, `fileThumb`. Onde: `fileThumb.jsx`, `MediaLightbox.jsx`. *Parcial: as miniaturas já têm tamanho fixo. Falta reservar espaço nas imagens grandes, que precisa de largura e altura conhecidas.*
 49. **Reduzir o CSS global** (107 KB hoje), separando o que só algumas telas usam. [médio] Onde: `styles.css`.
 50. **Medir INP e LCP no celular** e definir limites antes de cada rodada de mudança. [rápido] Ref.: `ANALYTICS.md` do OpenBot. *Lote 4: `scripts/medir-web.mjs`. Referência local: LCP de 0,9 s nas conversas, 0,9 s nos agentes, 0,9 s na caixa; toque de 48 ms. Emulado no Chromium, não é aparelho real.*
