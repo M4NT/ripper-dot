@@ -452,7 +452,7 @@ function Shell() {
     parts[0] === 'settings' ? <div className="hub-settings"><button className="icon-btn hub-close" aria-label="Fechar" onClick={closeHub}><Icon name="x" /></button><Settings theme={theme} toggleTheme={toggleTheme} tab={parts[1]} /></div> : <Integrations />;
 
   return (
-    <div className={`shell ${drawer ? 'drawer-open' : ''} ${collapsed && !mobile ? 'side-collapsed' : ''}`}>
+    <div className={`shell ${drawer ? 'drawer-open' : ''} ${collapsed && !mobile ? 'side-collapsed' : ''} ${mobile && page?.type !== Chat ? 'has-tabbar' : ''}`}>
       <Sidebar onNavigate={() => setDrawer(false)} onSearch={() => setPalette(true)} theme={theme} toggleTheme={toggleTheme}
         collapsed={collapsed && !mobile} onCollapse={mobile ? null : toggleCollapsed} />
       {mobile && <button className="scrim" aria-label={t('shell.closeMenu')} onClick={() => setDrawer(false)} tabIndex={drawer ? 0 : -1} />}
@@ -469,6 +469,23 @@ function Shell() {
         )}
         <Suspense fallback={<div className="page-loading"><ThinkingOrb state="breathing" size={20} /></div>}>{page}</Suspense>
       </main>
+      {mobile && page?.type !== Chat && (() => {
+        // Barra de abas do celular (padrão iOS): Início, Agentes e Caixa; o resto fica em Mais (menu).
+        const abas = [['chats', 'chat', 'nav.chats'], ['agents', 'agents', 'nav.agents'], ['inbox', 'inbox', 'nav.inbox']];
+        const ativa = abas.some(([r]) => r === p0) ? p0 : 'mais';
+        return (
+          <nav className="tabbar" aria-label={t('shell.tabs')}>
+            {abas.map(([rota, icone, rotulo]) => (
+              <button key={rota} type="button" className={ativa === rota ? 'on' : ''} aria-current={ativa === rota ? 'page' : undefined} onClick={() => go(`/${rota}`)}>
+                <Icon name={icone} size={22} /><span>{t(rotulo)}</span>
+              </button>
+            ))}
+            <button type="button" className={ativa === 'mais' ? 'on' : ''} aria-current={ativa === 'mais' ? 'page' : undefined} onClick={() => setDrawer(true)}>
+              <Icon name="more" size={22} /><span>{t('shell.more')}</span>
+            </button>
+          </nav>
+        );
+      })()}
       {hubPage && (
         <div className="hub-overlay" onMouseDown={e => e.target === e.currentTarget && closeHub()}>
           <div ref={hubRef} className="hub-modal" role="dialog" aria-modal="true" aria-label={parts[0] === 'settings' ? t('nav.settings') : parts[0] === 'saude' ? 'Saúde do Ripper' : parts[0] === 'ajuda' ? 'Ajuda' : 'Conectar aplicativos'}>

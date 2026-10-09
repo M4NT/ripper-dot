@@ -64,6 +64,8 @@ export default {
   'shell.closeMenu': 'Fechar menu',
   'shell.openMenu': 'Abrir menu',
   'shell.brand': 'Ripper',
+  'shell.tabs': 'Navegação principal',
+  'shell.more': 'Mais',
   'shell.modeSimple': 'Simples',
 
   'settings.title': 'Configurações',

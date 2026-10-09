@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib.js';
+import { useConfirm } from '../ui.jsx';
 
 const iso = d => d.toISOString().slice(0, 10);
 const brl = v => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -11,6 +12,7 @@ const readRate = () => { try { return Number(localStorage.getItem(RATE_KEY)) || 
 
 /** Clientes (FinOps): quem é cada cliente, como as conversas chegam nele e margem estimada dos últimos 30 dias. */
 export default function ClientsPanel() {
+  const [confirm, confirmNode] = useConfirm();
   const [data, setData] = useState(null);
   const [costs, setCosts] = useState({});
   const [draft, setDraft] = useState(null); // null = fechado; { id? , ...campos }
@@ -36,7 +38,7 @@ export default function ClientsPanel() {
     } catch (e2) { setErr(e2.message); }
   };
   const remove = async c => {
-    if (!confirm(`Excluir o cliente ${c.name}? O uso dele passa a aparecer em Sem cliente.`)) return;
+    if (!(await confirm({ title: `Excluir o cliente ${c.name}?`, body: 'O uso dele passa a aparecer em Sem cliente.', danger: true, action: 'Excluir' }))) return;
     try { await api(`/api/admin/clients/${c.id}`, { method: 'DELETE' }); load(); } catch (e) { setErr(e.message); }
   };
 
@@ -45,6 +47,8 @@ export default function ClientsPanel() {
   const projName = id => data.projects.find(p => p.id === id)?.name || 'projeto excluído';
 
   return (
+    <>
+      {confirmNode}
     <div className="metering-panel">
       <div className="usage-report-filters">
         <button type="button" className="btn btn-sm" onClick={() => setDraft({ ...EMPTY })}>Novo cliente</button>
@@ -104,5 +108,6 @@ export default function ClientsPanel() {
       )}
       <p className="muted small">Tudo aqui é estimativa: custo dos últimos 30 dias convertido pela cotação acima (~ = parte do custo estimada pelo catálogo; respostas pagas usam o custo real). Uso anterior ao cadastro do cliente só entra se a conversa tiver a tag ou projeto.</p>
     </div>
+    </>
   );
 }

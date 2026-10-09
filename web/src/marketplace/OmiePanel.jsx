@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib.js';
-import { Icon, EmptyState } from '../ui.jsx';
+import { Icon, EmptyState, useConfirm } from '../ui.jsx';
 
 /** Empresas do Omie: uma entrada por empresa, com chave e segredo guardados no cofre cifrado. */
 export default function OmiePanel() {
+  const [confirm, confirmNode] = useConfirm();
   const [data, setData] = useState(null); // { companies: [{ slug, status }], vaultConfigured }
   const [form, setForm] = useState(null); // { slug, appKey, appSecret } ou null
   const [busy, setBusy] = useState(''); // '' | 'save' | 'test:<nome>' | 'remove:<nome>'
@@ -36,7 +37,7 @@ export default function OmiePanel() {
   }
 
   async function remove(slug) {
-    if (!confirm(`Remover ${slug}? A chave dela sai do cofre.`)) return;
+    if (!(await confirm({ title: `Remover ${slug}?`, body: 'A chave dela sai do cofre.', danger: true, action: 'Remover' }))) return;
     setBusy('remove:' + slug); setErr(''); setNote('');
     try { const r = await api(`/api/omie/companies/${slug}`, { method: 'DELETE' }); setData(d => ({ ...d, companies: r.companies })); }
     catch (x) { setErr(x.message); }
@@ -46,6 +47,8 @@ export default function OmiePanel() {
   const companies = data?.companies || [];
 
   return (
+    <>
+      {confirmNode}
     <section className="set-card mp-omie" aria-labelledby="omie-title">
       <header>
         <h3 id="omie-title">Empresas no Omie</h3>
@@ -96,5 +99,6 @@ export default function OmiePanel() {
       {err && <p className="form-error" role="alert">{err}</p>}
       {note && <p className="set-card-desc">{note}</p>}
     </section>
+    </>
   );
 }

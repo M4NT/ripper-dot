@@ -104,7 +104,7 @@ export default function NewAgent() {
         <h1>Novo agente</h1>
         <div className="grow" />
         <button type="button" className="btn" onClick={() => go('/agents')}>Cancelar</button>
-        <button className="btn btn-primary" disabled={saving || !v.name.trim()}>{saving ? 'Criando…' : 'Criar agente'}</button>
+        <button className="btn btn-primary" disabled={saving || !v.name.trim()} title={!v.name.trim() ? 'Falta o nome do agente' : undefined}>{saving ? 'Criando…' : 'Criar agente'}</button>
       </header>
 
       <div className="na-grid">
