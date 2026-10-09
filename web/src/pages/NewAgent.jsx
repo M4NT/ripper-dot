@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { BotAvatar } from 'bot-avatars';
 import { useApp } from '../app.jsx';
 import { api, go, useRoute, fmtSize, TOOL_INFO, TONES, useDark } from '../lib.js';
-import { AgentAvatar, Icon, Select, Switch } from '../ui.jsx';
+import { AgentAvatar, Icon, Select, Switch, useErroCampo } from '../ui.jsx';
 import { EffortScale, MODEL_DESC } from '../modelPicker.jsx';
 import { uploadFile } from '../composer.jsx';
 
@@ -40,7 +40,7 @@ export default function NewAgent() {
   }));
   const [files, setFiles] = useState([]);
   const [look, setLook] = useState(false);
-  const [nomeTocado, setNomeTocado] = useState(false); // o erro do nome só aparece depois que a pessoa sai do campo
+  const erroNome = useErroCampo(v.name, x => (x.trim() ? null : 'Dê um nome ao agente para continuar.'));
   const [more, setMore] = useState(!!first?.instructions);
   const [saving, setSaving] = useState(false);
   const [sentence, setSentence] = useState('');
@@ -186,10 +186,10 @@ export default function NewAgent() {
                 <span className="na-avatar-edit"><Icon name="edit" size={13} /></span>
               </button>
               <div className="na-fields">
-                <input ref={nameRef} className="na-name" value={v.name} maxLength={60} onChange={e => set({ name: e.target.value })} onBlur={() => setNomeTocado(true)} aria-invalid={nomeTocado && !v.name.trim()} aria-describedby={nomeTocado && !v.name.trim() ? 'na-name-erro' : undefined} placeholder="Nome do agente" aria-label="Nome do agente" autoFocus={!first} />
+                <input ref={nameRef} className="na-name" value={v.name} maxLength={60} onChange={e => set({ name: e.target.value })} onBlur={erroNome.onBlur} {...erroNome.attrs} placeholder="Nome do agente" aria-label="Nome do agente" autoFocus={!first} />
                 <input className="input" value={v.description} maxLength={200} onChange={e => set({ description: e.target.value })} placeholder="Ex.: Analisa planilhas e explica os números em linguagem simples." aria-label="O que ele faz" />
-                {!nomeTocado && !v.name.trim() && <p className="na-falta-movel muted small">Falta só o nome do agente.</p>}
-                {nomeTocado && !v.name.trim() && <p className="form-error" id="na-name-erro" role="alert">Dê um nome ao agente para continuar.</p>}
+                {!erroNome.erro && !v.name.trim() && <p className="na-falta-movel muted small">Falta só o nome do agente.</p>}
+                {erroNome.erro}
               </div>
             </div>
             {look && (

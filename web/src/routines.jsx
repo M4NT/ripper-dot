@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useApp } from './app.jsx';
 import { api, fmtAgo } from './lib.js';
-import { Icon, Select, Switch } from './ui.jsx';
+import { Icon, Select, Switch, useErroCampo } from './ui.jsx';
 import ErrorNote from './errorNote.jsx';
 
 const DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -49,7 +49,8 @@ export function RoutineForm({ agentId, flow, onDone }) {
   const { S, refresh, toast } = useApp();
   const blank = { name: flow ? flow.name : '', prompt: '', kind: 'daily', when: '08:00', weekday: '', quiet: !flow, secret: '', keywords: '', scope: 'contacts' };
   const [f, setF] = useState(blank);
-  const waOn = !!S.settings.whatsappWeb?.agentId || !!S.settings.whatsappWeb?.enabled;
+  const erroNome = useErroCampo(f.name, v => (v.trim() ? null : 'Dê um nome para a rotina.'));
+  const waOn =!!S.settings.whatsappWeb?.agentId || !!S.settings.whatsappWeb?.enabled;
   async function add() {
     if (!flow && !f.prompt.trim()) return toast('Diga o que a rotina deve fazer.', 'error');
     const when = f.kind === 'webhook' ? { trigger: 'webhook', hookSecret: f.secret || undefined }
@@ -66,7 +67,8 @@ export function RoutineForm({ agentId, flow, onDone }) {
   return (
     <div className="card-form">
       <h3 className="sub">{flow ? 'Quando rodar este fluxo' : 'Nova rotina'}</h3>
-      <label className="field">Nome<input value={f.name} onChange={e => setF({ ...f, name: e.target.value })} placeholder={f.kind === 'webhook' ? 'Revisar PRs' : 'Resumo de IA'} /></label>
+      <label className="field">Nome<input value={f.name} onChange={e => setF({ ...f, name: e.target.value })} onBlur={erroNome.onBlur} {...erroNome.attrs} placeholder={f.kind === 'webhook' ? 'Revisar PRs' : 'Resumo de IA'} /></label>
+      {erroNome.erro}
       <label className="field">{flow ? 'Contexto extra (opcional)' : 'O que fazer'}<textarea rows={flow ? 2 : 3} value={f.prompt} onChange={e => setF({ ...f, prompt: e.target.value })} placeholder={flow ? 'Ex.: foque em clientes de São Paulo. O evento (e-mail, mensagem…) já chega ao fluxo sozinho.' : ph} /></label>
       <div className="row wrap-row">
         <Select label="Quando" value={f.kind} onChange={kind => setF({ ...f, kind, when: kind === 'every' ? '60' : '08:00' })}
