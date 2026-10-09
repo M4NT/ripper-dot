@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../app.jsx';
-import { api, go, useRoute, fmtSize, fmtAgo, fmtTime, stepLabel } from '../lib.js';
+import { api, go, guardaSaida, useRoute, fmtSize, fmtAgo, fmtTime, stepLabel } from '../lib.js';
 import { AgentAvatar, Icon, Segmented, StatusDot, EmptyState, useConfirm, Select, Switch } from '../ui.jsx';
 import { Basics, Behavior, Tools, Appearance, ModelPick, VoiceStyle, InstructionsField, agentStyleDraft } from '../agentForm.jsx';
 import { AutonomySemaphore } from '../autonomy.jsx';
@@ -139,6 +139,15 @@ export default function AgentConfig({ id }) {
     const f = e => { e.preventDefault(); e.returnValue = ''; };
     addEventListener('beforeunload', f); return () => removeEventListener('beforeunload', f);
   }, [dirty]);
+  // Sair da tela com alterações não salvas (botões, links internos): pergunta com o diálogo do app antes de trocar.
+  const sujo = useRef(false); sujo.current = !!dirty;
+  const confirmRef = useRef(confirm); confirmRef.current = confirm;
+  useEffect(() => guardaSaida(destino => {
+    if (!sujo.current) return false;
+    confirmRef.current({ title: 'Sair sem salvar?', body: 'As alterações deste agente ainda não foram salvas.', action: 'Sair sem salvar', danger: true })
+      .then(sair => { if (sair) { sujo.current = false; go(destino); } });
+    return true;
+  }), []);
   if (!agent || !v) return <div className="page"><EmptyState title="Agente não encontrado" action={<a className="btn" href="#/agents">Ver agentes</a>} /></div>;
   const set = p => setV(x => ({ ...x, ...p }));
 

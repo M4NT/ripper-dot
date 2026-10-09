@@ -46,14 +46,26 @@ export function markdown(src) {
     if (/^\|.*\|$/.test(line) && /^\|[\s:|-]+\|$/.test(lines[i + 1] || '')) {
       flushPara(); flushList();
       const row = (l, tag) => `<tr>${l.slice(1, -1).split('|').map(c => `<${tag}>${inline(c.trim())}</${tag}>`).join('')}</tr>`;
-      let html = `<div class="table"><table><thead>${row(line, 'th')}</thead><tbody>`;
+      // Guarda o texto original (já escapado) da tabela, para copiar como Markdown ou CSV.
+      const bruto = [line, lines[i + 1]];
+      let corpo = '';
       i += 2;
-      while (i < lines.length && /^\|.*\|$/.test(lines[i])) html += row(lines[i++], 'td');
-      i--; out.push(html + '</tbody></table></div>'); continue;
+      while (i < lines.length && /^\|.*\|$/.test(lines[i])) { bruto.push(lines[i]); corpo += row(lines[i++], 'td'); }
+      i--;
+      out.push(`<div class="table" data-table="${bruto.join('\n')}"><div class="table-tools"><button type="button" class="link" data-copy-table="md">Copiar como Markdown</button><button type="button" class="link" data-copy-table="csv">Copiar como CSV</button></div><div class="table-scroll"><table><thead>${row(line, 'th')}</thead><tbody>${corpo}</tbody></table></div></div>`);
+      continue;
     }
     if (!line.trim()) { flushPara(); flushList(); continue; }
     flushList(); para.push(line);
   }
   flushPara(); flushList();
   return out.join('').replace(/\u0000(\d+)\u0000/g, (_, n) => blocks[n]);
+}
+
+/** Tabela em Markdown (texto original) -> CSV com ";", que o Excel em português abre direto. */
+export function tabelaParaCsv(raw) {
+  const linhas = String(raw || '').split('\n').filter(Boolean);
+  const celulas = l => l.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
+  const campo = c => (/[";\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c);
+  return linhas.filter((_, i) => i !== 1).map(l => celulas(l).map(campo).join(';')).join('\n');
 }

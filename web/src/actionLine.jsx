@@ -71,6 +71,14 @@ function collapse(steps) {
  * Faixa central de atividades: comandos e status do agente ficam recolhidos numa linha
  * expansível (estilo faixa de ferramentas), em vez de uma lista longa na bolha.
  */
+// Tempo do passo que está rodando, ao lado da frase ("Pesquisando na web · 12 s"). Atualiza sozinho a cada segundo.
+function Tempo({ desde }) {
+  const [agora, setAgora] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setAgora(Date.now()), 1000); return () => clearInterval(t); }, []);
+  const s = Math.max(0, Math.floor((agora - desde) / 1000));
+  return <span className="action-line-tempo"> · {s < 60 ? `${s} s` : `${Math.floor(s / 60)} min`}</span>;
+}
+
 export default function ActionLine({ steps, live }) {
   const [open, setOpen] = useState(false);
 
@@ -125,7 +133,7 @@ export default function ActionLine({ steps, live }) {
             disabled={!canExpand}
           >
             {running ? <ThinkingOrb state={ORB[last.tool] || 'working'} size={20} /> : <Icon name={leadIcon} size={15} />}
-            <span className="action-line-text">{summarize(activity, live)}</span>
+            <span className="action-line-text">{summarize(activity, live)}{running && last?.at && <Tempo desde={last.at} />}</span>
             {(() => { const n = activity.filter(s => s.kind !== 'note').length; return n > 1 && <span className="action-line-badge">{n}</span>; })()}
             {canExpand && <Icon name="down" size={14} className={`action-line-chevron ${open ? 'open' : ''}`} />}
           </button>

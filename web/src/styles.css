@@ -2389,3 +2389,11 @@ body.agent-dragging .side-list { overflow: hidden; }
 /* Resposta longa recolhida: corta a altura e esmaece o fim; "Mostrar mais" abre o resto. */
 .recolhivel.is-collapsed > div:first-child { max-height: 460px; overflow: hidden; -webkit-mask-image: linear-gradient(#000 75%, transparent); mask-image: linear-gradient(#000 75%, transparent); }
 .recolher-btn { margin-top: 6px; font-size: 13px; }
+
+/* Tabelas do chat: botões de copiar acima da tabela; a tabela rola na horizontal sem estourar a tela. */
+.table-tools { display: flex; gap: 14px; justify-content: flex-end; flex-wrap: wrap; margin: 0 0 6px; font-size: 12.5px; }
+.table-tools .link { min-height: 32px; padding: 0 4px; }
+.table-scroll { overflow-x: auto; }
+
+/* Tempo do passo em andamento: mesmo peso da frase, em tom discreto, com números alinhados. */
+.action-line-tempo { color: var(--muted); font-variant-numeric: tabular-nums; }

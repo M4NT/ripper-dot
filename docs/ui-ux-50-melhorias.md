@@ -32,15 +32,15 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 7. **Campo de mensagem enxuto:** "+", campo de texto, microfone e enviar. Computador, pasta e modelo vão para uma folha de opções. [médio] Ref.: campo de mensagem do OpenBot. Onde: `composer.jsx`, `composerPlusMenu.jsx`. *Lote 4: no celular a faixa de computador e pasta foi escondida (decisão sua). A escolha da pasta continua no computador. Falta o restante do campo enxuto (chips de modelo).*
 8. **Círculo sem texto ao lado do seletor de modelo** no campo de mensagem. Confirmar o que ele faz e dar um nome, ou remover. [rápido] *Identificado: é o anel da janela de contexto (abre "Uso e limites"). Lote 2: mostra a porcentagem ao lado e um rótulo claro.*
 9. **Fila de mensagens visível**, com cancelar, editar e "enviar agora". [médio] Ref.: `QueuedMessage` (cancelar, atualizar, steer). Onde: `createInputQueue` em `lib/input-queue.mjs`. *Lote 2: cada mensagem da fila aparece com texto e botão "Cancelar" próprio. Faltam editar e "enviar agora".*
-10. **Copiar tabela como Markdown ou CSV** nas tabelas do chat, inclusive as de OpenUI. [rápido] Ref.: "Copiar como Markdown / Copiar como CSV". Onde: `Chat.jsx`, `openui/library.jsx`.
+10. **Copiar tabela como Markdown ou CSV** nas tabelas do chat, inclusive as de OpenUI. [rápido] Ref.: "Copiar como Markdown / Copiar como CSV". Onde: `Chat.jsx`, `openui/library.jsx`. *Lote 5: feito nas tabelas em Markdown do chat (copiar como Markdown e como CSV, com ";"). Falta nas tabelas do OpenUI.*
 11. **Arquivos de origem como chips com ícone por tipo** (MD, CSV) no fim da resposta. [médio] Ref.: "Source files". Onde: `MessageAttachments.jsx`, `fileThumb.jsx`.
 12. **"Enviada a [agente]" discreto** em mensagens repassadas entre agentes. [rápido] Ref.: "Mensagem enviada a Launch". Onde: `agentThread.jsx`. *Parcial: já existe o inverso ("Mensagem de [agente]", `ViaLabel`). Falta o rótulo na mensagem que sai; depende de saber, na mensagem, para quem ela foi enviada.*
 13. **Medida de leitura** de cerca de 680 px para texto corrido. Cartões e tabelas usam a largura toda. [rápido] *Feito no lote 1 (parágrafos e listas, 42 rem; código e tabelas seguem a largura toda). Visual ainda não conferido.* Ref.: layout do OpenBot. Onde: `styles.css` (`.md`).
 14. **Ações da resposta** (copiar, ouvir, refazer) aparecem ao passar o mouse no desktop e ficam sempre visíveis no toque. [rápido] Ref.: hover só com ponteiro fino (`ui-foundation.md`). Onde: `actionLine.jsx`. *Já existe no toque (`@media (hover: none)`); conferido no CSS.*
 15. **Botão "ir para o fim" com contagem** de mensagens novas quando a pessoa rola para cima. [rápido] *Lote 4: feito e testado (aparece ao rolar para cima, conta as novas, leva ao fim).*
 16. **Mensagens longas recolhíveis** ("Mostrar mais") acima de cerca de 20 linhas. [rápido] *Lote 4: feito e testado (recolhe acima de 460 px, "Mostrar mais" abre). Falta conferir o visual do esmaecimento.*
-17. **Estado do turno em uma linha** ("Pesquisando na web · 12 s"), com botão de parar sempre visível. [médio] Ref.: `AgentActivity`. Onde: `actionLine.jsx`, `stepLabel` em `lib/`.
-18. **Erro do campo de mensagem como faixa acima do campo**, com "Tentar de novo". [rápido] Ref.: `ComposerErrorBanner`. Onde: `errorNote.jsx`. *Verificar se já é assim.*
+17. **Estado do turno em uma linha** ("Pesquisando na web · 12 s"), com botão de parar sempre visível. [médio] Ref.: `AgentActivity`. Onde: `actionLine.jsx`, `stepLabel` em `lib/`. *Lote 5: a linha de atividade já resumia o turno; agora mostra o tempo do passo em andamento (· 12 s). A parada já existia.*
+18. **Erro do campo de mensagem como faixa acima do campo**, com "Tentar de novo". [rápido] Ref.: `ComposerErrorBanner`. Onde: `errorNote.jsx`. *Verificar se já é assim.* *Não feito neste lote. Erros de envio hoje aparecem como aviso temporário, sem "Tentar de novo".*
 
 ## Listas, cartões e estados (19–26)
 
@@ -49,7 +49,7 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 21. **Esqueletos no carregamento** de listas e cartões, no lugar do spinner. [médio] Ref.: `Skeleton`. Medido hoje: 0 usos. *Lote 2: componente `Skeleton` criado e usado no histórico de aprovações e nos fluxos. Faltam as outras listas.*
 22. **Cartão de documento de compra no chat** (nota fiscal ou pedido): cabeçalho, etiquetas de validação, botões de ação e estado "processando" no próprio cartão. [grande] Ref.: §3.2 da especificação e o `Card` do OpenUI.
 23. **Confirmação com `AlertDialog`** para toda ação irreversível, mostrando o nome do alvo. [rápido] Ref.: `AlertDialog` do `ui-foundation.md`. Onde: `useConfirm` (8 arquivos). *Feito no lote 1: os 4 `confirm()` do navegador que sobravam (Clientes, Certificados, Omie, Webhooks) agora usam o diálogo do app.*
-24. **Desfazer em toda ação reversível** (aviso com botão "Desfazer"). [médio] Ref.: padrão de aviso do OpenBot. Onde: 9 arquivos já têm algo parecido; padronizar.
+24. **Desfazer em toda ação reversível** (aviso com botão "Desfazer"). [médio] Ref.: padrão de aviso do OpenBot. Onde: 9 arquivos já têm algo parecido; padronizar. *Lote 5: "Desfazer" em arquivar e desarquivar em lote, e no deslizar. Apagar não tem volta (sem desfazer, de propósito).*
 25. **Uso por agente na ficha** (tokens, custo e tempo do período). [médio] Ref.: `AgentUsagePanel`. Onde: `modelUsage.jsx`, `pages/AgentConfig.jsx`.
 26. **Calendário visual das rotinas**, com as próximas execuções. [grande] Ref.: `SchedulePanel`. Onde: `routines.jsx`.
 
@@ -57,7 +57,7 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 
 27. **Folhas de criação com "×" à esquerda e "✓ Salvar" à direita**, no mesmo padrão do OpenBot. [médio] Ref.: `DESIGN.md`, "Save and create actions". Onde: `agentForm.jsx`, `pages/NewAgent.jsx`. *Lote 3: no celular, "×" à esquerda e "✓ Criar agente" à direita (conferido na foto). Ainda é página, não folha.*
 28. **O "✓ Salvar" só aparece quando algo foi alterado.** [rápido] Ref.: `SheetSaveAction`. *Feito no lote 1 (ficha do agente).*
-29. **Fechar com alterações não salvas pede confirmação.** [médio] *Verificar em Configurações e na ficha do agente.* Ref.: guardas de alterações não salvas.
+29. **Fechar com alterações não salvas pede confirmação.** [médio] *Verificar em Configurações e na ficha do agente.* Ref.: guardas de alterações não salvas. *Lote 5: aviso "Sair sem salvar?" ao trocar de tela pelos botões e links internos. Falta o botão "voltar" do navegador, que ainda passa sem aviso.*
 30. **Erro de campo ao sair do campo**, embaixo dele, com rótulo e descrição ligados ao campo. [médio] Ref.: componente `Field`. Onde: 12 arquivos já usam o padrão; padronizar. *Lote 3: feito no nome do agente (erro ao sair do campo vazio, com `aria-invalid`). Falta padronizar nos outros formulários.*
 31. **Botão desabilitado explica o motivo** ("Falta o nome do agente"). [rápido] Ref.: `DESIGN.md`, "disabled checkmark". *Parcial no lote 1: dica no botão "Criar agente" (tooltip). Falta texto visível para toque.*
 32. **Enter envia formulários simples** (um campo). [rápido] Ref.: "preserve keyboard submission". *Já funciona no "Criar agente" (formulário nativo).*
@@ -77,8 +77,8 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 40. **Transições de até 250 ms.** Hoje há 17 com 0,3 s ou mais. [rápido] Ref.: "animations stay below 300 ms". *Feito no lote 1: 21 ajustes.*
 41. **Reduzir transparência:** fundo sólido quando o sistema pedir. Hoje há 6 usos de desfoque e nenhuma regra para isso. [rápido] Ref.: `DESIGN.md`, "reduced transparency". *Feito no lote 1 (barras do topo e da navegação).*
 42. **Foco visível em todo controle** para uso com teclado. [rápido] *Lote 4: regra geral de contorno para `:focus-visible` em botões, links, campos e controles. Componentes que já definem o próprio foco continuam valendo.*
-43. **Rótulo acessível em todo botão só com ícone.** Hoje há 104 `aria-label`; falta checar a cobertura. [médio] Ref.: `IconButton` com `label` obrigatório.
-44. **Contraste verificado por script** nos dois temas, com 4,5:1 para texto. [médio] Ref.: `DESIGN.md`, "Theme and visual consistency".
+43. **Rótulo acessível em todo botão só com ícone.** Hoje há 104 `aria-label`; falta checar a cobertura. [médio] Ref.: `IconButton` com `label` obrigatório. *Lote 5: `scripts/rotulos.mjs` procura botões e links sem nome. Nas telas auditadas (vazias, 1280 e 375 px) não achou nenhum. Falta auditar com dados.*
+44. **Contraste verificado por script** nos dois temas, com 4,5:1 para texto. [médio] Ref.: `DESIGN.md`, "Theme and visual consistency". *Lote 5: `scripts/contraste.mjs` lê as cores do CSS e confere 4,5:1 nos dois temas. Todos passam (menor: 4,76:1).*
 45. **Deslizar na lista de conversas para arquivar**, com "Desfazer". Não usar deslize para aprovar nada. [médio] Ref.: decisão da especificação (ação irreversível exige confirmação). *Lote 3: lógica feita e testada (arquiva, "Desfazer" restaura, sem erro). Falta testar o gesto num celular de verdade: no navegador de teste o toque é cancelado antes de chegar ao fim.*
 46. **Verificação automática de estilo no build**, que bloqueia cor, tamanho e raio literais novos. [médio] Ref.: `bun run check:ui` do OpenBot.
 
