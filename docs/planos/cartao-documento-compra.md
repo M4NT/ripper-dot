@@ -1,6 +1,6 @@
 # Plano: cartão de documento de compra no chat (item 22)
 
-Status: proposta para aprovação. Nada foi implementado.
+Status: aprovado em parte. Decisões 1 e 2 respondidas (ver fim do documento). Nada foi implementado.
 
 ## O que é
 
@@ -13,7 +13,7 @@ Quando um agente traz uma nota fiscal (ou um pedido de compra) no chat, ele most
   - "sem CT-e", "sem conta", "sem conta do frete", "sem departamento", "sem projeto", "referência inconsistente", "pedido não encontrado".
   - Sem problemas: etiqueta verde "completo".
 - **Avisos:** os textos de `warnings` do elo, por exemplo "mais de um título bate".
-- **Botões:** "Ver detalhes", "Aprovar" e "Rejeitar e avisar".
+- **Botões:** "Ver detalhes", "Aprovar" e "Rejeitar". Só essas três.
 - **Estado depois do clique:** "Aguardando aprovação na Caixa", depois "Aprovado" ou "Rejeitado", atualizado sozinho.
 
 ## Regra de segurança (não negociável)
@@ -35,7 +35,7 @@ Dados vêm de:
 
 1. **Componente visual** com dados fixos num teste. Sem ação. Confere layout em 375 px e 1280 px, nos dois temas, com nome de fornecedor muito longo.
 2. **Ferramenta do agente** e dados reais de uma nota (sem botões).
-3. **Botões**, ligados à aprovação na Caixa. Testar: clique cria o pedido, não executa nada; rejeitar não cria nada no ERP.
+3. **Botões**, ligados à aprovação na Caixa. Testar: clique cria o pedido, não executa nada; "Rejeitar" não cria nada no ERP e não envia aviso a ninguém.
 4. **Estado ao vivo:** o cartão reflete a aprovação (sem recarregar a conversa).
 
 ## Critérios de aceite
@@ -52,12 +52,12 @@ Dados vêm de:
 - Documento sem CT-e ainda pode chegar depois: a etiqueta precisa dizer "por enquanto", não "faltou".
 - Dados de CNPJ aparecem no cartão: confirmar se pode mostrar completo ou só parcial.
 
-## Decisões que preciso de você
+## Decisões
 
-1. As três ações (Ver detalhes, Aprovar, Rejeitar e avisar) bastam para a primeira versão?
-2. "Rejeitar e avisar": avisar quem? Sugestão: o agente que trouxe o documento, pelo chat.
-3. Pedido de compra também usa o cartão, ou só nota fiscal na primeira versão?
-4. CNPJ completo no cartão ou parcial?
+1. **Respondida:** as três ações (Ver detalhes, Aprovar, Rejeitar) bastam.
+2. **Respondida:** "Rejeitar" não avisa ninguém. Quem controla é o usuário.
+3. **Padrão adotado, a confirmar:** só nota fiscal na primeira versão. Pedido de compra entra depois.
+4. **Padrão adotado, a confirmar:** CNPJ completo no cartão, por ser dado da própria empresa do usuário.
 
 ## Estimativa (grosseira)
 

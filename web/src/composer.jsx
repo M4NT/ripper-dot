@@ -32,7 +32,8 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
   const taggedAgents = tagged.map(id => S.agents.find(a => a.id === id)).filter(Boolean);
   // Pedido pronto (ex.: da Ajuda): escreve na caixa de mensagem para a pessoa revisar e enviar
   useEffect(() => {
-    const f = e => { setText(e.detail.text); setTimeout(() => ta.current?.focus(), 0); };
+    // anexar: junta ao que já estava digitado (ex.: editar uma mensagem da fila sem perder o rascunho)
+    const f = e => { setText(t => (e.detail.anexar && t.trim() ? t.replace(/\s*$/, '\n') + e.detail.text : e.detail.text)); setTimeout(() => ta.current?.focus(), 0); };
     addEventListener('ripper:compose', f); return () => removeEventListener('ripper:compose', f);
   }, []);
   const [files, setFiles] = useState([]); // { key, name, size, file?, id?, status }

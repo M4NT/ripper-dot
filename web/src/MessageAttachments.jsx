@@ -52,6 +52,8 @@ export { FileChip };
 const VIEWABLE = /^(image\/(png|jpe?g|webp|gif)|application\/pdf|text\/|application\/json)/;
 const KIND = [[/wordprocessing|msword/, 'Documento Word'], [/spreadsheet|ms-excel|text\/csv/, 'Planilha'], [/presentation/, 'Apresentação'], [/pdf/, 'PDF'], [/^image\//, 'Imagem'], [/^text\//, 'Texto'], [/zip/, 'Arquivo compactado']];
 const kindOf = type => (KIND.find(([re]) => re.test(type || '')) || [, 'Arquivo'])[1];
+/** Extensão do arquivo em maiúsculas (MD, CSV, PDF...) para o distintivo do tipo; vazio se não houver. */
+const extensao = nome => { const m = /.([A-Za-z0-9]{1,5})$/.exec(nome || ''); return m ? m[1].toUpperCase() : ''; };
 const fmtSize = n => (n > 1 << 20 ? `${(n / (1 << 20)).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
 /** Arquivo que o agente entregou: Abrir (aba ou programa do computador), Baixar e Mostrar na pasta. */
@@ -80,7 +82,7 @@ export function DeliveredFiles({ items, onError }) {
       const viewable = VIEWABLE.test(f.type || '');
       return (
         <li key={f.id} className="delivered-file">
-          <span className="delivered-ico"><Icon name="file" size={18} /></span>
+          <span className="delivered-ico delivered-ext" data-ext={extensao(f.name)} aria-hidden="true">{extensao(f.name) || <Icon name="file" size={18} />}</span>
           <span className="delivered-text"><b title={f.name}>{f.name}</b><small>{kindOf(f.type)}{f.size ? ` · ${fmtSize(f.size)}` : ''}</small></span>
           <span className="delivered-actions">
             {viewable

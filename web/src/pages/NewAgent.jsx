@@ -188,6 +188,7 @@ export default function NewAgent() {
               <div className="na-fields">
                 <input ref={nameRef} className="na-name" value={v.name} maxLength={60} onChange={e => set({ name: e.target.value })} onBlur={() => setNomeTocado(true)} aria-invalid={nomeTocado && !v.name.trim()} aria-describedby={nomeTocado && !v.name.trim() ? 'na-name-erro' : undefined} placeholder="Nome do agente" aria-label="Nome do agente" autoFocus={!first} />
                 <input className="input" value={v.description} maxLength={200} onChange={e => set({ description: e.target.value })} placeholder="Ex.: Analisa planilhas e explica os números em linguagem simples." aria-label="O que ele faz" />
+                {!nomeTocado && !v.name.trim() && <p className="na-falta-movel muted small">Falta só o nome do agente.</p>}
                 {nomeTocado && !v.name.trim() && <p className="form-error" id="na-name-erro" role="alert">Dê um nome ao agente para continuar.</p>}
               </div>
             </div>

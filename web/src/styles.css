@@ -104,7 +104,7 @@ code { font: .88em var(--mono); }
 .scrim { display: none; }
 
 /* ============ controles ============ */
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 38px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); font-weight: 500; font-size: 0.875rem; white-space: nowrap; box-shadow: var(--shadow-1); transition: border-color .15s, background .15s, transform .15s var(--out); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: var(--ctl-lg); padding: 0 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); font-weight: 500; font-size: 0.875rem; white-space: nowrap; box-shadow: var(--shadow-1); transition: border-color .15s, background .15s, transform .15s var(--out); }
 .btn:hover:not(:disabled) { border-color: var(--line-2); }
 .btn:active:not(:disabled) { transform: translateY(1px); }
 .btn:disabled { opacity: .45; }
@@ -112,8 +112,8 @@ code { font: .88em var(--mono); }
 .btn-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--ink) 88%, var(--bg)); border-color: transparent; }
 .btn-danger { color: var(--err); }
 .btn-danger:hover:not(:disabled) { border-color: color-mix(in srgb, var(--err) 45%, var(--line)); }
-.btn-lg { height: 52px; padding: 0 22px; font-size: 0.9375rem; border-radius: 14px; }
-.btn-sm { height: 30px; padding: 0 12px; font-size: 0.8125rem; }
+.btn-lg { height: var(--ctl-touch); padding: 0 22px; font-size: 0.9375rem; border-radius: 14px; }
+.btn-sm { height: var(--ctl-sm); padding: 0 12px; font-size: 0.8125rem; }
 .btn-block { width: 100%; }
 .btn-ghost-line { border-style: dashed; box-shadow: none; background: transparent; }
 .icon-btn { width: var(--ctl-lg); height: var(--ctl-lg); flex: none; display: inline-grid; place-items: center; border-radius: 10px; color: var(--ink-2); transition: background .15s, color .15s; }
@@ -2412,3 +2412,39 @@ body.agent-dragging .side-list { overflow: hidden; }
 .menu.menu-sheet .menu-item { min-height: 48px; font-size: 1rem; }
 @keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
 @media (prefers-reduced-motion: reduce) { .menu.menu-sheet, .menu-scrim { animation: none; } }
+
+/* Arquivo entregue: distintivo com a extensão (MD, CSV, PDF...). Cor só para a família: PDF em vermelho, planilhas em verde. */
+.delivered-ext { font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.02em; line-height: 1; color: var(--ink-2); }
+.delivered-ext[data-ext="PDF"] { color: var(--err); }
+.delivered-ext[data-ext="CSV"], .delivered-ext[data-ext="XLSX"], .delivered-ext[data-ext="XLS"] { color: var(--ok); }
+
+/* Dica do nome do agente no celular (o desktop usa a dica da prévia, ao lado). */
+.na-falta-movel { display: none; }
+@media (max-width: 900px) { .na-falta-movel { display: block; margin: 4px 2px 0; } }
+
+/* Cargo do agente na lista: etiqueta pequena ao lado do nome, sem empurrar a linha. */
+.row-top .row-tag { margin-left: 6px; font-size: 11px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+
+/* Cargo do agente fixado: etiqueta pequena logo abaixo do nome. */
+.pin-tag { display: block; max-width: 100%; font-style: normal; font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Celular: o título grande encolhe quando a página rola para longe do topo. */
+@media (max-width: 900px) {
+  .page-head h1, .v2 .page-head h1 { transition: font-size .2s var(--out); }
+  html[data-rolou] .page-head h1, html[data-rolou] .v2 .page-head h1 { font-size: 20px; letter-spacing: -.02em; }
+}
+
+/* Fila: as ações de cada mensagem ficam numa linha só; no celular quebram sem cortar. */
+.queued-acoes { display: flex; gap: 10px; flex: none; flex-wrap: wrap; justify-content: flex-end; }
+
+/* "Enviada a X": aparece sob a resposta do agente que mandou uma mensagem a outro agente. */
+.enviada-a { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; color: var(--muted); }
+
+/* Celular: o campo mostra só o ícone do modelo; nome e esforço ficam no toque (a folha que abre). */
+@media (max-width: 900px) {
+  .model-pill-texto, .model-pill-sub { display: none; }
+  .model-pill-main { padding: 0 10px; }
+}
+
+/* Celular: a pílula de modelo, só com o ícone, continua com o alvo de toque de 44 px. */
+@media (max-width: 900px) { .model-pill { min-width: 44px; justify-content: center; } }

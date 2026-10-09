@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib.js';
-import { Icon, EmptyState } from '../ui.jsx';
+import { Icon, EmptyState, Skeleton } from '../ui.jsx';
 
 function ProviderUsageBar({ label, pct, resetAt }) {
   if (pct == null) return null;
@@ -79,7 +79,7 @@ export default function MeteringPanel() {
     URL.revokeObjectURL(a.href);
   };
 
-  if (loading) return <p className="muted" role="status">Carregando medição…</p>;
+  if (loading) return <Skeleton rows={3} label="Carregando medição" />;
   if (err) return <p className="form-error" role="alert">{err}</p>;
   if (!data) return null;
 

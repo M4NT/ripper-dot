@@ -194,7 +194,7 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
           <a key={a.id} data-flip={a.id} data-pin={a.id} href={`#/a/${a.id}`} className={`pin ${activeAgent === a.id ? 'on' : ''} ${dragKey === a.id ? 'lifted' : ''}`} onClick={onNavigate}
             title={`${a.name} · Alt+setas move, Alt+P desafixa`} draggable={false} onPointerDown={e => drag.onPointerDown(e, a.id)} onKeyDown={e => keyMove(e, a.id)}>
             <span className="pin-av"><AgentAvatar agent={a} size={collapsed ? 30 : 52} state={busy[a.id] ? 'working' : undefined} />{busy[a.id] && <i className="pin-dot" aria-label="trabalhando" />}</span>
-            <b>{a.name}</b>
+            <b>{a.name}</b>{a.category && <em className="pin-tag">{a.category}</em>}
           </a>
         ))}
         {drag.pins.length === 0 && <p className="pins-empty">Arraste um agente para cá para fixar</p>}
@@ -223,7 +223,7 @@ function Sidebar({ onNavigate, onSearch, theme, toggleTheme, collapsed, onCollap
           return (
             <a {...common} href={`#/a/${a.id}`} className={`row ${activeAgent === a.id ? 'on' : ''} ${unread ? 'unread' : ''} ${dragKey === e.key ? 'lifted' : ''}`} onContextMenu={ev => c && chatMenu(ev, c)} title={collapsed ? a.name : undefined}>
               <span className="row-av"><AgentAvatar agent={a} size={40} state={busy[a.id] ? 'working' : undefined} /></span>
-              <span className="row-text"><span className="row-top"><b>{a.name}</b></span><small className={busy[a.id] ? 'is-working' : ''}>{busy[a.id] ? doing(a.id) : c?.preview || agentTag(a) || 'Diga oi'}</small></span>
+              <span className="row-text"><span className="row-top"><b>{a.name}</b>{a.category && <em className="row-tag">{a.category}</em>}</span><small className={busy[a.id] ? 'is-working' : ''}>{busy[a.id] ? doing(a.id) : c?.preview || agentTag(a) || 'Diga oi'}</small></span>
               {unread ? <span className="unread-dot" /> : c && <time>{fmtAgo(e.at)}</time>}
             </a>
           );
@@ -353,6 +353,15 @@ function Shell() {
     return () => removeEventListener('ripper:open-palette', open);
   }, []);
   useEffect(() => { setDrawer(false); document.querySelector('.main')?.scrollTo(0, 0); }, [parts.join('/')]);
+  // Título grande que encolhe ao rolar (celular): marca a casca quando a página sai do topo.
+  useEffect(() => {
+    const principal = document.querySelector('.main');
+    if (!principal) return;
+    // No elemento raiz (fora do que o React desenha), para a marca não sumir numa nova renderização.
+    const ao = () => document.documentElement.toggleAttribute('data-rolou', principal.scrollTop > 36);
+    principal.addEventListener('scroll', ao, { passive: true });
+    return () => { principal.removeEventListener('scroll', ao); document.documentElement.removeAttribute('data-rolou'); };
+  }, []);
   useEffect(() => {
     if (!S) return;
     if (parts[0] === 'enterprise') {

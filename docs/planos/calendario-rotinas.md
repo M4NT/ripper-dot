@@ -1,6 +1,6 @@
 # Plano: calendário de rotinas (item 26)
 
-Status: proposta para aprovação. Nada foi implementado.
+Status: aprovado em parte. Lista de 7 dias confirmada. Pausa e grade do desktop continuam em aberto. Nada foi implementado.
 
 ## O que é
 
@@ -57,11 +57,11 @@ Endpoint: `GET /api/routines/agenda?dias=7`, que devolve o resultado e o selo de
 - O agendador confere a cada 30 s, então um horário exato pode disparar com até 30 s de atraso. A tela deve mostrar o horário, não uma promessa de segundo exato.
 - Rotina com fluxo (`flowId`) pode ter mais de uma etapa. Mostrar só a rotina, não cada etapa, na primeira versão.
 
-## Decisões que preciso de você
+## Decisões
 
-1. Quantos dias na lista: 7 está bom?
-2. Rotina sem pausa hoje: quer que eu inclua pausar e retomar nesta tela? Isso exige campo novo na rotina e mudança no agendador.
-3. Desktop: grade semanal ou só lista, como no celular?
+1. **Respondida:** 7 dias na lista.
+2. **Em aberto:** pausar e retomar rotinas nesta tela. Exige campo novo na rotina e mudança no agendador.
+3. **Em aberto:** no desktop, grade semanal ou só lista, como no celular.
 
 ## Estimativa (grosseira)
 

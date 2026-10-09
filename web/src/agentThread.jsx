@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from './lib.js';
-import { AgentAvatar, Icon } from './ui.jsx';
+import { AgentAvatar, Icon, Skeleton } from './ui.jsx';
 import { useApp } from './app.jsx';
 
 /** Linha discreta na sua conversa: "Mensagem de 🟠 Valt" — um clique abre a troca entre os agentes. */
@@ -41,7 +41,7 @@ export function AgentThread({ chatId, onClose, Text }) {
         </span>
       </header>
       <div className="agent-thread-msgs" ref={box}>
-        {!chat && <p className="muted small">Carregando…</p>}
+        {!chat && <Skeleton rows={2} label="Carregando conversa" />}
         {chat?.messages?.filter(m => m.content).map((m, i) => {
           const who = agent(m.role === 'user' ? (m.inbox?.from || ids.find(x => x !== chat.agentId)) : m.agentId);
           return (

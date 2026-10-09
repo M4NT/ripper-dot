@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, fmtAgo } from '../lib.js';
 import { useApp } from '../app.jsx';
-import { AgentAvatar, Select, EmptyState } from '../ui.jsx';
+import { AgentAvatar, Select, EmptyState, Skeleton } from '../ui.jsx';
 
 const APPROVED = { user: 'aprovado por você', auto: 'automático (contato liberado)', rule: 'liberado pela autonomia' };
 const PERIODS = [['1', 'Últimas 24 h'], ['7', '7 dias'], ['30', '30 dias'], ['0', 'Tudo']];
@@ -28,7 +28,7 @@ export default function ExternalLog() {
         <Select label="Agente" value={agentId} onChange={setAgentId} options={[{ value: '', label: 'Todos os agentes' }, ...S.agents.map(a => ({ value: a.id, label: a.name }))]} />
         <Select label="Período" value={days} onChange={setDays} options={PERIODS.map(([v, l]) => ({ value: v, label: l }))} />
       </div>
-      {!data ? <p className="muted">Carregando…</p>
+      {!data ? <Skeleton rows={4} label="Carregando registro" />
         : data.entries.length === 0 ? <EmptyState title="Nenhuma ação externa" body="Quando um agente mandar uma mensagem, publicar algo ou agir no navegador em seu nome, fica registrado aqui." />
         : <ol className="extlog-list">{data.entries.map(e => {
             const a = agent(e.agentId);
