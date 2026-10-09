@@ -2412,3 +2412,12 @@ body.agent-dragging .side-list { overflow: hidden; }
 .menu.menu-sheet .menu-item { min-height: 48px; font-size: 1rem; }
 @keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
 @media (prefers-reduced-motion: reduce) { .menu.menu-sheet, .menu-scrim { animation: none; } }
+
+/* Arquivo entregue: distintivo com a extensão (MD, CSV, PDF...). Cor só para a família: PDF em vermelho, planilhas em verde. */
+.delivered-ext { font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.02em; line-height: 1; color: var(--ink-2); }
+.delivered-ext[data-ext="PDF"] { color: var(--err); }
+.delivered-ext[data-ext="CSV"], .delivered-ext[data-ext="XLSX"], .delivered-ext[data-ext="XLS"] { color: var(--ok); }
+
+/* Dica do nome do agente no celular (o desktop usa a dica da prévia, ao lado). */
+.na-falta-movel { display: none; }
+@media (max-width: 900px) { .na-falta-movel { display: block; margin: 4px 2px 0; } }

@@ -44,7 +44,7 @@ export const PROVIDERS = [
 ];
 
 export function ProviderLogo({ p, dark, size = 40 }) {
-  if (p.id === 'julia') return <span className="prov-logo prov-julia" style={{ width: size, height: size, fontSize: size * 0.36 }} aria-hidden="true">J1</span>;
+  if (p.id === 'julia') return <span className="prov-logo prov-julia" style={{ width: size, height: size, fontSize: `${(size * 0.36) / 16}rem` }} aria-hidden="true">J1</span>;
   return <span className="prov-logo" style={{ width: size, height: size }} aria-hidden="true" dangerouslySetInnerHTML={{ __html: svg(p.logo) }} />;
 }
 
