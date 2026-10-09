@@ -1,0 +1,13 @@
+/* Estilos de web/src/settingsSearch.jsx. Carregados junto com a tela. */
+
+.settings-search-box { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--raio-controle); background: var(--surface); color: var(--muted); }
+
+.settings-search-box:focus-within { border-color: var(--line-2); color: var(--ink-2); }
+
+.settings-search-box input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: var(--ink); font: inherit; font-size: var(--fs-base); }
+
+.set-flash { animation: set-flash 1.6s var(--out, ease-out); }
+
+@media (prefers-reduced-motion: reduce) {
+  .set-flash { animation: none; outline: 2px solid var(--ink-2); }
+}

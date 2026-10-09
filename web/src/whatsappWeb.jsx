@@ -3,6 +3,7 @@ import { api } from './lib.js';
 import { Icon, Switch, Select } from './ui.jsx';
 import { useOv } from './overlay.jsx';
 import { useApp } from './app.jsx';
+import './styles/telas/whatsappWeb.css';
 
 const STATE = {
   open: ['Conectado', 'ok'], connecting: ['Aguardando leitura do QR', 'warn'], close: ['Desconectado', ''],

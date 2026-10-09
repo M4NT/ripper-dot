@@ -1,0 +1,11 @@
+/* Estilos de web/src/pages/AdminUso.jsx. Carregados junto com a tela. */
+
+.admin-uso-page { max-width: 960px; display: flex; flex-direction: column; gap: 28px; }
+
+.admin-uso-crumb a { color: var(--muted); text-decoration: none; }
+
+.admin-uso-block { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 20px 22px; box-shadow: var(--shadow-1); }
+
+.admin-uso-block header { margin-bottom: 14px; }
+
+.admin-uso-block h2 { font-size: var(--fs-lg); font-weight: 500; margin: 0 0 4px; }

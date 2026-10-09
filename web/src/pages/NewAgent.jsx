@@ -5,6 +5,7 @@ import { api, go, useRoute, fmtSize, TOOL_INFO, TONES, useDark } from '../lib.js
 import { AgentAvatar, Icon, Select, Switch, useErroCampo } from '../ui.jsx';
 import { EffortScale, MODEL_DESC } from '../modelPicker.jsx';
 import { uploadFile } from '../composer.jsx';
+import '../styles/telas/pages/NewAgent.css';
 
 const TYPES = ['clover', 'flower', 'triangle', 'square', 'blob', 'ghost', 'circle', 'drop', 'star', 'droid', 'mech', 'alien', 'hexagon', 'cat', 'cloud', 'pill', 'pebble', 'puddle'];
 const COLORS = [null, '#1a1917', '#e8537a', '#f08a3c', '#f2c94c', '#3fae78', '#3aa7c9', '#5b6cf0', '#9b6cf0'];

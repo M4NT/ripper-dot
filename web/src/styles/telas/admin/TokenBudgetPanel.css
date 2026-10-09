@@ -1,0 +1,5 @@
+/* Estilos de web/src/admin/TokenBudgetPanel.jsx. Carregados junto com a tela. */
+
+.admin-budget-form { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
+
+.admin-budget-form { gap: 0; margin-top: 16px; }

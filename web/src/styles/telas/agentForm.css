@@ -1,0 +1,13 @@
+/* Estilos de web/src/agentForm.jsx. Carregados junto com a tela. */
+
+.note-inline { color: var(--warn) !important; }
+
+.note-inline a { text-decoration: underline; text-underline-offset: 2px; }
+
+.appearance-stage { display: grid; place-items: center; padding: 24px; margin-bottom: 18px; border-radius: var(--r-lg); background: radial-gradient(circle at 50% 40%, var(--surface), var(--surface-2)); border: 1px solid var(--line); }
+
+.avatar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 8px; }
+
+.note-info { color: var(--muted); }
+
+.note-info a { text-decoration: underline; text-underline-offset: 2px; color: var(--ink-2); }

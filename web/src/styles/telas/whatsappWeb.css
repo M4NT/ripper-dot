@@ -1,0 +1,9 @@
+/* Estilos de web/src/whatsappWeb.jsx. Carregados junto com a tela. */
+
+.wa-conn { flex-wrap: wrap; gap: 8px; align-items: center; }
+
+.wa-allow { width: 100%; font: 13px/1.5 var(--mono); }
+
+.wa-history { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; padding: 10px 14px; margin: 4px 0; border-radius: var(--r); background: var(--chip); font-size: var(--fs-sm); color: var(--ink-2); }
+
+.wa-allow-wrap { display: flex; flex-direction: column; gap: 6px; width: 100%; }

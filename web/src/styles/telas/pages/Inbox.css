@@ -1,0 +1,19 @@
+/* Estilos de web/src/pages/Inbox.jsx. Carregados junto com a tela. */
+
+.inbox-summary { margin: 0; font-size: var(--fs-md); line-height: 1.55; color: var(--ink); max-width: 70ch; white-space: pre-wrap; }
+
+.inbox-summary.is-error { color: var(--err); }
+
+.inbox-urgent { margin-left: 8px; vertical-align: middle; }
+
+.inbox-actions { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 2px; }
+
+.inbox-pick, .bulk-all input { width: 18px; height: 18px; margin: 0; accent-color: var(--ink); flex: none; cursor: pointer; }
+
+.bulk-all { display: inline-flex; align-items: center; gap: 10px; font-size: var(--fs-base); color: var(--ink-2); cursor: pointer; min-width: 0; flex: 1; }
+
+.inbox-keys { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 18px; font-size: var(--fs-xs); color: var(--muted); }
+
+@media (pointer: coarse), (max-width: 900px) {
+  .inbox-keys { display: none; }
+}

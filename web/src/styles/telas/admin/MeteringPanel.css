@@ -1,0 +1,13 @@
+/* Estilos de web/src/admin/MeteringPanel.jsx. Carregados junto com a tela. */
+
+.metering-chart { display: flex; align-items: flex-end; gap: 6px; min-height: 120px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+
+.metering-chart-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+
+.metering-subhead { margin: 16px 0 4px; font-size: var(--fs-base); }
+
+.metering-provider { margin-top: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+
+.metering-provider h4 { margin: 0 0 8px; font-size: var(--fs-base); }
+
+.metering-subhead { font-weight: 500; }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib.js';
 import { Skeleton } from '../ui.jsx';
+import '../styles/telas/admin/UsageReportPanel.css';
 
 const iso = d => d.toISOString().slice(0, 10);
 const daysAgo = n => iso(new Date(Date.now() - n * 86400_000));

@@ -12,6 +12,7 @@ import { useOv } from '../overlay.jsx';
 import { authStatusLabel, refreshMcpOAuth, runMcpOAuthLogin } from '../marketplace/mcpOAuth.js';
 import SocialWebhooksPanel from '../marketplace/SocialWebhooksPanel.jsx';
 import { isEnterpriseMode } from '../uiMode.js';
+import '../styles/telas/pages/Connectors.css';
 
 function RowIcon({ id }) {
   const stroke = { plug: 'plug', terminal: 'terminal', bulb: 'bulb', cube: 'cube' };

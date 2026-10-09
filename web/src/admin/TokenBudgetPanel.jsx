@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../app.jsx';
 import { api } from '../lib.js';
 import { EmptyState, Switch } from '../ui.jsx';
+import '../styles/telas/admin/TokenBudgetPanel.css';
 
 function UsageBar({ pct, label, sublabel, tone = 'blue' }) {
   if (pct == null) return null;

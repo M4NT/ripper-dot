@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import HubShell from '../marketplace/HubShell.jsx';
 import { Icon } from '../ui.jsx';
+import '../styles/telas/pages/Help.css';
 
 // Central de ajuda: o que cada coisa faz e pedidos prontos (um clique escreve na conversa).
 const TOPICS = [

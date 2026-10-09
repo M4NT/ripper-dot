@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib.js';
 import { EmptyState, Skeleton } from '../ui.jsx';
+import '../styles/telas/admin/JuliaEconomiaPanel.css';
 
 function fmtTok(n) {
   if (n == null) return '—';

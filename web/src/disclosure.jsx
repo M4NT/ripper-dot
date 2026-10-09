@@ -1,4 +1,5 @@
 import { isEnterpriseMode } from './uiMode.js';
+import './styles/telas/disclosure.css';
 
 /**
  * Agrupa controles avançados em <details> recolhido no modo simples.

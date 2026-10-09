@@ -7,6 +7,7 @@ import MeteringPanel from '../admin/MeteringPanel.jsx';
 import JuliaEconomiaPanel from '../admin/JuliaEconomiaPanel.jsx';
 import TokenBudgetPanel from '../admin/TokenBudgetPanel.jsx';
 import ClientsPanel from '../admin/ClientsPanel.jsx';
+import '../styles/telas/pages/AdminUso.css';
 
 function Section({ id, title, desc, children }) {
   return (

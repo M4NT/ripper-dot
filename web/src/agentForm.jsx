@@ -5,6 +5,7 @@ import { useApp } from './app.jsx';
 import { EffortScale } from './modelPicker.jsx';
 import { AutonomyPick } from './autonomy.jsx';
 import { isEnterpriseMode } from './uiMode.js';
+import './styles/telas/agentForm.css';
 
 const TYPES = ['clover', 'flower', 'triangle', 'square', 'blob', 'ghost', 'circle', 'drop', 'star', 'droid', 'mech', 'alien', 'hexagon', 'cat', 'cloud', 'pill', 'pebble', 'puddle'];
 const COLORS = [null, '#1a1917', '#f2efe9', '#e8537a', '#f08a3c', '#f2c94c', '#3fae78', '#3aa7c9', '#5b6cf0', '#9b6cf0'];

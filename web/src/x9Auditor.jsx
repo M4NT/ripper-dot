@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from './lib.js';
 import { Icon } from './ui.jsx';
+import './styles/telas/x9Auditor.css';
 
 const SEV_CLASS = { critical: 'tag-warn', high: 'tag-warn', medium: 'tag', low: 'muted', info: 'muted' };
 

@@ -5,6 +5,7 @@ import { useApp } from './app.jsx';
 import { api, fmtAgo } from './lib.js';
 import { Icon, Select, Switch, useErroCampo } from './ui.jsx';
 import ErrorNote from './errorNote.jsx';
+import './styles/telas/routines.css';
 
 const DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const SCOPE = { contacts: 'de contatos', groups: 'em grupos', any: 'de contatos ou grupos' };

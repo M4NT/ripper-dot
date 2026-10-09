@@ -9,6 +9,7 @@ import { CONNECTOR_DISCOVER, PLUGIN_CATALOG, CLAUDE_CONNECTORS_URL, marketplaceD
 import { installPlugin, installedCount, isPluginInstalled, listInstalledPlugins, uninstallPlugin } from '../marketplace/state.js';
 import { runMcpOAuthLogin } from '../marketplace/mcpOAuth.js';
 import { useOv } from '../overlay.jsx';
+import '../styles/telas/pages/Marketplace.css';
 
 /** Conectores reais da conta claude.ai (Google, Slack…). */
 export function useClaudeConnectors() {

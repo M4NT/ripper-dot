@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useApp } from '../app.jsx';
 import { AgentAvatar, Icon, Segmented, EmptyState } from '../ui.jsx';
 import { TOOL_INFO } from '../lib.js';
+import '../styles/telas/pages/Explore.css';
 
 export default function Explore() {
   const { S } = useApp();

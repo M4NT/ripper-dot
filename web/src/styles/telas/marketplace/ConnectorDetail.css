@@ -1,0 +1,27 @@
+/* Estilos de web/src/marketplace/ConnectorDetail.jsx. Carregados junto com a tela. */
+
+@media (max-width: 720px) {
+  .mp-detail-hero { grid-template-columns: 1fr; }
+
+  .mp-detail-cta { justify-self: start; }
+}
+
+.mp-detail { max-width: 720px; }
+
+.mp-detail-back { margin-bottom: 20px; }
+
+.mp-detail-hero { display: grid; grid-template-columns: auto 1fr auto; gap: 20px; align-items: center; margin-bottom: 24px; }
+
+.mp-detail-title h1 { font-size: var(--fs-2xl); font-weight: 500; display: flex; align-items: center; gap: 8px; }
+
+.mp-detail-tag { color: var(--muted); margin-top: 6px; }
+
+.mp-detail-body { line-height: 1.55; color: var(--ink-2); margin-bottom: 28px; }
+
+.mp-detail-trust { display: flex; gap: 12px; padding: 14px 16px; border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface-2); margin: 28px 0; font-size: var(--fs-sm); color: var(--muted); }
+
+.mp-detail-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; font-size: var(--fs-sm); padding-top: 20px; border-top: 1px solid var(--line); }
+
+.mp-detail-meta-label { display: block; font-size: var(--fs-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--faint); margin-bottom: 4px; }
+
+.mp-detail-url code { font-size: var(--fs-xs); word-break: break-all; }

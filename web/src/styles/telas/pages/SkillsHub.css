@@ -1,0 +1,19 @@
+/* Estilos de web/src/pages/SkillsHub.jsx. Carregados junto com a tela. */
+
+.mp-skill-actions { display: flex; align-items: center; gap: 6px; }
+
+.mp-skill-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; background: var(--surface); }
+
+.mp-skill-list > li { border-bottom: 1px solid var(--line); }
+
+.mp-skill-list > li:last-child { border-bottom: 0; }
+
+.mp-skill-row { width: 100%; display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 14px 16px; text-align: left; }
+
+.mp-skill-row:hover { background: var(--surface-2); }
+
+.mp-skill-ico { width: 36px; height: 36px; border-radius: var(--raio-controle); background: var(--chip); border: 1px solid var(--line); display: grid; place-items: center; color: var(--muted); }
+
+.mp-skill-text b { font-weight: 500; margin-right: 6px; }
+
+.mp-skill-text small { display: block; color: var(--muted); font-size: var(--fs-sm); margin-top: 4px; }

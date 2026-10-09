@@ -1,0 +1,53 @@
+/* Estilos de web/src/marketplace/CustomConnectorModal.jsx. Carregados junto com a tela. */
+
+.conn-modal { max-width: 520px; padding: 0; }
+
+.conn-modal-head { display: flex; justify-content: space-between; align-items: center; padding: 20px 22px 0; }
+
+.conn-modal-head h2 { font-size: var(--fs-lg); font-weight: 500; }
+
+.conn-modal-lede { padding: 12px 22px; font-size: var(--fs-base); color: var(--muted); }
+
+.conn-modal-lede a { text-decoration: underline; }
+
+.conn-field { display: block; padding: 0 22px 14px; }
+
+.conn-field small { display: block; margin-top: 6px; color: var(--muted); font-size: var(--fs-xs); }
+
+.conn-trust { padding: 8px 22px 0; font-size: var(--fs-sm); color: var(--muted); }
+
+.conn-modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 22px 22px; border-top: 1px solid var(--line); margin-top: 12px; }
+
+.conn-verify-title { padding: 8px 22px; font-weight: 500; }
+
+.conn-verify-list { list-style: none; margin: 0; padding: 0 22px 12px; display: flex; flex-direction: column; gap: 10px; }
+
+.conn-verify-list li { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start; font-size: var(--fs-sm); }
+
+.conn-verify-list small { display: block; color: var(--muted); }
+
+.conn-warn { display: flex; gap: 12px; margin: 12px 22px; padding: 12px 14px; border-radius: var(--raio-controle); background: color-mix(in srgb, var(--warn) 12%, transparent); border: 1px solid color-mix(in srgb, var(--warn) 35%, var(--line)); font-size: var(--fs-sm); }
+
+.conn-readonly { padding: 0 22px 12px; display: flex; flex-direction: column; gap: 4px; }
+
+.conn-readonly code { font-size: var(--fs-xs); color: var(--muted); word-break: break-all; }
+
+.conn-section { padding: 12px 22px; border-top: 1px solid var(--line); }
+
+.conn-section h3 { font-size: var(--fs-sm); font-weight: 500; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+
+.conn-radio { display: flex; gap: 10px; padding: 8px 0; cursor: pointer; font-size: var(--fs-sm); }
+
+.conn-radio input { margin-top: 4px; }
+
+.conn-radio small { display: block; color: var(--muted); margin-top: 2px; }
+
+.conn-header-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+
+.conn-custom-oauth { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+
+.conn-radio { padding: 10px 12px; margin: 0 0 6px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); transition: border-color .15s; }
+
+.conn-radio:has(input:checked) { border-color: var(--ink); }
+
+.conn-radio input { accent-color: var(--ink); }

@@ -6,6 +6,7 @@ import { api, fmtSize, fmtAgo } from '../lib.js';
 import FileThumb from '../fileThumb.jsx';
 import { ArtifactList } from '../actions.jsx';
 import { SkillList, ScriptPool } from '../skills.jsx';
+import '../styles/telas/pages/Library.css';
 const isImage = t => /^image\/(png|jpe?g|webp|gif)$/.test(t);
 
 /** Memória em dois níveis: perfil (estável, sempre no contexto) e registro (datado, só o recente entra). */

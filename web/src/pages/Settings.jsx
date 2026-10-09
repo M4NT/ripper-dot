@@ -17,6 +17,7 @@ import UiModeToggle from '../uiModeToggle.jsx';
 import { isEnterpriseMode, isSettingsTabAllowed } from '../uiMode.js';
 import { EnterpriseHint } from '../uiModeToggle.jsx';
 import { useT, settingsTabs } from '../i18n/index.jsx';
+import '../styles/telas/pages/Settings.css';
 
 export function SaveBar({ dirty, saving, save, reset }) {
   const tr = useT();

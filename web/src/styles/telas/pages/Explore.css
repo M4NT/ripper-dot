@@ -1,0 +1,7 @@
+/* Estilos de web/src/pages/Explore.jsx. Carregados junto com a tela. */
+
+.template-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+
+.tpl-tools { display: flex; gap: 6px; color: var(--muted); margin: 4px 0; }
+
+.tpl-tools span { width: 26px; height: 26px; border-radius: var(--raio-controle); background: var(--surface-2); border: 1px solid var(--line); display: grid; place-items: center; }

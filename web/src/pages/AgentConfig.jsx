@@ -9,6 +9,7 @@ import { isEnterpriseMode } from '../uiMode.js';
 import { EnterpriseHint } from '../uiModeToggle.jsx';
 import { useOv } from '../overlay.jsx';
 import { RoutineList, RoutineForm } from '../routines.jsx';
+import '../styles/telas/pages/AgentConfig.css';
 
 // Abas pelo jeito que o dono pensa: quem ele é, o que sabe fazer, quanto decide sozinho, quando age sozinho, o que já fez.
 const TABS = [['identity', 'Identidade'], ['skills', 'Habilidades'], ['autonomy', 'Autonomia'], ['routines', 'Rotinas'], ['activity', 'Atividade']];

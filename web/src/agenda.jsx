@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from './lib.js';
 import { useApp } from './app.jsx';
 import { Skeleton } from './ui.jsx';
+import './styles/telas/agenda.css';
 
 // Agenda das rotinas: próximos 7 dias por horário (na mesma lista para celular e computador).
 // Intervalos e eventos têm seções próprias, porque não têm um horário fixo.

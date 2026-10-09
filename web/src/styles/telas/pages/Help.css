@@ -1,0 +1,11 @@
+/* Estilos de web/src/pages/Help.jsx. Carregados junto com a tela. */
+
+.help-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+
+.help-card { display: grid; align-content: start; gap: 8px; padding: 16px 18px; border-radius: var(--raio-cartao); background: var(--surface-2); }
+
+.help-card h2 { display: flex; align-items: center; gap: 8px; font-size: var(--fs-md); font-weight: 600; color: var(--ink); }
+
+.help-card p { font-size: var(--fs-base); color: var(--ink-2); line-height: 1.5; }
+
+.help-examples { display: grid; gap: 6px; margin-top: 4px; }

@@ -2,6 +2,7 @@ import { Icon } from '../ui.jsx';
 import BrandIcon from './BrandIcon.jsx';
 import OmiePanel from './OmiePanel.jsx';
 import CertificadosPanel from './CertificadosPanel.jsx';
+import '../styles/telas/marketplace/ConnectorDetail.css';
 
 const HOW = {
   oauth: 'Você faz login na conta do serviço numa janela; o Ripper guarda o acesso e renova sozinho.',

@@ -1,0 +1,3 @@
+/* Estilos de web/src/pages/Agents.jsx. Carregados junto com a tela. */
+
+.page-head-actions { display: flex; flex: none; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-end; }
