@@ -113,8 +113,18 @@ export const STEP_LABEL = {
   post_social: 'Publicando', email_campaign: 'Montando campanha de e-mail', send_webhook: 'Enviando webhook', list_social_webhooks: 'Listando webhooks',
   deliver_file: 'Entregando arquivo', create_agent: 'Criando agente', create_group: 'Criando grupo', use_connectors: 'Abrindo conectores', find_script: 'Procurando script pronto', save_script: 'Guardando script', handoff: 'Passando a tarefa',
   ask_owner: 'Perguntando a você', notify_owner: 'Avisando você', github_read: 'Lendo o GitHub', github_clone: 'Clonando o repositório', github_open_pr: 'Abrindo PR', github_comment: 'Comentando no GitHub', github_issue: 'Abrindo issue', email_list: 'Vendo e-mails', email_read: 'Lendo e-mail', email_attachment: 'Baixando anexo', email_send: 'Enviando e-mail', whatsapp_send: 'Enviando WhatsApp', whatsapp_chats: 'Vendo conversas do WhatsApp', whatsapp_read: 'Lendo conversa do WhatsApp', whatsapp_contacts: 'Buscando contato',
-  list_skills: 'Listando skills', x9_context: 'Coletando dados', x9_checklist: 'Rodando checklist'
+  list_skills: 'Listando skills', x9_context: 'Coletando dados', x9_checklist: 'Rodando checklist',
+  offer_setting: 'Sugerindo uma configuração', parallel_tasks: 'Rodando tarefas em paralelo', computer_screenshot: 'Tirando foto da tela',
+  dfe_listar_notas_recebidas: 'Listando notas recebidas', dfe_sincronizar: 'Buscando notas na Receita', nfse_listar_notas_recebidas: 'Listando notas de serviço recebidas',
+  nfse_sincronizar: 'Buscando notas de serviço na prefeitura', compras_fechar_elo: 'Montando o elo de compras', mostrar_documento: 'Mostrando o cartão da nota', nfe_manifestar_ciencia: 'Registrando a ciência da nota'
 };
+/** Verbos das ferramentas do Omie (omie_<verbo>_<objeto>), em português (item 9). */
+const VERBO_OMIE = { listar: 'Listando', consultar: 'Consultando', detalhar: 'Detalhando', incluir: 'Incluindo', alterar: 'Alterando', excluir: 'Excluindo', cancelar: 'Cancelando', associar: 'Associando', conciliar: 'Conciliando', desconciliar: 'Desfazendo a conciliação de', transferir: 'Transferindo', anexar: 'Anexando', aging: 'Calculando vencimentos de' };
+export function rotuloOmie(tool) {
+  const [, verbo, ...resto] = String(tool).split('_');
+  const acao = VERBO_OMIE[verbo] || 'Consultando';
+  return `${acao} ${resto.join(' ')} no Omie`.replace(/\s+/g, ' ').trim();
+}
 /** "Ripper viu" / "Ripper e Donald viram" / "Ana, Bia e Caio viram". */
 export function seenLabel(names) {
   const n = (names || []).filter(Boolean);
@@ -124,15 +134,25 @@ export function seenLabel(names) {
 }
 
 /** Passo parado há 20 s ou mais: "ainda em: Rodando o build · 40 s"; antes disso, null. */
+/** Motivo provável de a etapa estar demorando, em português simples (item 12). */
+export function motivoDaDemora(label) {
+  const t = String(label || '');
+  if (/pesquis|web|página|lendo|site|browser|navegand/i.test(t)) return 'esperando o site responder';
+  if (/comando|rodando|computador|build|instal|shell/i.test(t)) return 'o comando ainda está rodando';
+  if (/escrev|resposta/i.test(t)) return 'a resposta está longa';
+  if (/pensando/i.test(t)) return 'pensando com calma';
+  return 'ainda trabalhando';
+}
 export function stallLabel(label, ms, slowAfterMs = 20_000) {
   if (ms < slowAfterMs) return null;
   const s = Math.floor(ms / 1000);
-  return `Está demorando mais que o habitual · ${label} · ${s < 120 ? `${s} s` : `${Math.floor(s / 60)} min`}`;
+  return `${label}: ${motivoDaDemora(label)} · ${s < 120 ? `${s} s` : `${Math.floor(s / 60)} min`}`;
 }
 
 /** Rótulo humano de uma ferramenta; conectores (mcp__claude_ai_Google_Calendar__list_events) viram "Google Calendar: list events". */
 export function stepLabel(tool) {
   if (STEP_LABEL[tool]) return STEP_LABEL[tool];
+  if (/^omie_/.test(String(tool || ''))) return rotuloOmie(tool);
   const m = /^mcp__(?:claude_ai_)?(.+?)__(.+)$/.exec(String(tool || ''));
   if (m) {
     // "Multipli_MCP" + "multipli_listar_minhas_empresas" → "Multipli: listar minhas empresas"

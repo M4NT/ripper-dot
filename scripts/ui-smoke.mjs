@@ -51,7 +51,8 @@ try {
   // 2) Aprovar: o agente pede para rodar um comando, o botão Aprovar libera
   await step('aprovar comando', async () => {
     await send('[[ripper:test:approve]] apagar dist');
-    await page.getByRole('button', { name: 'Aprovar', exact: true }).first().click({ timeout: 15_000 });
+    // Comando pede o verbo do que faz: "Permitir comando" (Aprovar nos demais tipos)
+    await page.getByRole('button', { name: /^(Permitir comando|Aprovar)$/ }).first().click({ timeout: 15_000 });
     await page.locator('text=comando aprovado').last().waitFor({ timeout: 15_000 });
   });
 

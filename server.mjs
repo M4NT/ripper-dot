@@ -415,7 +415,7 @@ function trackLive(chatId, e) {
   let cur = liveByChat.get(chatId);
   if (e.speaker || !cur) { cur = { agentId: e.speaker || cur?.agentId || null, content: '', steps: [], at: Date.now() }; liveByChat.set(chatId, cur); }
   if (e.text) cur.content += e.text;
-  if (e.tool) cur.steps.push({ kind: 'tool', tool: e.tool, detail: e.detail });
+  if (e.tool) cur.steps.push({ kind: 'tool', tool: e.tool, detail: e.detail, at: Date.now() });
   if (e.approval) cur.steps.push({ kind: 'approval', rec: e.approval, status: 'pending' });
   if (e.warn) cur.steps.push({ kind: 'warn', label: e.warn });
   if (e.campaign) cur.steps.push({ kind: 'campaign', rec: e.campaign });
@@ -927,7 +927,8 @@ const gate = new ApprovalGate({
     save();
   }
 });
-const approvalView = a => ({ ...a, agentName: db.agents.find(x => x.id === a.agentId)?.name, chatTitle: db.chats.find(c => c.id === a.chatId)?.title });
+// expiresAt: quando um pedido pendente da Caixa vence (o ApprovalGate usa 10 min por padrão). Perguntas não expiram na tela.
+const approvalView = a => ({ ...a, agentName: db.agents.find(x => x.id === a.agentId)?.name, chatTitle: db.chats.find(c => c.id === a.chatId)?.title, ...(a.status === 'pending' && a.kind !== 'question' && a.createdAt ? { expiresAt: a.createdAt + 10 * 60_000 } : {}) });
 
 /** Computador com portão: comandos de risco (ou tudo, na máquina do usuário) esperam sua aprovação. */
 const browsers = new Map();
@@ -1847,7 +1848,9 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
   // Texto escrito antes de uma ferramenta é rascunho do agente ("Agora vou…"): vira nota nas atividades; a resposta é o que vem depois da última ferramenta.
   let turnText = '', cut = 0;
   const notes = [];
+  let turnTruncada = false; // o modelo parou no limite de tamanho (sinal do Claude, stop_reason)
   const emitTurn = ev => {
+    if (ev.truncated) turnTruncada = true;
     if (ev.handoff) { turnText = ''; cut = 0; notes.length = 0; }
     if (ev.tool && turnText.length > cut) { const n = turnText.slice(cut).trim(); if (n) notes.push({ kind: 'note', label: n.slice(0, 400), at: Date.now() - 1 }); cut = turnText.length; } // -1: a nota fica antes da ferramenta que a interrompeu
     if (ev.text) turnText += ev.text;
@@ -1901,7 +1904,7 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
       const finalText = out.slice(out.length - turnText.length + cut).trim();
       const answer = finalText || out.trim() || `Fiz ${steps.length} ${steps.length === 1 ? 'ação' : 'ações'} e terminei sem escrever um resumo. Veja as atividades acima.`;
       const allSteps = finalText && notes.length ? [...steps, ...notes].sort((a, b) => (a.at || 0) - (b.at || 0)) : steps;
-      push(answer, allSteps, { model: m, effort, routedBy, timing, ...(turnCost ? { costUsd: turnCost } : {}), ...(delivered.length ? { files: [...delivered] } : {}) });
+      push(answer, allSteps, { model: m, effort, routedBy, timing, ...(turnCost ? { costUsd: turnCost } : {}), ...(delivered.length ? { files: [...delivered] } : {}), ...(turnTruncada ? { truncated: true } : {}) });
       recordUsage(db, m, {
         charsIn: (text?.length || 0) + (prompt?.length || 0),
         charsOut: out.length,
@@ -3612,6 +3615,15 @@ const routes = [
     if (!r.ok) throw new HttpError(400, r.reason);
     c.updatedAt = Date.now(); save();
     return r;
+  }],
+  // Fixar uma resposta: marca a mensagem para ser achada depressa no topo da conversa (alterna).
+  ['POST', /^\/api\/chats\/([\w-]+)\/messages\/([\w-]+)\/fixar$/, async (req, [cid, mid]) => {
+    const c = db.chats.find(x => x.id === cid);
+    const msg = c?.messages.find(x => x.id === mid);
+    if (!msg) throw new HttpError(404, 'Mensagem não encontrada.');
+    msg.fixada = msg.fixada ? undefined : true; // sem o campo, o JSON não guarda nada
+    c.updatedAt = Date.now(); save();
+    return { fixada: !!msg.fixada };
   }],
   ['DELETE', /^\/api\/chats\/([\w-]+)$/, (req, [cid]) => { if (isChatStreaming(cid)) throw new HttpError(409, 'Aguarde a resposta terminar.'); db.chats = db.chats.filter(c => c.id !== cid); save(); return {}; }],
   // Ditado em qualquer navegador (Firefox, Safari, celular): o áudio gravado vira texto no Whisper local.

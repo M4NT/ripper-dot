@@ -3,10 +3,15 @@ import { api, go, useRoute, fmtAgo } from './lib.js';
 import { AgentAvatar, Icon, Skeleton } from './ui.jsx';
 import { useApp } from './app.jsx';
 import { useT } from './i18n/index.jsx';
+import { fraseDaAprovacao, verbosDaAprovacao } from './agentesInteracao.js';
 
 const KIND = { exec: 'quer rodar um comando', share: 'quer publicar um link', social: 'quer publicar em webhook', whatsapp: 'quer enviar um WhatsApp', email: 'quer enviar um e-mail', github: 'quer publicar no GitHub', omie: 'quer alterar o Omie', agent: 'quer criar um agente', flow: 'terminou um passo do fluxo' };
 /** O que o agente está pedindo, em uma frase (a Caixa mostra isso na linha do mascote). */
 export const approvalAsk = rec => rec.kind === 'question' ? 'precisa de você' : rec.kind === 'setting' ? 'sugere uma configuração' : rec.kind === 'documento' ? 'aguarda a sua confirmação' : KIND[rec.kind] || 'pede aprovação';
+
+// Verbos dos botões e frase do pedido vêm das funções puras (testadas no Node).
+export { fraseDaAprovacao, verbosDaAprovacao };
+const hora = ms => new Date(ms).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
 
 /** Cartão de aprovação: mostra exatamente o que vai acontecer e por que precisa do seu ok. */
 export function ApprovalCard(props) {
@@ -90,7 +95,10 @@ function DecisionCard({ rec, status, compact, onDone }) {
     catch (e) { toast(e.message, 'error'); onDone?.('expired'); }
     setBusy(false);
   }
-  const label = { approved: 'Aprovado', denied: 'Recusado', expired: 'Expirou sem resposta', cancelled: 'Cancelado' }[st];
+  const verbos = verbosDaAprovacao(rec);
+  // Resultado com a hora da decisão (item 34): "Você aprovou · 14:02", "Você não aprovou · 14:02".
+  const quando = rec.decidedAt ? ` · ${hora(rec.decidedAt)}` : '';
+  const label = st === 'approved' ? `Você aprovou${quando}` : st === 'denied' ? `Você não aprovou${quando}` : { expired: 'Expirou sem resposta', cancelled: 'Cancelado' }[st];
   return (
     <div className={`approval ${st} ${compact ? 'compact' : ''}`} role="group" aria-label="Pedido de aprovação">
       <div className="approval-head">
@@ -98,15 +106,20 @@ function DecisionCard({ rec, status, compact, onDone }) {
         <span className="approval-title">{rec.kind === 'documento' ? <><b>Nota de compra</b> · você aprovou no cartão</> : <><b>{a?.name || rec.agentName || 'Agente'}</b> {KIND[rec.kind] || 'pede aprovação'}</>}</span>
         {compact && rec.chatTitle && <button className="link approval-chat" onClick={() => go(`/c/${rec.chatId}`)}>{rec.chatTitle}</button>}
       </div>
-      <pre className="approval-cmd"><code>{rec.command}</code></pre>
+      <p className="approval-frase">{fraseDaAprovacao(rec)}</p>
+      <details className="approval-detalhe"><summary>Ver detalhe</summary><pre className="approval-cmd"><code>{rec.command}</code></pre></details>
       <p className="approval-why"><Icon name="x" size={12} className="why-ico" />Por que pedir: {rec.reason}</p>
       {st === 'pending' ? (
-        <div className="approval-actions">
-          <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => decide(true)}><Icon name="check" size={14} />Aprovar</button>
-          {rec.kind !== 'documento' && <button className="btn btn-sm" disabled={busy} onClick={() => decide(true, true)} title="Não pergunta de novo por este mesmo comando nesta conversa">Aprovar sempre aqui</button>}
-          <div className="grow" />
-          <button className="btn btn-sm btn-danger" disabled={busy} onClick={() => decide(false)}>Recusar</button>
-        </div>
+        <>
+          <div className="approval-actions">
+            <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => decide(true)}><Icon name="check" size={14} />{verbos.sim}</button>
+            {rec.kind !== 'documento' && <button className="btn btn-sm" disabled={busy} onClick={() => decide(true, true)} title="Não pergunta de novo por este mesmo comando nesta conversa">Aprovar sempre aqui</button>}
+            <div className="grow" />
+            <button className="btn btn-sm btn-danger" disabled={busy} onClick={() => decide(false)}>{verbos.nao}</button>
+          </div>
+          {rec.kind !== 'documento' && <small className="approval-hint">"Aprovar sempre aqui" vale só para este comando, nesta conversa.</small>}
+          {rec.expiresAt && <small className="approval-expira">Expira às {hora(rec.expiresAt)}</small>}
+        </>
       ) : <p className={`approval-result ${st}`}><Icon name={st === 'approved' ? 'check' : 'x'} size={13} />{label}</p>}
     </div>
   );
