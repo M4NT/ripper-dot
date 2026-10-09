@@ -2,6 +2,8 @@
 
 Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS e app mobile em Expo/HeroUI, com o guia `apps/mobile/DESIGN.md` e o `docs/ui-foundation.md`.
 
+**Situação final:** os 50 itens estão fechados: 47 feitos ou decididos e 3 descartados (5, 6 e 25). O Yan testou no celular os itens 4 e 45, e ficaram bons. O item 22 está implementado (lote 14). O item 47 fica para reavaliar com cerca de 2.000 mensagens.
+
 **Uso:** o OpenBot é licenciado como PolyForm Noncommercial 1.0.0. Esta lista usa só as ideias de design. Nenhum código ou recurso visual dele deve ser copiado.
 
 **Medições feitas nesta rodada (web/src):**
@@ -23,7 +25,7 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 1. **Barra de abas no celular:** Início (Conversas), Agentes, Caixa e Mais. *Feito (PR #112 e lote 1 em #113).* [rápido] Ref.: `NativeTabs` do DESIGN.md.
 2. **Busca dentro da barra de navegação do celular:** o campo aparece no topo ao tocar, em vez de um ícone que abre outra tela. [médio] Ref.: `Stack.SearchBar`. Onde: `app.jsx` (barra do celular). *Decidido: manter a busca rápida atual (sem mudança).*
 3. **Título grande que encolhe ao rolar** nas telas principais do celular (Agentes, Conversas, Caixa). [médio] Ref.: título grande do iOS. Onde: `pages/Agents.jsx`, `pages/Chats.jsx`. *Feito e verificado no celular: título de 32 px no topo e 20 px depois de rolar; volta ao tamanho cheio ao voltar ao topo.*
-4. **Menu de ações do topo como folha de baixo** no celular, em vez de janela no meio da tela. [médio] Ref.: `Stack.Toolbar` e menus nativos. Onde: `ui.jsx` (`Menu`). *Lote 7: feito. No celular, o menu abre como folha de baixo para cima, com fundo escurecido que fecha ao tocar fora (testado).*
+4. **Menu de ações do topo como folha de baixo** no celular, em vez de janela no meio da tela. [médio] Ref.: `Stack.Toolbar` e menus nativos. Onde: `ui.jsx` (`Menu`). *Testado pelo Yan no celular: ficou bom. Lote 7: feito. No celular, o menu abre como folha de baixo para cima, com fundo escurecido que fecha ao tocar fora (testado).*
 5. **Seletor de empresa/time no topo da lateral**, com ícone e nome, para trocar de contexto sem sair da tela. [grande] Ref.: "OpenBot team ⌄" e §3.3 da especificação. Onde: `app.jsx` (`Sidebar`). *Descartado: não haverá seletor de empresas; a organização fica em projetos.*
 6. **Faixa de contas à esquerda** com um ícone por empresa, quando houver mais de uma. [médio] Ref.: barra vertical do OpenBot. Depende do item 5. *Descartado junto com o 5.*
 
@@ -47,7 +49,7 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 19. **Lista de agentes com prévia da última mensagem e hora**, em duas linhas por agente. [rápido] *verificar: `chatRow.jsx` já tem parte disso.* Ref.: lista de agentes do OpenBot. *Já existe: a linha de agente mostra a última mensagem e a hora.*
 20. **Cargo do agente como etiqueta** ao lado do nome, por exemplo "Gerente de projeto". [rápido] Ref.: etiqueta "Chief of staff". Onde: `app.jsx` (linha do agente). *Feito e verificado: a categoria aparece ao lado do nome nas conversas e logo abaixo do nome nos agentes fixados; nome longo corta com reticências.*
 21. **Esqueletos no carregamento** de listas e cartões, no lugar do spinner. [médio] Ref.: `Skeleton`. Medido hoje: 0 usos. *Feito e verificado: esqueleto no histórico de aprovações, fluxos, registro, conversa de agente e painéis de administração.*
-22. **Cartão de documento de compra no chat** (nota fiscal ou pedido): cabeçalho, etiquetas de validação, botões de ação e estado "processando" no próprio cartão. [grande] Ref.: §3.2 da especificação e o `Card` do OpenUI. *Plano escrito: `docs/planos/cartao-documento-compra.md`. Ainda não implementado: aguarda a sua decisão, explicada no chat no lote 12.*
+22. **Cartão de documento de compra no chat** (nota fiscal ou pedido): cabeçalho, etiquetas de validação, botões de ação e estado "processando" no próprio cartão. [grande] Ref.: §3.2 da especificação e o `Card` do OpenUI. *Feito no lote 14 (as quatro fases do plano): cartão no chat com etiquetas de situação, "Ver detalhes" e três botões. "Aprovar" cria um pedido na Caixa e não lança nada no ERP. "Rejeitar" só registra a decisão, sem aviso. O cartão acompanha a Caixa sem recarregar a conversa. Plano: `docs/planos/cartao-documento-compra.md`.*
 23. **Confirmação com `AlertDialog`** para toda ação irreversível, mostrando o nome do alvo. [rápido] Ref.: `AlertDialog` do `ui-foundation.md`. Onde: `useConfirm` (8 arquivos). *Feito no lote 1: os 4 `confirm()` do navegador que sobravam (Clientes, Certificados, Omie, Webhooks) agora usam o diálogo do app.*
 24. **Desfazer em toda ação reversível** (aviso com botão "Desfazer"). [médio] Ref.: padrão de aviso do OpenBot. Onde: 9 arquivos já têm algo parecido; padronizar. *Lote 5: "Desfazer" em arquivar e desarquivar em lote, e no deslizar. Apagar não tem volta (sem desfazer, de propósito).*
 25. **Uso por agente na ficha** (tokens, custo e tempo do período). [médio] Ref.: `AgentUsagePanel`. Onde: `modelUsage.jsx`, `pages/AgentConfig.jsx`. *Descartado por decisão: não será feito por enquanto.*
@@ -79,7 +81,7 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 42. **Foco visível em todo controle** para uso com teclado. [rápido] *Lote 4: regra geral de contorno para `:focus-visible` em botões, links, campos e controles. Componentes que já definem o próprio foco continuam valendo.*
 43. **Rótulo acessível em todo botão só com ícone.** Hoje há 104 `aria-label`; falta checar a cobertura. [médio] Ref.: `IconButton` com `label` obrigatório. *Feito e verificado: `scripts/rotulos.mjs` com dados (agente com categoria, conversa com tabela e resposta longa), em 1280 e 375 px, nas 15 telas: nenhum botão ou link sem nome.*
 44. **Contraste verificado por script** nos dois temas, com 4,5:1 para texto. [médio] Ref.: `DESIGN.md`, "Theme and visual consistency". *Lote 5: `scripts/contraste.mjs` lê as cores do CSS e confere 4,5:1 nos dois temas. Todos passam (menor: 4,76:1).*
-45. **Deslizar na lista de conversas para arquivar**, com "Desfazer". Não usar deslize para aprovar nada. [médio] Ref.: decisão da especificação (ação irreversível exige confirmação). *Lote 3: lógica feita e testada (arquiva, "Desfazer" restaura, sem erro). Falta testar o gesto num celular de verdade: no navegador de teste o toque é cancelado antes de chegar ao fim.*
+45. **Deslizar na lista de conversas para arquivar**, com "Desfazer". Não usar deslize para aprovar nada. [médio] Ref.: decisão da especificação (ação irreversível exige confirmação). *Lote 3: lógica feita e testada (arquiva, "Desfazer" restaura, sem erro). Testado pelo Yan no celular: ficou ok. (No navegador de teste o toque era cancelado antes do fim; o teste real foi feito no aparelho.)*
 46. **Verificação automática de estilo no build**, que bloqueia cor, tamanho e raio literais novos. [médio] Ref.: `bun run check:ui` do OpenBot. *Lote 6: `scripts/cores-literais.mjs` falha se o CSS ganhar cores literais novas (testado: falha ao adicionar uma cor e passa ao restaurar).*
 
 ## Desempenho (47–50)

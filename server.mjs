@@ -64,8 +64,9 @@ import { SECRET_PATHS } from './lib/local-secret.mjs';
 import { emailReady, listEmails, readEmail, sendEmail, newEmailsSince, testEmail, getAttachment, safeName, attachmentText, readHint } from './lib/email.mjs';
 import { createDfeRunner, dfeCompanies, saveCertificate, removeCertificate, certificadosList, certificateAlerts, DfeError } from './lib/dfe.mjs';
 import { createNfseRunner } from './lib/nfse.mjs';
-import { createEloRunner } from './lib/elo-compras.mjs';
+import { createEloRunner, chNumero } from './lib/elo-compras.mjs';
 import { createNfeCienciaRunner } from './lib/nfe-ciencia.mjs';
+import { createDocumentoRunner, estadoDocumento, pedirAprovacaoDocumento, rejeitarDocumento } from './lib/documento-compra.mjs';
 import { createOmieRunner, omieCompanyList, omieAddCompany, omieRemoveCompany, omieCredentials, omieTestConnection } from './lib/omie.mjs';
 import { gh, githubReady, normalizeRepo, repoChanges, describeChange, prBranch, gitAuthArg, hideToken } from './lib/github.mjs';
 import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './lib/event-triggers.mjs';
@@ -328,7 +329,8 @@ const googleTasksSync = createGoogleTasksSync({
   enabled: db.settings?.taskSync?.google?.enabled !== false,
   runtime: googleTasksRuntime()
 });
-for (const a of db.approvals || []) if (a.status === 'pending') { a.status = 'expired'; a.decidedAt = Date.now(); }
+// Pedido de "Aprovar" no cartão de documento não tem agente esperando: não expira ao reiniciar.
+for (const a of db.approvals || []) if (a.status === 'pending' && a.kind !== 'documento') { a.status = 'expired'; a.decidedAt = Date.now(); }
 await migrateInlineArtifacts(db.artifacts).catch(e => console.error('[artifacts] migração:', e.message));
 const _storageCleanup = await startupStorageCleanup(db).catch(e => ({ error: e.message }));
 if (_storageCleanup?.files?.removedRecords?.length) save();
@@ -1537,6 +1539,14 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
     nfse: !chat.channel && dfeCompanies(db).length ? createNfseRunner({ getDb: () => db, save }) : null,
     // Elo de compras: precisa de certificado (notas) e de Omie conectado (conta e pedido); só leitura.
     elo: !chat.channel && dfeCompanies(db).length && omieCompanyList(db.settings).some(c => c.status === 'conectada') ? createEloRunner({ getDb: () => db }) : null,
+    // Cartão de documento de compra (item 22): mesma leitura do elo; o cartão vai para a conversa.
+    documento: !chat.channel && dfeCompanies(db).length && omieCompanyList(db.settings).some(c => c.status === 'conectada') ? createDocumentoRunner({
+      getDb: () => db,
+      onCard: card => {
+        const rec = { ...card, agentId: agent.id, chatId: chat.id };
+        cardSteps.push({ kind: 'documento', rec }); emit({ documento: rec });
+      }
+    }) : null,
     // Ciência da Operação (210210): escrita na Receita; toda vez pede a sua aprovação na Caixa antes de enviar.
     nfeCiencia: !chat.channel && dfeCompanies(db).length ? createNfeCienciaRunner({
       getDb: () => db, save,
@@ -3063,8 +3073,45 @@ const routes = [
     pending: db.approvals.filter(a => a.status === 'pending').map(approvalView),
     recent: db.approvals.filter(a => a.status !== 'pending').slice(-30).reverse().map(approvalView)
   })],
+  // Cartão de documento de compra: estado da decisão e os dois botões (nenhum deles mexe no ERP).
+  ['GET', /^\/api\/documentos\/(\d{14})\/(\d{44})$/, (req, [empresa, chNFe]) => estadoDocumento(db, empresa, chNFe)],
+  ['POST', /^\/api\/documentos\/(\d{14})\/(\d{44})\/(aprovar|rejeitar)$/, async (req, [empresa, chNFe, acao]) => {
+    if (!dfeCompanies(db).includes(empresa)) throw new HttpError(404, 'Empresa sem certificado cadastrado.');
+    const nota = Object.values(db.dfe?.companies?.[empresa]?.notes || {}).find(n => n.chNFe === chNFe);
+    if (!nota) throw new HttpError(404, 'Essa NF-e não está salva.');
+    if (acao === 'rejeitar') {
+      let r;
+      try { r = rejeitarDocumento(db, { empresa, chNFe }); } catch (e) { throw new HttpError(409, e.message); }
+      if (r.cancelado) appendAudit(db, auditFromApproval(r.cancelado));
+      save();
+      return r.estado;
+    }
+    // Aprovar: o cartão manda só o texto das etiquetas (para a Caixa mostrar); número, fornecedor e valor vêm da nota salva.
+    const b = await body(req);
+    const etiquetas = (Array.isArray(b.etiquetas) ? b.etiquetas : []).slice(0, 12).map(t => ({ texto: String(t).slice(0, 80) }));
+    const agentId = db.agents.find(x => x.id === b.agentId)?.id || null;
+    const chatId = db.chats.find(x => x.id === b.chatId)?.id || null;
+    const card = {
+      numero: chNumero(chNFe), valor: nota.vNF ?? null,
+      fornecedor: { nome: nota.xNome || null, cnpj: nota.cnpjEmitente || null },
+      etiquetas: etiquetas.length ? etiquetas : [{ texto: 'sem resumo' }]
+    };
+    const estado = pedirAprovacaoDocumento(db, { empresa, chNFe, card, agentId, chatId, novoId: id });
+    save();
+    return estado;
+  }],
   ['POST', /^\/api\/approvals\/([\w-]+)$/, async (req, [aid]) => {
     const b = await body(req);
+    // Pedido do cartão de documento: não tem agente esperando; só registra a decisão da Caixa.
+    const doc = db.approvals.find(a => a.id === aid && a.kind === 'documento');
+    if (doc) {
+      if (doc.status !== 'pending') throw new HttpError(409, 'Este pedido não está mais aguardando.');
+      Object.assign(doc, { status: b.approve ? 'approved' : 'denied', decidedAt: Date.now() });
+      appendAudit(db, auditFromApproval(doc));
+      recordCorporateAudit(db.settings, auditFromApprovalRecord(doc));
+      save();
+      return { ok: true };
+    }
     // Pedido que já não está esperando (servidor reiniciou, expirou): fecha no histórico.
     const answer = typeof b.answer === 'string' ? b.answer.trim().slice(0, 4000) : '';
     if (!gate.decide(aid, answer ? true : !!b.approve, answer ? { answer } : { remember: !!b.remember })) {

@@ -1,0 +1,39 @@
+/* Estilos de web/src/documentoCard.jsx. Carregados junto com a conversa. */
+
+.doc-card { display: grid; gap: 10px; width: 100%; max-width: 560px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--raio-cartao); background: var(--surface); min-width: 0; }
+.doc-head { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: var(--fs-base); }
+.doc-head b { font-weight: 500; min-width: 0; }
+.doc-head .tag { flex: none; white-space: nowrap; margin-left: auto; }
+.doc-ico { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: var(--raio-controle); background: var(--surface-2); color: var(--muted); flex: none; }
+.doc-main { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; min-width: 0; }
+.doc-forn, .doc-valor { display: flex; flex-direction: column; min-width: 0; }
+.doc-forn { flex: 1; }
+.doc-valor { text-align: right; flex: none; }
+.doc-nome { display: block; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: var(--fs-md); }
+.doc-valor b { font-size: var(--fs-md); font-variant-numeric: tabular-nums; }
+.doc-valor small, .doc-forn small { font-size: var(--fs-xs); }
+
+.doc-etiquetas { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.doc-etq { padding: 2px 9px; border-radius: var(--raio-pilula); font-size: var(--fs-xs); border: 1px solid var(--line); color: var(--ink-2); background: var(--surface-2); }
+.doc-etq.alerta { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); color: var(--warn); }
+.doc-etq.ok { border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); color: var(--ok); }
+
+.doc-avisos { margin: 0; padding: 0 0 0 16px; color: var(--muted); font-size: var(--fs-sm); display: grid; gap: 2px; }
+
+.doc-detalhes { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 0; padding: 10px 12px; border-top: 1px solid var(--line); font-size: var(--fs-sm); }
+.doc-detalhes dt { color: var(--muted); }
+.doc-detalhes dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+
+.doc-estado { margin: 0; font-size: var(--fs-sm); color: var(--ink-2); }
+.doc-aprovado .doc-estado { color: var(--ok); }
+.doc-rejeitado .doc-estado { color: var(--muted); }
+.doc-aguardando .doc-estado { color: var(--warn); }
+
+.doc-acoes { display: flex; flex-wrap: wrap; gap: 8px; }
+
+@media (max-width: 560px) {
+  .doc-main { flex-direction: column; align-items: stretch; }
+  .doc-valor { text-align: left; }
+  .doc-detalhes { grid-template-columns: 1fr; gap: 2px; }
+  .doc-detalhes dt { margin-top: 6px; }
+}
