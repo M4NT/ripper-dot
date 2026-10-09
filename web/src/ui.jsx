@@ -221,18 +221,33 @@ function useDismiss(open, close, refs) {
   }, [open]);
 }
 
+// Celular (mesma largura em que o app recolhe a barra lateral): o menu sobe de baixo como folha, com fundo escurecido.
+const TELA_PEQUENA = '(max-width: 900px)';
+function useTelaPequena() {
+  const [pequena, setPequena] = useState(() => typeof matchMedia !== 'undefined' && matchMedia(TELA_PEQUENA).matches);
+  useEffect(() => { const mq = matchMedia(TELA_PEQUENA); const f = () => setPequena(mq.matches); mq.addEventListener('change', f); return () => mq.removeEventListener('change', f); }, []);
+  return pequena;
+}
+
 export function Menu({ trigger, children, align = 'left', className = '', onOpenChange }) {
   const [open, setOpen] = useState(false);
   const anchor = useRef(null), pop = useRef(null);
+  const pequena = useTelaPequena();
   const pos = useFloating(open, anchor, align);
   useDismiss(open, () => setOpen(false), [anchor, pop]);
   const toggle = () => setOpen(o => { const next = !o; onOpenChange?.(next); return next; });
+  const fecha = e => e.target.closest('[role=menuitem]') && setOpen(false);
   return (
     <div className={'menu-wrap ' + className} ref={anchor}>
       {trigger({ open, toggle })}
-      {open && pos && createPortal(
-        <div ref={pop} className={`menu floating ${className}-pop`} style={pos} role="menu"
-          onClick={e => e.target.closest('[role=menuitem]') && setOpen(false)}>{children}</div>,
+      {open && pequena && createPortal(
+        <>
+          <div className="menu-scrim" onClick={() => setOpen(false)} aria-hidden="true" />
+          <div ref={pop} className={`menu floating menu-sheet ${className}-pop`} role="menu" onClick={fecha}>{children}</div>
+        </>,
+        document.body)}
+      {open && !pequena && pos && createPortal(
+        <div ref={pop} className={`menu floating ${className}-pop`} style={pos} role="menu" onClick={fecha}>{children}</div>,
         document.body)}
     </div>
   );

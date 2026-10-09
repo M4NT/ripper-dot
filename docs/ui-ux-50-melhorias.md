@@ -23,9 +23,9 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 1. **Barra de abas no celular:** Início (Conversas), Agentes, Caixa e Mais. *Feito (PR #112 e lote 1 em #113).* [rápido] Ref.: `NativeTabs` do DESIGN.md.
 2. **Busca dentro da barra de navegação do celular:** o campo aparece no topo ao tocar, em vez de um ícone que abre outra tela. [médio] Ref.: `Stack.SearchBar`. Onde: `app.jsx` (barra do celular). *Decidido: manter a busca rápida atual (sem mudança).*
 3. **Título grande que encolhe ao rolar** nas telas principais do celular (Agentes, Conversas, Caixa). [médio] Ref.: título grande do iOS. Onde: `pages/Agents.jsx`, `pages/Chats.jsx`. *Lote 2: título grande no celular (32 px, conferido na foto). Falta o encolhimento ao rolar.*
-4. **Menu de ações do topo como folha de baixo** no celular, em vez de janela no meio da tela. [médio] Ref.: `Stack.Toolbar` e menus nativos. Onde: `ui.jsx` (`Menu`).
-5. **Seletor de empresa/time no topo da lateral**, com ícone e nome, para trocar de contexto sem sair da tela. [grande] Ref.: "OpenBot team ⌄" e §3.3 da especificação. Onde: `app.jsx` (`Sidebar`).
-6. **Faixa de contas à esquerda** com um ícone por empresa, quando houver mais de uma. [médio] Ref.: barra vertical do OpenBot. Depende do item 5.
+4. **Menu de ações do topo como folha de baixo** no celular, em vez de janela no meio da tela. [médio] Ref.: `Stack.Toolbar` e menus nativos. Onde: `ui.jsx` (`Menu`). *Lote 7: feito. No celular, o menu abre como folha de baixo para cima, com fundo escurecido que fecha ao tocar fora (testado).*
+5. **Seletor de empresa/time no topo da lateral**, com ícone e nome, para trocar de contexto sem sair da tela. [grande] Ref.: "OpenBot team ⌄" e §3.3 da especificação. Onde: `app.jsx` (`Sidebar`). *Descartado: não haverá seletor de empresas; a organização fica em projetos.*
+6. **Faixa de contas à esquerda** com um ícone por empresa, quando houver mais de uma. [médio] Ref.: barra vertical do OpenBot. Depende do item 5. *Descartado junto com o 5.*
 
 ## Chat e campo de mensagem (7–18)
 
@@ -47,11 +47,11 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 19. **Lista de agentes com prévia da última mensagem e hora**, em duas linhas por agente. [rápido] *verificar: `chatRow.jsx` já tem parte disso.* Ref.: lista de agentes do OpenBot. *Já existe: a linha de agente mostra a última mensagem e a hora.*
 20. **Cargo do agente como etiqueta** ao lado do nome, por exemplo "Gerente de projeto". [rápido] Ref.: etiqueta "Chief of staff". Onde: `app.jsx` (linha do agente). *Parcial: a linha de agente mostra uma etiqueta de função, mas abaixo do nome, e não ao lado.*
 21. **Esqueletos no carregamento** de listas e cartões, no lugar do spinner. [médio] Ref.: `Skeleton`. Medido hoje: 0 usos. *Lote 2: componente `Skeleton` criado e usado no histórico de aprovações e nos fluxos. Faltam as outras listas.*
-22. **Cartão de documento de compra no chat** (nota fiscal ou pedido): cabeçalho, etiquetas de validação, botões de ação e estado "processando" no próprio cartão. [grande] Ref.: §3.2 da especificação e o `Card` do OpenUI.
+22. **Cartão de documento de compra no chat** (nota fiscal ou pedido): cabeçalho, etiquetas de validação, botões de ação e estado "processando" no próprio cartão. [grande] Ref.: §3.2 da especificação e o `Card` do OpenUI. *Plano escrito: `docs/planos/cartao-documento-compra.md`. Aguarda as decisões do plano.*
 23. **Confirmação com `AlertDialog`** para toda ação irreversível, mostrando o nome do alvo. [rápido] Ref.: `AlertDialog` do `ui-foundation.md`. Onde: `useConfirm` (8 arquivos). *Feito no lote 1: os 4 `confirm()` do navegador que sobravam (Clientes, Certificados, Omie, Webhooks) agora usam o diálogo do app.*
 24. **Desfazer em toda ação reversível** (aviso com botão "Desfazer"). [médio] Ref.: padrão de aviso do OpenBot. Onde: 9 arquivos já têm algo parecido; padronizar. *Lote 5: "Desfazer" em arquivar e desarquivar em lote, e no deslizar. Apagar não tem volta (sem desfazer, de propósito).*
-25. **Uso por agente na ficha** (tokens, custo e tempo do período). [médio] Ref.: `AgentUsagePanel`. Onde: `modelUsage.jsx`, `pages/AgentConfig.jsx`.
-26. **Calendário visual das rotinas**, com as próximas execuções. [grande] Ref.: `SchedulePanel`. Onde: `routines.jsx`.
+25. **Uso por agente na ficha** (tokens, custo e tempo do período). [médio] Ref.: `AgentUsagePanel`. Onde: `modelUsage.jsx`, `pages/AgentConfig.jsx`. *Descartado por decisão: não será feito por enquanto.*
+26. **Calendário visual das rotinas**, com as próximas execuções. [grande] Ref.: `SchedulePanel`. Onde: `routines.jsx`. *Plano escrito: `docs/planos/calendario-rotinas.md`. Aguarda as decisões do plano.*
 
 ## Formulários e folhas (27–33)
 
@@ -66,10 +66,10 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 ## Visual: cor, tipografia, raio e escala (34–39)
 
 34. **Trocar as 97 cores literais do CSS por variáveis de tema.** [médio] Ref.: `tokens.css` como fonte única. Medido hoje. *Medido de novo: 66 cores literais fora dos temas (27 diferentes). `scripts/cores-literais.mjs` impede que o número suba. Trocar as restantes por variáveis fica para depois.*
-35. **Reduzir os 359 tamanhos de fonte em `px`** para uma escala de 6 a 7 passos. [médio] Ref.: `ui-foundation.md`.
-36. **Reduzir os 214 raios literais para quatro valores** (controle, cartão, folha e pílula). [médio] Ref.: escala de raios do OpenBot.
-37. **Escala de controles definida:** 24, 28, 32, 36 e 44 px, com uso por função. [rápido] Ref.: `ui-foundation.md`, "compact control scale".
-38. **Texto em `rem`, não em `px`**, para respeitar o tamanho de fonte que a pessoa escolheu no celular. [médio] Ref.: "Dynamic Type" no `DESIGN.md`. Medido hoje: 1 uso de `rem`.
+35. **Reduzir os 359 tamanhos de fonte em `px`** para uma escala de 6 a 7 passos. [médio] Ref.: `ui-foundation.md`. *Parcial: texto já em `rem` (item 38). A escala de tamanhos (6 a 7 passos) ainda não foi definida.*
+36. **Reduzir os 214 raios literais para quatro valores** (controle, cartão, folha e pílula). [médio] Ref.: escala de raios do OpenBot. *Lote 7: escala de raios no tema (controle, cartão, folha e pílula), usada no cartão de configuração e na folha de menu. Os outros raios ainda não foram migrados.*
+37. **Escala de controles definida:** 24, 28, 32, 36 e 44 px, com uso por função. [rápido] Ref.: `ui-foundation.md`, "compact control scale". *Lote 7: escala de controles no tema (28, 32, 36 e 44 px), usada no ícone, na pílula e no seletor de segmento. Botão pequeno (30 px) e botão padrão (38 px) ficam fora da escala; decidir depois.*
+38. **Texto em `rem`, não em `px`**, para respeitar o tamanho de fonte que a pessoa escolheu no celular. [médio] Ref.: "Dynamic Type" no `DESIGN.md`. Medido hoje: 1 uso de `rem`. *Lote 7: 367 tamanhos convertidos para `rem` (16 px = 1 rem). Medido: 487 textos com o mesmo tamanho calculado antes e depois, no padrão. Falta 1 caso em JSX e as fontes em outros atributos.*
 39. **Agrupamentos de configuração com cantos de 16 pt**, fundo agrupado e separadores internos, no claro e no escuro. [médio] Ref.: tabela de cores do `DESIGN.md`. *Lote 6: raio dos cartões de configuração de 18 px para 16 px.*
 
 ## Movimento, toque e acessibilidade (40–46)
