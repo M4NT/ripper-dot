@@ -11,6 +11,7 @@ import { chromium } from 'playwright';
 
 const TELAS = ['/#/', '/#/new', '/#/agents', '/#/projects', '/#/inbox', '/#/flows', '/#/explore', '/#/chats', '/#/marketplace', '/#/settings', '/#/connectors', '/#/log'];
 const MIN_TOQUE = 44;
+const LARGURA = Number(process.env.LARGURA) || 375; // ex.: LARGURA=768 node scripts/mobile-audit.mjs
 
 const port = await new Promise(r => { const s = createServer().listen(0, () => { const p = s.address().port; s.close(() => r(p)); }); });
 const base = `http://127.0.0.1:${port}`;
@@ -26,7 +27,7 @@ try {
   for (let i = 0; i < 60; i++) { try { if ((await fetch(base + '/api/health')).ok) break; } catch {} await new Promise(r => setTimeout(r, 250)); }
   await api('/api/settings', { method: 'PUT', body: JSON.stringify({ onboarded: true }) });
   browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 375, height: 812 }, colorScheme: 'dark' });
+  const page = await browser.newPage({ viewport: { width: LARGURA, height: 812 }, colorScheme: 'dark' });
   await page.goto(`${base}/?token=${token}`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
   console.log(`tela`.padEnd(16), 'rolagem lateral'.padEnd(18), `alvos < ${MIN_TOQUE}px`);
   const contagem = new Map(); // rótulo+tamanho -> em quantas telas aparece

@@ -159,7 +159,7 @@ export default function AgentConfig({ id }) {
         <nav className="crumbs" aria-label="Caminho"><a href="#/agents"><Icon name="arrowL" size={15} />Agentes</a><span>/</span><a href={`#/a/${agent.id}`}>{agent.name}</a><span>/</span><b>Configurações</b></nav>
         <div className="grow" />
         {dirty && <button className="btn" onClick={() => setV(pick(agent))}>Descartar</button>}
-        <button className="btn btn-primary" disabled={!dirty || saving} onClick={save}>{saving ? 'Salvando…' : 'Salvar alterações'}</button>
+        {dirty && <button className="btn btn-primary" disabled={saving} onClick={save}>{saving ? 'Salvando…' : 'Salvar alterações'}</button>}
       </header>
       <div className="config-hero">
         <AgentAvatar agent={{ ...agent, ...v }} size={80} interactive animate />

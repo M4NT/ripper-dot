@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { api } from '../lib.js';
-import { Icon, Switch, EmptyState } from '../ui.jsx';
+import { Icon, Switch, EmptyState, useConfirm } from '../ui.jsx';
 import { useApp } from '../app.jsx';
 
 function newHook() {
@@ -42,7 +42,7 @@ export default function SocialWebhooksPanel() {
   }
 
   async function removeHook(id) {
-    if (!confirm('Remover este webhook?')) return;
+    if (!(await confirm({ title: 'Remover este webhook?', danger: true, action: 'Remover' }))) return;
     await saveWebhooks(hooks.filter(h => h.id !== id));
   }
 
@@ -50,7 +50,10 @@ export default function SocialWebhooksPanel() {
     await saveWebhooks(hooks.map(h => h.id === hook.id ? { ...h, enabled } : h));
   }
 
+  const [confirm, confirmNode] = useConfirm();
   return (
+    <>
+      {confirmNode}
     <section className="set-card mp-social-hooks" aria-labelledby="social-hooks-title">
       <header>
         <h3 id="social-hooks-title">Webhooks sociais</h3>
@@ -95,5 +98,6 @@ export default function SocialWebhooksPanel() {
         </div>
       )}
     </section>
+    </>
   );
 }

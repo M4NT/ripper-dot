@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib.js';
-import { Icon, EmptyState } from '../ui.jsx';
+import { Icon, EmptyState, useConfirm } from '../ui.jsx';
 
 const fmtCnpj = d => String(d).replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
 const fmtData = iso => new Date(iso).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
@@ -54,7 +54,7 @@ export default function CertificadosPanel() {
   }
 
   async function remove(cnpj) {
-    if (!confirm(`Remover o certificado da empresa ${fmtCnpj(cnpj)}? As notas já baixadas continuam guardadas.`)) return;
+    if (!(await confirm({ title: `Remover o certificado da empresa ${fmtCnpj(cnpj)}?`, body: 'As notas já baixadas continuam guardadas.', danger: true, action: 'Remover' }))) return;
     setBusy('remove:' + cnpj); setErr(''); setNote('');
     try {
       const r = await api(`/api/certificados/${cnpj}`, { method: 'DELETE' });
@@ -65,7 +65,10 @@ export default function CertificadosPanel() {
 
   const certs = data?.certificados || [];
 
+  const [confirm, confirmNode] = useConfirm();
   return (
+    <>
+      {confirmNode}
     <section className="set-card mp-omie" aria-labelledby="cert-title">
       <header>
         <h3 id="cert-title">Certificado digital (NF-e recebidas)</h3>
@@ -119,5 +122,6 @@ export default function CertificadosPanel() {
       {err && <p className="form-error" role="alert">{err}</p>}
       {note && <p className="set-card-desc">{note}</p>}
     </section>
+    </>
   );
 }
