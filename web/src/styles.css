@@ -2290,3 +2290,28 @@ body.agent-dragging .side-list { overflow: hidden; }
 /* celular: ☰ no próprio cabeçalho da conversa (a barra do app some no chat) */
 .chat-menu-btn { display: none; }
 @media (max-width: 900px) { .chat-menu-btn { display: inline-flex; flex: none; } }
+
+/* Celular: alvos de toque com pelo menos 44px (spec de UI mobile). Vale para os botões compartilhados de todas as telas. */
+@media (max-width: 720px) {
+  .round-btn, .icon-btn { min-width: 44px; min-height: 44px; }
+  .btn { min-height: 44px; }
+}
+
+/* Celular: o resto dos alvos pequenos (chips, filtros, envio, logo, campo de busca). */
+@media (max-width: 720px) {
+  .composer-row .icon-btn, .send { min-width: 44px; min-height: 44px; }
+  .pill, .select-btn, .ws-chip, .model-pill, .usage-btn, .link { min-height: 44px; }
+  a.brand { display: inline-flex; align-items: center; min-height: 44px; }
+  input:not([type="checkbox"]):not([type="radio"]) { min-height: 44px; }
+}
+
+/* Celular: sobras — botão de opções pequeno, controles segmentados e campo de mensagem. */
+@media (max-width: 720px) {
+  .icon-btn.sm, .seg button, .effort-step { min-width: 44px; min-height: 44px; height: auto; }
+  .composer textarea { min-height: 44px; }
+}
+
+/* Celular: links do menu de Configurações com altura de toque. */
+@media (max-width: 720px) {
+  .settings-nav a, .settings-nav button { min-height: 44px; }
+}
