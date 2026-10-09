@@ -59,7 +59,8 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
   }, []);
 
   const uploading = files.some(f => f.status === 'uploading');
-  const canSend = !uploading && // com o agente trabalhando, Enter põe a mensagem na fila (o botão continua sendo Parar)
+  const comErro = files.some(f => f.status === 'error'); // arquivo que não subiu: tentar de novo ou remover antes de enviar
+  const canSend = !uploading && !comErro && // com o agente trabalhando, Enter põe a mensagem na fila (o botão continua sendo Parar)
      (text.trim().length > 0 || files.some(f => f.id) || credentials.length > 0);
 
   async function addFiles(list) {
@@ -68,14 +69,17 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
     for (const file of list) {
       const key = Math.random().toString(36).slice(2);
       const url = file.type.startsWith('image/') ? URL.createObjectURL(file) : null;
-      setFiles(fs => [...fs, { key, name: file.name, size: file.size, type: file.type, url, status: 'uploading' }]);
-      try {
-        const rec = await uploadFile(agent.id, chatId, file, projectId, { batch });
-        setFiles(fs => fs.map(f => f.key === key ? { ...f, id: rec.id, status: 'ready' } : f));
-      } catch (e) {
-        toast(e.message, 'error');
-        setFiles(fs => fs.filter(f => f.key !== key));
-      }
+      setFiles(fs => [...fs, { key, name: file.name, size: file.size, type: file.type, url, status: 'uploading', arquivo: file }]);
+      await enviaArquivo(key, file, batch);
+    }
+  }
+  async function enviaArquivo(key, file, batch = 1) {
+    setFiles(fs => fs.map(f => f.key === key ? { ...f, status: 'uploading', erro: null } : f));
+    try {
+      const rec = await uploadFile(agent.id, chatId, file, projectId, { batch });
+      setFiles(fs => fs.map(f => f.key === key ? { ...f, id: rec.id, status: 'ready', erro: null } : f));
+    } catch (e) {
+      setFiles(fs => fs.map(f => f.key === key ? { ...f, status: 'error', erro: e.message } : f));
     }
   }
 
@@ -217,7 +221,8 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
               <div className="attach-row">
                 {files.map(f => (
                   <span key={f.key} className={`attach ${f.status} ${f.url ? 'attach-img' : ''}`}>
-                    {f.url ? <img src={f.url} alt="" /> : <Icon name="file" size={14} />}<span className="attach-name">{f.name}</span><small>{f.status === 'uploading' ? 'enviando…' : fmtSize(f.size)}</small>
+                    {f.url ? <img src={f.url} alt="" /> : <Icon name="file" size={14} />}<span className="attach-name">{f.name}</span><small>{f.status === 'uploading' ? 'enviando…' : f.status === 'error' ? 'não enviou' : fmtSize(f.size)}</small>
+                    {f.status === 'error' && <button type="button" className="attach-retry" onClick={() => enviaArquivo(f.key, f.arquivo)} title={f.erro}>Tentar de novo</button>}
                     <button type="button" aria-label={`Remover ${f.name}`} onClick={() => { setFiles(fs => fs.filter(x => x.key !== f.key)); f.id && api(`/api/files/${f.id}`, { method: 'DELETE' }).catch(() => {}); }}><Icon name="x" size={13} /></button>
                   </span>
                 ))}
