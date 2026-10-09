@@ -1,4 +1,5 @@
-import { fmtAgo, nameColor } from './lib.js';
+import { useRef } from 'react';
+import { api, fmtAgo, nameColor } from './lib.js';
 import { Icon } from './ui.jsx';
 import { useApp } from './app.jsx';
 import { useChatMenu } from './actions.jsx';
@@ -15,8 +16,43 @@ export default function ChatRow({ c, showProject }) {
   const group = isGroupChat(c);
   const project = showProject && c.projectId && S.projects.find(p => p.id === c.projectId);
   const working = !!busyChats[c.id];
+  const { refresh, toast } = useApp();
+  const gesto = useRef({ x: 0, y: 0, dx: 0, ativo: false, moveu: false });
+  const arquiva = async () => {
+    try {
+      const r = await api('/api/chats/bulk', { method: 'POST', body: { ids: [c.id], action: 'archive' } });
+      if (r.skipped) { toast('Esta conversa está respondendo agora; não arquivei.', 'error'); return; }
+      await refresh();
+      toast('Conversa arquivada', 'info', { label: 'Desfazer', run: async () => {
+        await api('/api/chats/bulk', { method: 'POST', body: { ids: [c.id], action: 'unarchive' } });
+        await refresh();
+        toast('Conversa de volta às ativas');
+      } });
+    } catch (e) { toast(e.message, 'error'); }
+  };
+  // Deslize para a esquerda: passou de 96 px solta e arquiva. Mouse não desliza (é clique normal).
+  const fimGesto = e => {
+    const g = gesto.current; g.ativo = false;
+    const el = e.currentTarget; el.style.transform = ''; el.style.transition = '';
+    if (g.dx < -96) arquiva();
+    g.dx = 0;
+    if (g.moveu) setTimeout(() => { g.moveu = false; }, 300); // o clique que vem depois do gesto é ignorado
+  };
   return (
-    <li className={`crow ${group ? 'is-group' : ''} ${c.unread ? 'unread' : ''}`} onContextMenu={e => chatMenu(e, c)}>
+    <li className={`crow ${group ? 'is-group' : ''} ${c.unread ? 'unread' : ''}`} onContextMenu={e => chatMenu(e, c)}
+      onPointerDown={e => { if (e.pointerType === 'mouse') return; gesto.current = { x: e.clientX, y: e.clientY, dx: 0, ativo: true, moveu: false }; }}
+      onPointerMove={e => {
+        const g = gesto.current; if (!g.ativo) return;
+        const dx = e.clientX - g.x, dy = e.clientY - g.y;
+        if (!g.moveu && Math.abs(dy) > Math.abs(dx)) { g.ativo = false; return; } // rolagem vertical
+        if (Math.abs(dx) > 8) g.moveu = true;
+        if (!g.moveu) return;
+        e.currentTarget.style.transition = 'none'; // acompanha o dedo sem atraso
+        g.dx = Math.min(0, dx);
+        e.currentTarget.style.transform = `translateX(${Math.max(-120, g.dx)}px)`;
+      }}
+      onPointerUp={fimGesto} onPointerCancel={fimGesto}
+      onClickCapture={e => { if (gesto.current.moveu) { e.preventDefault(); e.stopPropagation(); gesto.current.moveu = false; } }}>
       <a href={`#/c/${c.id}`} className="crow-link">
         <ChatAvatar chat={c} size={36} />
         <span className="crow-main">

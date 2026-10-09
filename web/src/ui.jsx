@@ -131,16 +131,18 @@ const ToastCtx = createContext(() => {});
 export const useToast = () => useContext(ToastCtx);
 export function ToastProvider({ children }) {
   const [items, setItems] = useState([]);
-  const push = useCallback((text, kind = 'info') => {
+  // action: { label, run } opcional, com botão no aviso (ex.: "Desfazer"). Fica mais tempo na tela.
+  const push = useCallback((text, kind = 'info', action) => {
     const id = Math.random().toString(36).slice(2);
-    setItems(xs => [...xs.slice(-2), { id, text, kind }]);
-    setTimeout(() => setItems(xs => xs.filter(x => x.id !== id)), kind === 'error' ? 5200 : 2600);
+    setItems(xs => [...xs.slice(-2), { id, text, kind, action }]);
+    setTimeout(() => setItems(xs => xs.filter(x => x.id !== id)), action ? 6000 : kind === 'error' ? 5200 : 2600);
   }, []);
+  const fecha = id => setItems(xs => xs.filter(x => x.id !== id));
   return (
     <ToastCtx.Provider value={push}>
       {children}
       <div className="toasts" role="status" aria-live="polite">
-        {items.map(t => <div key={t.id} className={`toast toast-${t.kind}`}>{t.kind === 'error' && <Icon name="x" size={15} />}{t.text}</div>)}
+        {items.map(t => <div key={t.id} className={`toast toast-${t.kind}`}>{t.kind === 'error' && <Icon name="x" size={15} />}{t.text}{t.action && <button type="button" className="toast-action" onClick={() => { fecha(t.id); t.action.run(); }}>{t.action.label}</button>}</div>)}
       </div>
     </ToastCtx.Provider>
   );
