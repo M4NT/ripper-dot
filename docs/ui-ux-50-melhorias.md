@@ -2,7 +2,7 @@
 
 Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS e app mobile em Expo/HeroUI, com o guia `apps/mobile/DESIGN.md` e o `docs/ui-foundation.md`.
 
-**Situação final:** 46 itens feitos ou decididos, 3 descartados (5, 6 e 25) e 1 aguardando o teste do Yan no celular (45). O item 4 foi testado pelo Yan e ficou bom. O item 22 está implementado (lote 14).
+**Situação final:** os 50 itens estão fechados: 47 feitos ou decididos e 3 descartados (5, 6 e 25). O Yan testou no celular os itens 4 e 45, e ficaram bons. O item 22 está implementado (lote 14). O item 47 fica para reavaliar com cerca de 2.000 mensagens.
 
 **Uso:** o OpenBot é licenciado como PolyForm Noncommercial 1.0.0. Esta lista usa só as ideias de design. Nenhum código ou recurso visual dele deve ser copiado.
 
@@ -81,7 +81,7 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 42. **Foco visível em todo controle** para uso com teclado. [rápido] *Lote 4: regra geral de contorno para `:focus-visible` em botões, links, campos e controles. Componentes que já definem o próprio foco continuam valendo.*
 43. **Rótulo acessível em todo botão só com ícone.** Hoje há 104 `aria-label`; falta checar a cobertura. [médio] Ref.: `IconButton` com `label` obrigatório. *Feito e verificado: `scripts/rotulos.mjs` com dados (agente com categoria, conversa com tabela e resposta longa), em 1280 e 375 px, nas 15 telas: nenhum botão ou link sem nome.*
 44. **Contraste verificado por script** nos dois temas, com 4,5:1 para texto. [médio] Ref.: `DESIGN.md`, "Theme and visual consistency". *Lote 5: `scripts/contraste.mjs` lê as cores do CSS e confere 4,5:1 nos dois temas. Todos passam (menor: 4,76:1).*
-45. **Deslizar na lista de conversas para arquivar**, com "Desfazer". Não usar deslize para aprovar nada. [médio] Ref.: decisão da especificação (ação irreversível exige confirmação). *Lote 3: lógica feita e testada (arquiva, "Desfazer" restaura, sem erro). Falta testar o gesto num celular de verdade: no navegador de teste o toque é cancelado antes de chegar ao fim.*
+45. **Deslizar na lista de conversas para arquivar**, com "Desfazer". Não usar deslize para aprovar nada. [médio] Ref.: decisão da especificação (ação irreversível exige confirmação). *Lote 3: lógica feita e testada (arquiva, "Desfazer" restaura, sem erro). Testado pelo Yan no celular: ficou ok. (No navegador de teste o toque era cancelado antes do fim; o teste real foi feito no aparelho.)*
 46. **Verificação automática de estilo no build**, que bloqueia cor, tamanho e raio literais novos. [médio] Ref.: `bun run check:ui` do OpenBot. *Lote 6: `scripts/cores-literais.mjs` falha se o CSS ganhar cores literais novas (testado: falha ao adicionar uma cor e passa ao restaurar).*
 
 ## Desempenho (47–50)
