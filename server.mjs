@@ -95,6 +95,7 @@ import {
   auditDataRestore
 } from './lib/corporate-audit.mjs';
 import { newHookToken, verifySignature, eventMeta } from './lib/hooks.mjs';
+import { startTelaVigia } from './lib/tela-vigia.mjs';
 import { recordUsage, usageSummary, accountLimits, contextBreakdown, checkSendQuota, compactChat, parseProviderLimitFromError, recordProviderSignal } from './lib/usage.mjs';
 import { checkRunBudget, ToolLoopDetector, tokenBudgetAlertFromCheck } from './lib/token-budget-governor.mjs';
 import { buildUsageContract, normalizeContextWindow } from './lib/usage-api.mjs';
@@ -3971,6 +3972,16 @@ server.on('connection', socket => {
 });
 
 server.listen(PORT, HOST, () => console.log(`Ripper em http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`));
+// Vigia da tela das rotinas com vigiaTela (ver lib/tela-vigia.mjs): a VM é olhada e o webhook só dispara quando a tela muda.
+startTelaVigia({
+  porta: PORT,
+  log: m => console.log(m),
+  alvos: () => (db.routines || []).filter(r => r.vigiaTela && r.trigger === 'webhook' && r.hookToken).flatMap(routine => {
+    const agent = db.agents.find(x => x.id === routine.agentId);
+    if (!agent || db.settings.computer?.mode !== 'docker') return [];
+    try { return [{ routine, agent, computer: computerFor(agent, db.settings, save) }]; } catch { return []; }
+  })
+});
 
 // Acesso pela rede Wi-Fi: desligado por padrão. Ligado, abre um segundo ouvinte só no IP da rede local,
 // repassando para o mesmo servidor (o principal continua em 127.0.0.1).

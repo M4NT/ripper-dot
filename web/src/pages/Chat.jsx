@@ -16,6 +16,7 @@ import ImageGenLoader from '../imageGenLoader.jsx';
 import { AgentThread, ViaLabel } from '../agentThread.jsx';
 import { delegationCardState } from '../../../lib/agent-flow.mjs';
 import { ResizeHandle } from '../resize.jsx';
+import { OpenUIBlock, splitOpenUi } from '../openui/library.jsx';
 import ActionLine, { StallNote } from '../actionLine.jsx';
 import { useChatMenu } from '../actions.jsx';
 import { useOv } from '../overlay.jsx';
@@ -103,7 +104,7 @@ function useFadeIn(ref, html, live) {
   }, [html, live]);
 }
 
-function Markdown({ text, live }) {
+function MarkdownText({ text, live }) {
   // Markdown só é recalculado quando o texto muda; mensagens antigas nunca são refeitas.
   const html = useMemo(() => markdown(text), [text]);
   const ref = useRef(null);
@@ -113,6 +114,15 @@ function Markdown({ text, live }) {
     if (b) { navigator.clipboard.writeText(b.closest('.code').querySelector('code').textContent); b.lastChild.textContent = 'Copiado'; setTimeout(() => (b.lastChild.textContent = 'Copiar'), 1400); }
   };
   return <div ref={ref} className={`md ${live ? 'streaming' : ''}`} onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+// Blocos ```openui viram componentes visuais; o resto segue o markdown de sempre.
+function Markdown({ text, live }) {
+  const parts = useMemo(() => splitOpenUi(text), [text]);
+  if (parts.length === 1 && parts[0].t === 'md') return <MarkdownText text={text} live={live} />;
+  return parts.map((p, i) => p.t === 'ui'
+    ? <OpenUIBlock key={i} code={p.code} live={live && p.open} />
+    : <MarkdownText key={i} text={p.text} live={live} />);
 }
 
 function LiveText({ text }) {
