@@ -20,7 +20,7 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 
 ## Navegação (1–6)
 
-1. **Barra de abas no celular:** Início (Conversas), Agentes, Caixa e Mais. *Feito nesta rodada, aguarda commit.* [rápido] Ref.: `NativeTabs` do DESIGN.md.
+1. **Barra de abas no celular:** Início (Conversas), Agentes, Caixa e Mais. *Feito (PR #112 e lote 1 em #113).* [rápido] Ref.: `NativeTabs` do DESIGN.md.
 2. **Busca dentro da barra de navegação do celular:** o campo aparece no topo ao tocar, em vez de um ícone que abre outra tela. [médio] Ref.: `Stack.SearchBar`. Onde: `app.jsx` (barra do celular).
 3. **Título grande que encolhe ao rolar** nas telas principais do celular (Agentes, Conversas, Caixa). [médio] Ref.: título grande do iOS. Onde: `pages/Agents.jsx`, `pages/Chats.jsx`.
 4. **Menu de ações do topo como folha de baixo** no celular, em vez de janela no meio da tela. [médio] Ref.: `Stack.Toolbar` e menus nativos. Onde: `ui.jsx` (`Menu`).
@@ -35,8 +35,8 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 10. **Copiar tabela como Markdown ou CSV** nas tabelas do chat, inclusive as de OpenUI. [rápido] Ref.: "Copiar como Markdown / Copiar como CSV". Onde: `Chat.jsx`, `openui/library.jsx`.
 11. **Arquivos de origem como chips com ícone por tipo** (MD, CSV) no fim da resposta. [médio] Ref.: "Source files". Onde: `MessageAttachments.jsx`, `fileThumb.jsx`.
 12. **"Enviada a [agente]" discreto** em mensagens repassadas entre agentes. [rápido] Ref.: "Mensagem enviada a Launch". Onde: `agentThread.jsx`.
-13. **Medida de leitura** de cerca de 680 px para texto corrido. Cartões e tabelas usam a largura toda. [rápido] Ref.: layout do OpenBot. Onde: `styles.css` (`.md`).
-14. **Ações da resposta** (copiar, ouvir, refazer) aparecem ao passar o mouse no desktop e ficam sempre visíveis no toque. [rápido] Ref.: hover só com ponteiro fino (`ui-foundation.md`). Onde: `actionLine.jsx`.
+13. **Medida de leitura** de cerca de 680 px para texto corrido. Cartões e tabelas usam a largura toda. [rápido] *Feito no lote 1 (parágrafos e listas, 42 rem; código e tabelas seguem a largura toda). Visual ainda não conferido.* Ref.: layout do OpenBot. Onde: `styles.css` (`.md`).
+14. **Ações da resposta** (copiar, ouvir, refazer) aparecem ao passar o mouse no desktop e ficam sempre visíveis no toque. [rápido] Ref.: hover só com ponteiro fino (`ui-foundation.md`). Onde: `actionLine.jsx`. *Já existe no toque (`@media (hover: none)`); conferido no CSS.*
 15. **Botão "ir para o fim" com contagem** de mensagens novas quando a pessoa rola para cima. [rápido] *verificar se já existe.* Onde: `Chat.jsx`.
 16. **Mensagens longas recolhíveis** ("Mostrar mais") acima de cerca de 20 linhas. [rápido] *verificar.* Onde: `Chat.jsx`.
 17. **Estado do turno em uma linha** ("Pesquisando na web · 12 s"), com botão de parar sempre visível. [médio] Ref.: `AgentActivity`. Onde: `actionLine.jsx`, `stepLabel` em `lib/`.
@@ -48,7 +48,7 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 20. **Cargo do agente como etiqueta** ao lado do nome, por exemplo "Gerente de projeto". [rápido] Ref.: etiqueta "Chief of staff". Onde: `app.jsx` (linha do agente).
 21. **Esqueletos no carregamento** de listas e cartões, no lugar do spinner. [médio] Ref.: `Skeleton`. Medido hoje: 0 usos.
 22. **Cartão de documento de compra no chat** (nota fiscal ou pedido): cabeçalho, etiquetas de validação, botões de ação e estado "processando" no próprio cartão. [grande] Ref.: §3.2 da especificação e o `Card` do OpenUI.
-23. **Confirmação com `AlertDialog`** para toda ação irreversível, mostrando o nome do alvo. [rápido] Ref.: `AlertDialog` do `ui-foundation.md`. Onde: `useConfirm` (8 arquivos).
+23. **Confirmação com `AlertDialog`** para toda ação irreversível, mostrando o nome do alvo. [rápido] Ref.: `AlertDialog` do `ui-foundation.md`. Onde: `useConfirm` (8 arquivos). *Feito no lote 1: os 4 `confirm()` do navegador que sobravam (Clientes, Certificados, Omie, Webhooks) agora usam o diálogo do app.*
 24. **Desfazer em toda ação reversível** (aviso com botão "Desfazer"). [médio] Ref.: padrão de aviso do OpenBot. Onde: 9 arquivos já têm algo parecido; padronizar.
 25. **Uso por agente na ficha** (tokens, custo e tempo do período). [médio] Ref.: `AgentUsagePanel`. Onde: `modelUsage.jsx`, `pages/AgentConfig.jsx`.
 26. **Calendário visual das rotinas**, com as próximas execuções. [grande] Ref.: `SchedulePanel`. Onde: `routines.jsx`.
@@ -56,11 +56,11 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 ## Formulários e folhas (27–33)
 
 27. **Folhas de criação com "×" à esquerda e "✓ Salvar" à direita**, no mesmo padrão do OpenBot. [médio] Ref.: `DESIGN.md`, "Save and create actions". Onde: `agentForm.jsx`, `pages/NewAgent.jsx`.
-28. **O "✓ Salvar" só aparece quando algo foi alterado.** [rápido] Ref.: `SheetSaveAction`.
+28. **O "✓ Salvar" só aparece quando algo foi alterado.** [rápido] Ref.: `SheetSaveAction`. *Feito no lote 1 (ficha do agente).*
 29. **Fechar com alterações não salvas pede confirmação.** [médio] *Verificar em Configurações e na ficha do agente.* Ref.: guardas de alterações não salvas.
 30. **Erro de campo ao sair do campo**, embaixo dele, com rótulo e descrição ligados ao campo. [médio] Ref.: componente `Field`. Onde: 12 arquivos já usam o padrão; padronizar.
-31. **Botão desabilitado explica o motivo** ("Falta o nome do agente"). [rápido] Ref.: `DESIGN.md`, "disabled checkmark".
-32. **Enter envia formulários simples** (um campo). [rápido] Ref.: "preserve keyboard submission".
+31. **Botão desabilitado explica o motivo** ("Falta o nome do agente"). [rápido] Ref.: `DESIGN.md`, "disabled checkmark". *Parcial no lote 1: dica no botão "Criar agente" (tooltip). Falta texto visível para toque.*
+32. **Enter envia formulários simples** (um campo). [rápido] Ref.: "preserve keyboard submission". *Já funciona no "Criar agente" (formulário nativo).*
 33. **Estado de "salvando" sem duplicar o envio:** o botão fica desabilitado, com rótulo acessível de pendente. [rápido] Ref.: `DESIGN.md`, estado pendente.
 
 ## Visual: cor, tipografia, raio e escala (34–39)
@@ -74,8 +74,8 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 
 ## Movimento, toque e acessibilidade (40–46)
 
-40. **Transições de até 250 ms.** Hoje há 17 com 0,3 s ou mais. [rápido] Ref.: "animations stay below 300 ms".
-41. **Reduzir transparência:** fundo sólido quando o sistema pedir. Hoje há 6 usos de desfoque e nenhuma regra para isso. [rápido] Ref.: `DESIGN.md`, "reduced transparency".
+40. **Transições de até 250 ms.** Hoje há 17 com 0,3 s ou mais. [rápido] Ref.: "animations stay below 300 ms". *Feito no lote 1: 21 ajustes.*
+41. **Reduzir transparência:** fundo sólido quando o sistema pedir. Hoje há 6 usos de desfoque e nenhuma regra para isso. [rápido] Ref.: `DESIGN.md`, "reduced transparency". *Feito no lote 1 (barras do topo e da navegação).*
 42. **Foco visível em todo controle** para uso com teclado. [rápido] *Verificar a cobertura.* Ref.: `focus-visible`.
 43. **Rótulo acessível em todo botão só com ícone.** Hoje há 104 `aria-label`; falta checar a cobertura. [médio] Ref.: `IconButton` com `label` obrigatório.
 44. **Contraste verificado por script** nos dois temas, com 4,5:1 para texto. [médio] Ref.: `DESIGN.md`, "Theme and visual consistency".
@@ -85,7 +85,7 @@ Referência: projeto OpenBot (`openbot-main.zip`): desktop em Electron + SolidJS
 ## Desempenho (47–50)
 
 47. **Virtualizar a lista de mensagens** em conversas longas, depois de medir uma conversa com 500 mensagens. [grande] Ref.: `createChatVirtualizer`.
-48. **Miniaturas de imagem com tamanho fixo e carregamento preguiçoso**, sem salto de layout. [rápido] Ref.: `MediaLightbox`, `fileThumb`. Onde: `fileThumb.jsx`, `MediaLightbox.jsx`.
+48. **Miniaturas de imagem com tamanho fixo e carregamento preguiçoso**, sem salto de layout. [rápido] *Carregamento preguiçoso já existe nas miniaturas de mensagem; falta tamanho fixo.* Ref.: `MediaLightbox`, `fileThumb`. Onde: `fileThumb.jsx`, `MediaLightbox.jsx`.
 49. **Reduzir o CSS global** (107 KB hoje), separando o que só algumas telas usam. [médio] Onde: `styles.css`.
 50. **Medir INP e LCP no celular** e definir limites antes de cada rodada de mudança. [rápido] Ref.: `ANALYTICS.md` do OpenBot.
 

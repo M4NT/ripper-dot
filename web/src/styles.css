@@ -2329,3 +2329,6 @@ body.agent-dragging .side-list { overflow: hidden; }
 @media (prefers-reduced-transparency: reduce) {
   .mobile-bar, .na-top, .tabbar { background: var(--bg); backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
+
+/* Medida de leitura: parágrafos e listas com largura confortável; código e tabelas seguem a largura toda. */
+.md > p, .md > ul, .md > ol, .md > blockquote { max-width: 42rem; }
