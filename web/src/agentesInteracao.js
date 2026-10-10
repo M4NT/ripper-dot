@@ -7,7 +7,8 @@
 const VERBOS = {
   email: ['Enviar e-mail', 'Não enviar'], whatsapp: ['Enviar WhatsApp', 'Não enviar'], exec: ['Permitir comando', 'Não permitir'], command: ['Permitir comando', 'Não permitir'],
   omie: ['Alterar no Omie', 'Não alterar'], social: ['Publicar', 'Não publicar'], share: ['Publicar link', 'Não publicar'], github: ['Publicar no GitHub', 'Não publicar'],
-  agent: ['Criar agente', 'Não criar'], flow: ['Continuar', 'Parar aqui'], documento: ['Confirmar aprovação', 'Cancelar']
+  agent: ['Criar agente', 'Não criar'], flow: ['Continuar', 'Parar aqui'], documento: ['Confirmar aprovação', 'Cancelar'],
+  computer: ['Permitir na tela', 'Não permitir']
 };
 export function verbosDaAprovacao(rec) {
   const [sim, nao] = VERBOS[rec?.kind] || ['Aprovar', 'Recusar'];
@@ -17,6 +18,7 @@ export function verbosDaAprovacao(rec) {
 /** Frase curta do que vai acontecer; o comando inteiro fica em "Ver detalhe". */
 export function fraseDaAprovacao(rec) {
   if (rec.kind === 'exec' || rec.kind === 'command') return 'Rodar um comando no seu computador.';
+  if (rec.kind === 'computer') return String(rec.command || 'Usar mouse ou teclado na tela da VM.').split('\n')[0].slice(0, 200);
   if (rec.kind === 'omie') return 'Alterar dados no seu Omie.';
   const linhas = String(rec.command || '').split('\n');
   // E-mail: destinatário e assunto na frase, para ver para quem e o quê antes de enviar (item 38).

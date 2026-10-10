@@ -37,6 +37,7 @@ test('frase da aprovação: e-mail mostra destinatário e assunto; exec e Omie e
   const email = { kind: 'email', command: 'Para ana@cliente.com\nAssunto: Proposta de março\n\nOi, Ana.' };
   assert.equal(fraseDaAprovacao(email), 'Para ana@cliente.com · Assunto: Proposta de março');
   assert.equal(fraseDaAprovacao({ kind: 'exec', command: 'rm -rf dist' }), 'Rodar um comando no seu computador.');
+  assert.equal(fraseDaAprovacao({ kind: 'computer', command: 'Clicar na tela da VM (10, 20)' }), 'Clicar na tela da VM (10, 20)');
   assert.equal(fraseDaAprovacao({ kind: 'omie', command: 'ALTER X' }), 'Alterar dados no seu Omie.');
   assert.equal(fraseDaAprovacao({ kind: 'question', command: 'Qual cliente?\nmais' }), 'Qual cliente?');
 });
@@ -44,6 +45,7 @@ test('frase da aprovação: e-mail mostra destinatário e assunto; exec e Omie e
 test('verbos dos botões: o que a ação faz de fato; sem tipo conhecido, Aprovar/Recusar (item 32)', () => {
   assert.deepEqual(verbosDaAprovacao({ kind: 'email' }), { sim: 'Enviar e-mail', nao: 'Não enviar' });
   assert.deepEqual(verbosDaAprovacao({ kind: 'whatsapp' }), { sim: 'Enviar WhatsApp', nao: 'Não enviar' });
+  assert.deepEqual(verbosDaAprovacao({ kind: 'computer' }), { sim: 'Permitir na tela', nao: 'Não permitir' });
   assert.deepEqual(verbosDaAprovacao({ kind: 'desconhecido' }), { sim: 'Aprovar', nao: 'Recusar' });
 });
 

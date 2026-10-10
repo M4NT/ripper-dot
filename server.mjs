@@ -34,6 +34,7 @@ import { patchTask, taskPrompt } from './lib/project-tasks.mjs';
 import { closeTaskFromInboxReply } from './lib/task-closure.mjs';
 import { createGoogleTasksSync } from './lib/google-tasks-sync.mjs';
 import { rememberAllowedCommand, execNeedsApproval } from './lib/permissions.mjs';
+import { wrapComputerInput, setUserScreenControl, isUserScreenControl } from './lib/computer-input.mjs';
 import { browserAutonomyGate, shareAutonomyGate, socialPostAutonomyGate, effectiveApprovalPolicy, sanitizeAutonomyLevel } from './lib/autonomy.mjs';
 import {
   enabledSocialWebhooks,
@@ -1096,7 +1097,7 @@ async function offerSetting({ agent, chat, emit, signal }, { key, on, reason }) 
 }
 
 function guarded(computer, { agent, chat, emit, signal }) {
-  const ask = async (kind, command, reason) => {
+  const ask = async (kind, command, reason, rememberKey = command) => {
     const rec = { id: id(), agentId: agent.id, chatId: chat.id, kind, command, reason, status: 'pending', createdAt: Date.now() };
     db.approvals.push(rec);
     if (db.approvals.length > 300) db.approvals.splice(0, db.approvals.length - 300);
@@ -1104,13 +1105,24 @@ function guarded(computer, { agent, chat, emit, signal }) {
     notifyApproval(agent, command, rec);
     const done = await gate.request(rec, signal);
     emit({ approvalDone: { id: rec.id, status: done.status } });
-    if (done.status === 'approved' && done.remember) rememberAllowedCommand(chat, command);
+    if (done.status === 'approved' && done.remember) rememberAllowedCommand(chat, rememberKey);
     return done.status === 'approved';
   };
   const globalPolicy = db.settings.approvalPolicy || 'risky';
   const policy = effectiveApprovalPolicy(agent, globalPolicy, db.settings);
+  chat.allowedCommands ||= [];
+  const gated = wrapComputerInput(computer, {
+    agent,
+    settings: db.settings,
+    policy,
+    allowed: chat.allowedCommands,
+    ask: (command, reason, rememberKey) => ask('computer', command, reason, rememberKey),
+    record: ({ target, approved, ok, error }) => recordExternal({
+      kind: 'computer.input', agentId: agent.id, chatId: chat.id, target, approved, ok, error
+    })
+  });
   return {
-    ...computer,
+    ...gated,
     async exec(command) {
       let reason = execNeedsApproval({ command, computerKind: computer.kind, policy: globalPolicy, chat, agent, settings: db.settings });
       if (!reason && policy === 'risky' && !(chat.allowedCommands || []).includes(command)) {
@@ -3101,7 +3113,12 @@ const routes = [
   ['POST', /^\/api\/computer\/image$/, async () => { ensureImage().then(() => { resolveSystemAlert('agent-image'); save(); }).catch(e => console.error('imagem', e.message)); return { image: await imageStatus() }; }],
   ['GET', /^\/api\/agents\/([\w-]+)\/vnc$/, async (req, [aid]) => {
     const t = await vncTarget(aid);
-    return { url: vncClientUrl(aid), port: t.port };
+    return { url: vncClientUrl(aid), port: t.port, control: isUserScreenControl(aid) };
+  }],
+  ['PUT', /^\/api\/agents\/([\w-]+)\/vnc\/control$/, async (req, [aid]) => {
+    const a = agentOr404(aid);
+    const b = await body(req);
+    return { control: setUserScreenControl(a.id, b.control === true) };
   }],
   ['GET', /^\/api\/agents\/([\w-]+)\/vnc\/(.+)$/, serveAgentVncProxy],
   ['HEAD', /^\/api\/agents\/([\w-]+)\/vnc\/(.+)$/, serveAgentVncProxy],
