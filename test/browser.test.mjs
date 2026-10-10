@@ -41,7 +41,8 @@ import {
   unknownRefRisk,
   pickFingerprintHit,
   isMacReject,
-  MAC_REJECT
+  MAC_REJECT,
+  runBrowserGate
 } from '../lib/browser.mjs';
 
 function fakeDaemon(scriptsDir, handle, { bootAt = Date.now() } = {}) {
@@ -180,6 +181,8 @@ test('daemonSource: sem think, sem data-ripper-ref plantável, com fila e shred'
   assert.doesNotMatch(src, /RIPPER_BROWSER_TOKEN/);
   assert.doesNotMatch(src, /process\.env\.\w*TOKEN/);
   assert.doesNotMatch(src, /if \(hits\.length === 1\)/);
+  assert.doesNotMatch(src, /toLowerCase\(\)\.startsWith/);
+  assert.doesNotMatch(src, /toLowerCase\(\)\.includes/);
   assert.doesNotMatch(src, /bctl\.mjs/);
 });
 
@@ -592,6 +595,80 @@ test('browserFor: primeira implantação da sessão reinicia daemon vivo; token 
   } finally { stop(); }
 });
 
+test('browserFor: clique aprovado não reenvia após HMAC recusada', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ripper-br-'));
+  const scripts = join(dir, '.ripper');
+  const clicks = [];
+  let rejects = 1;
+  const stop = fakeDaemon(scripts, cmd => {
+    if (cmd.action === 'go') return { title: 'T', url: 'https://t.test/', nodes: [{ ref: 'e1', role: 'button', name: 'Ok' }] };
+    if (cmd.action === 'click') {
+      clicks.push(cmd.id);
+      if (rejects > 0) {
+        rejects -= 1;
+        return { ok: false, error: MAC_REJECT };
+      }
+      return { title: 'T', url: 'https://t.test/', nodes: [] };
+    }
+    return { title: 'T', url: 'https://t.test/', nodes: [] };
+  });
+  try {
+    const b = browserFor(rawReady(scripts), pathToFileURL(dir + '/'), { timeoutMs: 3000, pollMs: 10 });
+    await b.open('https://t.test/');
+    const out = await b.click('e1');
+    assert.equal(clicks.length, 1);
+    assert.match(out, /assinatura HMAC recusada/);
+  } finally { stop(); }
+});
+
+test('browserFor: timeout reenvia com horário novo', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ripper-br-'));
+  const scripts = join(dir, '.ripper');
+  mkdirSync(scripts, { recursive: true });
+  const cmds = [];
+  const alivePath = join(scripts, 'alive');
+  const cmdPath = join(scripts, 'cmd.json');
+  const resPath = join(scripts, 'res.json');
+  let phase = 'drop';
+  let deploys = 0;
+  const beat = () => writeFileSync(alivePath, JSON.stringify({ t: Date.now(), chromium: true }));
+  const tick = () => {
+    let raw;
+    try { raw = readFileSync(cmdPath, 'utf8'); } catch { return; }
+    let cmd;
+    try { cmd = JSON.parse(raw); } catch { return; }
+    cmds.push({ id: cmd.id, ts: cmd.ts, action: cmd.action });
+    try { unlinkSync(cmdPath); } catch {}
+    if (phase === 'drop') {
+      phase = 'dead';
+      try { unlinkSync(alivePath); } catch {}
+      return;
+    }
+    beat();
+    const tmp = resPath + '.' + Date.now() + '.tmp';
+    writeFileSync(tmp, JSON.stringify({ id: cmd.id, ok: true, title: 'T', url: 'https://t.test/', nodes: [] }));
+    renameSync(tmp, resPath);
+  };
+  const iv = setInterval(() => { if (phase !== 'dead') tick(); }, 10);
+  beat();
+  const raw = {
+    async exec() {
+      deploys += 1;
+      if (deploys > 1) phase = 'answer';
+      beat();
+      return 'RIPPER_BROWSER_READY\nRIPPER_BROWSER_DAEMON';
+    }
+  };
+  try {
+    const b = browserFor(raw, pathToFileURL(dir + '/'), { timeoutMs: 2800, pollMs: 10 });
+    const out = await b.read();
+    assert.match(out, /Página: T/);
+    assert.ok(cmds.length >= 2);
+    assert.notEqual(cmds[0].id, cmds[1].id);
+    assert.ok(cmds[1].ts > cmds[0].ts);
+  } finally { clearInterval(iv); }
+});
+
 test('browserFor: HMAC recusada reimplanta em vez de esperar', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'ripper-br-'));
   const scripts = join(dir, '.ripper');
@@ -704,5 +781,76 @@ test('browserFor: busca aproximada por texto leva o fingerprint do snapshot', as
     assert.equal(cmds[1].action, 'click');
     assert.equal(cmds[1].expect.name, 'Entrar agora');
     assert.equal(cmds[1].expect.role, 'button');
+  } finally { stop(); }
+});
+
+test('trava ativa bloqueia o clique sem consumir o alvo aprovado', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ripper-br-'));
+  const scripts = join(dir, '.ripper');
+  const cmds = [];
+  const stop = fakeDaemon(scripts, cmd => {
+    cmds.push(cmd);
+    return { title: 'T', url: 'https://t.test/', nodes: [{ ref: 'e1', role: 'button', name: 'Entrar' }] };
+  });
+  try {
+    const b = browserFor(rawReady(scripts), pathToFileURL(dir + '/'), { timeoutMs: 3000, pollMs: 10 });
+    await b.open('https://t.test/');
+    assert.equal(b.risk('click', { target: 'e1' }), null);
+    assert.equal(b.hasApprovedExpect('click', 'e1'), true);
+    let locked = false;
+    const afterAsk = await runBrowserGate({
+      locked: () => locked,
+      ask: async () => { locked = true; return true; },
+      run: () => b.click('e1'),
+      denied: 'negado'
+    });
+    assert.match(afterAsk, /assumiu o controle/);
+    assert.equal(b.hasApprovedExpect('click', 'e1'), true);
+    assert.equal(cmds.filter(c => c.action === 'click').length, 0);
+    locked = false;
+    const ok = await runBrowserGate({
+      locked: () => locked,
+      ask: async () => true,
+      run: () => b.click('e1'),
+      denied: 'negado'
+    });
+    assert.match(ok, /Página: T/);
+    assert.equal(b.hasApprovedExpect('click', 'e1'), false);
+    assert.equal(cmds.filter(c => c.action === 'click').length, 1);
+  } finally { stop(); }
+});
+
+test('mudança de página após aprovação é recusada (gate)', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ripper-br-'));
+  const scripts = join(dir, '.ripper');
+  const stop = fakeDaemon(scripts, cmd => {
+    if (cmd.action === 'go') {
+      return {
+        title: 'A', url: 'https://loja.test/passo',
+        nodes: [{ ref: 'e7', role: 'button', name: 'Próxima página', tag: 'button', nth: 0 }]
+      };
+    }
+    if (cmd.action === 'click') {
+      const live = [{ ref: 'e7', role: 'button', name: 'Finalizar compra', tag: 'button', nth: 0 }];
+      const hits = live.filter(n => n.role === cmd.expect?.role && n.name === cmd.expect?.name);
+      if (!hits.length) return { ok: false, error: bindMismatchError(cmd.expect), title: 'B', url: 'https://loja.test/fim', nodes: live };
+      return { title: 'B', url: 'https://loja.test/fim', nodes: live };
+    }
+    return { title: 'A', url: 'https://loja.test/passo', nodes: [] };
+  });
+  try {
+    const b = browserFor(rawReady(scripts), pathToFileURL(dir + '/'), { timeoutMs: 3000, pollMs: 10 });
+    await b.open('https://loja.test/passo');
+    const out = await runBrowserGate({
+      locked: () => false,
+      ask: async () => {
+        assert.equal(b.risk('click', { target: 'e7' }), null);
+        return true;
+      },
+      run: () => b.click('e7'),
+      denied: 'negado'
+    });
+    assert.match(out, /A página mudou/);
+    assert.match(out, /Próxima página/);
   } finally { stop(); }
 });
