@@ -73,7 +73,7 @@ import { gh, githubReady, normalizeRepo, repoChanges, describeChange, prBranch, 
 import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './lib/event-triggers.mjs';
 import { isPaidModel, paidBlockReason, addSpend, spendToday, spendLimits, normalizeBilling, useSpendStore, closeSpendStore } from './lib/paid-usage.mjs';
 import { runTestProvider } from './lib/test-provider.mjs';
-import { presentGenui, findUiPart, applyUiAction, rememberUiPart } from './lib/genui.mjs';
+import { presentGenui, findUiPart, applyUiAction, rememberUiPart, forgetUiParts, collectFenceParts, mergeUiSteps, slimUiPart, registerUiPart } from './lib/genui.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
 import { memoryContext, isDuplicateMemory, canUseFile, selectSpeakers, mentionOrder, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, ambiguousMentions, isAck, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent, turnPlanIds, delegationTasks, oneLineTask, ownerBlockedReason } from './lib/agent-flow.mjs';
 import { providerAttemptOrder, runProviderAttemptLoop, needsUsageCredits } from './lib/provider-turn.mjs';
@@ -423,7 +423,7 @@ function trackLive(chatId, e) {
   if (e.approval) cur.steps.push({ kind: 'approval', rec: e.approval, status: 'pending' });
   if (e.warn) cur.steps.push({ kind: 'warn', label: e.warn });
   if (e.campaign) cur.steps.push({ kind: 'campaign', rec: e.campaign });
-  if (e.ui) cur.steps.push({ ...e.ui, kind: 'ui' });
+  if (e.ui) cur.steps.push(slimUiPart({ ...e.ui, kind: 'ui' }));
   if (e.passed) liveByChat.set(chatId, { agentId: null, content: '', steps: [], at: Date.now() });
 }
 
@@ -470,6 +470,7 @@ async function streamChatResponse(req, c, { text, fileIds, mcpSession, resume = 
       if (last?.role === 'assistant' && (last.stopped || last.error)) status = 'done';
     }
     finishChatRun(c, status);
+    forgetUiParts(c.id);
     if (!turnMetricRecorded && status === 'interrupted') recordChatTurn('interrupted');
     save();
   }
@@ -1098,6 +1099,17 @@ async function offerSetting({ agent, chat, emit, signal }, { key, on, reason }) 
   return `Pronto: "${view.label}" ${on ? 'ligado' : 'desligado'} pelo usuário.`;
 }
 
+/** Clique no cartão show_setting: aplica de verdade, como offer_setting. */
+function applyGenuiSetting(key, on) {
+  const view = settingCardView(db.settings, key, on);
+  if (!view) return null;
+  const before = structuredClone(db.settings);
+  const patch = settingPatch(key, on);
+  patchSettings(db.settings, patch, { mergePluginAuth });
+  recordCorporateAudit(db.settings, auditSettingsPatch(before, db.settings, patch));
+  return view;
+}
+
 function guarded(computer, { agent, chat, emit, signal }) {
   const ask = async (kind, command, reason, rememberKey = command, meta = {}) => {
     const rememberable = meta.rememberable !== false && rememberKey != null && rememberKey !== '';
@@ -1306,7 +1318,7 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
       if (shown.part) {
         cardSteps.push(shown.part);
         rememberUiPart(chat.id, shown.part);
-        emit({ ui: shown.part });
+        emit({ ui: (shown.part.component === 'html_preview' || shown.part.component === 'data_table' || shown.part.component === 'media_gallery') ? slimUiPart(shown.part) : shown.part });
       } else if (shown.warning) emit({ warn: shown.warning });
       if (!shown.ok && shown.text) return shown.text;
       return shown.ok ? `Mostrado: ${component}.` : (shown.warning || 'não mostrado');
@@ -1890,11 +1902,15 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
   // Reserva fora do Claude (Codex, OpenRouter) com o Sonnet desligado: cai no primeiro Claude liberado.
   const claudeBackup = enabledModels(s).find(m => MODELS[m].provider === 'claude' && m !== pick.model);
   if (!testProvider && order.length === 1 && MODELS[pick.model]?.provider !== 'claude' && claudeBackup) order.push(claudeBackup);
-  const push = (out, steps, extra) => chat.messages.push({
-    id: id(), role: 'assistant', agentId: agent.id, content: out, at: Date.now(),
-    ...(steps.length || subtaskSteps.length || cardSteps.length ? { steps: [...subtaskSteps, ...cardSteps, ...steps] } : {}),
-    ...(sentDelegations.length ? { delegations: [...sentDelegations] } : {}), ...extra
-  });
+  const push = (out, steps, extra) => {
+    const fences = collectFenceParts(chat.id, out, chat);
+    const merged = mergeUiSteps([...subtaskSteps, ...cardSteps, ...fences, ...steps]);
+    chat.messages.push({
+      id: id(), role: 'assistant', agentId: agent.id, content: out, at: Date.now(),
+      ...(merged.length ? { steps: merged } : {}),
+      ...(sentDelegations.length ? { delegations: [...sentDelegations] } : {}), ...extra
+    });
+  };
 
   const semanticCacheCfg = resolveSemanticCacheConfig(s);
   const cacheContext = history.join('\n').slice(-2000);
@@ -2032,7 +2048,7 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
 let activeTurns = 0;
 async function chat(args, emit) {
   activeTurns++;
-  try { return await chatTurn(args, emit); } finally { activeTurns--; }
+  try { return await chatTurn(args, emit); } finally { activeTurns--; forgetUiParts(args.chat?.id); }
 }
 async function chatTurn({ chat, text, fileIds, signal, mcpSession, skipUserPush = false, credentialRefs, voice }, emit) {
   logger.info('chat.turn.start', { chatId: chat.id, resume: skipUserPush });
@@ -3631,6 +3647,14 @@ const routes = [
     return testAccount(aid, CLAUDE_FAST_ENV);
   }],
   ['GET', /^\/api\/chats\/([\w-]+)\/live$/, (req, [cid]) => ({ streaming: isChatStreaming(cid), live: liveByChat.get(cid) || null })],
+  ['POST', /^\/api\/chats\/([\w-]+)\/ui-parts$/, async (req, [cid]) => {
+    const c = db.chats.find(x => x.id === cid);
+    if (!c) throw new HttpError(404, 'Conversa não encontrada.');
+    const b = await body(req);
+    const r = registerUiPart(c, { fence: b.fence, component: b.component, props: b.props, partId: b.id });
+    if (!r.ok) throw new HttpError(400, r.error);
+    return { ok: true, part: r.part };
+  }],
   ['POST', /^\/api\/chats\/([\w-]+)\/ui-actions$/, async (req, [cid]) => {
     const c = db.chats.find(x => x.id === cid);
     if (!c) throw new HttpError(404, 'Conversa não encontrada.');
@@ -3640,7 +3664,12 @@ const routes = [
     const r = applyUiAction(found.step, { action: b.action, payload: b.payload });
     if (!r.ok) throw new HttpError(400, r.error);
     Object.assign(found.step, r.part);
-    c.updatedAt = Date.now();
+    if (found.live) rememberUiPart(cid, found.step);
+    if (r.applySetting) {
+      try { applyGenuiSetting(r.applySetting.key, r.applySetting.on); }
+      catch { /* chave desconhecida: o texto ainda volta ao agente */ }
+    }
+    if (!found.live) c.updatedAt = Date.now();
     save();
     return { ok: true, text: r.userText, part: r.part, continue: !!r.continue };
   }],

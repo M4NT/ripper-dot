@@ -47,7 +47,11 @@ test('securityHeaderFields inclui nosniff, referrer e frame deny', () => {
   assert.equal(h['x-content-type-options'], 'nosniff');
   assert.equal(h['referrer-policy'], 'no-referrer');
   assert.equal(h['x-frame-options'], 'DENY');
-  assert.ok(h['content-security-policy']?.includes("frame-ancestors 'none'"));
+  const csp = h['content-security-policy'] || '';
+  assert.ok(csp.includes("frame-ancestors 'none'"));
+  const img = /img-src[^;]*/.exec(csp)?.[0] || '';
+  assert.match(img, /img-src 'self' data: blob:/);
+  assert.equal(img.includes('https:'), false, 'img-src não libera https de terceiros');
 });
 
 test('classifyRequestOrigin: sem Origin, same-host e allowlist', () => {

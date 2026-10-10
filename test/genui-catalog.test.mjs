@@ -14,9 +14,22 @@ import {
   applyUiAction,
   rememberUiPart,
   findUiPart,
+  findUiPartByProps,
+  forgetUiParts,
+  liveUiCount,
+  mergeUiSteps,
+  collectFenceParts,
+  registerUiPart,
   detectMarkdownTableAbuse,
   genuiSafeToRepeat,
-  isUiState
+  isUiState,
+  safeMediaUrl,
+  safeHref,
+  hrefHost,
+  sanitizeGenuiProps,
+  slimUiPart,
+  htmlPreviewSrcdoc,
+  HTML_PREVIEW_CSP
 } from '../lib/genui.mjs';
 import { GENUI_TOOL_CATALOG, buildGenuiTools, makeGenuiExecute } from '../lib/genui-tools.mjs';
 import { listRipperBuiltinToolNames } from '../lib/ripper-builtin-tools.mjs';
@@ -24,8 +37,9 @@ import { SAFE_TO_REPEAT } from '../lib/chat-run.mjs';
 import { normalizeMetricRoute } from '../lib/metrics.mjs';
 import { splitChatVisual } from '../web/src/genui/split.js';
 
-test('catálogo tem 15 componentes com schema, when/whenNot e fallback em texto', () => {
-  assert.equal(GENUI_NAMES.length, 15);
+test('catálogo tem 14 componentes com schema, when/whenNot e fallback em texto', () => {
+  assert.equal(GENUI_NAMES.length, 14);
+  assert.ok(!GENUI_NAMES.includes('secure_form'));
   assert.deepEqual(GENUI_TOOL_NAMES, GENUI_NAMES.map(n => `show_${n}`));
   for (const name of GENUI_NAMES) {
     const e = genuiEntry(name);
@@ -55,6 +69,7 @@ test('prompt do sistema é gerado do catálogo e não diverge dos nomes', () => 
   const p = genuiSystemPrompt();
   assert.match(p, /show_data_table/);
   assert.match(p, /Nunca escreva tabela markdown com 3\+ linhas/);
+  assert.doesNotMatch(p, /show_secure_form/);
   for (const name of GENUI_NAMES) assert.match(p, new RegExp(`show_${name}`));
 });
 
@@ -89,8 +104,9 @@ test('presentGenui marca erro e devolve texto quando as props falham', () => {
   assert.equal(unknown.fallback, true);
 });
 
-test('applyUiAction: aprovação, pergunta, formulário sem valores e cartão já respondido', () => {
+test('applyUiAction: aprovação sem sempre, pergunta, rascunho com corpo editado, setting aplica', () => {
   const approval = presentGenui({ component: 'approval', props: GENUI_CATALOG.approval.example }).part;
+  assert.equal(applyUiAction(approval, { action: 'always' }).ok, false);
   const deny = applyUiAction(approval, { action: 'deny' });
   assert.equal(deny.part.state, 'denied');
   assert.equal(deny.userText, 'Neguei a ação.');
@@ -102,24 +118,104 @@ test('applyUiAction: aprovação, pergunta, formulário sem valores e cartão j�
   const pick = applyUiAction(q, { action: 'submit', payload: { selected: ['ana'] } });
   assert.equal(pick.userText, 'Escolhi: Ana Ltda');
 
-  const form = presentGenui({ component: 'secure_form', props: GENUI_CATALOG.secure_form.example }).part;
-  const sent = applyUiAction(form, { action: 'submit', payload: { values: { user: 'ana@loja.com', pass: 'segredo' } } });
+  const draft = presentGenui({ component: 'draft_message', props: GENUI_CATALOG.draft_message.example }).part;
+  const sent = applyUiAction(draft, { action: 'send', payload: { body: 'Texto que eu editei agora.' } });
   assert.equal(sent.ok, true);
-  assert.doesNotMatch(JSON.stringify(sent), /segredo/);
-  assert.equal(sent.part.payload.count, 2);
-  assert.match(sent.userText, /2 campos/);
+  assert.match(sent.userText, /Texto que eu editei agora/);
+  assert.equal(sent.part.props.body, 'Texto que eu editei agora.');
+  assert.equal(applyUiAction(sent.part, { action: 'send', payload: { body: 'outra' } }).ok, false);
+
+  const setting = presentGenui({ component: 'setting', props: GENUI_CATALOG.setting.example }).part;
+  const applied = applyUiAction(setting, { action: 'apply' });
+  assert.equal(applied.ok, true);
+  assert.deepEqual(applied.applySetting, { key: 'pulse.enabled', on: true });
 
   const table = presentGenui({ component: 'data_table', props: GENUI_CATALOG.data_table.example }).part;
   assert.equal(applyUiAction(table, { action: 'submit' }).ok, false);
 });
 
-test('rememberUiPart encontra o cartão antes da mensagem persistir', () => {
-  const part = presentGenui({ component: 'slides', props: GENUI_CATALOG.slides.example, chatId: 'c1' }).part;
+test('findUiPart no turno atual não grava no turno anterior; um clique; mapa limpa', () => {
+  forgetUiParts('c1');
+  const prev = { id: 'm0', role: 'assistant', steps: [] };
+  const chat = { id: 'c1', messages: [prev] };
+  const part = presentGenui({ component: 'question', props: GENUI_CATALOG.question.example, chatId: 'c1' }).part;
   rememberUiPart('c1', part);
-  const found = findUiPart({ id: 'c1', messages: [] }, part.id);
-  assert.equal(found.step.id, part.id);
-  const choose = applyUiAction(found.step, { action: 'choose', payload: { id: 'limpo' } });
-  assert.equal(choose.userText, 'Escolhi o visual "Limpo".');
+  const found = findUiPart(chat, part.id);
+  assert.equal(found.live, true);
+  assert.equal(found.message, null);
+  assert.equal(prev.steps.length, 0);
+  const pick = applyUiAction(found.step, { action: 'submit', payload: { selected: ['ana'] } });
+  Object.assign(found.step, pick.part);
+  assert.equal(prev.steps.length, 0);
+  assert.equal(found.step.state, 'answered');
+  const again = applyUiAction(found.step, { action: 'submit', payload: { selected: ['me'] } });
+  assert.equal(again.ok, false);
+  const merged = mergeUiSteps([part, { ...part, state: 'input-available' }]);
+  assert.equal(merged.filter(s => s.id === part.id).length, 1);
+  assert.equal(merged[0].state, 'answered');
+  chat.messages.push({ id: 'm1', role: 'assistant', steps: merged });
+  forgetUiParts('c1');
+  assert.equal(liveUiCount('c1'), 0);
+  const after = findUiPart(chat, part.id);
+  assert.equal(after.live, false);
+  assert.equal(after.step.state, 'answered');
+  assert.equal(prev.steps.length, 0);
+});
+
+test('cerca genui registra id no servidor e reusa o mesmo cartão', () => {
+  forgetUiParts('c2');
+  const chat = { id: 'c2', messages: [] };
+  const fence = '{"component":"question","props":{"prompt":"Qual tom?","options":[{"id":"a","label":"Formal"},{"id":"b","label":"Leve"}]}}';
+  const first = registerUiPart(chat, { fence });
+  assert.equal(first.ok, true);
+  assert.ok(first.part.id);
+  const second = registerUiPart(chat, { fence });
+  assert.equal(second.part.id, first.part.id);
+  const collected = collectFenceParts('c2', `texto\n\`\`\`genui\n${fence}\n\`\`\``, chat);
+  assert.equal(collected[0].id, first.part.id);
+  const byProps = findUiPartByProps(chat, 'question', first.part.props);
+  assert.equal(byProps.step.id, first.part.id);
+  forgetUiParts('c2');
+});
+
+test('URLs de imagem e href: só data:/mesmo domínio e http(s)/relativo', () => {
+  assert.equal(safeMediaUrl('https://atacante.example/?d=segredo'), '');
+  assert.equal(safeMediaUrl('javascript:alert(1)'), '');
+  assert.equal(safeMediaUrl('//cdn.evil/x.png'), '');
+  assert.equal(safeMediaUrl('/api/files/abc'), '/api/files/abc');
+  assert.equal(safeMediaUrl('/api/files/../etc/passwd'), '');
+  assert.ok(safeMediaUrl('data:image/png;base64,aaa=').startsWith('data:image/png'));
+  assert.equal(safeHref('javascript:alert(1)'), '');
+  assert.equal(safeHref('https://user:pass@evil.test/'), '');
+  assert.equal(safeHref('https://docs.ripper.dev/x'), 'https://docs.ripper.dev/x');
+  assert.equal(hrefHost('https://docs.ripper.dev/x'), 'docs.ripper.dev');
+  const dirty = sanitizeGenuiProps('link_preview', {
+    url: 'javascript:alert(1)',
+    icon: 'https://atacante.example/i.png',
+    title: 'X'
+  });
+  assert.equal(dirty.icon, undefined);
+  assert.equal(dirty.url, undefined);
+  const ok = sanitizeGenuiProps('media_gallery', {
+    title: 'A',
+    items: [{ src: 'https://evil/x.png', name: 'x' }, { src: '/api/files/a', name: 'ok' }]
+  });
+  assert.equal(ok.items[0].src, '');
+  assert.equal(ok.items[1].src, '/api/files/a');
+});
+
+test('prévia HTML leva CSP própria e slimUiPart corta o HTML de 80 KB', () => {
+  const html = `<script>alert(1)</script><p>${'x'.repeat(1000)}</p>`;
+  const src = htmlPreviewSrcdoc(html);
+  assert.match(src, /Content-Security-Policy/);
+  assert.match(src, /script-src 'none'/);
+  assert.equal(src.includes(HTML_PREVIEW_CSP), true);
+  const part = presentGenui({ component: 'html_preview', props: { title: 'T', html: 'y'.repeat(20_000) } }).part;
+  const slim = slimUiPart(part);
+  assert.equal(slim.slim, true);
+  assert.equal(slim.props.html, undefined);
+  assert.equal(slim.props.bytes, 20_000);
+  assert.ok(JSON.stringify(slim).length < 2000);
 });
 
 test('nomes, rótulos e retomada segura acompanham o catálogo', () => {
@@ -134,13 +230,14 @@ test('nomes, rótulos e retomada segura acompanham o catálogo', () => {
   const names = listRipperBuiltinToolNames({ tools: [], autonomyLevel: 'read_only' }, {});
   for (const n of GENUI_TOOL_NAMES) assert.ok(names.includes(n), n);
   assert.equal(normalizeMetricRoute('/api/chats/abc123xyz/ui-actions'), '/api/chats/:id/ui-actions');
+  assert.equal(normalizeMetricRoute('/api/chats/abc123xyz/ui-parts'), '/api/chats/:id/ui-parts');
 });
 
 test('ferramentas show_* só mostram o cartão (sem efeito colateral)', async () => {
   assert.ok(GENUI_TOOL_CATALOG.show_question.inputSchema.prompt);
   const shown = [];
   const tools = buildGenuiTools({ showUi: async (c, p) => { shown.push([c, p]); return 'ok'; } });
-  assert.equal(tools.length, 15);
+  assert.equal(tools.length, 14);
   await tools.find(t => t.name === 'show_file_card').execute({ name: 'a.csv' });
   assert.deepEqual(shown, [['file_card', { name: 'a.csv' }]]);
   const offline = makeGenuiExecute('show_link_preview', {});

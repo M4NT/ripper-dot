@@ -155,13 +155,13 @@ function MarkdownText({ text, live }) {
 }
 
 // Blocos ```openui e ```genui viram componentes; o resto segue o markdown de sempre.
-function Markdown({ text, live }) {
+function Markdown({ text, live, skipGenui }) {
   const parts = useMemo(() => splitChatVisual(text), [text]);
   if (parts.length === 1 && parts[0].t === 'md') return <MarkdownText text={text} live={live} />;
   return parts.map((p, i) => p.t === 'openui'
     ? <OpenUIBlock key={i} code={p.code} live={live && p.open} />
     : p.t === 'genui'
-      ? <GenUiFence key={i} code={p.code} live={live && p.open} />
+      ? (skipGenui ? null : <GenUiFence key={i} code={p.code} live={live && p.open} />)
       : <MarkdownText key={i} text={p.text} live={live} />);
 }
 
@@ -250,7 +250,7 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, on
           {live && phase === 'generate_image' && <ImageGenLoader />}
           {live && phase !== 'approval' && <StallNote label={phase === 'text' ? 'Escrevendo' : phase === 'route' || phase === 'think' || !phase ? 'Pensando' : stepLabel(phase)} sig={`${phase}|${m.steps.length}|${m.content.length}|${m.agentId}`} slowAfterMs={phase === 'generate_image' ? 200_000 : undefined} />}
           {delivered.length > 0 && <DeliveredFiles items={delivered} onError={onFileError} />}
-          {m.content ? (live ? <LiveText text={m.content} /> : <Recolhivel><Markdown text={m.content} /></Recolhivel>)
+          {m.content ? (live ? <LiveText text={m.content} /> : <Recolhivel><Markdown text={m.content} skipGenui /></Recolhivel>)
             : live ? <div className="typing" role="status" aria-live="polite"><span className="typing-dots" aria-hidden="true"><i /><i /><i /></span><span>{typingLabel(phase)}</span></div>
             : m.error ? <ErrorNote raw={m.error} onRetry={onRetry} contexto={contextoDoErro(m)} />
             : m.stopped ? <p className="muted">{STOP_REASON[m.stopReason] || 'Resposta interrompida.'}</p> : null}

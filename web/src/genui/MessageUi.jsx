@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib.js';
 import { parseGenuiFence, presentGenui } from '../../../lib/genui.mjs';
 import { GenUiView } from './registry.jsx';
@@ -51,11 +51,22 @@ export function GenUiSteps({ steps, live }) {
 }
 
 export function GenUiFence({ code, live, chatId }) {
+  const hostId = chatId || getGenUiHost().chatId || chatIdFromLocation();
   const shown = useMemo(() => {
     const parsed = parseGenuiFence(code, { live });
     if (parsed.part) return parsed.part;
-    if (parsed.fallback && parsed.text) return { id: 'fence', kind: 'ui', component: 'data_table', props: {}, state: 'output-error', error: parsed.warning, chatId };
+    if (parsed.fallback && parsed.text) return { id: 'fence', kind: 'ui', component: 'data_table', props: {}, state: 'output-error', error: parsed.warning, chatId: hostId };
     return presentGenui({ component: 'progress', props: { steps: [{ title: 'Montando…', status: 'running' }, { title: 'Pronto', status: 'pending' }] }, partial: true }).part;
-  }, [code, live, chatId]);
-  return <GenUiCard part={{ ...shown, chatId: shown.chatId || chatId }} live={live} />;
+  }, [code, live, hostId]);
+  const [registered, setRegistered] = useState(null);
+  useEffect(() => {
+    if (live || !hostId || !shown?.component || shown.state === 'input-streaming' || shown.state === 'output-error') return;
+    let cancelled = false;
+    api(`/api/chats/${hostId}/ui-parts`, { method: 'POST', body: { fence: code } })
+      .then(r => { if (!cancelled && r?.part) setRegistered(r.part); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [code, live, hostId, shown?.component, shown?.state]);
+  const part = registered || { ...shown, chatId: shown.chatId || hostId };
+  return <GenUiCard part={part} live={live} />;
 }

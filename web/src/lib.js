@@ -116,7 +116,7 @@ export const STEP_LABEL = {
   list_skills: 'Listando skills', x9_context: 'Coletando dados', x9_checklist: 'Rodando checklist',
   offer_setting: 'Sugerindo uma configuração', parallel_tasks: 'Rodando tarefas em paralelo', computer_screenshot: 'Tirando foto da tela',
   show_approval: 'Mostrando aprovação', show_question: 'Mostrando pergunta', show_connect_app: 'Mostrando conectar app',
-  show_secure_form: 'Mostrando formulário', show_draft_message: 'Mostrando rascunho', show_data_table: 'Mostrando tabela',
+  show_draft_message: 'Mostrando rascunho', show_data_table: 'Mostrando tabela',
   show_chart: 'Mostrando gráfico', show_progress: 'Mostrando progresso', show_link_preview: 'Mostrando link',
   show_pr_card: 'Mostrando PR', show_file_card: 'Mostrando arquivo', show_media_gallery: 'Mostrando galeria',
   show_html_preview: 'Mostrando prévia HTML', show_slides: 'Mostrando slides', show_setting: 'Mostrando configuração',

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Icon } from '../ui.jsx';
 import { GENUI_CATALOG } from '../../../lib/genui-catalog.mjs';
-import { genuiToText } from '../../../lib/genui.mjs';
+import { genuiToText, safeMediaUrl, safeHref, hrefHost, htmlPreviewSrcdoc } from '../../../lib/genui.mjs';
 import { Badge, Button, Card, Field, FallbackText, Skeleton, Tabs, cardStatus, cn } from './shell.jsx';
 
 const locked = state => state && !['input-available', 'input-streaming'].includes(state);
@@ -26,6 +26,18 @@ function Receipt({ state, text }) {
   return <p className={cn('oui-receipt', ok ? 'ok' : 'err')}><Icon name={ok ? 'check' : 'x'} size={13} />{text}</p>;
 }
 
+function SafeImg({ src, alt = '', ...rest }) {
+  const url = safeMediaUrl(src);
+  if (!url) return null;
+  return <img src={url} alt={alt} {...rest} />;
+}
+
+function SafeA({ href, children, className }) {
+  const url = safeHref(href);
+  if (!url) return <span className={className}>{children}</span>;
+  return <a href={url} target="_blank" rel="noopener noreferrer" className={className}>{children}</a>;
+}
+
 export function ApprovalView({ props, state, onAction }) {
   const [open, setOpen] = useState(false);
   const disabled = locked(state);
@@ -44,7 +56,6 @@ export function ApprovalView({ props, state, onAction }) {
       {!disabled && (
         <Actions>
           <Button variant="default" onClick={() => onAction('allow')}>{props.allowOnceLabel || 'Permitir uma vez'}</Button>
-          <Button variant="secondary" onClick={() => onAction('always')}>{props.alwaysLabel || 'Sempre permitir'}</Button>
           <Button variant="destructive" onClick={() => onAction('deny')}>{props.denyLabel || 'Negar'}</Button>
         </Actions>
       )}
@@ -95,7 +106,7 @@ export function ConnectAppView({ props, state, onAction }) {
     <Card status={cardStatus(state)} role="group" aria-label={`Conectar ${props.app}`}>
       <Head icon="plug" title="Conectar app" extra={<Badge tone={tone}>{label}</Badge>} />
       <div className="oui-app">
-        {props.logo ? <img src={props.logo} alt="" width={36} height={36} /> : <span className="oui-app-fallback">{(props.app || '?')[0]}</span>}
+        {safeMediaUrl(props.logo) ? <SafeImg src={props.logo} alt="" width={36} height={36} /> : <span className="oui-app-fallback">{(props.app || '?')[0]}</span>}
         <div><b>{props.app}</b>{props.reason && <p className="oui-muted">{props.reason}</p>}</div>
       </div>
       {props.scopes?.length > 0 && <p className="oui-muted">Permissões: {props.scopes.join(', ')}</p>}
@@ -107,30 +118,6 @@ export function ConnectAppView({ props, state, onAction }) {
         </Actions>
       )}
       <Receipt state={state} text={state === 'denied' ? 'Cancelado' : 'Conectado — o agente continua'} />
-    </Card>
-  );
-}
-
-export function SecureFormView({ props, state, onAction }) {
-  const [values, setValues] = useState({});
-  const disabled = locked(state);
-  const missing = (props.fields || []).some(f => f.required && !String(values[f.name] || '').trim());
-  return (
-    <Card status={cardStatus(state)} role="form" aria-label={props.title}>
-      <Head icon="key" title={props.title} extra={props.site && <Badge>{props.site}</Badge>} />
-      <p className="oui-muted">Os valores não entram no histórico do agente.</p>
-      {!disabled && (props.fields || []).map(f => (
-        <Field key={f.name} label={f.label}>
-          <input className="input" name={f.name} type={f.type || 'text'} autoComplete="off" required={!!f.required} value={values[f.name] || ''} onChange={e => setValues(v => ({ ...v, [f.name]: e.target.value }))} />
-        </Field>
-      ))}
-      {!disabled && (
-        <Actions>
-          <Button variant="default" disabled={missing} onClick={() => onAction('submit', { values })}>{props.submitLabel || 'Enviar'}</Button>
-          <Button variant="ghost" onClick={() => onAction('cancel')}>Cancelar</Button>
-        </Actions>
-      )}
-      <Receipt state={state} text={state === 'denied' ? 'Cancelado' : 'Enviado (valores omitidos)'} />
     </Card>
   );
 }
@@ -212,7 +199,7 @@ export function DataTableView({ props }) {
               <tr key={i}>
                 {(props.columns || []).map(c => {
                   const v = r?.[c.key];
-                  if (c.type === 'link' && v) return <td key={c.key}><a href={String(v)} target="_blank" rel="noopener noreferrer">{String(v)}</a></td>;
+                  if (c.type === 'link' && v) return <td key={c.key}><SafeA href={String(v)}>{hrefHost(String(v)) || String(v)}</SafeA></td>;
                   if (c.type === 'status') return <td key={c.key}><Badge tone={/ok|pronto|open|merged/i.test(String(v)) ? 'ok' : /fail|erro|closed/i.test(String(v)) ? 'err' : 'neutral'}>{String(v ?? '')}</Badge></td>;
                   return <td key={c.key} className={c.type === 'number' ? 'num' : undefined}>{v == null ? '' : String(v)}</td>;
                 })}
@@ -309,16 +296,18 @@ export function ProgressView({ props }) {
 }
 
 export function LinkPreviewView({ props }) {
+  const href = safeHref(props.url);
+  const host = hrefHost(props.url) || props.host || '';
   return (
     <Card className="oui-link">
-      <a href={props.url} target="_blank" rel="noopener noreferrer" className="oui-link-a">
-        {props.icon ? <img src={props.icon} alt="" width={28} height={28} /> : <span className="oui-ico"><Icon name="globe" size={15} /></span>}
+      <SafeA href={href} className="oui-link-a">
+        {safeMediaUrl(props.icon) ? <SafeImg src={props.icon} alt="" width={28} height={28} /> : <span className="oui-ico"><Icon name="globe" size={15} /></span>}
         <span>
-          <b>{props.title || props.host || props.url}</b>
+          <b>{props.title || host || href || props.url}</b>
           {props.description && <small>{props.description}</small>}
-          <small className="oui-host">{props.host || props.url}</small>
+          {host && <small className="oui-host">{host}</small>}
         </span>
-      </a>
+      </SafeA>
     </Card>
   );
 }
@@ -330,7 +319,7 @@ export function PrCardView({ props }) {
       <Head icon="branch" title={props.repo || 'Pull request'} extra={<Badge tone={tone}>{props.status}</Badge>} />
       <p className="oui-lead">{props.number ? `#${props.number} ` : ''}{props.title}</p>
       {props.author && <p className="oui-muted">por {props.author}</p>}
-      <a className="link" href={props.url} target="_blank" rel="noopener noreferrer">Abrir PR</a>
+      <SafeA className="link" href={props.url}>{hrefHost(props.url) ? `Abrir PR · ${hrefHost(props.url)}` : 'Abrir PR'}</SafeA>
     </Card>
   );
 }
@@ -341,7 +330,7 @@ export function FileCardView({ props }) {
     <Card className="oui-file">
       <Head icon="file" title={props.name} extra={props.size != null && <Badge>{props.size} B</Badge>} />
       {props.type && <p className="oui-muted">{props.type}</p>}
-      {href && <a className="link" href={href} target="_blank" rel="noopener noreferrer">Abrir</a>}
+      {href && <SafeA className="link" href={href}>Abrir{hrefHost(href) ? ` · ${hrefHost(href)}` : ''}</SafeA>}
     </Card>
   );
 }
@@ -353,10 +342,10 @@ export function MediaGalleryView({ props }) {
       <ul className="oui-gallery">
         {(props.items || []).map((it, i) => (
           <li key={i}>
-            {it.type === 'image' || /\.(png|jpe?g|gif|webp)$/i.test(it.src) ? (
-              <img src={it.src} alt={it.alt || it.name || ''} />
+            {safeMediaUrl(it.src) && (it.type === 'image' || /\.(png|jpe?g|gif|webp)$/i.test(it.src)) ? (
+              <SafeImg src={it.src} alt={it.alt || it.name || ''} />
             ) : (
-              <a href={it.src} target="_blank" rel="noopener noreferrer">{it.name || it.alt || it.src}</a>
+              <SafeA href={it.src}>{it.name || it.alt || hrefHost(it.src) || 'arquivo'}</SafeA>
             )}
             {it.name && <small>{it.name}</small>}
           </li>
@@ -376,7 +365,9 @@ export function HtmlPreviewView({ props }) {
         <Tabs items={[{ id: 'preview', label: 'Prévia' }, { id: 'source', label: 'Código' }]} value={tab} onChange={setTab} />
       </div>
       {tab === 'preview' ? (
-        <iframe className="oui-frame" title={props.title || 'Prévia'} sandbox="allow-scripts" srcDoc={props.html} />
+        props.html
+          ? <iframe className="oui-frame" title={props.title || 'Prévia'} sandbox="" srcDoc={htmlPreviewSrcdoc(props.html)} />
+          : <p className="oui-muted">Prévia de {props.bytes || 0} bytes — o HTML completo fica na resposta gravada.</p>
       ) : (
         <pre className="oui-src">{src}</pre>
       )}
@@ -393,7 +384,7 @@ export function SlidesView({ props, state, onAction }) {
         {(props.samples || []).map(s => (
           <li key={s.id}>
             <button type="button" className="oui-slide" disabled={disabled} onClick={() => onAction('choose', { id: s.id })}>
-              {s.preview ? <img src={s.preview} alt="" /> : <span className="oui-slide-ph">{s.title[0]}</span>}
+              {safeMediaUrl(s.preview) ? <SafeImg src={s.preview} alt="" /> : <span className="oui-slide-ph">{s.title[0]}</span>}
               <b>{s.title}</b>
               {s.description && <small>{s.description}</small>}
             </button>
@@ -424,7 +415,6 @@ export const GENUI_VIEWS = {
   approval: ApprovalView,
   question: QuestionView,
   connect_app: ConnectAppView,
-  secure_form: SecureFormView,
   draft_message: DraftMessageView,
   data_table: DataTableView,
   chart: ChartView,

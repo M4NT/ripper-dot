@@ -64,6 +64,15 @@ try {
     await page.locator('text=Escolhi: Ana Ltda').last().waitFor({ timeout: 15_000 });
   });
 
+  await step('rascunho genui', async () => {
+    await send('[[ripper:test:genui_draft]]');
+    const group = page.getByRole('group', { name: 'Rascunho' });
+    await group.locator('textarea').waitFor({ timeout: 15_000 });
+    await group.locator('textarea').fill('Texto editado no smoke.');
+    await group.getByRole('button', { name: 'Enviar' }).click({ timeout: 10_000 });
+    await page.locator('text=Texto editado no smoke.').last().waitFor({ timeout: 15_000 });
+  });
+
   // 3) Criar agente pela tela /new
   await step('criar agente', async () => {
     await page.goto(base + '/#/new', { waitUntil: 'domcontentloaded' });
