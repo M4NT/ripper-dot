@@ -41,10 +41,14 @@ test('modo simples neutraliza fully_autonomous', () => {
 
 test('read_only bloqueia ferramentas mutáveis', () => {
   assert.equal(isToolAllowedByAutonomy(agent('read_only'), 'computer_exec'), false);
+  assert.equal(isToolAllowedByAutonomy(agent('read_only'), 'computer_click'), false);
+  assert.equal(isToolAllowedByAutonomy(agent('read_only'), 'computer_type'), false);
   assert.equal(isToolAllowedByAutonomy(agent('read_only'), 'browser_read'), true);
   assert.equal(builtinToolAllowed(agent('read_only'), 'computer_exec', { settings: { computer: { mode: 'docker' } }, computer: {} }), false);
   const names = listRipperBuiltinToolNames(agent('read_only'), { computer: { mode: 'docker' } });
   assert.ok(!names.includes('computer_exec'));
+  assert.ok(!names.includes('computer_click'));
+  assert.ok(names.includes('computer_screenshot'));
 });
 
 test('fully_autonomous dispensa aprovação de exec rotineiro (enterprise)', () => {
