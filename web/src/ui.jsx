@@ -315,19 +315,14 @@ export const StatusDot = ({ status }) => {
   );
 };
 
-/** Esqueleto de lista: linhas com forma da lista real, no lugar do texto "Carregando…". */
-export function Skeleton({ rows = 3, label = 'Carregando' }) {
-  return (
-    <div className="skeleton-list" role="status" aria-label={label}>
-      {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="skeleton-row" aria-hidden="true">
-          <span className="skeleton-dot" />
-          <span className="skeleton-lines"><span className="skeleton-line" /><span className="skeleton-line short" /></span>
-        </div>
-      ))}
-    </div>
-  );
-}
+/* Primitivos da reforma Grok Bot (UI-2). EmptyState e Skeleton mantêm a API antiga. */
+export { Skeleton } from './ui/state/Skeleton.jsx';
+export { EmptyState } from './ui/state/EmptyState.jsx';
+export { ErrorState } from './ui/state/ErrorState.jsx';
+export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, CardAction } from './ui/Card.jsx';
+export { BottomSheet } from './ui/BottomSheet.jsx';
+export { VirtualList } from './ui/VirtualList.jsx';
+export { BP_PHONE, BP_TABLET, QUERY as UI_BREAKPOINTS } from './ui/breakpoints.js';
 
 /**
  * Erro de campo padrão (30): só aparece depois que a pessoa sai do campo.
@@ -346,6 +341,3 @@ export function useErroCampo(valor, validar) {
   };
 }
 
-export function EmptyState({ title, body, action }) {
-  return <div className="empty"><p className="empty-title">{title}</p>{body && <p className="empty-body">{body}</p>}{action}</div>;
-}

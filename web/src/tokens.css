@@ -1,0 +1,17 @@
+/* Tokens NOVOS da reforma Grok Bot (§3.1). Não redefine o :root de styles.css —
+   até a UI-7 aquela continua a fonte das cores/raios/tipo. Quem muda uma cor
+   muda só styles.css; estes nomes não existiam lá. */
+
+:root {
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-7: 32px; --space-8: 40px;
+  --space-9: 48px; --space-10: 64px;
+  /* breakpoints §1: celular ≤640 · tablet 641–1100 · desktop >1100 (media query não lê var()) */
+  --bp-phone: 640px; --bp-tablet: 1100px;
+  --bubble: #f2f2f2; --composer: #ffffff;
+}
+
+/* escuro (padrão): balões #2c2c2c, composer #303030 */
+:root:not([data-theme="light"]) {
+  --bubble: #2c2c2c; --composer: #303030;
+}

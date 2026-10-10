@@ -1,0 +1,30 @@
+/* Primitivos de estado em uso (Skeleton, EmptyState). Sem :root de cor. */
+
+/* ---- Skeleton (variantes novas; .skeleton-* continua o da lista antiga) ---- */
+.ui-skel-msg { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3) 0; }
+.ui-skel-bubble {
+  height: 56px; width: min(72%, 420px); border-radius: var(--r-xl);
+  background: var(--surface-2); animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+.ui-skel-bubble.user { align-self: flex-end; width: min(48%, 280px); }
+.ui-skel-panel { display: grid; gap: var(--space-3); padding: var(--space-3) 0; }
+.ui-skel-block {
+  height: 12px; border-radius: var(--raio-controle); background: var(--surface-2);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+.ui-skel-block.wide { width: 88%; }
+.ui-skel-block.mid { width: 64%; }
+.ui-skel-block.short { width: 40%; height: 10px; }
+.ui-skel-line {
+  display: block; height: 10px; width: 70%; border-radius: var(--raio-controle);
+  background: var(--surface-2); animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-skel-bubble, .ui-skel-block, .ui-skel-line { animation: none; }
+}
+
+/* ---- Empty (ícone opcional; .empty/.empty-title/.empty-body ficam em styles.css) ---- */
+.ui-empty-icon {
+  display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: var(--space-2);
+  border-radius: var(--raio-controle); background: var(--surface-2); color: var(--ink);
+}
