@@ -1,5 +1,6 @@
-import { memo, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, Suspense, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ThinkingOrb } from '../fx/ThinkingOrb.jsx';
+import { lazyReload } from '../lazyReload.js';
 import WorkspaceBar from '../workspaceBar.jsx';
 import { api, go, fmtTime, fmtSize, stepLabel, seenLabel, useMediaQuery, local, nameColor, speak, canSpeak } from '../lib.js';
 import { markdown, closeOpen, plain, tabelaParaCsv, titulosDo } from '../markdown.js';
@@ -16,10 +17,12 @@ import ImageGenLoader from '../imageGenLoader.jsx';
 import { AgentThread, ViaLabel } from '../agentThread.jsx';
 import { delegationCardState } from '../../../lib/agent-flow.mjs';
 import { ResizeHandle } from '../resize.jsx';
-import { OpenUIBlock } from '../openui/library.jsx';
 import { splitChatVisual } from '../genui/split.js';
-import { GenUiFence, GenUiSteps } from '../genui/MessageUi.jsx';
 import { setGenUiHost } from '../genui/host.js';
+
+const OpenUIBlock = lazyReload(() => import('../openui/library.jsx').then(m => ({ default: m.OpenUIBlock })));
+const GenUiFence = lazyReload(() => import('../genui/MessageUi.jsx').then(m => ({ default: m.GenUiFence })));
+const GenUiSteps = lazyReload(() => import('../genui/MessageUi.jsx').then(m => ({ default: m.GenUiSteps })));
 import ActionLine, { Fontes, StallNote } from '../actionLine.jsx';
 import { useChatMenu } from '../actions.jsx';
 import { useOv } from '../overlay.jsx';
@@ -159,10 +162,15 @@ function Markdown({ text, live, skipGenui }) {
   const parts = useMemo(() => splitChatVisual(text), [text]);
   if (parts.length === 1 && parts[0].t === 'md') return <MarkdownText text={text} live={live} />;
   return parts.map((p, i) => p.t === 'openui'
-    ? <OpenUIBlock key={i} code={p.code} live={live && p.open} />
+    ? <Suspense key={i} fallback={null}><OpenUIBlock code={p.code} live={live && p.open} /></Suspense>
     : p.t === 'genui'
-      ? (skipGenui ? null : <GenUiFence key={i} code={p.code} live={live && p.open} />)
+      ? (skipGenui ? null : <Suspense key={i} fallback={null}><GenUiFence code={p.code} live={live && p.open} /></Suspense>)
       : <MarkdownText key={i} text={p.text} live={live} />);
+}
+
+function MaybeGenUiSteps({ steps, live }) {
+  if (!(steps || []).some(s => s.kind === 'ui')) return null;
+  return <Suspense fallback={null}><GenUiSteps steps={steps} live={live} /></Suspense>;
 }
 
 function LiveText({ text }) {
@@ -244,7 +252,7 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, on
         {group && <span className="speaker" style={{ color: agentColor(agent) }}>{agent.name}</span>}
         <div className="bubble bot-bubble" tabIndex={-1}>
           <ActionLine steps={m.steps} live={live} onStop={live ? onStop : undefined} />
-          <GenUiSteps steps={m.steps} live={live} />
+          <MaybeGenUiSteps steps={m.steps} live={live} />
           {live && phase === 'approval' && <p className="action-status" role="status"><Icon name="clock" size={13} />Esperando você responder acima</p>}
           {(m.steps || []).filter(s => s.tool === 'send_message' && s.detail).map((s, i) => <span key={i} className="enviada-a">Enviada a {String(s.detail).replace(/^→\s*/, '')}</span>)}
           {live && phase === 'generate_image' && <ImageGenLoader />}

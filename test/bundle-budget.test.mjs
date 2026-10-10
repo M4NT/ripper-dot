@@ -94,6 +94,14 @@ test('Chat e Home carregam sob demanda no casco', () => {
   assert.doesNotMatch(app, /import Home from/);
 });
 
+test('Chat não puxa OpenUI nem genui no grafo estático', () => {
+  const chat = readFileSync(join(SRC, 'pages/Chat.jsx'), 'utf8');
+  assert.doesNotMatch(chat, /import \{[^}]*OpenUIBlock/);
+  assert.doesNotMatch(chat, /import \{[^}]*GenUi(?:Fence|Steps)/);
+  assert.match(chat, /import\('\.\.\/openui\/library\.jsx'\)/);
+  assert.match(chat, /import\('\.\.\/genui\/MessageUi\.jsx'\)/);
+});
+
 test('App e Login usam lazyReload (mesmo recarregamento de chunk 404)', () => {
   const main = readFileSync(join(SRC, 'main.jsx'), 'utf8');
   assert.match(main, /lazyReload/);
