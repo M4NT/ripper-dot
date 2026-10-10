@@ -84,12 +84,12 @@ export default function ConnectorCard({
       <div className="mp-app-actions">
         {status.id === STATUS.connected ? (
           <span className="mp-status ok">Conectado</span>
-        ) : (
+        ) : !formOpen ? (
           <button type="button" className={`btn btn-sm ${action.id === 'connect' || action.id === 'auth' || action.id === 'setup' ? 'btn-primary' : ''}`}
             disabled={connecting || action.disabled} onClick={clickAction}>
             {connecting ? 'Conectando…' : action.label}
           </button>
-        )}
+        ) : null}
       </div>
       {(status.detail || error) && (
         <p className="mp-app-detail" role="status">{error || status.detail}</p>

@@ -308,8 +308,8 @@ export default function Marketplace() {
         searchPlaceholder="Buscar Notion, Gmail, GitHub…"
         actions={
           <>
-            <button type="button" className="btn btn-sm" onClick={() => setCustomOpen(true)}>
-              <Icon name="plus" size={14} /> Adicionar por endereço
+            <button type="button" className="btn btn-sm" onClick={() => setCustomOpen(true)} aria-label="Adicionar por endereço">
+              <Icon name="plus" size={14} /> <span className="mp-add-label">Adicionar por endereço</span>
             </button>
             <button type="button" className={`mp-installed ${installedOnly ? 'on' : ''}`} onClick={() => setInstalledOnly(v => !v)}>
               <span className="mp-installed-icons">

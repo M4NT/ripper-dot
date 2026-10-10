@@ -9,9 +9,17 @@
 
 .mp-filters .chip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 
-.hub-modal .mp-page .btn-sm.btn-primary {
+.hub-modal .mp-page .btn-sm.btn-primary,
+.hub-modal .mp-app .btn-primary,
+.hub-modal .mp-detail-cta {
   background: var(--ink);
   color: var(--bg);
+}
+
+@media (max-width: 720px) {
+  .mp-add-label { display: none; }
+  .mp-installed { font-size: var(--fs-xs); padding: 6px 8px; }
+  .mp-installed-icons { display: none; }
 }
 
 .mp-row-text small { display: block; color: var(--muted); font-size: var(--fs-sm); }

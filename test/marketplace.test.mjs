@@ -26,6 +26,17 @@ test('filtros de categoria, auth e verificado', () => {
   assert.ok(verified.length >= oauth.length);
 });
 
+test('token ou local instalado conta como conectado, não como login pendente', () => {
+  const gh = catalogById('github');
+  const settings = { plugins: [{ name: 'github', type: 'http', url: 'https://api.githubcopilot.com/mcp/', enabled: true, auth: { apiKey: 'x' } }] };
+  const st = resolveConnectorStatus({
+    cat: gh,
+    settings,
+    authByName: { github: { state: 'lazy', reason: 'Login será solicitado quando o servidor exigir.' } }
+  });
+  assert.equal(st.id, STATUS.connected);
+});
+
 test('estados: disponível → precisa autenticar → conectado / erro / desativado / expirado', () => {
   const notion = catalogById('notion');
   assert.equal(resolveConnectorStatus({ cat: notion, settings: { plugins: [] } }).id, STATUS.available);

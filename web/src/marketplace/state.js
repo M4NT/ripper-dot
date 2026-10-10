@@ -34,7 +34,7 @@ export const STATUS_TONE = {
   off: null
 };
 
-const AUTH_NEEDS = new Set(['needs_auth', 'lazy']);
+const AUTH_NEEDS = new Set(['needs_auth']);
 const AUTH_EXPIRED = new Set(['expired', 'expired_refreshable', 'expiring_soon']);
 
 function claudeHit(cat, claudeList = []) {
@@ -93,16 +93,20 @@ export function resolveConnectorStatus({
     return { id: STATUS.error, label: STATUS_LABEL.error, tone: 'err', detail: stdio.lastError || 'O processo local parou.', logs: stdio.lastError };
   }
 
-  const auth = authByName[cat.id] || plugin.authStatus;
-  if (auth?.state && AUTH_NEEDS.has(auth.state)) {
-    return { id: STATUS.needs_auth, label: STATUS_LABEL.needs_auth, tone: 'warn', detail: auth.reason };
-  }
-  if (auth?.state && AUTH_EXPIRED.has(auth.state)) {
-    return { id: STATUS.expired, label: auth.state === 'expiring_soon' ? 'Token expira em breve' : STATUS_LABEL.expired, tone: 'warn', detail: auth.reason, refreshable: auth.state === 'expired_refreshable' };
+  if (cat.connect?.type === 'token' || cat.connect?.type === 'local') {
+    return { id: STATUS.connected, label: STATUS_LABEL.connected, tone: 'ok' };
   }
 
-  if (cat.connect?.type === 'oauth' && !auth?.state && plugin.auth?.mode !== 'none' && !plugin.auth?.apiKey) {
-    return { id: STATUS.needs_auth, label: STATUS_LABEL.needs_auth, tone: 'warn' };
+  const auth = authByName[cat.id] || plugin.authStatus;
+  if (auth?.state && AUTH_NEEDS.has(auth.state)) {
+    return { id: STATUS.needs_auth, label: STATUS_LABEL.needs_auth, tone: 'warn', detail: 'Faça login para os agentes usarem.' };
+  }
+  if (auth?.state && AUTH_EXPIRED.has(auth.state)) {
+    return { id: STATUS.expired, label: auth.state === 'expiring_soon' ? 'Token expira em breve' : STATUS_LABEL.expired, tone: 'warn', detail: 'O acesso expirou. Entre de novo.', refreshable: auth.state === 'expired_refreshable' };
+  }
+
+  if (cat.connect?.type === 'oauth' && plugin.auth?.mode !== 'none' && !plugin.auth?.apiKey && (!auth?.state || auth.state === 'lazy')) {
+    return { id: STATUS.needs_auth, label: STATUS_LABEL.needs_auth, tone: 'warn', detail: 'Faça login para os agentes usarem.' };
   }
 
   return { id: STATUS.connected, label: STATUS_LABEL.connected, tone: 'ok' };
