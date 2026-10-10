@@ -94,3 +94,15 @@ export function indexOfKey(items, getKey, key) {
   }
   return -1;
 }
+
+/** Janela visível + índice focado (se estiver fora). Uma lista só, mesma chave. */
+export function pinnedIndices(start, end, pinIdx) {
+  const out = [];
+  for (let i = start; i < end; i++) out.push(i);
+  if (pinIdx >= 0 && (pinIdx < start || pinIdx >= end)) {
+    let at = 0;
+    while (at < out.length && out[at] < pinIdx) at++;
+    out.splice(at, 0, pinIdx);
+  }
+  return out;
+}

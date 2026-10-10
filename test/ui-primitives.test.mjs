@@ -4,10 +4,11 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  endScrollTop, lowerBound, nearEnd, patchPrefix, prefixHeights, prependShift,
+  endScrollTop, lowerBound, nearEnd, patchPrefix, pinnedIndices, prefixHeights, prependShift,
   pruneMeasured, scrollCompensation, visibleRange,
 } from '../web/src/ui/virtualRange.js';
 import { FOCUSABLE, focusables, trapTab } from '../web/src/ui/focusTrap.js';
+import { createSheetLock } from '../web/src/ui/sheetLock.js';
 import { BP_PHONE, BP_TABLET, QUERY } from '../web/src/ui/breakpoints.js';
 
 const src = nome => readFileSync(fileURLToPath(new URL('../web/src/' + nome, import.meta.url)), 'utf8');
@@ -107,7 +108,7 @@ test('BottomSheet tem Esc, arrastar, foco preso, inert e onClose em ref', () => 
   assert.match(sheet, /onPointerDown/);
   assert.match(sheet, /onCloseRef/);
   assert.match(sheet, /\[open\]/);
-  assert.match(sheet, /inert/);
+  assert.match(sheet, /sheetLock/);
   assert.match(sheet, /100dvh|ui-sheet-root/);
   assert.match(sheet, /safe-area-inset-bottom|ui-sheet/);
   const css = src('styles/telas/ui-shell.css');
@@ -131,8 +132,14 @@ test('VirtualList usa key estável, altura medida, âncora e acessibilidade', ()
   assert.match(list, /aria-posinset/);
   assert.match(list, /offsetHeight/);
   assert.match(list, /followEnd \? 'log'/);
+  assert.match(list, /pinnedIndices/);
+  assert.match(list, /key=\{key\}/);
+  assert.doesNotMatch(list, /aria-live/);
+  assert.doesNotMatch(list, /ui-vlist-sticky/);
   assert.doesNotMatch(list, /if \(!items\.length\) return empty/);
-  assert.match(src('styles/telas/ui-shell.css'), /\.ui-vlist-row\s*\{\s*display:\s*flow-root/);
+  const css = src('styles/telas/ui-shell.css');
+  assert.match(css, /\.ui-vlist-row\s*\{\s*display:\s*flow-root/);
+  assert.match(css, /\.ui-vlist\s*\{[^}]*overflow-anchor:\s*none/);
 });
 
 test('visibleRange de 10.000 itens só devolve a janela visível', () => {
@@ -212,6 +219,36 @@ test('pruneMeasured remove chaves mortas do mapa', () => {
   const m = new Map([['a', 10], ['b', 20], ['c', 30]]);
   pruneMeasured(m, new Set(['a', 'c']));
   assert.deepEqual([...m.keys()], ['a', 'c']);
+});
+
+test('pinnedIndices mantém a linha focada na mesma lista', () => {
+  assert.deepEqual(pinnedIndices(5, 10, -1), [5, 6, 7, 8, 9]);
+  assert.deepEqual(pinnedIndices(5, 10, 7), [5, 6, 7, 8, 9]);
+  assert.deepEqual(pinnedIndices(5, 10, 2), [2, 5, 6, 7, 8, 9]);
+  assert.deepEqual(pinnedIndices(5, 10, 12), [5, 6, 7, 8, 9, 12]);
+  assert.equal(pinnedIndices(5, 10, 2).filter(i => i === 2).length, 1);
+});
+
+test('sheetLock conta inert e overflow com duas folhas', () => {
+  const body = { style: { overflow: '' } };
+  const fundo = { inert: false };
+  const lock = createSheetLock({ getBody: () => body, getFundo: () => fundo });
+  const a = lock.acquire();
+  assert.equal(lock.count, 1);
+  assert.equal(body.style.overflow, 'hidden');
+  assert.equal(fundo.inert, true);
+  const b = lock.acquire();
+  assert.equal(lock.count, 2);
+  a();
+  assert.equal(lock.count, 1);
+  assert.equal(body.style.overflow, 'hidden');
+  assert.equal(fundo.inert, true);
+  a();
+  assert.equal(lock.count, 1);
+  b();
+  assert.equal(lock.count, 0);
+  assert.equal(body.style.overflow, '');
+  assert.equal(fundo.inert, false);
 });
 
 test('nearEnd solta a âncora quando a pessoa sobe', () => {

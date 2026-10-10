@@ -79,11 +79,9 @@
 }
 
 /* ---- Virtual list ---- */
-.ui-vlist { overflow: auto; min-height: 0; height: 100%; overscroll-behavior: contain; }
+.ui-vlist { overflow: auto; min-height: 0; height: 100%; overscroll-behavior: contain; overflow-anchor: none; }
 .ui-vlist-inner { position: relative; width: 100%; }
-.ui-vlist-window { position: absolute; left: 0; right: 0; top: 0; will-change: transform; }
-.ui-vlist-row { display: flow-root; }
-.ui-vlist-sticky { position: absolute; left: 0; right: 0; top: 0; }
+.ui-vlist-row { display: flow-root; position: absolute; left: 0; right: 0; }
 
 /* ---- Galeria de exemplos (dev) ---- */
 .ui-ex { max-width: 920px; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-10); display: grid; gap: var(--space-7); }

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { focusables, trapTab } from './focusTrap.js';
+import { sheetLock } from './sheetLock.js';
 import './styles.js';
 import '../styles/telas/ui-shell.css';
 
@@ -28,14 +29,10 @@ export function BottomSheet({ open, onClose, title, label, children, className =
       else trapTab(e, root);
     };
     document.addEventListener('keydown', onKey, true);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    const fundo = document.getElementById('root');
-    if (fundo) fundo.inert = true;
+    const unlock = sheetLock.acquire();
     return () => {
       document.removeEventListener('keydown', onKey, true);
-      document.body.style.overflow = prev;
-      if (fundo) fundo.inert = false;
+      unlock();
       if (typeof voltar.current?.focus === 'function') voltar.current.focus();
     };
   }, [open]);

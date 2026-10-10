@@ -5,6 +5,7 @@ import {
   liveKeysOf,
   nearEnd,
   patchPrefix,
+  pinnedIndices,
   prefixHeights,
   prependShift,
   pruneMeasured,
@@ -44,7 +45,6 @@ export function VirtualList({
   const itemsRef = useRef(items);
   const getKeyRef = useRef(getKey);
   const estimateRef = useRef(estimateSize);
-  const focusKey = useRef(null);
   itemsRef.current = items;
   getKeyRef.current = getKey;
   estimateRef.current = estimateSize;
@@ -174,19 +174,16 @@ export function VirtualList({
     if (!row || !scroller.current?.contains(row)) return;
     const idx = Number(row.dataset.vlistIndex);
     if (!Number.isInteger(idx) || !items[idx]) return;
-    const key = getKey(items[idx], idx);
-    focusKey.current = key;
-    setPinned(key);
+    setPinned(getKey(items[idx], idx));
   };
 
   const onFocusOut = e => {
     if (e.currentTarget.contains(e.relatedTarget)) return;
-    focusKey.current = null;
     setPinned(null);
   };
 
   const pinIdx = pinned != null ? indexOfKey(items, getKey, pinned) : -1;
-  const sticky = pinIdx >= 0 && (pinIdx < range.start || pinIdx >= range.end);
+  const shown = pinnedIndices(range.start, range.end, pinIdx);
 
   return (
     <div
@@ -197,35 +194,33 @@ export function VirtualList({
       onFocus={onFocusIn}
       onBlur={onFocusOut}
       role={listRole}
-      aria-live={listRole === 'log' ? 'polite' : undefined}
     >
       {!items.length ? empty : (
         <div className="ui-vlist-inner" style={{ height: range.total }}>
-          <div className="ui-vlist-window" style={{ transform: `translateY(${range.offset}px)` }}>
-            {items.slice(range.start, range.end).map((item, i) => {
-              const index = range.start + i;
-              const key = getKey(item, index);
-              return (
-                <VirtualRow key={key} id={key} index={index} setSize={items.length} measure={measure} itemRole={itemRole}>
-                  {renderItem(item, index)}
-                </VirtualRow>
-              );
-            })}
-          </div>
-          {sticky && (
-            <div className="ui-vlist-sticky" style={{ transform: `translateY(${range.prefix[pinIdx]}px)` }}>
-              <VirtualRow id={pinned} index={pinIdx} setSize={items.length} measure={measure} itemRole={itemRole}>
-                {renderItem(items[pinIdx], pinIdx)}
+          {shown.map(index => {
+            const item = items[index];
+            const key = getKey(item, index);
+            return (
+              <VirtualRow
+                key={key}
+                id={key}
+                index={index}
+                top={range.prefix[index]}
+                setSize={items.length}
+                measure={measure}
+                itemRole={itemRole}
+              >
+                {renderItem(item, index)}
               </VirtualRow>
-            </div>
-          )}
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
 
-function VirtualRow({ id, index, setSize, measure, itemRole, children }) {
+function VirtualRow({ id, index, top, setSize, measure, itemRole, children }) {
   const ref = useRef(null);
   useLayoutEffect(() => {
     const el = ref.current;
@@ -245,6 +240,7 @@ function VirtualRow({ id, index, setSize, measure, itemRole, children }) {
       aria-setsize={setSize}
       aria-posinset={index + 1}
       data-vlist-index={index}
+      style={{ top }}
     >
       {children}
     </div>
