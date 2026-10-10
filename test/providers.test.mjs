@@ -8,8 +8,14 @@ import {
   mcpPluginHttpHeaders,
   buildClaudeQueryOptions,
   parseCodexJsonEvent,
-  describeRipperTool
+  applyCodexTextEvent,
+  describeRipperTool,
+  claudePromptMessages,
+  claudePromptInput,
+  buildCodexPrompt,
+  codexSandboxMode
 } from '../lib/providers.mjs';
+import { continueHistoryAfterConnectors } from '../lib/agent-flow.mjs';
 import { createRipperMcpBridge } from '../lib/ripper-mcp-bridge.mjs';
 import { ripperClaudeToolAllowlist } from '../lib/ripper-builtin-tools.mjs';
 
@@ -62,9 +68,10 @@ test('userMcp ignora plugins quando ferramenta plugins está desligada', () => {
   assert.deepEqual(userMcp(agent, settings.plugins), {});
 });
 
-test('buildCodexSpawnArgs: sandbox read-only, MCP stdio/http e ripper builtin', () => {
+test('buildCodexSpawnArgs: sandbox read-only sem computador isolado, MCP stdio/http e ripper builtin', () => {
+  const off = { ...settings, computer: { mode: 'off', allowLocalCommands: false } };
   const bridge = { url: 'http://127.0.0.1:9', token: 'tok' };
-  const args = buildCodexSpawnArgs({ agent: baseAgent, effort: 'high', settings, images: [{ path: '/tmp/x.png' }], ripperMcpBridge: bridge });
+  const args = buildCodexSpawnArgs({ agent: baseAgent, effort: 'high', settings: off, images: [{ path: '/tmp/x.png' }], ripperMcpBridge: bridge });
   assert.deepEqual(args.slice(0, 5), ['exec', '--json', '--skip-git-repo-check', '--sandbox', 'read-only']);
   assert.ok(args.includes('-c'));
   assert.ok(args.some(a => String(a).includes('mcp_servers.my-mcp.command')));
@@ -72,6 +79,17 @@ test('buildCodexSpawnArgs: sandbox read-only, MCP stdio/http e ripper builtin', 
   assert.ok(args.some(a => String(a).includes('mcp_servers.ripper.command')));
   assert.ok(args.some(a => String(a).includes('RIPPER_MCP_BRIDGE_URL')));
   assert.ok(args.includes('/tmp/x.png'));
+});
+
+test('Codex escreve no workspace quando o computador isola o agente', () => {
+  assert.equal(codexSandboxMode(baseAgent, { computer: { mode: 'docker' } }), 'workspace-write');
+  assert.equal(codexSandboxMode(baseAgent, { computer: { mode: 'boat' } }), 'workspace-write');
+  assert.equal(codexSandboxMode(baseAgent, { computer: { mode: 'local', allowLocalCommands: true } }), 'workspace-write');
+  assert.equal(codexSandboxMode(baseAgent, { computer: { mode: 'local', allowLocalCommands: false } }), 'read-only');
+  assert.equal(codexSandboxMode({ ...baseAgent, tools: ['web'] }, { computer: { mode: 'docker' } }), 'read-only');
+  assert.equal(codexSandboxMode({ ...baseAgent, autonomyLevel: 'read_only' }, { computer: { mode: 'docker' } }), 'read-only');
+  const dockerArgs = buildCodexSpawnArgs({ agent: baseAgent, settings: { ...settings, computer: { mode: 'docker' } } });
+  assert.deepEqual(dockerArgs.slice(0, 5), ['exec', '--json', '--skip-git-repo-check', '--sandbox', 'workspace-write']);
 });
 
 test('buildClaudeQueryOptions registra MCP ripper e conectores só com plugins', () => {
@@ -96,13 +114,62 @@ test('buildClaudeQueryOptions registra MCP ripper e conectores só com plugins',
 });
 
 test('parseCodexJsonEvent: mensagem, shell e mcp ripper', () => {
-  assert.deepEqual(parseCodexJsonEvent({ item: { type: 'agent_message', text: 'oi' } }), { text: 'oi' });
+  const msg = parseCodexJsonEvent({ item: { type: 'agent_message', text: 'oi' } });
+  assert.equal(msg.text, 'oi');
+  assert.equal(msg.snapshot, true);
   // shell do Codex não é o Computador do Ripper (a UI dizia "Rodando no computador" com o modo desligado)
   assert.equal(parseCodexJsonEvent({ item: { type: 'command_execution', command: 'ls' } }).tool, 'shell');
   assert.deepEqual(
     parseCodexJsonEvent({ type: 'item.started', item: { type: 'mcp_tool_call', server: 'ripper', tool: 'remember', arguments: { text: 'x' }, status: 'in_progress' } }),
     describeRipperTool('remember', { text: 'x' })
   );
+});
+
+test('Codex transmite texto aos poucos a partir de snapshot e delta', () => {
+  const state = { last: '' };
+  const a = applyCodexTextEvent(parseCodexJsonEvent({ type: 'item.updated', item: { type: 'agent_message', text: 'Hel' } }), state);
+  const b = applyCodexTextEvent(parseCodexJsonEvent({ type: 'item.updated', item: { type: 'agent_message', text: 'Hello' } }), state);
+  const c = applyCodexTextEvent(parseCodexJsonEvent({ type: 'item.completed', item: { type: 'agent_message', text: 'Hello' } }), state);
+  assert.deepEqual(a, { text: 'Hel' });
+  assert.deepEqual(b, { text: 'lo' });
+  assert.equal(c, null);
+  assert.deepEqual(applyCodexTextEvent(parseCodexJsonEvent({ msg: { type: 'agent_message_delta', delta: '!' } }), { last: 'Hello' }), { text: '!' });
+});
+
+test('histórico vai ao Claude e ao Codex como mensagens reais', () => {
+  const history = [
+    { role: 'user', content: 'lembra o café' },
+    { role: 'assistant', content: 'anotei', steps: [{ tool: 'remember', detail: 'café' }] }
+  ];
+  const msgs = claudePromptMessages(history, 'e o chá?');
+  assert.equal(msgs.length, 3);
+  assert.equal(msgs[0].shouldQuery, false);
+  assert.equal(msgs[0].message.role, 'user');
+  assert.equal(msgs[0].message.content, 'lembra o café');
+  assert.equal(msgs[1].message.role, 'assistant');
+  assert.match(msgs[1].message.content, /anotei/);
+  assert.match(msgs[1].message.content, /remember: café/);
+  assert.equal(msgs[2].message.content, 'e o chá?');
+  assert.doesNotMatch(JSON.stringify(msgs), /Usuário: lembra/);
+  assert.equal(claudePromptInput([], 'oi'), 'oi');
+
+  const prompt = buildCodexPrompt({ system: 'sys', history, prompt: 'e o chá?' });
+  assert.match(prompt, /^sys/);
+  assert.match(prompt, /user:\nlembra o café/);
+  assert.match(prompt, /assistant:\nanotei/);
+  assert.doesNotMatch(prompt, /Usuário: lembra o café/);
+});
+
+test('use_connectors continua o turno com o que já foi feito', () => {
+  const cont = continueHistoryAfterConnectors(
+    [{ role: 'user', content: 'oi' }],
+    'vê a agenda',
+    { text: 'vou abrir', tools: [{ tool: 'use_connectors' }] }
+  );
+  assert.equal(cont.history.length, 3);
+  assert.equal(cont.history[1].content, 'vê a agenda');
+  assert.match(cont.history[2].content, /vou abrir/);
+  assert.match(cont.prompt, /Continue de onde parou/);
 });
 
 test('createRipperMcpBridge executa remember sem Codex', async () => {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canUseFile, selectSpeakers, routineDue, mayFallback, mentionOrder, Floor, isPass, heuristicSpeaker, trimHistory, turnPlanIds, delegationCardState, ownerBlockedReason, oneLineTask, ambiguousMentions, isAck } from '../lib/agent-flow.mjs';
+import { canUseFile, selectSpeakers, routineDue, mayFallback, mentionOrder, Floor, isPass, heuristicSpeaker, trimHistory, turnPlanIds, delegationCardState, ownerBlockedReason, oneLineTask, ambiguousMentions, isAck, summarizeTools, toProviderMessages, continueHistoryAfterConnectors, estimateHistoryTokens } from '../lib/agent-flow.mjs';
 
 test('@menção tolerante a nome; ambígua não chama ninguém', () => {
   const eng = { id: 'e', name: 'Engenheiro de Software (Ripper)' };
@@ -120,11 +120,57 @@ test('heurística escolhe pela função quando não há Julia', () => {
   assert.equal(heuristicSpeaker('Qual público a campanha deve priorizar?', team).id, 'e');
 });
 
-test('histórico é cortado para economizar tokens', () => {
-  const msgs = Array.from({ length: 30 }, (_, i) => ({ role: 'user', content: 'x'.repeat(i === 29 ? 5000 : 10) }));
-  const h = trimHistory(msgs);
-  assert.equal(h.length, 12);
-  assert.ok(h.at(-1).content.length < 1600);
+test('histórico cabe por tokens, mantém mensagens reais e resume ferramentas', () => {
+  const small = Array.from({ length: 30 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: `msg ${i}` }));
+  const kept = trimHistory(small);
+  assert.ok(kept.length > 12, 'mensagens curtas não caem no teto antigo de 12');
+  assert.equal(kept.length, 30);
+  assert.equal(kept[0].role, 'user');
+  assert.equal(kept.at(-1).role, 'assistant');
+  assert.equal(kept.at(-1).content, 'msg 29');
+
+  const withTools = trimHistory([{
+    role: 'assistant',
+    content: 'pronto',
+    steps: [{ tool: 'remember', detail: 'gosta de café' }, { tool: 'computer_exec', detail: 'python app.py' }]
+  }]);
+  assert.match(withTools[0].content, /pronto/);
+  assert.match(withTools[0].content, /\[Ferramentas: remember: gosta de café · computer_exec: python app.py\]/);
+
+  const budget = trimHistory(
+    Array.from({ length: 40 }, (_, i) => ({ role: 'user', content: `bloco-${i} ${'y'.repeat(80)}` })),
+    { maxTokens: 256, keepRecent: 3 }
+  );
+  assert.ok(budget.length >= 3);
+  assert.ok(budget.length < 40);
+  assert.match(budget.at(-1).content, /bloco-39/);
+  assert.ok(estimateHistoryTokens(budget) <= 256);
+
+  const huge = trimHistory([{ role: 'user', content: 'z'.repeat(20_000) }]);
+  assert.ok(huge[0].content.length > 1600);
+  assert.match(huge[0].content, /\[…\]/);
+});
+
+test('toProviderMessages e continueHistoryAfterConnectors não achatam o turno', () => {
+  assert.equal(summarizeTools([{ tool: 'remember', detail: 'x' }]), 'remember: x');
+  const msgs = toProviderMessages([
+    { role: 'user', content: 'oi' },
+    { role: 'assistant', content: 'feito', steps: [{ tool: 'remember', detail: 'café' }] }
+  ]);
+  assert.deepEqual(msgs.map(m => m.role), ['user', 'assistant']);
+  assert.match(msgs[1].content, /\[Ferramentas: remember: café\]/);
+
+  const cont = continueHistoryAfterConnectors(
+    [{ role: 'user', content: 'oi' }],
+    'vê a agenda',
+    { text: 'vou ver', tools: [{ tool: 'use_connectors' }] }
+  );
+  assert.equal(cont.history[1].role, 'user');
+  assert.equal(cont.history[1].content, 'vê a agenda');
+  assert.equal(cont.history[2].role, 'assistant');
+  assert.match(cont.history[2].content, /vou ver/);
+  assert.match(cont.history[2].content, /use_connectors/);
+  assert.match(cont.prompt, /Continue de onde parou/);
 });
 
 test('anexo de outro agente não atravessa projeto', () => {
