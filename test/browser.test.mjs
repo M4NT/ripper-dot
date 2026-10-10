@@ -30,7 +30,14 @@ import {
   verifyBrowserCommand,
   assignSnapshotRefs,
   redactResult,
-  isSensitiveField
+  isSensitiveField,
+  expectedFromTarget,
+  sanitizeExpect,
+  elementFingerprint,
+  fingerprintsMatch,
+  bindMismatchError,
+  unknownRefError,
+  unknownRefRisk
 } from '../lib/browser.mjs';
 
 function fakeDaemon(scriptsDir, handle, { bootAt = Date.now() } = {}) {
@@ -161,6 +168,10 @@ test('daemonSource: sem think, sem data-ripper-ref plantável, com fila e shred'
   assert.match(src, /shouldAcceptCommand/);
   assert.match(src, /mouse\.wheel/);
   assert.match(src, /includeText/);
+  assert.match(src, /process\.stdin/);
+  assert.match(src, /Ref sem elemento aprovado/);
+  assert.doesNotMatch(src, /RIPPER_BROWSER_TOKEN/);
+  assert.doesNotMatch(src, /process\.env\.\w*TOKEN/);
   assert.doesNotMatch(src, /bctl\.mjs/);
 });
 
@@ -202,6 +213,12 @@ test('sanitizeBrowserCommand: allowlist, url e dy', () => {
   const sc = sanitizeBrowserCommand({ id: '1', ts, action: 'scroll', dy: 99999 });
   assert.equal(sc.dy, 4000);
   assert.ok(sanitizeBrowserCommand({ id: '1', ts, action: 'read' }));
+  const clk = sanitizeBrowserCommand({
+    id: '1', ts, action: 'click', target: 'e7',
+    expect: { role: 'button', name: 'Próxima página', tag: 'button', nth: 0, extra: 'x' }
+  });
+  assert.deepEqual(clk.expect, { role: 'button', name: 'Próxima página', nth: 0, tag: 'button' });
+  assert.equal(clk.expect.extra, undefined);
 });
 
 test('shouldAcceptCommand recusa id repetido e cmd anterior ao boot', () => {
@@ -231,13 +248,36 @@ test('assignSnapshotRefs e redactResult escondem valor sensível', () => {
   const red = redactResult({ nodes: [{ ref: 'e1', name: 'Token', value: 'xyz' }] }, { secret: true, target: 'Token' });
   assert.equal(red.nodes[0].value, undefined);
   assert.ok(isSensitiveField('Senha'));
+  for (const t of ['OTP', 'PIN', 'código', 'codigo', 'chave', 'Código de verificação']) {
+    assert.ok(isSensitiveField(t), t);
+    assert.ok(browserRisk('type', { target: t }), t);
+  }
+  const otp = assignSnapshotRefs([{ role: 'textbox', name: 'OTP', value: '847291' }]);
+  assert.equal(otp[0].value, undefined);
+});
+
+test('fingerprint do elemento aprovado: papel, nome e nth', () => {
+  const nodes = [
+    { ref: 'e7', role: 'button', name: 'Próxima página', tag: 'button', nth: 0 },
+    { ref: 'e8', role: 'button', name: 'Finalizar compra', tag: 'button', nth: 0 }
+  ];
+  assert.deepEqual(expectedFromTarget('e7', nodes), {
+    role: 'button', name: 'Próxima página', tag: 'button', nth: 0
+  });
+  assert.ok(fingerprintsMatch(expectedFromTarget('e7', nodes), { role: 'button', name: 'Próxima página', nth: 0 }));
+  assert.equal(fingerprintsMatch(expectedFromTarget('e7', nodes), { role: 'button', name: 'Finalizar compra', nth: 0 }), false);
+  assert.equal(sanitizeExpect({ role: '', name: '' }), null);
+  assert.match(bindMismatchError({ role: 'button', name: 'Próxima página' }), /Próxima página/);
+  assert.match(unknownRefError('e7'), /e7/);
+  assert.match(unknownRefRisk('e7'), /ref desconhecida/);
+  assert.ok(elementFingerprint(nodes[0]));
 });
 
 test('browserRisk resolve ref pelo snapshot (não pelo texto e7)', () => {
   const nodes = [{ ref: 'e7', role: 'button', name: 'Finalizar compra' }, { ref: 'e3', role: 'textbox', name: 'Senha' }];
   assert.equal(resolveRiskTarget('e7', nodes), 'Finalizar compra');
   assert.ok(browserRisk('click', { target: 'e7', nodes }));
-  assert.equal(browserRisk('click', { target: 'e7' }), null);
+  assert.match(browserRisk('click', { target: 'e7' }), /ref desconhecida/);
   assert.ok(browserRisk('type', { target: 'e3', nodes }));
   assert.ok(browserRisk('click', { target: 'Excluir conta' }));
 });
@@ -283,7 +323,12 @@ test('browserFor: uma preparação via exec; ações falam com o daemon por arqu
     assert.equal(cmds.map(c => c.action).join(','), 'go,click,type,read');
     assert.equal(cmds[0].url, 'https://ex.test/');
     assert.equal(cmds[1].target, 'e1');
+    assert.deepEqual(cmds[1].expect, { role: 'button', name: 'Entrar', nth: 0 });
     assert.equal(cmds[2].text, 'ana@ex.test');
+    assert.deepEqual(cmds[2].expect, { role: 'textbox', name: 'E-mail', nth: 0 });
+    assert.doesNotMatch(lastExec, /RIPPER_BROWSER_TOKEN=/);
+    assert.match(lastExec, /printf '%s'/);
+    assert.match(lastExec, /nohup node \/opt\/ripper-browser\/browserd\.mjs/);
     assert.match(opened, /\[ref=e1\]/);
     assert.match(clicked, /textbox "E-mail"/);
     assert.match(typed, /ana@ex\.test/);
@@ -302,7 +347,7 @@ test('browserFor: screenshot explícito continua opt-in no comando', async () =>
   const cmds = [];
   const stop = fakeDaemon(scripts, cmd => {
     cmds.push(cmd);
-    return { title: 'T', url: 'https://t.test/', nodes: [] };
+    return { title: 'T', url: 'https://t.test/', nodes: [{ ref: 'e1', role: 'button', name: 'Ok' }] };
   });
   try {
     const b = browserFor(rawReady(scripts), pathToFileURL(dir + '/'), { timeoutMs: 3000, pollMs: 10 });
@@ -364,7 +409,7 @@ test('browserFor.risk usa o snapshot: e7 perigoso pede aprovação', async () =>
   });
   try {
     const b = browserFor(rawReady(scripts), pathToFileURL(dir + '/'), { timeoutMs: 3000, pollMs: 10 });
-    assert.equal(b.risk('click', { target: 'e7' }), null);
+    assert.match(b.risk('click', { target: 'e7' }), /ref desconhecida/);
     await b.open('https://loja.test/');
     assert.equal(b.labelOf('e7'), 'Finalizar compra');
     assert.ok(b.risk('click', { target: 'e7' }));
@@ -410,4 +455,79 @@ test('browserRisk permanece o mesmo para texto puro', () => {
   assert.equal(browserRisk('click', { target: 'Próxima página' }), null);
   assert.equal(browserRisk('type', { target: 'Buscar' }), null);
   assert.ok(browserRisk('type', { target: 'Buscar', submit: true }));
+});
+
+test('browserFor: clique leva fingerprint; página mudada entre aprovação e clique é recusada', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ripper-br-'));
+  const scripts = join(dir, '.ripper');
+  const cmds = [];
+  let live = [{ ref: 'e7', role: 'button', name: 'Próxima página', tag: 'button', nth: 0 }];
+  const stop = fakeDaemon(scripts, cmd => {
+    cmds.push(cmd);
+    if (cmd.action === 'go') {
+      live = [{ ref: 'e7', role: 'button', name: 'Próxima página', tag: 'button', nth: 0 }];
+      return { title: 'Checkout', url: 'https://loja.test/passo', nodes: live };
+    }
+    if (cmd.action === 'click') {
+      live = [{ ref: 'e7', role: 'button', name: 'Finalizar compra', tag: 'button', nth: 0 }];
+      const exp = cmd.expect;
+      const hits = live.filter(n => n.role === exp?.role && n.name === exp?.name);
+      if (!hits.length) {
+        return { ok: false, error: bindMismatchError(exp), title: 'Checkout', url: 'https://loja.test/fim', nodes: live };
+      }
+      return { title: 'Checkout', url: 'https://loja.test/fim', nodes: live };
+    }
+    return { title: 'Checkout', url: 'https://loja.test/', nodes: live };
+  });
+  try {
+    const b = browserFor(rawReady(scripts), pathToFileURL(dir + '/'), { timeoutMs: 3000, pollMs: 10 });
+    await b.open('https://loja.test/passo');
+    assert.equal(b.labelOf('e7'), 'Próxima página');
+    assert.equal(b.risk('click', { target: 'e7' }), null);
+    const out = await b.click('e7');
+    assert.equal(cmds[1].target, 'e7');
+    assert.deepEqual(cmds[1].expect, { role: 'button', name: 'Próxima página', tag: 'button', nth: 0 });
+    assert.match(out, /A página mudou/);
+    assert.match(out, /Próxima página/);
+    assert.doesNotMatch(out, /ok: true/);
+  } finally { stop(); }
+});
+
+test('browserFor: ref desconhecida recusa o clique e pede aprovação', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ripper-br-'));
+  const scripts = join(dir, '.ripper');
+  const cmds = [];
+  const stop = fakeDaemon(scripts, cmd => {
+    cmds.push(cmd);
+    return { title: 'Home', url: 'https://h.test/', nodes: [{ ref: 'e1', role: 'button', name: 'Entrar' }] };
+  });
+  try {
+    const b = browserFor(rawReady(scripts), pathToFileURL(dir + '/'), { timeoutMs: 3000, pollMs: 10 });
+    const before = await b.click('e7');
+    assert.match(before, /Não achei a ref e7/);
+    assert.equal(cmds.length, 0);
+    assert.match(b.risk('click', { target: 'e7' }), /ref desconhecida/);
+    await b.open('https://h.test/');
+    const after = await b.click('e9');
+    assert.match(after, /Não achei a ref e9/);
+    assert.equal(cmds.map(c => c.action).join(','), 'go');
+    assert.match(b.risk('click', { target: 'e9' }), /ref desconhecida/);
+    assert.equal(b.risk('click', { target: 'e1' }), null);
+  } finally { stop(); }
+});
+
+test('browserFor: .ripper vira symlink entre operações e a próxima recusa', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ripper-br-'));
+  const scripts = join(dir, '.ripper');
+  const stop = fakeDaemon(scripts, () => ({
+    title: 'T', url: 'https://t.test/', nodes: [{ ref: 'e1', role: 'button', name: 'Entrar' }]
+  }));
+  try {
+    const b = browserFor(rawReady(scripts), pathToFileURL(dir + '/'), { timeoutMs: 3000, pollMs: 10 });
+    await b.open('https://t.test/');
+    const moved = join(dir, 'ripper-real');
+    renameSync(scripts, moved);
+    symlinkSync(moved, scripts);
+    await assert.rejects(() => b.click('e1'), /symlink/i);
+  } finally { stop(); }
 });

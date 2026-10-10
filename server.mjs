@@ -1242,7 +1242,7 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
     const ask = (action, opts, label) => {
       const autonomy = browserAutonomyGate(agent, action, s);
       if (typeof autonomy === 'string') return Promise.resolve(false);
-      // Refs (e7) resolvem pelo último snapshot em b.risk — senão o portão via o texto "e7".
+      // Refs: b.risk usa o snapshot; ref desconhecida pede ok. O clique leva fingerprint (não só e7).
       const reason = autonomy === null ? null : b.risk(action, opts);
       if (!reason) return Promise.resolve(true);
       // Ação arriscada (envio, compra, login…) aprovada: entra no registro de ações externas.
