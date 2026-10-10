@@ -84,6 +84,7 @@ test('buildCodexSpawnArgs: sandbox read-only sem computador isolado, MCP stdio/h
   const args = buildCodexSpawnArgs({ agent: baseAgent, effort: 'high', settings: off, images: [{ path: '/tmp/x.png' }], ripperMcpBridge: bridge });
   assert.deepEqual(args.slice(0, 5), ['exec', '--json', '--skip-git-repo-check', '--sandbox', 'read-only']);
   assert.ok(args.includes('-c'));
+  assert.ok(args.includes('shell_environment_policy.inherit=core'));
   assert.ok(args.some(a => String(a).includes('mcp_servers.my-mcp.command')));
   assert.ok(args.some(a => String(a).includes('mcp_servers.http-one.url')));
   assert.ok(args.some(a => String(a).includes('mcp_servers.ripper.command')));
@@ -109,6 +110,7 @@ test('Codex no host fica read-only; escrita só com RIPPER_CODEX_WRITE=1, opçã
   assert.match(dockerArgs, /--sandbox read-only/);
   assert.match(dockerArgs, /sandbox_workspace_write\.network_access=false/);
   assert.match(dockerArgs, /approval_policy=on-request/);
+  assert.match(dockerArgs, /shell_environment_policy\.inherit=core/);
   assert.doesNotMatch(dockerArgs, /--ask-for-approval/);
   const writeArgs = buildCodexSpawnArgs({
     agent: baseAgent,
@@ -117,6 +119,14 @@ test('Codex no host fica read-only; escrita só com RIPPER_CODEX_WRITE=1, opçã
   });
   assert.deepEqual(writeArgs.slice(0, 5), ['exec', '--json', '--skip-git-repo-check', '--sandbox', 'workspace-write']);
   assert.ok(writeArgs.includes('approval_policy=never'));
+});
+
+test('Codex spawn herda só o env core nos comandos (OPENAI_API_KEY não vaza para o shell)', () => {
+  const args = buildCodexSpawnArgs({ agent: baseAgent, settings, env: {} });
+  const i = args.indexOf('shell_environment_policy.inherit=core');
+  assert.ok(i > 0);
+  assert.equal(args[i - 1], '-c');
+  assert.ok(!args.some(a => String(a).includes('shell_environment_policy.inherit=all')));
 });
 
 test('CLI real do Codex: --ask-for-approval depois de exec falha; -c approval_policy vale', () => {

@@ -52,6 +52,7 @@ Arquivos: `lib/metrics.mjs` (`metricsAccessAllowed(signedIn)`), `server.mjs`, `l
 - MCP `stdio` sem isolamento: avaliar rodar dentro do contêiner do agente ou avisar na tela ao adicionar.
 - Sessões e limite de login em memória (por decisão; reiniciar pede a senha de novo).
 - Rotina por webhook sem segredo HMAC depende só do token da URL: sugerir segredo na tela.
+- **Codex no host (follow-up):** o HOME isolado do processo (`$TMPDIR/ripper-codex-home`) só muda o `$HOME` padrão. Não impede leitura de caminhos absolutos (`~/.ssh` resolvido pelo usuário real, tokens em `data/`, `$CODEX_HOME/auth.json`). Isolamento de verdade exige outro usuário do SO ou o Codex dentro do contêiner do agente. Ver §6.
 
 ## 4. Política de permissões por nível de autonomia (rascunho)
 
@@ -87,3 +88,17 @@ Código: `lib/dfe.mjs`, rotas `/api/certificados`, tela `web/src/marketplace/Cer
 - **Ferramentas dos agentes:** `dfe_listar_notas_recebidas` (do banco) e `dfe_sincronizar` (consulta a Receita). Aparecem só se alguma empresa tiver certificado cadastrado. Nenhuma das duas escreve em sistema externo.
 - **Teste sem rede:** o certificado de teste é gerado com `openssl` numa pasta temporária e nunca é commitado; a Receita é simulada por servidor HTTPS local (`RIPPER_DFE_URL`). Nenhum teste chama a Receita real.
 - **Pendências:** conferir com o certificado real da empresa em homologação antes de usar em produção; o owner envia o `.pfx` pela tela, nunca por arquivo no repositório.
+
+## 6. Codex no host: o que o spawn isola e o que não isola
+
+O CLI do Codex roda no mesmo usuário do servidor (`lib/providers.mjs`, `runCodex` / `buildCodexSpawnArgs`). Mitigações atuais:
+
+| Controle | O que faz | O que não faz |
+|---|---|---|
+| `--sandbox read-only` (padrão) | Impede escrita no workspace do host | Não esconde arquivos que o usuário do servidor já lê |
+| `RIPPER_CODEX_WRITE=1` + local + `never` | Único caminho para `workspace-write` | Continua no host, não no contêiner |
+| Env mínimo + `OPENAI_API_KEY` só na auth por chave | O processo Codex não herda tokens do servidor | A chave, quando necessária, existe no processo |
+| `-c shell_environment_policy.inherit=core` | Comandos do sandbox recebem só o env core (PATH, HOME, USER…). `OPENAI_API_KEY` não vai para o shell | O próprio Codex ainda autentica com a chave ou com `CODEX_HOME` |
+| HOME isolado | `~/.ssh` e `~/…` relativos ao HOME vazio não abrem o HOME do servidor | Caminhos absolutos (`/home/…/.ssh`, `RIPPER_DATA`, `$CODEX_HOME/auth.json`) continuam legíveis pelo mesmo uid |
+
+O login do Codex precisa de `CODEX_HOME` (em geral `~/.codex`); por isso `auth.json` fica visível para o processo. Isolar de verdade é follow-up: usuário dedicado sem acesso a `data/` e `~/.ssh`, ou Codex dentro do contêiner do agente.

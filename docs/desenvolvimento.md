@@ -24,6 +24,7 @@ julia/serve.py (opcional) ── classificador local; sem ele, regras de reserva
 - **Interface** — React 19 + Vite em `web/src` (`app.jsx` é a raiz). `npm run build` gera `dist/`, servido pelo próprio `server.mjs`.
 - **Serviço** — `scripts/service.mjs` instala o Ripper como tarefa/serviço do sistema e tem um vigia (`run`) que reinicia o servidor com espera crescente se ele cair.
 - **Computador do agente** — imagem em `docker/agent/` (Chromium + noVNC), gerenciada por `lib/docker.mjs`, `lib/boat.mjs` e `lib/sandbox-lifecycle.mjs`.
+- **Codex** — `codex exec` no host, com env mínimo, HOME de processo isolado e `-c shell_environment_policy.inherit=core` (a `OPENAI_API_KEY` não vai para os comandos). Isso **não** é sandbox de usuário: caminhos absolutos (`~/.ssh`, `data/`, `$CODEX_HOME/auth.json`) continuam legíveis. Isolamento real (outro uid ou Codex no contêiner) é follow-up; ver [seguranca.md](seguranca.md) §6.
 
 ## Rodar em desenvolvimento
 
