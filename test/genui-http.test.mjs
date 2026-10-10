@@ -170,8 +170,8 @@ test('rascunho Enviar manda o texto editado; setting aplica; cerca tem id no ser
       action: 'submit',
       payload: { selected: ['a'] }
     });
-    assert.equal(pick.status, 200, await pick.text());
     const pickBody = await pick.json();
+    assert.equal(pick.status, 200, pickBody.error || JSON.stringify(pickBody));
     assert.equal(pickBody.text, 'Escolhi: Formal');
 
     const same = await post(base, `/api/chats/${fence.chatId}/ui-parts`, {
