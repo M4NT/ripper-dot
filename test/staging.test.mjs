@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync, existsSync, symlinkSync, mkdirSync, readdirSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, existsSync, symlinkSync, mkdirSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -338,6 +338,8 @@ test('compose publica só em 127.0.0.1 e exige token e senha', () => {
   const df = readFileSync(dockerfile, 'utf8');
   assert.match(df, /RIPPER_ENV=staging/);
   assert.doesNotMatch(df, /ENV NODE_ENV=/);
+  const ci = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
+  assert.match(ci, /permissions:\s*\n\s+contents:\s*read/);
 });
 
 test('ensureStagingSecrets gera token e senha aleatórios', () => {
