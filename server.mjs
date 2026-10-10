@@ -58,8 +58,9 @@ import {
   trimInboxKeepingOpenTasks,
   rootChatId,
   computeTaskAutonomy,
-  addTeamTreeUsage,
-  ensureTeamTree,
+  applyTeamTreeUsage,
+  beginRootUserTurn,
+  teamTreeRootForChat,
   parentTaskIdForChat
 } from './lib/team-delegation.mjs';
 import { patchTask, taskPrompt } from './lib/project-tasks.mjs';
@@ -730,6 +731,7 @@ async function runInboxDelivery(m, { signal } = {}) {
     : m.protocol?.id === PROTOCOL_ID
       ? `${m.body}\n\nResponda de forma direta; para delegações use JSON manager-worker na primeira linha (accept, progress, complete ou reject).`
       : inboxPrompt(m, from.name);
+  if (!inGroup && origin) c.originChatId = origin.id;
   c.messages.push({
     id: id(), role: 'user', content: prompt,
     inbox: { from: from.id, messageId: m.id, priority: m.priority, kind: m.kind || 'message' },
@@ -740,7 +742,8 @@ async function runInboxDelivery(m, { signal } = {}) {
   const worker = linkedTask
     ? agentWithEffectiveAutonomy(from, to, db.settings, linkedTask)
     : to;
-  await turn({ agent: worker, chat: c, text: m.body, prompt, images: [], group: inGroup ? groupMembers(origin, db.agents) : null, hops: m.hops, signal, forName: from.name }, ev => {
+  const turnChat = inGroup && origin ? { ...c, originChatId: origin.id } : c;
+  await turn({ agent: worker, chat: turnChat, text: m.body, prompt, images: [], group: inGroup ? groupMembers(origin, db.agents) : null, hops: m.hops, signal, forName: from.name }, ev => {
     if (origin?.id && (ev.approval || ev.tool || ev.text)) emitTeamLive(rootChatId(db, origin) || origin.id, ev);
   });
   const parsed = interpretInboxReply(c.messages, lenBeforeTurn);
@@ -1037,7 +1040,8 @@ function teamDispatchCtx(originChatId, hops = 0) {
       task, worker, prompt, parentChat, hops, owner
     }),
     busyToIds: inboxBusy,
-    settings: db.settings
+    settings: db.settings,
+    cancelChatStream
   };
 }
 
@@ -1053,7 +1057,8 @@ function spawnIsolatedSubagent({ task, worker, prompt, parentChat, hops = 0, own
     accessControl: db.accessControl,
     settings: db.settings,
     isolated: true,
-    exceptTaskId: task?.id
+    exceptTaskId: task?.id,
+    cancelChatStream
   });
   if (gate.error) return gate;
 
@@ -1726,7 +1731,7 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
         const limits = { maxPerHour: 20, maxHops: 3, ...(s.inbox || {}) };
         const gate = assertTeamDispatch({
           db, from: agent, to, parentChat: chat, hops, limits, busyToIds: inboxBusy,
-          accessControl: db.accessControl, settings: s, isolated: false
+          accessControl: db.accessControl, settings: s, isolated: false, cancelChatStream
         });
         if (gate.error) return gate.error;
         const m = { id: id(), from: agent.id, to: to.id, body: String(a.message).slice(0, 4000), priority: a.priority || 'normal', status: 'queued', hops: hops + 1, originChatId: chat.id, createdAt: Date.now() };
@@ -1749,7 +1754,7 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
         const limits = { maxPerHour: 20, maxHops: 3, ...(s.inbox || {}) };
         const gate = assertTeamDispatch({
           db, from: agent, to, parentChat: chat, hops, limits, busyToIds: inboxBusy,
-          accessControl: db.accessControl, settings: s, isolated: false
+          accessControl: db.accessControl, settings: s, isolated: false, cancelChatStream
         });
         if (gate.error) return formatCallAgentResult({ ok: false, error: gate.error });
         const timeoutMs = Math.min(clampCallTimeoutMs(a.timeout_seconds, s.inbox || {}), gate.timeoutMs || Infinity);
@@ -2186,7 +2191,8 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
         },
         spawnIsolated: ({ task, worker, prompt, owner }) => spawnIsolatedSubagent({
           task, worker, prompt, parentChat: chat, hops, owner: owner || agent
-        })
+        }),
+        cancelChatStream
       })
     };
   }
@@ -2353,15 +2359,13 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
         clientId: resolveClient(db.clients, chat)?.id,
         costUsd: turnCost
       });
-      if (chat.isolated || chat.parentChatId) {
-        const rid = rootChatId(db, chat);
-        if (rid) {
-          addTeamTreeUsage(ensureTeamTree(db, rid, { settings: db.settings }), {
-            charsIn: (text?.length || 0) + (prompt?.length || 0),
-            charsOut: out.length,
-            usd: turnCost
-          });
-        }
+      const rid = teamTreeRootForChat(db, chat);
+      if (rid && (chat.isolated || chat.parentChatId || chat.originChatId)) {
+        applyTeamTreeUsage(db, rid, {
+          charsIn: (text?.length || 0) + (prompt?.length || 0),
+          charsOut: out.length,
+          usd: turnCost
+        }, { settings: db.settings, cancelChatStream });
       }
       if (canUseSemanticCache) {
         storeSemanticCacheEntry({
@@ -2421,6 +2425,7 @@ async function chatTurn({ chat, text, fileIds, signal, mcpSession, skipUserPush 
     if (chat.run?.status === 'running' && !chat.run.userMessageId) chat.run.userMessageId = uid;
     // Você respondeu na conversa: o "<Agente> precisa de você" desta conversa sai da Caixa.
     for (const a of db.systemAlerts || []) if (!a.done && a.key?.startsWith(`blocked:${chat.id}:`)) a.done = true;
+    beginRootUserTurn(db, chat, { settings: db.settings });
   }
   // @Nome de quem não está na conversa (ex.: 1:1) traz o agente para esta rodada, sem virar grupo.
   const base = groupMembers(chat, db.agents);
@@ -4019,7 +4024,8 @@ const routes = [
     const gate = assertTeamDispatch({
       db, from: owner, to: worker, parentChat: origin, hops: 0,
       limits: inboxLimits(), busyToIds: inboxBusy,
-      accessControl: db.accessControl, settings: db.settings, isolated
+      accessControl: db.accessControl, settings: db.settings, isolated,
+      cancelChatStream
     });
     if (gate.error) throw new HttpError(400, gate.error);
     const title = String(b.title || b.prompt || 'Subtarefa').slice(0, 200);

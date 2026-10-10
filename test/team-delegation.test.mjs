@@ -16,7 +16,12 @@ import {
   clampAutonomyTo,
   ensureTeamTree,
   checkTeamTree,
-  addTeamTreeUsage
+  addTeamTreeUsage,
+  applyTeamTreeUsage,
+  beginRootUserTurn,
+  teamTreeRootForChat,
+  DEFAULT_TREE_TIMEOUT_MS,
+  DEFAULT_TREE_MAX_TOKENS
 } from '../lib/team-delegation.mjs';
 import {
   TEAM_TASK_STATUS,
@@ -294,7 +299,140 @@ test('teto de tempo e tokens vale para a árvore inteira', () => {
 
   const db2 = dbBase();
   ensureTeamTree(db2, 'chat-1', { settings: { inbox: { treeTimeoutMs: 1, treeMaxTokens: 5 } }, now });
-  assert.match(assertTeamDispatch({
+  const again = assertTeamDispatch({
     db: db2, from: C, to: W, parentChat: db2.chats[0], hops: 0, limits, isolated: true, now: now + 50
-  }).error, /Tempo da árvore/);
+  });
+  assert.ok(again.ok, 'sem tarefas abertas a árvore zera e pode delegar de novo');
+  assert.equal(db2.teamTrees['chat-1'].usedTokens, 0);
+});
+
+test('depois de 15 min sem tarefas abertas pode delegar de novo', () => {
+  const db = dbBase();
+  const now = 1_000_000;
+  const settings = { inbox: { treeTimeoutMs: DEFAULT_TREE_TIMEOUT_MS, treeMaxTokens: DEFAULT_TREE_MAX_TOKENS } };
+  ensureTeamTree(db, 'chat-1', { settings, now });
+  const later = now + DEFAULT_TREE_TIMEOUT_MS + 1;
+  assert.match(checkTeamTree(db.teamTrees['chat-1'], { now: later }).error, /Tempo da árvore/);
+  const gate = assertTeamDispatch({
+    db, from: C, to: W, parentChat: db.chats[0], hops: 0, limits, isolated: true, settings, now: later
+  });
+  assert.ok(gate.ok);
+  assert.ok(db.teamTrees['chat-1'].deadlineAt > later);
+});
+
+test('depois de estourar tokens sem tarefas abertas pode delegar de novo', () => {
+  const db = dbBase();
+  const now = 1_000_000;
+  const settings = { inbox: { treeTimeoutMs: DEFAULT_TREE_TIMEOUT_MS, treeMaxTokens: 10 } };
+  const tree = ensureTeamTree(db, 'chat-1', { settings, now });
+  addTeamTreeUsage(tree, { tokens: 10 });
+  assert.match(checkTeamTree(tree, { now }).error, /tokens da árvore/);
+  const gate = assertTeamDispatch({
+    db, from: C, to: W, parentChat: db.chats[0], hops: 0, limits, isolated: true, settings, now
+  });
+  assert.ok(gate.ok);
+  assert.equal(db.teamTrees['chat-1'].usedTokens, 0);
+});
+
+test('novo pedido do usuário na raiz zera a árvore e permite delegar de novo', () => {
+  const db = dbBase();
+  const now = 1_000_000;
+  const oldSettings = { inbox: { treeTimeoutMs: 1, treeMaxTokens: 5 } };
+  const fresh = { inbox: { treeTimeoutMs: DEFAULT_TREE_TIMEOUT_MS, treeMaxTokens: DEFAULT_TREE_MAX_TOKENS } };
+  const tree = ensureTeamTree(db, 'chat-1', { settings: oldSettings, now });
+  addTeamTreeUsage(tree, { tokens: 5 });
+  createTeamTask(db, {
+    ownerId: C.id, assigneeId: W.id, title: 'Ainda aberta', chatId: 'chat-1', originChatId: 'chat-1',
+    status: 'doing'
+  }, { id });
+  assert.match(checkTeamTree(tree, { now: now + 50 }).error, /Tempo da árvore|tokens/);
+
+  const reset = beginRootUserTurn(db, db.chats[0], { settings: fresh, now: now + 50 });
+  assert.equal(reset.usedTokens, 0);
+  assert.ok(reset.deadlineAt > now + 50);
+  const gate = assertTeamDispatch({
+    db, from: C, to: X, parentChat: db.chats[0], hops: 0, limits, isolated: true, settings: fresh, now: now + 50
+  });
+  assert.ok(gate.ok);
+  assert.equal(beginRootUserTurn(db, { id: 'child', parentChatId: 'chat-1', isolated: true }, { settings: fresh }), null);
+});
+
+test('depois de 15 min com tarefas abertas cancela em cascata e depois delega de novo', () => {
+  const db = dbBase();
+  const now = 1_000_000;
+  const settings = { inbox: { treeTimeoutMs: DEFAULT_TREE_TIMEOUT_MS, treeMaxTokens: DEFAULT_TREE_MAX_TOKENS } };
+  db.chats.push({ id: 'child', agentId: W.id, parentChatId: 'chat-1', isolated: true });
+  createTeamTask(db, {
+    ownerId: C.id, assigneeId: W.id, title: 'Em curso', chatId: 'chat-1', originChatId: 'chat-1',
+    status: 'doing', isolated: true, childChatId: 'child'
+  }, { id });
+  ensureTeamTree(db, 'chat-1', { settings, now });
+  const later = now + DEFAULT_TREE_TIMEOUT_MS + 1;
+  const blocked = assertTeamDispatch({
+    db, from: C, to: X, parentChat: db.chats[0], hops: 0, limits, isolated: true, settings, now: later
+  });
+  assert.match(blocked.error, /Tempo da árvore/);
+  assert.equal(blocked.exhausted, true);
+  assert.equal(db.teamTasks[0].status, TEAM_TASK_STATUS.cancelled);
+  const gate = assertTeamDispatch({
+    db, from: C, to: W, parentChat: db.chats[0], hops: 0, limits, isolated: true, settings, now: later
+  });
+  assert.ok(gate.ok);
+});
+
+test('estouro do teto com tarefas abertas cancela a árvore em cascata', () => {
+  const db = dbBase();
+  const now = 1_000_000;
+  const settings = { inbox: { treeTimeoutMs: DEFAULT_TREE_TIMEOUT_MS, treeMaxTokens: 5 } };
+  db.chats.push({ id: 'child', agentId: W.id, parentChatId: 'chat-1', isolated: true });
+  createTeamTask(db, {
+    ownerId: C.id, assigneeId: W.id, title: 'Em curso', chatId: 'chat-1', originChatId: 'chat-1',
+    status: 'doing', isolated: true, childChatId: 'child'
+  }, { id });
+  const tree = ensureTeamTree(db, 'chat-1', { settings, now });
+  addTeamTreeUsage(tree, { tokens: 5 });
+  const cancelledStreams = [];
+  const blocked = assertTeamDispatch({
+    db, from: C, to: X, parentChat: db.chats[0], hops: 0, limits, isolated: true, settings, now,
+    cancelChatStream: cid => { cancelledStreams.push(cid); return true; }
+  });
+  assert.match(blocked.error, /tokens da árvore/);
+  assert.equal(blocked.exhausted, true);
+  assert.equal(db.teamTasks[0].status, TEAM_TASK_STATUS.cancelled);
+  assert.ok(cancelledStreams.includes('chat-1'));
+  assert.ok(cancelledStreams.includes('child'));
+});
+
+test('applyTeamTreeUsage estoura e cancela em cascata; inbox soma na raiz', () => {
+  const db = dbBase();
+  const now = 1_000_000;
+  const settings = { inbox: { treeTimeoutMs: DEFAULT_TREE_TIMEOUT_MS, treeMaxTokens: 8 } };
+  const thread = { id: 'ab', agentId: W.id, inboxKey: 'coord:wrk', originChatId: 'chat-1', messages: [] };
+  db.chats.push(thread);
+  createTeamTask(db, {
+    ownerId: C.id, assigneeId: W.id, title: 'Recado', chatId: 'chat-1', originChatId: 'chat-1',
+    status: 'doing'
+  }, { id });
+  ensureTeamTree(db, 'chat-1', { settings, now });
+  assert.equal(teamTreeRootForChat(db, thread), 'chat-1');
+  assert.equal(teamTreeRootForChat(db, 'ab'), 'chat-1');
+
+  const counted = applyTeamTreeUsage(db, teamTreeRootForChat(db, thread), { tokens: 3 }, { settings, now });
+  assert.equal(counted.ok, true);
+  assert.equal(db.teamTrees['chat-1'].usedTokens, 3);
+
+  const cancelledStreams = [];
+  const boom = applyTeamTreeUsage(db, 'chat-1', { tokens: 5 }, {
+    settings, now, cancelChatStream: cid => { cancelledStreams.push(cid); return true; }
+  });
+  assert.equal(boom.exhausted, true);
+  assert.match(boom.error, /tokens da árvore/);
+  assert.equal(db.teamTasks[0].status, TEAM_TASK_STATUS.cancelled);
+  assert.ok(cancelledStreams.includes('chat-1'));
+
+  const again = assertTeamDispatch({
+    db, from: C, to: W, parentChat: db.chats[0], hops: 0, limits, isolated: true, settings, now
+  });
+  assert.ok(again.ok, 'após cascata as tarefas fecham e a próxima delegação abre janela nova');
+  assert.equal(db.teamTrees['chat-1'].usedTokens, 0);
 });
