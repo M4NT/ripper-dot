@@ -1,0 +1,45 @@
+# Staging reproduzível do Ripper: provedor de teste, dados de exemplo, volume persistente.
+# Uso: node scripts/staging.mjs up
+# Ou, nesta pasta: docker compose up -d --build
+#
+# O volume ripper-staging-data sobrevive a `restart` e a `down` sem `-v`.
+# `node scripts/staging.mjs reset` (ou `docker compose down -v`) recomeça do seed.
+
+name: ripper-staging
+
+services:
+  ripper:
+    build:
+      context: ../..
+      dockerfile: deploy/staging/Dockerfile
+    image: ripper-staging:local
+    container_name: ripper-staging
+    restart: unless-stopped
+    ports:
+      - "${RIPPER_STAGING_PORT:-3010}:3000"
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "3000"
+      RIPPER_DATA: /data
+      RIPPER_TEST_PROVIDER: ${RIPPER_TEST_PROVIDER:-stream}
+      RIPPER_TOKEN: ${RIPPER_TOKEN:-ripper-staging-token}
+      RIPPER_STAGING_PASSWORD: ${RIPPER_STAGING_PASSWORD:-staging-ok-8}
+      JULIA_AUTOSTART: "0"
+      RIPPER_NO_PREWARM: "1"
+    volumes:
+      - ripper-staging-data:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+
+volumes:
+  ripper-staging-data:

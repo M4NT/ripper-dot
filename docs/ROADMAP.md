@@ -1,6 +1,6 @@
 # Ripper — Norte e caminho para produção
 
-Última atualização: 06/10/2026. O histórico do que já foi entregue fica em [ENTREGUE.md](ENTREGUE.md).
+Última atualização: 10/10/2026. O histórico do que já foi entregue fica em [ENTREGUE.md](ENTREGUE.md).
 
 ---
 
@@ -79,14 +79,14 @@ Legenda: **P0** bloqueia o lançamento · **P1** logo depois do lançamento · *
 ### B. Confiabilidade (P0)
 - ✅ Recarregar a página não para o agente; a resposta continua no servidor e fica salva.
 - ✅ **Reiniciar o servidor não perde turnos**: retoma sozinho os que só leram/pesquisaram; os que já fizeram algo com efeito fora (enviar, publicar) param com aviso na Caixa.
-- 🔨 **Staging que sobrevive a reinício** (docker-compose, dados de exemplo, provedor simulado para smoke). *Engenheiro (Ripper), em andamento.*
+- ✅ **Staging que sobrevive a reinício** (10/10/2026): `deploy/staging/` (docker-compose + seed) e `scripts/staging.mjs`. Provedor `RIPPER_TEST_PROVIDER=stream`, dados de exemplo no volume / em `data/staging`, `node scripts/staging.mjs smoke` roda o `npm run smoke` contra ele. Equivalente local sem Docker (`up --local`). Reinício mantém o `RIPPER_DATA`.
 - ✅ Servidor como serviço do sistema: `node scripts/service.mjs install` (Windows, macOS, Linux), com vigia que reinicia se cair. [ ] Testar o `install` em máquina real.
 - ✅ Atualização sem derrubar o que está rodando: aviso "Nova versão — recarregar" nas abas abertas; `node scripts/service.mjs restart` (ou SIGTERM) para de aceitar turnos, espera os em andamento (até `RIPPER_DRAIN_TURNS_MS`, padrão 2 min; o que passar é retomado depois) e o vigia sobe a versão nova na hora.
 - ✅ Backup automático diário, cópia extra em outra pasta, aviso de falha. ✅ Backup manual corrigido (link simbólico criado no Docker derrubava o `tar`; agora fica de fora com aviso). ✅ Teste de restauração automático após cada backup diário (extrai numa pasta temporária e confere o `db.json`; falha vira aviso).
 - ✅ Fila de envios com novas tentativas (WhatsApp, e-mail, publicações).
 - ✅ Contêineres dos agentes: um por agente e por pasta de trabalho (nome/alias com hash curto da pasta; sem pasta mantém o nome antigo). Tela ao vivo e status olham o último contêiner usado pelo agente.
 - [ ] Agentes trabalhando no código do Ripper em cópia própria (`/work/repos`), nunca trocando o branch da pasta compartilhada.
-- [ ] Branch `ripper/staging` ficou para trás da `main` (06/10/2026) e o `scripts/staging.sh` do Engenheiro está fora do Git: alinhar com ele antes de retomar o staging.
+- ✅ Branch `ripper/staging` e `scripts/staging.sh` fora do Git: substituídos por `deploy/staging/` + `scripts/staging.mjs` versionados (10/10/2026).
 - ✅ Limites de recursos por contêiner (`computer.dockerMemory`/`dockerCpus`, padrão 2g/2) e limpeza de contêineres parados na subida.
 
 ### C. Instalação e atualização (P0)

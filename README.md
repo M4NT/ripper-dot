@@ -403,7 +403,8 @@ Mais detalhes em [docs/desenvolvimento.md](docs/desenvolvimento.md).
 | `lib/` | Módulos do servidor: estado, provedores, ferramentas, canais, segurança, backup, atualização… |
 | `web/` | Interface (React + Vite): `web/src/app.jsx`, `pages/`, componentes, estilos e textos (`i18n/`) |
 | `test/` | Testes (`node --test`), com `helpers/` para subir servidores isolados |
-| `scripts/` | Serviço, instalador e desinstalador, senha, dados, auditoria de capacidades, teste das telas |
+| `scripts/` | Serviço, instalador e desinstalador, senha, dados, auditoria de capacidades, teste das telas, staging |
+| `deploy/staging/` | Staging reproduzível: Compose, imagem do servidor e dados de exemplo (`scripts/staging.mjs`) |
 | `docker/agent/` | Imagem do computador dos agentes (Chromium, noVNC, Node, Python) |
 | `skills/` | Skills internas (manifesto, arquiteto multiagente, auditor X9, economia de tokens) |
 | `julia/` | Classificador opcional Julia 1 (Python) |
@@ -435,6 +436,7 @@ Para conversar sem gastar conta de IA: `RIPPER_TEST_PROVIDER=stream npm run dev:
 | `npm run dev:server` / `npm run dev:web` | Desenvolvimento com recarga |
 | `npm run julia` / `npm run julia:dry` | Classificador Julia (real / sem pesos) |
 | `npm run data:info`, `data:clear-usage`, `data:clear-julia` | Inspecionar e limpar dados locais |
+| `npm run staging` | Staging reproduzível (`up`, `smoke`, `restart`…); ver [docs/instalacao.md](docs/instalacao.md) |
 
 Outros scripts: `node scripts/agent-audit.mjs` (auditoria de capacidades com tarefas reais, resultado em [docs/capacidades.md](docs/capacidades.md)), `node scripts/senha.mjs` (nova senha) e `node scripts/service.mjs install|uninstall|status|restart|run`.
 
