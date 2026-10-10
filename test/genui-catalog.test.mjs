@@ -12,6 +12,8 @@ import {
   parseGenuiFence,
   presentGenui,
   applyUiAction,
+  allowedGenuiFileIds,
+  lockGenuiSettingIfChannel,
   rememberUiPart,
   findUiPart,
   findUiPartByProps,
@@ -131,7 +133,7 @@ test('applyUiAction: aprovação sem sempre, pergunta, rascunho com corpo editad
   assert.match(setting.props.description, /resumo do que os agentes/);
   const applied = applyUiAction(setting, { action: 'apply' });
   assert.equal(applied.ok, true);
-  assert.deepEqual(applied.applySetting, { key: 'pulse.enabled', on: true });
+  assert.deepEqual(applied.applySetting, { key: 'pulse.enabled', on: true, sensitive: false });
   assert.match(applied.userText, /Resumo diário/);
   assert.doesNotMatch(applied.userText, /modo Deus/);
 
@@ -142,18 +144,26 @@ test('applyUiAction: aprovação sem sempre, pergunta, rascunho com corpo editad
   assert.equal(sensitive.props.sensitive, true);
   assert.equal(sensitive.props.label, 'Comandos direto no seu computador');
   const wait = applyUiAction(sensitive, { action: 'apply' });
-  assert.equal(wait.needsConfirm, true);
-  assert.equal(wait.applySetting, undefined);
+  assert.equal(wait.needsApproval, true);
+  assert.deepEqual(wait.applySetting, { key: 'computer.allowLocalCommands', on: true, sensitive: true });
   assert.equal(wait.part.state, 'input-available');
+  assert.equal(wait.part.props.pendingApproval, true);
   const confirmed = applyUiAction(sensitive, { action: 'apply', payload: { confirm: true } });
-  assert.deepEqual(confirmed.applySetting, { key: 'computer.allowLocalCommands', on: true });
+  assert.equal(confirmed.needsApproval, true);
+  assert.equal(confirmed.continue, false);
+  assert.equal(confirmed.part.state, 'input-available');
 
   const backupOff = presentGenui({ component: 'setting', props: { key: 'backup.enabled', label: 'X', proposed: false } }).part;
   assert.equal(backupOff.props.sensitive, true);
-  assert.equal(applyUiAction(backupOff, { action: 'apply' }).needsConfirm, true);
+  assert.equal(applyUiAction(backupOff, { action: 'apply' }).needsApproval, true);
   const backupOn = presentGenui({ component: 'setting', props: { key: 'backup.enabled', label: 'X', proposed: true } }).part;
   assert.equal(backupOn.props.sensitive, false);
   assert.equal(applyUiAction(backupOn, { action: 'apply' }).applySetting.on, true);
+
+  const channelPart = lockGenuiSettingIfChannel(backupOn, { channel: 'whatsapp' });
+  assert.equal(channelPart.state, 'expired');
+  assert.equal(channelPart.props.channelLocked, true);
+  assert.equal(applyUiAction(channelPart, { action: 'apply' }).ok, false);
 
   const table = presentGenui({ component: 'data_table', props: GENUI_CATALOG.data_table.example }).part;
   assert.equal(applyUiAction(table, { action: 'submit' }).ok, false);
@@ -210,7 +220,7 @@ test('cerca genui registra id no servidor e reusa o mesmo cartão', () => {
   forgetUiParts('c2');
 });
 
-test('URLs de imagem e href: só data: ou /api/files/<id>; href http(s)/relativo', () => {
+test('URLs de imagem e href: só data: raster ou /api/files/<id> da conversa; href http(s)/relativo', () => {
   assert.equal(safeMediaUrl('https://atacante.example/?d=segredo'), '');
   assert.equal(safeMediaUrl('javascript:alert(1)'), '');
   assert.equal(safeMediaUrl('//cdn.evil/x.png'), '');
@@ -220,6 +230,24 @@ test('URLs de imagem e href: só data: ou /api/files/<id>; href http(s)/relativo
   assert.equal(safeMediaUrl('/api/files/../etc/passwd'), '');
   assert.equal(safeMediaUrl('/api/files/abc?x=1'), '');
   assert.ok(safeMediaUrl('data:image/png;base64,aaa=').startsWith('data:image/png'));
+  assert.equal(safeMediaUrl('data:image/svg+xml;base64,PHN2Zz4='), '');
+  const allowed = new Set(['mine']);
+  assert.equal(safeMediaUrl('/api/files/mine', { allowedFileIds: allowed }), '/api/files/mine');
+  assert.equal(safeMediaUrl('/api/files/other', { allowedFileIds: allowed }), '');
+  const scope = allowedGenuiFileIds([
+    { id: 'mine', chatId: 'c1' },
+    { id: 'agentf', agentId: 'a1' },
+    { id: 'team', team: true },
+    { id: 'foreign', agentId: 'a2', chatId: 'c2' }
+  ], { id: 'c1', agentId: 'a1' });
+  assert.ok(scope.has('mine') && scope.has('agentf') && scope.has('team'));
+  assert.equal(scope.has('foreign'), false);
+  const stripped = sanitizeGenuiProps('media_gallery', {
+    title: 'A',
+    items: [{ src: '/api/files/foreign', name: 'x' }, { src: '/api/files/mine', name: 'ok' }]
+  }, { allowedFileIds: scope });
+  assert.equal(stripped.items[0].src, '');
+  assert.equal(stripped.items[1].src, '/api/files/mine');
   assert.equal(safeHref('javascript:alert(1)'), '');
   assert.equal(safeHref('https://user:pass@evil.test/'), '');
   assert.equal(safeHref('https://docs.ripper.dev/x'), 'https://docs.ripper.dev/x');

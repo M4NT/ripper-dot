@@ -176,7 +176,11 @@ test('rascunho Enviar manda o texto editado; setting aplica; cerca tem id no ser
     });
     assert.equal(noConfirm.status, 200);
     const noConfirmBody = await noConfirm.json();
-    assert.equal(noConfirmBody.needsConfirm, true);
+    assert.equal(noConfirmBody.pendingApproval, true);
+    assert.equal(noConfirmBody.approval?.kind, 'setting');
+    assert.equal(noConfirmBody.approval?.genuiPartId, sensitive.ui.id);
+    assert.equal(noConfirmBody.approval?.setting?.label, 'Comandos direto no seu computador');
+    assert.match(noConfirmBody.approval?.reason || '', /comandos na sua máquina/);
     assert.equal(!!(await (await fetch(base + '/api/settings')).json()).settings.computer?.allowLocalCommands, false);
     const yesConfirm = await post(base, `/api/chats/${sensitive.chatId}/ui-actions`, {
       partId: sensitive.ui.id,
@@ -184,7 +188,20 @@ test('rascunho Enviar manda o texto editado; setting aplica; cerca tem id no ser
       payload: { confirm: true }
     });
     assert.equal(yesConfirm.status, 200);
+    const yesConfirmBody = await yesConfirm.json();
+    assert.equal(yesConfirmBody.pendingApproval, true);
+    assert.equal((await (await fetch(base + '/api/settings')).json()).settings.computer?.allowLocalCommands, false);
+    const box = await (await fetch(base + '/api/approvals')).json();
+    const rec = (box.pending || []).find(a => a.genuiPartId === sensitive.ui.id);
+    assert.ok(rec, 'o pedido sensível deveria ir para a Caixa');
+    assert.match(rec.reason || '', /comandos na sua máquina/);
+    const decided = await post(base, `/api/approvals/${rec.id}`, { approve: true });
+    assert.equal(decided.status, 200);
     assert.equal((await (await fetch(base + '/api/settings')).json()).settings.computer.allowLocalCommands, true);
+    const savedSensitive = await (await fetch(base + `/api/chats/${sensitive.chatId}`)).json();
+    const settingPart = (savedSensitive.messages || []).flatMap(m => m.steps || []).find(s => s.id === sensitive.ui.id);
+    assert.equal(settingPart?.state, 'approved');
+    assert.equal(settingPart?.props?.pendingApproval, false);
 
     const fence = await startChat(base, '[[ripper:test:genui_fence]]');
     const chat = await (await fetch(base + `/api/chats/${fence.chatId}`)).json();

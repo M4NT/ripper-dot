@@ -49,6 +49,7 @@
 .oui-draft { min-height: 140px; }
 .oui-setting { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .oui-setting small { display: block; color: var(--muted); font-weight: 400; }
+.oui-setting-note { margin: 8px 0 0; }
 
 .oui-table-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 16px 0; }
 .oui-filter { max-width: 180px; }

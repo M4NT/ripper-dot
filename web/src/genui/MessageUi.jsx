@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib.js';
+import { useConfirm } from '../ui.jsx';
 import { parseGenuiFence, presentGenui } from '../../../lib/genui.mjs';
 import { GenUiView } from './registry.jsx';
 import { chatIdFromLocation, getGenUiHost } from './host.js';
@@ -23,6 +24,7 @@ async function runAction(part, action, payload) {
 
 export function GenUiCard({ part, live }) {
   const [local, setLocal] = useState(part);
+  const [confirm, confirmNode] = useConfirm();
   const cur = local?.id === part.id ? { ...part, ...local, props: local.props || part.props } : part;
   async function onAction(action, payload) {
     if (action === 'edit') {
@@ -31,8 +33,19 @@ export function GenUiCard({ part, live }) {
     }
     try {
       const r = await runAction(cur, action, payload);
-      if (r?.needsConfirm) {
-        setLocal(p => ({ ...(p || part), ...(r.part || {}), state: 'input-available' }));
+      if (r?.pendingApproval) {
+        setLocal(r.part || { ...(local || part), props: { ...(local || part).props, pendingApproval: true } });
+        const v = r.approval?.setting || {};
+        const ok = r.approval && await confirm({
+          title: v.label || 'Configuração sensível',
+          body: r.approval.reason || v.desc,
+          action: v.proposed ? 'Ligar' : 'Desligar',
+          danger: true
+        });
+        if (ok) {
+          await api(`/api/approvals/${r.approval.id}`, { method: 'POST', body: { approve: true } });
+          setLocal(p => ({ ...(p || part), ...(r.part || {}), state: 'approved', props: { ...(r.part?.props || p?.props), pendingApproval: false } }));
+        }
         return;
       }
       if (r?.part) setLocal(r.part);
@@ -41,7 +54,7 @@ export function GenUiCard({ part, live }) {
       setLocal(p => ({ ...(p || part), state: 'output-error', error: 'Não consegui registrar a escolha.' }));
     }
   }
-  return <GenUiView part={cur} live={live} onAction={onAction} />;
+  return <>{confirmNode}<GenUiView part={cur} live={live} onAction={onAction} /></>;
 }
 
 export function GenUiSteps({ steps, live }) {

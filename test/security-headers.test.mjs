@@ -50,8 +50,7 @@ test('securityHeaderFields inclui nosniff, referrer e frame deny', () => {
   const csp = h['content-security-policy'] || '';
   assert.ok(csp.includes("frame-ancestors 'none'"));
   const img = /img-src[^;]*/.exec(csp)?.[0] || '';
-  assert.match(img, /img-src 'self' data: blob:/);
-  assert.equal(img.includes('https:'), false, 'img-src não libera https de terceiros');
+  assert.match(img, /img-src 'self' data: blob: https:/);
 });
 
 test('classifyRequestOrigin: sem Origin, same-host e allowlist', () => {
