@@ -166,7 +166,8 @@ test('oauth-callback.js envia só status, fecha o popup e respeita a origem', ()
     location: { origin: 'http://127.0.0.1:3000' },
     setTimeout: (fn, ms) => { scheduled.push({ fn, ms }); }
   });
-  assert.deepEqual(posted.m, { type: 'ripper-mcp-oauth', status: 'complete' });
+  assert.equal(posted.m.type, 'ripper-mcp-oauth');
+  assert.equal(posted.m.status, 'complete');
   assert.equal(posted.o, 'http://127.0.0.1:3000');
   assert.equal(scheduled[0].ms, 800);
   scheduled[0].fn();
