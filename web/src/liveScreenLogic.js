@@ -113,3 +113,38 @@ export function shouldHandleLiveScreenEscape({ key, big, float, focusInside } = 
   if (float && focusInside) return 'close-float';
   return null;
 }
+
+export const SCREEN_CONTROL_HEARTBEAT_MS = 8_000;
+
+/** Corpo do PUT /vnc/control: dono impede a miniatura de soltar a trava do painel. */
+export function screenControlPayload(on, owner) {
+  return { control: !!on, owner };
+}
+
+/** Esta instância ficou com a trava? Outro dono (miniatura vs painel) não. */
+export function screenControlIsMine(response, owner) {
+  if (!response?.control) return false;
+  if (!owner || !response.owner) return true;
+  return response.owner === owner;
+}
+
+export function screenControlAfterGrab(wantedOn, response, owner) {
+  if (!wantedOn) return false;
+  return screenControlIsMine(response, owner);
+}
+
+/** Fechar tela cheia: miniatura solta (não dá para digitar nela); painel mantém. */
+export function shouldReleaseControlOnCloseFull(variant) {
+  return variant === 'float';
+}
+
+export function liveScreenCanControl({ variant, control, big } = {}) {
+  if (variant === 'float') return !!(big && control);
+  return !!control;
+}
+
+/** Soltar só vale se for o dono da trava (fechar MiniScreen não libera o painel). */
+export function screenControlReleaseForOwner(lockOwner, closerOwner) {
+  if (!lockOwner || !closerOwner) return true;
+  return lockOwner === closerOwner;
+}

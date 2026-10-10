@@ -1,5 +1,8 @@
 import { createElement, useEffect, useMemo, useRef, useState } from 'react';
-import { consumeLiveTabOpen, liveScreenAutoKey, shouldConnectThisTurn } from './liveScreenLogic.js';
+import {
+  consumeLiveTabOpen, liveScreenAutoKey, liveScreenCanControl, screenControlIsMine,
+  screenControlReleaseForOwner, shouldConnectThisTurn, shouldReleaseControlOnCloseFull
+} from './liveScreenLogic.js';
 
 /** O que a aba faz neste instante: abrir, ficar onde está, ligar a VM. */
 export function liveComputerTabState({
@@ -50,4 +53,29 @@ export function LiveComputerTab(props) {
     'data-live-open': s.open ? '1' : '0',
     'aria-label': 'Painel da tela ao vivo',
   }, s.connect ? 'Computador ao vivo' : (s.tab === 'computer' ? 'Computador' : 'Detalhes'));
+}
+
+/** Trava Assumir controle no painel e na miniatura (donos independentes). */
+export function liveScreenControlState({
+  variant = 'panel', control = false, big = false, owner = '', lockOwner = '',
+} = {}) {
+  const mine = screenControlIsMine({ control: true, owner: lockOwner }, owner);
+  const holding = !!(control && mine);
+  return {
+    variant,
+    canControl: liveScreenCanControl({ variant, control: holding, big }),
+    releaseOnCloseFull: shouldReleaseControlOnCloseFull(variant),
+    closeReleasesLock: screenControlReleaseForOwner(lockOwner, owner),
+  };
+}
+
+export function LiveScreenControl(props) {
+  const s = liveScreenControlState(props);
+  return createElement('div', {
+    'data-live-screen': s.variant,
+    'data-can-control': s.canControl ? '1' : '0',
+    'data-release-on-close-full': s.releaseOnCloseFull ? '1' : '0',
+    'data-close-releases': s.closeReleasesLock ? '1' : '0',
+    'aria-label': s.variant === 'float' ? 'Miniatura da tela ao vivo' : 'Painel da tela ao vivo',
+  });
 }

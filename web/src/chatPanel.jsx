@@ -8,10 +8,46 @@ import { ResizeHandle } from './resize.jsx';
 import { AutonomySemaphore, autonomyMeta } from './autonomy.jsx';
 import { ArtifactList } from './actions.jsx';
 import ConversationMedia from './ConversationMedia.jsx';
-import { doingLine, isLiveScreenTool, liveScreenStep, shouldAutoConnect, shouldConnectThisTurn, shouldHandleLiveScreenEscape, shouldRetryConnect } from './liveScreenLogic.js';
+import {
+  doingLine, isLiveScreenTool, liveScreenCanControl, liveScreenStep,
+  SCREEN_CONTROL_HEARTBEAT_MS, screenControlAfterGrab, screenControlPayload,
+  shouldAutoConnect, shouldConnectThisTurn, shouldHandleLiveScreenEscape,
+  shouldReleaseControlOnCloseFull, shouldRetryConnect
+} from './liveScreenLogic.js';
 import { useLiveComputerTab } from './liveScreenTab.js';
 export { doingLine };
 const COMP_LABEL = { running: 'Ligado', stopped: 'Parado', 'not started': 'Ainda não iniciado', local: 'Pasta local', off: 'Desligado', 'no key': 'Falta a chave do boat.dev', unknown: 'Sem resposta da VM' };
+const tellScreenControl = (agentId, on, owner) =>
+  api(`/api/agents/${agentId}/vnc/control`, { method: 'PUT', body: screenControlPayload(on, owner) }).catch(() => null);
+
+function newScreenOwner() {
+  return (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `own-${Math.random().toString(36).slice(2)}`;
+}
+
+/** Trava com dono + heartbeat: aba fechada expira; fechar MiniScreen não solta a do painel. */
+function useScreenControl(agentId) {
+  const ownerRef = useRef(null);
+  if (!ownerRef.current) ownerRef.current = newScreenOwner();
+  const owner = ownerRef.current;
+  const [control, setControl] = useState(false);
+  const grab = async on => {
+    const r = await tellScreenControl(agentId, on, owner);
+    const mine = screenControlAfterGrab(on, r, owner);
+    setControl(mine);
+    return mine;
+  };
+  useEffect(() => {
+    if (!control) return undefined;
+    const t = setInterval(() => {
+      tellScreenControl(agentId, true, owner).then(r => {
+        if (!screenControlAfterGrab(true, r, owner)) setControl(false);
+      });
+    }, SCREEN_CONTROL_HEARTBEAT_MS);
+    return () => clearInterval(t);
+  }, [control, agentId, owner]);
+  useEffect(() => () => { tellScreenControl(agentId, false, owner); }, [agentId, owner]);
+  return { control, grab };
+}
 
 /** Engrenagem: as ferramentas de cada agente ficam "anexadas" aqui, sem ocupar o painel. */
 function ToolsMenu({ members }) {
@@ -107,9 +143,9 @@ function AgentLiveScreen({ agent, working, variant = 'panel', onClose, messages,
   const { working: workingNow } = useApp();
   const [url, setUrl] = useState(null);
   const [err, setErr] = useState(null);
-  const [control, setControl] = useState(false);
   const [big, setBig] = useState(false);
   const [loading, setLoading] = useState(false);
+  const { control, grab } = useScreenControl(agent.id);
   const tried = useRef('');
   const rootRef = useRef(null);
   const fullRef = useRef(null);
@@ -120,7 +156,10 @@ function AgentLiveScreen({ agent, working, variant = 'panel', onClose, messages,
     () => liveScreenStep({ working: workingNow, messages, agentId: agent.id, busy: working, step: stepProp }),
     [workingNow, messages, agent.id, working, stepProp]
   );
-  const closeFull = () => { setBig(false); setControl(false); };
+  const closeFull = () => {
+    setBig(false);
+    if (shouldReleaseControlOnCloseFull(variant)) grab(false);
+  };
 
   async function connect(fromUser = false) {
     if (!shouldRetryConnect({ url, loading, err, live, alreadyTried: tried.current === agent.id, fromUser })) return;
@@ -174,7 +213,7 @@ function AgentLiveScreen({ agent, working, variant = 'panel', onClose, messages,
     };
   }, [big]);
 
-  const canControl = float ? big && control : control;
+  const canControl = liveScreenCanControl({ variant, control, big });
   const src = url && `${url}&view_only=${canControl ? 0 : 1}`;
   const frame = src && <iframe key={src} src={src} title={`Tela de ${agent.name}`} allow="clipboard-read; clipboard-write" tabIndex={float && !big ? -1 : undefined} />;
   const idle = err || (big ? 'Aberta em tela cheia.' : loading ? 'Ligando o computador…' : live ? 'Ligando a tela…' : `Veja a tela do computador de ${agent.name} quando ele estiver usando.`);
@@ -212,7 +251,7 @@ function AgentLiveScreen({ agent, working, variant = 'panel', onClose, messages,
           <i /><i /><i /><span>tela · {agent.name}</span>
           {working && <span className="live-dot">trabalhando</span>}
           {url && <>
-            <button type="button" className={`vnc-btn ${control ? 'on' : ''}`} onClick={() => setControl(c => !c)} title={control ? 'Voltar a só assistir' : 'Usar mouse e teclado no computador'}>
+            <button type="button" className={`vnc-btn ${control ? 'on' : ''}`} onClick={() => grab(!control)} title={control ? 'Voltar a só assistir' : 'Usar mouse e teclado no computador'}>
               <Icon name={control ? 'x' : 'edit'} size={12} />{control ? 'Soltar controle' : 'Assumir controle'}
             </button>
             <button type="button" className="vnc-btn icon" onClick={() => setBig(true)} title="Tela cheia" aria-label="Tela cheia"><Icon name="share" size={12} /></button>
@@ -236,7 +275,7 @@ function AgentLiveScreen({ agent, working, variant = 'panel', onClose, messages,
           {working && <span className="live-dot">trabalhando</span>}
           {step && <span className="live-screen-step-inline">{step}</span>}
           <div className="grow" />
-          <button type="button" className={`btn btn-sm ${control ? 'btn-primary' : ''}`} onClick={() => setControl(c => !c)}>{control ? 'Soltar controle' : 'Assumir controle'}</button>
+          <button type="button" className={`btn btn-sm ${control ? 'btn-primary' : ''}`} onClick={() => grab(!control)}>{control ? 'Soltar controle' : 'Assumir controle'}</button>
           <button type="button" ref={closeBtn} className="btn btn-sm" onClick={closeFull}><Icon name="x" size={14} />Fechar</button>
         </div>
         {frame}
