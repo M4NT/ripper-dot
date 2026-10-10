@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -153,8 +153,8 @@ test('CLI real do Codex: --ask-for-approval depois de exec falha; -c approval_po
 });
 
 test('Codex recebe env mínimo, HOME isolado, CODEX_HOME e OPENAI_API_KEY só na auth por chave', () => {
-  const isolated = join(tmpdir(), 'ripper-codex-home-test');
-  const login = join(tmpdir(), 'ripper-codex-login');
+  const isolated = mkdtempSync(join(tmpdir(), 'ripper-codex-home-'));
+  const login = mkdtempSync(join(tmpdir(), 'ripper-codex-login-'));
   const env = codexChildEnv({
     PATH: '/bin',
     HOME: '/home/ripper',
