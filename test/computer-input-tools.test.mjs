@@ -19,6 +19,7 @@ test('catálogo: mouse/teclado da VM e screenshot só como último recurso', () 
   assert.match(RIPPER_TOOL_CATALOG.computer_screenshot.description, /ÚLTIMO RECURSO/);
   assert.match(RIPPER_TOOL_CATALOG.computer_screenshot.description, /computer_click/);
   assert.match(RIPPER_TOOL_CATALOG.computer_click.description, /não tire print só para clicar/i);
+  assert.match(RIPPER_TOOL_CATALOG.computer_type.description, /não pode ser lembrada/);
   assert.match(RIPPER_TOOL_CATALOG.computer_exec.description, /não tire print no lugar de agir/);
 });
 
@@ -50,10 +51,13 @@ test('execute: repassa clique/digitação e avisa se o computador não tem xdoto
   const run = (n, a) => tools.find(t => t.name === n).execute(a).then(r => r.content[0].text);
   assert.equal(await run('computer_click', { x: 10, y: 20 }), 'ok-click');
   assert.equal(await run('computer_type', { text: 'oi' }), 'ok-type');
+  const typeTool = tools.find(t => t.name === 'computer_type');
+  await typeTool.execute({ text: 'de novo' }, { toolUseID: 'toolu_abc' });
+  assert.equal(calls.at(-1)[1].requestId, 'toolu_abc');
   assert.equal(await run('computer_key', { keys: 'Return' }), 'ok-key');
   assert.equal(await run('computer_move', { x: 1, y: 2 }), 'ok-move');
   assert.equal(await run('computer_scroll', { dy: 3 }), 'ok-scroll');
-  assert.deepEqual(calls.map(c => c[0]), ['click', 'type', 'key', 'move', 'scroll']);
+  assert.deepEqual(calls.map(c => c[0]), ['click', 'type', 'type', 'key', 'move', 'scroll']);
 
   const local = buildRipperBuiltinTools(agent, { computer: { exec: async () => '' }, settings: dockerSettings });
   const txt = await local.find(t => t.name === 'computer_click').execute({ x: 0, y: 0 });

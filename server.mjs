@@ -34,7 +34,7 @@ import { patchTask, taskPrompt } from './lib/project-tasks.mjs';
 import { closeTaskFromInboxReply } from './lib/task-closure.mjs';
 import { createGoogleTasksSync } from './lib/google-tasks-sync.mjs';
 import { rememberAllowedCommand, execNeedsApproval } from './lib/permissions.mjs';
-import { wrapComputerInput, setUserScreenControl, isUserScreenControl } from './lib/computer-input.mjs';
+import { wrapComputerInput, setUserScreenControl, isUserScreenControl, userScreenControlState, wrapDisplaySession, USER_CONTROL_MSG } from './lib/computer-input.mjs';
 import { browserAutonomyGate, shareAutonomyGate, socialPostAutonomyGate, effectiveApprovalPolicy, sanitizeAutonomyLevel } from './lib/autonomy.mjs';
 import {
   enabledSocialWebhooks,
@@ -1097,15 +1097,16 @@ async function offerSetting({ agent, chat, emit, signal }, { key, on, reason }) 
 }
 
 function guarded(computer, { agent, chat, emit, signal }) {
-  const ask = async (kind, command, reason, rememberKey = command) => {
-    const rec = { id: id(), agentId: agent.id, chatId: chat.id, kind, command, reason, status: 'pending', createdAt: Date.now() };
+  const ask = async (kind, command, reason, rememberKey = command, meta = {}) => {
+    const rememberable = meta.rememberable !== false && rememberKey != null && rememberKey !== '';
+    const rec = { id: id(), agentId: agent.id, chatId: chat.id, kind, command, reason, status: 'pending', createdAt: Date.now(), rememberable };
     db.approvals.push(rec);
     if (db.approvals.length > 300) db.approvals.splice(0, db.approvals.length - 300);
     emit({ approval: approvalView(rec) });
     notifyApproval(agent, command, rec);
     const done = await gate.request(rec, signal);
     emit({ approvalDone: { id: rec.id, status: done.status } });
-    if (done.status === 'approved' && done.remember) rememberAllowedCommand(chat, rememberKey);
+    if (rememberable && done.status === 'approved' && done.remember) rememberAllowedCommand(chat, rememberKey);
     return done.status === 'approved';
   };
   const globalPolicy = db.settings.approvalPolicy || 'risky';
@@ -1116,7 +1117,7 @@ function guarded(computer, { agent, chat, emit, signal }) {
     settings: db.settings,
     policy,
     allowed: chat.allowedCommands,
-    ask: (command, reason, rememberKey) => ask('computer', command, reason, rememberKey),
+    ask: (command, reason, rememberKey, meta) => ask('computer', command, reason, rememberKey, meta),
     record: ({ target, approved, ok, error }) => recordExternal({
       kind: 'computer.input', agentId: agent.id, chatId: chat.id, target, approved, ok, error
     })
@@ -1250,11 +1251,19 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
       });
     };
     const denied = 'O usuário NÃO aprovou esta ação no navegador. Não tente contornar; explique o que ia fazer e pare.';
+    const display = wrapDisplaySession(b, agent.id);
     browser = {
-      open: url => { emit({ screen: true }); return b.open(url); },
-      click: async t => (await ask('click', { target: t }, `clicar em “${t}”`)) ? b.click(t) : denied,
-      type: async (t, txt, submit) => (await ask('type', { target: t, submit }, `digitar em “${t}”${submit ? ' e enviar' : ''}`)) ? b.type(t, txt, submit) : denied,
-      scroll: dy => b.scroll(dy), read: () => b.read()
+      open: url => { emit({ screen: true }); return display.open(url); },
+      click: async t => {
+        if (isUserScreenControl(agent.id)) return USER_CONTROL_MSG;
+        return (await ask('click', { target: t }, `clicar em “${t}”`)) ? display.click(t) : denied;
+      },
+      type: async (t, txt, submit) => {
+        if (isUserScreenControl(agent.id)) return USER_CONTROL_MSG;
+        return (await ask('type', { target: t, submit }, `digitar em “${t}”${submit ? ' e enviar' : ''}`)) ? display.type(t, txt, submit) : denied;
+      },
+      scroll: dy => display.scroll(dy),
+      read: () => display.read()
     };
   }
   const rawComputer = computer; // o Ripper usa sem pedir aprovação (ex.: git com token do Guardião); o agente só vê o guardado
@@ -3113,12 +3122,12 @@ const routes = [
   ['POST', /^\/api\/computer\/image$/, async () => { ensureImage().then(() => { resolveSystemAlert('agent-image'); save(); }).catch(e => console.error('imagem', e.message)); return { image: await imageStatus() }; }],
   ['GET', /^\/api\/agents\/([\w-]+)\/vnc$/, async (req, [aid]) => {
     const t = await vncTarget(aid);
-    return { url: vncClientUrl(aid), port: t.port, control: isUserScreenControl(aid) };
+    return { url: vncClientUrl(aid), port: t.port, ...userScreenControlState(aid) };
   }],
   ['PUT', /^\/api\/agents\/([\w-]+)\/vnc\/control$/, async (req, [aid]) => {
     const a = agentOr404(aid);
     const b = await body(req);
-    return { control: setUserScreenControl(a.id, b.control === true) };
+    return setUserScreenControl(a.id, b.control === true, b.owner);
   }],
   ['GET', /^\/api\/agents\/([\w-]+)\/vnc\/(.+)$/, serveAgentVncProxy],
   ['HEAD', /^\/api\/agents\/([\w-]+)\/vnc\/(.+)$/, serveAgentVncProxy],

@@ -38,6 +38,10 @@ test('frase da aprovação: e-mail mostra destinatário e assunto; exec e Omie e
   assert.equal(fraseDaAprovacao(email), 'Para ana@cliente.com · Assunto: Proposta de março');
   assert.equal(fraseDaAprovacao({ kind: 'exec', command: 'rm -rf dist' }), 'Rodar um comando no seu computador.');
   assert.equal(fraseDaAprovacao({ kind: 'computer', command: 'Clicar na tela da VM (10, 20)' }), 'Clicar na tela da VM (10, 20)');
+  assert.equal(
+    fraseDaAprovacao({ kind: 'computer', command: 'Digitar na tela da VM:\nhello' }),
+    'Digitar na tela da VM: · hello'
+  );
   assert.equal(fraseDaAprovacao({ kind: 'omie', command: 'ALTER X' }), 'Alterar dados no seu Omie.');
   assert.equal(fraseDaAprovacao({ kind: 'question', command: 'Qual cliente?\nmais' }), 'Qual cliente?');
 });
