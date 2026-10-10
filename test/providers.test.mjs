@@ -146,7 +146,7 @@ test('CLI real do Codex: --ask-for-approval depois de exec falha; -c approval_po
   const after = spawnSync(bin, ['exec', '--ask-for-approval', 'never', '--version'], { encoding: 'utf8' });
   assert.notEqual(after.status, 0, after.stderr || after.stdout);
   assert.match(`${after.stderr}${after.stdout}`, /unexpected argument|--ask-for-approval/i);
-  const viaConfig = spawnSync(bin, ['exec', '-c', 'approval_policy=never', '--version'], { encoding: 'utf8' });
+  const viaConfig = spawnSync(bin, ['exec', '-c', 'approval_policy=never', '-c', 'shell_environment_policy.inherit=core', '--version'], { encoding: 'utf8' });
   assert.equal(viaConfig.status, 0, viaConfig.stderr || viaConfig.stdout);
   const before = spawnSync(bin, ['--ask-for-approval', 'never', 'exec', '--version'], { encoding: 'utf8' });
   assert.equal(before.status, 0, before.stderr || before.stdout);
