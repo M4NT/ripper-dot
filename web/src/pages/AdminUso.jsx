@@ -1,13 +1,16 @@
+import { lazy, Suspense } from 'react';
 import { useApp } from '../app.jsx';
 import { go } from '../lib.js';
 import { isEnterpriseMode } from '../uiMode.js';
 import { Icon, EmptyState } from '../ui.jsx';
-import UsageReportPanel from '../admin/UsageReportPanel.jsx';
-import MeteringPanel from '../admin/MeteringPanel.jsx';
-import JuliaEconomiaPanel from '../admin/JuliaEconomiaPanel.jsx';
-import TokenBudgetPanel from '../admin/TokenBudgetPanel.jsx';
-import ClientsPanel from '../admin/ClientsPanel.jsx';
 import '../styles/telas/pages/AdminUso.css';
+
+const UsageReportPanel = lazy(() => import('../admin/UsageReportPanel.jsx'));
+const MeteringPanel = lazy(() => import('../admin/MeteringPanel.jsx'));
+const JuliaEconomiaPanel = lazy(() => import('../admin/JuliaEconomiaPanel.jsx'));
+const TokenBudgetPanel = lazy(() => import('../admin/TokenBudgetPanel.jsx'));
+const ClientsPanel = lazy(() => import('../admin/ClientsPanel.jsx'));
+const PanelFallback = () => <p className="muted" role="status">Carregando…</p>;
 
 function Section({ id, title, desc, children }) {
   return (
@@ -58,7 +61,7 @@ export default function AdminUso() {
         title="Uso por período"
         desc="Respostas, tokens e custo por dia, agente, modelo ou cliente."
       >
-        <UsageReportPanel />
+        <Suspense fallback={<PanelFallback />}><UsageReportPanel /></Suspense>
       </Section>
 
       <Section
@@ -66,7 +69,7 @@ export default function AdminUso() {
         title="Clientes"
         desc="Custo por cliente (CNPJ/empresa) via tag da conversa ou projeto, com margem estimada."
       >
-        <ClientsPanel />
+        <Suspense fallback={<PanelFallback />}><ClientsPanel /></Suspense>
       </Section>
 
       <Section
@@ -74,7 +77,7 @@ export default function AdminUso() {
         title="Medição de uso"
         desc="Agregados de usage.sqlite e export CSV."
       >
-        <MeteringPanel />
+        <Suspense fallback={<PanelFallback />}><MeteringPanel /></Suspense>
       </Section>
 
       <Section
@@ -82,7 +85,7 @@ export default function AdminUso() {
         title="Economia Julia (medida)"
         desc="Telemetria real de roteamento, cache e cascata — sem US$ ou percentual de economia fabricado."
       >
-        <JuliaEconomiaPanel />
+        <Suspense fallback={<PanelFallback />}><JuliaEconomiaPanel /></Suspense>
       </Section>
 
       <Section
@@ -90,7 +93,7 @@ export default function AdminUso() {
         title="Orçamento de tokens"
         desc="Limites configuráveis com soft-stop no backend. Cotas Ripper via RIPPER_LIMIT_* continuam no servidor."
       >
-        <TokenBudgetPanel />
+        <Suspense fallback={<PanelFallback />}><TokenBudgetPanel /></Suspense>
       </Section>
     </div>
   );

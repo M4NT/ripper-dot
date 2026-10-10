@@ -54,7 +54,7 @@ function reveal(tab, label, prov) {
       setTimeout(() => box.isConnected && box.scrollIntoView({ block: 'center' }), 350);
       box.classList.add('set-flash');
       setTimeout(() => box.classList.remove('set-flash'), 1600);
-    } else if (tries++ < 10) setTimeout(find, 120); // a aba pode demorar um instante para desenhar
+    } else if (tries++ < 20) setTimeout(find, 120); // a aba (lazy) pode demorar um instante para desenhar
   };
   setTimeout(find, 60);
 }

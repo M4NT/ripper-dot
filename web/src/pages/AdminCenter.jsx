@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useApp } from '../app.jsx';
 import { api, go } from '../lib.js';
 import { isEnterpriseMode } from '../uiMode.js';
 import { Icon, EmptyState } from '../ui.jsx';
-import X9AuditorCard from '../x9Auditor.jsx';
 import '../styles/telas/pages/AdminCenter.css';
+
+const X9AuditorCard = lazy(() => import('../x9Auditor.jsx'));
 
 function StatusTag({ ok, label, warn }) {
   const cls = ok ? 'tag tag-ok' : (warn ? 'tag tag-warn' : 'tag');
@@ -108,7 +109,7 @@ export default function AdminCenter() {
         <section className="admin-x9-wrap set-card">
           <header><h3>X9 — Auditor</h3></header>
           <p className="set-card-desc muted">Varredura somente leitura: sandbox, autonomia, LGPD/retenção e trilha local. Sem alterar produção.</p>
-          <X9AuditorCard />
+          <Suspense fallback={<p className="muted" role="status">Carregando…</p>}><X9AuditorCard /></Suspense>
         </section>
       )}
 
