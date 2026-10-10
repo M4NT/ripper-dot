@@ -45,7 +45,7 @@ import {
 } from './lib/social-webhooks.mjs';
 import { listChatsPage } from './lib/history.mjs';
 import { tryClaimRoutine, releaseRoutineClaim } from './lib/persist-coord.mjs';
-import { browserFor, browserRisk } from './lib/browser.mjs';
+import { browserFor, runBrowserGate } from './lib/browser.mjs';
 import { runClaude, runCodex, systemPrompt, describeImage, CLAUDE_FAST_ENV } from './lib/providers.mjs';
 import { detectHardware, pickModel, LOCAL_MODELS, ollamaUp, pullModel } from './lib/local-models.mjs';
 import { runOpenRouter, syncOpenRouterModels, checkCompatKey, compatCatalog, COMPAT } from './lib/openrouter.mjs';
@@ -1242,8 +1242,9 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
     const ask = (action, opts, label) => {
       const autonomy = browserAutonomyGate(agent, action, s);
       if (typeof autonomy === 'string') return Promise.resolve(false);
-      const reason = autonomy === null ? null : browserRisk(action, opts);
-      if (!reason) return Promise.resolve(true);
+      // risk() grava o fingerprint na aprovação; ref desconhecida pede ok. Sempre chama para amarrar o alvo.
+      const reason = b.risk(action, opts);
+      if (autonomy === null || !reason) return Promise.resolve(true);
       // Ação arriscada (envio, compra, login…) aprovada: entra no registro de ações externas.
       return askApproval({ agent, chat, emit, signal }, 'browser', label, reason).then(ok => {
         if (ok) recordExternal({ kind: 'browser.action', agentId: agent.id, chatId: chat.id, target: label, text: reason, approved: 'user' });
@@ -1251,17 +1252,24 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
       });
     };
     const denied = 'O usuário NÃO aprovou esta ação no navegador. Não tente contornar; explique o que ia fazer e pare.';
+    // Aprovação (b.risk + labelOf) fora da fila; só a execução entra no wrapDisplaySession.
     const display = wrapDisplaySession(b, agent.id);
     browser = {
       open: url => { emit({ screen: true }); return display.open(url); },
-      click: async t => {
-        if (isUserScreenControl(agent.id)) return USER_CONTROL_MSG;
-        return (await ask('click', { target: t }, `clicar em “${t}”`)) ? display.click(t) : denied;
-      },
-      type: async (t, txt, submit) => {
-        if (isUserScreenControl(agent.id)) return USER_CONTROL_MSG;
-        return (await ask('type', { target: t, submit }, `digitar em “${t}”${submit ? ' e enviar' : ''}`)) ? display.type(t, txt, submit) : denied;
-      },
+      click: async t => runBrowserGate({
+        locked: () => isUserScreenControl(agent.id),
+        lockedMsg: USER_CONTROL_MSG,
+        ask: () => ask('click', { target: t }, `clicar em “${b.labelOf(t)}”`),
+        run: () => display.click(t),
+        denied
+      }),
+      type: async (t, txt, submit) => runBrowserGate({
+        locked: () => isUserScreenControl(agent.id),
+        lockedMsg: USER_CONTROL_MSG,
+        ask: () => ask('type', { target: t, submit }, `digitar em “${b.labelOf(t)}”${submit ? ' e enviar' : ''}`),
+        run: () => display.type(t, txt, submit),
+        denied
+      }),
       scroll: dy => display.scroll(dy),
       read: () => display.read()
     };
