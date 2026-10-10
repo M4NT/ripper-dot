@@ -17,7 +17,17 @@ mkdir -p /work/.ripper/chromium && rm -f /work/.ripper/chromium/Singleton*
       --window-position=0,0 --window-size="$W,$H" about:blank >/tmp/chromium.log 2>&1
     sleep 1
   done ) &
-# Sem senha, mas só acessível pela porta publicada em 127.0.0.1 da sua máquina.
-x11vnc -display :99 -forever -shared -nopw -quiet -rfbport 5900 >/tmp/x11vnc.log 2>&1 &
+# Senha do x11vnc em /run (não no /work do agente). O Ripper guarda a senha fora do
+# contêiner e reaplica ao abrir a tela. Imagens antigas sem senha são recusadas pelo proxy.
+if [ -n "$RIPPER_VNC_PASSWORD" ]; then
+  printf '%s' "$RIPPER_VNC_PASSWORD" > /run/ripper-vnc.pass
+elif [ ! -s /run/ripper-vnc.pass ]; then
+  tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24 > /run/ripper-vnc.pass
+fi
+chmod 600 /run/ripper-vnc.pass
+PASS=$(cat /run/ripper-vnc.pass)
+x11vnc -storepasswd "$PASS" /run/ripper-vnc.rfb >/dev/null 2>&1
+chmod 600 /run/ripper-vnc.rfb
+x11vnc -display :99 -forever -shared -rfbauth /run/ripper-vnc.rfb -localhost -quiet -rfbport 5900 >/tmp/x11vnc.log 2>&1 &
 websockify --web /usr/share/novnc 6080 localhost:5900 >/tmp/novnc.log 2>&1 &
 exec sleep infinity

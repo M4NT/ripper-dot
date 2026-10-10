@@ -25,6 +25,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check noVNC bundle
+        run: npm run build:novnc -- --check
+
       - name: Test
         run: npm test
 

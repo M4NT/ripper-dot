@@ -1,0 +1,9 @@
+noVNC (@novnc/novnc 1.5.0)
+Copyright (C) The noVNC Authors
+https://github.com/novnc/noVNC
+
+Licensed under the Mozilla Public License 2.0. See LICENSE in this
+directory and docs/LICENSE.MPL-2.0 no pacote @novnc/novnc.
+
+O arquivo rfb.bundle.js é gerado por `npm run build:novnc` a partir de
+node_modules/@novnc/novnc/lib/rfb.js. Não edite o bundle à mão.
