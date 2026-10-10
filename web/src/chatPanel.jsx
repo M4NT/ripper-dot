@@ -8,7 +8,8 @@ import { ResizeHandle } from './resize.jsx';
 import { AutonomySemaphore, autonomyMeta } from './autonomy.jsx';
 import { ArtifactList } from './actions.jsx';
 import ConversationMedia from './ConversationMedia.jsx';
-import { consumeLiveTabOpen, doingLine, isLiveScreenTool, liveScreenAutoKey, liveScreenStep, shouldAutoConnect, shouldHandleLiveScreenEscape, shouldRetryConnect } from './liveScreenLogic.js';
+import { doingLine, isLiveScreenTool, liveScreenStep, shouldAutoConnect, shouldConnectThisTurn, shouldHandleLiveScreenEscape, shouldRetryConnect } from './liveScreenLogic.js';
+import { useLiveComputerTab } from './liveScreenTab.js';
 export { doingLine };
 const COMP_LABEL = { running: 'Ligado', stopped: 'Parado', 'not started': 'Ainda não iniciado', local: 'Pasta local', off: 'Desligado', 'no key': 'Falta a chave do boat.dev', unknown: 'Sem resposta da VM' };
 
@@ -114,7 +115,7 @@ function AgentLiveScreen({ agent, working, variant = 'panel', onClose, messages,
   const fullRef = useRef(null);
   const closeBtn = useRef(null);
   const float = variant === 'float';
-  const live = shouldAutoConnect({ working, autoConnect });
+  const live = shouldAutoConnect(float ? { working } : { autoConnect });
   const step = useMemo(
     () => liveScreenStep({ working: workingNow, messages, agentId: agent.id, busy: working, step: stepProp }),
     [workingNow, messages, agent.id, working, stepProp]
@@ -247,7 +248,7 @@ function AgentLiveScreen({ agent, working, variant = 'panel', onClose, messages,
 }
 
 /** A "tela" do computador: estado da VM e o que o agente executou nesta conversa. */
-function Computer({ members, messages, busy, S_mode }) {
+function Computer({ members, messages, busy, workingNow, S_mode }) {
   const withPc = members.filter(a => a.tools.includes('computer'));
   const [status, setStatus] = useState({});
   useEffect(() => {
@@ -280,7 +281,7 @@ function Computer({ members, messages, busy, S_mode }) {
           </div>
         );
       })}
-      {S_mode === 'docker' && withPc.map(a => <AgentLiveScreen key={a.id} agent={a} working={!!busy[a.id]} messages={messages} autoConnect={!!busy[a.id]} />)}
+      {S_mode === 'docker' && withPc.map(a => <AgentLiveScreen key={a.id} agent={a} working={!!busy[a.id]} messages={messages} autoConnect={shouldConnectThisTurn({ messages, working: workingNow, busy, agentId: a.id })} />)}
       <div className={`pc-screen ${working ? 'live' : ''}`} ref={screen} aria-label="Tela do computador" role="log">
         <div className="pc-bar"><i /><i /><i /><span>{withPc.length > 1 ? 'computadores' : withPc[0].name.toLowerCase().replace(/\s+/g, '-')}</span>{working && <ThinkingOrb state="working" size={20} />}</div>
         {log.length === 0
@@ -302,21 +303,16 @@ export default function ChatPanel({ members, project, chatId, messages, files, o
   const { S, refresh, toast, busy: busyAgents, busyChats, working: workingNow } = useApp();
   // Nesta tela, "trabalhando" é desta conversa (não de outra em que o agente esteja).
   const busy = chatId && busyChats[chatId] ? busyAgents : {};
-  const [tab, setTab] = useState('details');
   const memberKey = members.map(x => x.id).join();
-  const liveKey = useMemo(
-    () => liveScreenAutoKey({ messages, working: workingNow, busy, agentIds: memberKey ? memberKey.split(',') : [] }),
-    [messages, workingNow, busy, memberKey]
-  );
-  const openedLive = useRef('');
-  useEffect(() => { openedLive.current = ''; }, [chatId]);
-  useEffect(() => { const show = () => setTab('computer'); addEventListener('ripper:computer', show); return () => removeEventListener('ripper:computer', show); }, []);
-  useEffect(() => {
-    if (S.settings.computer?.mode !== 'docker') return;
-    const next = consumeLiveTabOpen(openedLive.current, liveKey);
-    openedLive.current = next.openedKey;
-    if (next.open) setTab('computer');
-  }, [liveKey, S.settings.computer?.mode]);
+  const { tab, setTab } = useLiveComputerTab({
+    mode: S.settings.computer?.mode,
+    messages,
+    working: workingNow,
+    busy,
+    agentIds: memberKey ? memberKey.split(',') : [],
+    chatId,
+  });
+  useEffect(() => { const show = () => setTab('computer'); addEventListener('ripper:computer', show); return () => removeEventListener('ripper:computer', show); }, [setTab]);
   const group = members.length > 1, a = members[0];
   const working = members.some(x => busy[x.id]);
   const arts = S.artifacts.filter(x => project ? x.projectId === project.id : chatId && x.chatId === chatId);
@@ -342,7 +338,7 @@ export default function ChatPanel({ members, project, chatId, messages, files, o
         {arts.length > 0 && <p className="muted small">{project ? 'Compartilhados com todos os agentes do projeto.' : 'Salvos nesta conversa.'}</p>}
       </div>}
       {tab === 'files' && <Files members={members} project={project} chatId={chatId} files={files} refresh={refresh} toast={toast} />}
-      {tab === 'computer' && <Computer members={members} messages={messages} busy={busy} S_mode={S.settings.computer.mode} />}
+      {tab === 'computer' && <Computer members={members} messages={messages} busy={busy} workingNow={workingNow} S_mode={S.settings.computer.mode} />}
     </aside>
   );
 }

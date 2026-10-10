@@ -21,8 +21,26 @@ function messagesOf(agentId, messages) {
   });
 }
 
-function hasLiveTool(messages, agentId) {
-  return messagesOf(agentId, messages).some(m => (m.steps || []).some(s => isLiveScreenTool(s.tool)));
+/** Mensagens depois do último pedido seu — o turno que está rodando agora. */
+export function currentTurnMessages(messages) {
+  const all = messages || [];
+  let cut = -1;
+  for (let i = all.length - 1; i >= 0; i--) {
+    if (all[i].role === 'user') { cut = i; break; }
+  }
+  return all.slice(cut + 1);
+}
+
+function turnHasLiveTool(messages, agentId) {
+  return messagesOf(agentId, currentTurnMessages(messages)).some(m => (m.steps || []).some(s => isLiveScreenTool(s.tool)));
+}
+
+/** Este turno usa computador/navegador agora (não o histórico da conversa). */
+export function shouldConnectThisTurn({ messages, working, busy, agentId } = {}) {
+  const w = working?.[agentId];
+  if (w && isLiveScreenTool(w.tool)) return true;
+  if (!busy?.[agentId]) return false;
+  return turnHasLiveTool(messages, agentId);
 }
 
 /**
@@ -52,16 +70,9 @@ export function liveScreenStep({ working, messages, agentId, busy, step } = {}) 
  */
 export function liveScreenAutoKey({ messages, working, busy, agentIds } = {}) {
   const ids = agentIds || [];
-  const liveIds = ids.filter(id => {
-    const w = working?.[id];
-    if (w && isLiveScreenTool(w.tool)) return true;
-    return busy?.[id] && hasLiveTool(messages, id);
-  });
+  const liveIds = ids.filter(id => shouldConnectThisTurn({ messages, working, busy, agentId: id }));
   if (!liveIds.length) return '';
-  return liveIds.map(id => {
-    const w = working?.[id];
-    return `turn:${id}:${w?.since || 'busy'}`;
-  }).join('|');
+  return liveIds.map(id => `turn:${id}`).join('|');
 }
 
 /** Abrir a aba: só Docker, e só neste turno (chave estável). */

@@ -1,10 +1,13 @@
 // Tela ao vivo: quando abrir a aba, quando ligar a VM, Esc e o passo por cima.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import {
-  consumeLiveTabOpen, doingLine, isLiveScreenTool, liveScreenAutoKey, liveScreenStep,
-  shouldAutoConnect, shouldHandleLiveScreenEscape, shouldOpenLiveScreen, shouldRetryConnect
+  consumeLiveTabOpen, currentTurnMessages, doingLine, isLiveScreenTool, liveScreenAutoKey, liveScreenStep,
+  shouldAutoConnect, shouldConnectThisTurn, shouldHandleLiveScreenEscape, shouldOpenLiveScreen, shouldRetryConnect
 } from '../web/src/liveScreenLogic.js';
+import { LiveComputerTab } from '../web/src/liveScreenTab.js';
 
 test('isLiveScreenTool: computador e navegador, mais nada', () => {
   assert.equal(isLiveScreenTool('computer_exec'), true);
@@ -38,28 +41,72 @@ test('liveScreenStep: só computador/navegador deste agente; WebSearch e mensage
   }), null);
 });
 
-test('liveScreenAutoKey é estável no mesmo turno e some quando o turno acaba', () => {
+test('currentTurnMessages: só o que veio depois do último pedido seu', () => {
+  const history = [
+    { role: 'user', text: 'abre o site' },
+    { agentId: 'a1', steps: [{ tool: 'browser_open' }] },
+    { role: 'user', text: 'explica' },
+    { agentId: 'a1', text: 'é assim' },
+  ];
+  assert.deepEqual(currentTurnMessages(history), [{ agentId: 'a1', text: 'é assim' }]);
+  assert.deepEqual(currentTurnMessages([{ role: 'user', text: 'oi' }]), []);
+});
+
+test('liveScreenAutoKey só olha o turno atual; working não muda a chave', () => {
   const ids = ['a1'];
   const busy = { a1: true };
-  const a = liveScreenAutoKey({ messages: [{ agentId: 'a1', steps: [{ tool: 'computer_exec' }] }], busy, agentIds: ids });
-  const b = liveScreenAutoKey({ messages: [{ agentId: 'a1', steps: [{ tool: 'computer_exec' }, { tool: 'browser_open' }] }], busy, agentIds: ids });
+  const past = [
+    { role: 'user', text: 'abre o site' },
+    { agentId: 'a1', steps: [{ tool: 'browser_open' }] },
+  ];
+  const a = liveScreenAutoKey({ messages: past, busy, agentIds: ids });
+  const b = liveScreenAutoKey({ messages: [...past.slice(0, 1), { agentId: 'a1', steps: [{ tool: 'computer_exec' }, { tool: 'browser_open' }] }], busy, agentIds: ids });
   assert.ok(a);
   assert.equal(a, b);
-  assert.equal(liveScreenAutoKey({ messages: [{ agentId: 'a1', steps: [{ tool: 'computer_exec' }] }], busy: {}, agentIds: ids }), '');
+  assert.equal(a, 'turn:a1');
+  assert.equal(liveScreenAutoKey({ messages: past, busy: {}, agentIds: ids }), '');
+
+  const textTurn = [...past, { role: 'user', text: 'explica isso' }, { agentId: 'a1', text: 'é assim' }];
+  assert.equal(liveScreenAutoKey({ messages: textTurn, busy, agentIds: ids }), '');
+  assert.equal(shouldConnectThisTurn({ messages: textTurn, busy, agentId: 'a1' }), false);
+  assert.equal(shouldConnectThisTurn({ messages: past, busy, agentId: 'a1' }), true);
+
+  const busyOnly = liveScreenAutoKey({ messages: past, busy, agentIds: ids });
+  const withWorking = liveScreenAutoKey({
+    messages: past, busy, agentIds: ids,
+    working: { a1: { tool: 'browser_open', since: 10 } },
+  });
+  const workingMoved = liveScreenAutoKey({
+    messages: past, busy, agentIds: ids,
+    working: { a1: { tool: 'browser_click', since: 99 } },
+  });
+  assert.equal(busyOnly, withWorking);
+  assert.equal(withWorking, workingMoved);
+
   const w = liveScreenAutoKey({ working: { a1: { tool: 'browser_open', since: 10 } }, agentIds: ids });
   const w2 = liveScreenAutoKey({ working: { a1: { tool: 'browser_click', since: 10 } }, agentIds: ids });
   assert.equal(w, w2);
-  assert.notEqual(w, liveScreenAutoKey({ working: { a1: { tool: 'browser_open', since: 99 } }, agentIds: ids }));
+  assert.equal(w, liveScreenAutoKey({ working: { a1: { tool: 'browser_open', since: 99 } }, agentIds: ids }));
 });
 
-test('consumeLiveTabOpen: abre na 1ª vez do turno e não rouba a aba depois', () => {
-  const first = consumeLiveTabOpen('', 'turn:a1:busy');
+test('consumeLiveTabOpen: abre na 1ª vez do turno e working não abre de novo', () => {
+  const ids = ['a1'];
+  const busy = { a1: true };
+  const messages = [{ role: 'user', text: 'abre' }, { agentId: 'a1', steps: [{ tool: 'browser_open' }] }];
+  const firstKey = liveScreenAutoKey({ messages, busy, agentIds: ids });
+  const first = consumeLiveTabOpen('', firstKey);
   assert.equal(first.open, true);
-  assert.equal(consumeLiveTabOpen(first.openedKey, 'turn:a1:busy').open, false);
+  assert.equal(consumeLiveTabOpen(first.openedKey, firstKey).open, false);
+  const afterWorking = liveScreenAutoKey({
+    messages, busy, agentIds: ids,
+    working: { a1: { tool: 'browser_click', since: 50 } },
+  });
+  assert.equal(afterWorking, firstKey);
+  assert.equal(consumeLiveTabOpen(first.openedKey, afterWorking).open, false);
   const ended = consumeLiveTabOpen(first.openedKey, '');
   assert.equal(ended.open, false);
   assert.equal(ended.openedKey, '');
-  assert.equal(consumeLiveTabOpen(ended.openedKey, 'turn:a1:busy').open, true);
+  assert.equal(consumeLiveTabOpen(ended.openedKey, firstKey).open, true);
 });
 
 test('shouldOpenLiveScreen: Docker + turno ao vivo; conversa antiga sem busy não abre', () => {
@@ -98,4 +145,52 @@ test('shouldHandleLiveScreenEscape: composer e menus não fecham a miniatura', (
 test('doingLine: o que o agente faz, há quanto tempo e para quem', () => {
   assert.equal(doingLine(null), null);
   assert.equal(doingLine({ task: 'Lendo a página', since: Date.now(), forName: 'você' }), 'Lendo a página · agora · para você');
+});
+
+function renderLiveTab(props) {
+  const html = renderToStaticMarkup(createElement(LiveComputerTab, props));
+  return {
+    html,
+    tab: html.match(/data-live-tab="([^"]*)"/)?.[1],
+    connect: html.match(/data-live-connect="([^"]*)"/)?.[1],
+    key: html.match(/data-live-key="([^"]*)"/)?.[1],
+    open: html.match(/data-live-open="([^"]*)"/)?.[1],
+  };
+}
+
+test('render LiveComputerTab: histórico + texto não abre; working não reabre a aba', () => {
+  const ids = ['a1'];
+  const busy = { a1: true };
+  const past = [
+    { role: 'user', text: 'abre o site' },
+    { agentId: 'a1', steps: [{ tool: 'browser_open' }] },
+  ];
+
+  const first = renderLiveTab({ mode: 'docker', messages: past, busy, agentIds: ids });
+  assert.match(first.html, /<section/);
+  assert.equal(first.tab, 'computer');
+  assert.equal(first.connect, '1');
+  assert.equal(first.open, '1');
+  assert.equal(first.key, 'turn:a1');
+
+  const afterWorking = renderLiveTab({
+    mode: 'docker',
+    messages: past,
+    busy,
+    working: { a1: { tool: 'browser_click', since: 50 } },
+    agentIds: ids,
+    tab: 'details',
+    openedKey: first.key,
+  });
+  assert.equal(afterWorking.tab, 'details');
+  assert.equal(afterWorking.open, '0');
+  assert.equal(afterWorking.key, first.key);
+  assert.equal(afterWorking.connect, '1');
+
+  const textTurn = [...past, { role: 'user', text: 'explica isso' }, { agentId: 'a1', text: 'é assim' }];
+  const later = renderLiveTab({ mode: 'docker', messages: textTurn, busy, agentIds: ids });
+  assert.equal(later.tab, 'details');
+  assert.equal(later.connect, '0');
+  assert.equal(later.open, '0');
+  assert.equal(later.key, '');
 });
