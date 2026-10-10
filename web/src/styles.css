@@ -1534,6 +1534,7 @@ code, .mono, pre { overflow-wrap: anywhere; }
 
 /* tela do agente em miniatura dentro da conversa (mesmo componente do painel) */
 .live-screen-float, .mini-screen { position: fixed; right: 20px; bottom: 120px; z-index: 40; width: min(340px, calc(100vw - 32px)); border-radius: var(--raio-cartao); overflow: hidden; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-3); animation: pop .25s var(--out); }
+.live-screen-float:focus { outline: none; }
 .live-screen-float.live, .mini-screen.live { border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
 .live-screen-bar, .mini-screen-bar { display: flex; align-items: center; gap: 6px; padding: 4px 4px 4px 12px; font-size: var(--fs-sm); color: var(--ink-2); border-bottom: 1px solid var(--line); }
 .live-screen-bar .grow, .mini-screen-bar .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; }
@@ -1542,16 +1543,16 @@ code, .mono, pre { overflow-wrap: anywhere; }
 .mini-screen-msg { margin: 0; padding: 28px 14px; text-align: center; color: var(--muted); font-size: var(--fs-sm); overflow-wrap: anywhere; }
 /* celular 375: a miniatura usa a largura da conversa; alvos de toque 44px; passo quebra linha */
 @media (max-width: 400px) {
-  .live-screen-float, .mini-screen { left: 8px; right: 8px; bottom: 96px; width: auto; }
+  .live-screen-float, .mini-screen { left: 8px; right: 8px; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); width: auto; }
   .live-screen-bar .icon-btn, .mini-screen-bar .icon-btn { width: var(--ctl-touch); height: var(--ctl-touch); }
   .live-screen-step { left: 8px; right: 8px; bottom: 8px; padding: 8px 10px; }
-  .vnc-full { padding: 8px; gap: 8px; }
+  .vnc-full { padding: 8px; padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); gap: 8px; }
   .vnc-full-bar { gap: 8px; }
   .pc-bar { flex-wrap: wrap; }
   .vnc-btn { margin: 2px 0 0; }
 }
 @media (max-width: 720px) and (min-width: 401px) {
-  .live-screen-float, .mini-screen { right: 16px; bottom: 110px; width: min(240px, calc(100vw - 32px)); }
+  .live-screen-float, .mini-screen { right: 16px; bottom: calc(110px + env(safe-area-inset-bottom, 0px)); width: min(240px, calc(100vw - 32px)); }
 }
 /* desktop 1280: miniatura ao lado do composer, sem invadir o painel */
 @media (min-width: 1280px) {

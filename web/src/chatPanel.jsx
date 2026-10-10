@@ -8,7 +8,7 @@ import { ResizeHandle } from './resize.jsx';
 import { AutonomySemaphore, autonomyMeta } from './autonomy.jsx';
 import { ArtifactList } from './actions.jsx';
 import ConversationMedia from './ConversationMedia.jsx';
-import { doingLine, isLiveScreenTool, liveScreenAutoKey, liveScreenStep } from './liveScreenLogic.js';
+import { consumeLiveTabOpen, doingLine, isLiveScreenTool, liveScreenAutoKey, liveScreenStep, shouldAutoConnect, shouldHandleLiveScreenEscape, shouldRetryConnect } from './liveScreenLogic.js';
 export { doingLine };
 const COMP_LABEL = { running: 'Ligado', stopped: 'Parado', 'not started': 'Ainda não iniciado', local: 'Pasta local', off: 'Desligado', 'no key': 'Falta a chave do boat.dev', unknown: 'Sem resposta da VM' };
 
@@ -99,8 +99,8 @@ function Files({ members, project, chatId, files, refresh, toast }) {
 
 /**
  * Tela ao vivo do computador (noVNC) — um componente só, em dois modos:
- * painel (aba Computador) e miniatura flutuante. Liga sozinha; o passo atual
- * fica por cima da tela. Por padrão só assiste; “Assumir controle” libera mouse e teclado.
+ * painel (aba Computador) e miniatura flutuante. Liga só enquanto o agente
+ * usa a tela agora (não ao abrir conversa antiga). O passo atual fica por cima.
  */
 function AgentLiveScreen({ agent, working, variant = 'panel', onClose, messages, step: stepProp, autoConnect = false }) {
   const { working: workingNow } = useApp();
@@ -110,47 +110,89 @@ function AgentLiveScreen({ agent, working, variant = 'panel', onClose, messages,
   const [big, setBig] = useState(false);
   const [loading, setLoading] = useState(false);
   const tried = useRef('');
+  const rootRef = useRef(null);
+  const fullRef = useRef(null);
+  const closeBtn = useRef(null);
   const float = variant === 'float';
-  const hasHistory = (messages || []).some(m => (m.steps || []).some(s => isLiveScreenTool(s.tool)));
-  const step = liveScreenStep({ working: workingNow, messages, agentId: agent.id, busy: working, step: stepProp });
+  const live = shouldAutoConnect({ working, autoConnect });
+  const step = useMemo(
+    () => liveScreenStep({ working: workingNow, messages, agentId: agent.id, busy: working, step: stepProp }),
+    [workingNow, messages, agent.id, working, stepProp]
+  );
   const closeFull = () => { setBig(false); setControl(false); };
 
-  async function connect() {
-    if (loading) return;
+  async function connect(fromUser = false) {
+    if (!shouldRetryConnect({ url, loading, err, live, alreadyTried: tried.current === agent.id, fromUser })) return;
+    tried.current = agent.id;
     setLoading(true); setErr(null);
     try { setUrl((await api(`/api/agents/${agent.id}/vnc`)).url); }
-    catch (e) { setErr(e.message); }
+    catch (e) { setErr(e.message); setUrl(null); }
     setLoading(false);
   }
   useEffect(() => {
-    const want = working || float || autoConnect || hasHistory;
-    if (!want || url || loading || tried.current === agent.id) return;
+    if (!live) { tried.current = ''; return undefined; }
+    if (!shouldRetryConnect({ url: null, loading: false, err: null, live, alreadyTried: false, fromUser: false })) return undefined;
+    let gone = false;
     tried.current = agent.id;
-    connect();
-  }, [working, float, autoConnect, hasHistory, agent.id, url, loading]);
+    setLoading(true); setErr(null); setUrl(null);
+    api(`/api/agents/${agent.id}/vnc`).then(
+      r => { if (!gone) setUrl(r.url); },
+      e => { if (!gone) { setErr(e.message); setUrl(null); } }
+    ).finally(() => { if (!gone) setLoading(false); });
+    return () => { gone = true; };
+  }, [live, agent.id]);
   useEffect(() => {
     const onKey = e => {
-      if (e.key !== 'Escape') return;
-      if (big) { e.preventDefault(); closeFull(); return; }
-      if (float && onClose) { e.preventDefault(); onClose(); }
+      const inside = !!(rootRef.current?.contains(document.activeElement) || fullRef.current?.contains(document.activeElement));
+      const action = shouldHandleLiveScreenEscape({ key: e.key, big, float, focusInside: inside });
+      if (!action) return;
+      e.preventDefault();
+      if (big) e.stopPropagation();
+      if (action === 'close-full') closeFull();
+      else onClose?.();
     };
-    addEventListener('keydown', onKey);
-    return () => removeEventListener('keydown', onKey);
+    addEventListener('keydown', onKey, big);
+    return () => removeEventListener('keydown', onKey, big);
   }, [big, float, onClose]);
+  useEffect(() => {
+    if (!big) return;
+    const prev = document.activeElement;
+    closeBtn.current?.focus();
+    const onTab = e => {
+      if (e.key !== 'Tab' || !fullRef.current) return;
+      const nodes = [...fullRef.current.querySelectorAll('button, [href], iframe')].filter(el => !el.disabled);
+      if (!nodes.length) return;
+      const first = nodes[0], last = nodes[nodes.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', onTab, true);
+    return () => {
+      document.removeEventListener('keydown', onTab, true);
+      if (prev?.focus) prev.focus();
+    };
+  }, [big]);
 
   const canControl = float ? big && control : control;
   const src = url && `${url}&view_only=${canControl ? 0 : 1}`;
   const frame = src && <iframe key={src} src={src} title={`Tela de ${agent.name}`} allow="clipboard-read; clipboard-write" tabIndex={float && !big ? -1 : undefined} />;
-  const overlay = step && (
+  const idle = err || (big ? 'Aberta em tela cheia.' : loading ? 'Ligando o computador…' : live ? 'Ligando a tela…' : `Veja a tela do computador de ${agent.name} quando ele estiver usando.`);
+  const overlay = step && !big && (
     <p className="live-screen-step" aria-live="polite">
       {working && <span className="live-dot" aria-hidden="true" />}
       <span>{step}</span>
     </p>
   );
+  const retry = !url && !big && (
+    <button type="button" className="btn btn-sm" onClick={() => connect(true)} disabled={loading}>
+      {loading ? 'Ligando o computador…' : err ? 'Tentar de novo' : 'Ver tela ao vivo'}
+    </button>
+  );
 
   return <>
     {float ? (
-      <aside className={`live-screen live-screen-float mini-screen ${working ? 'live' : ''}`} data-live-screen="float" aria-label={`Tela de ${agent.name} ao vivo`}>
+      <aside ref={rootRef} tabIndex={-1} className={`live-screen live-screen-float mini-screen ${working ? 'live' : ''}`} data-live-screen="float" aria-label={`Tela de ${agent.name} ao vivo`}
+        onPointerDown={e => e.currentTarget.focus({ preventScroll: true })}>
         <div className="live-screen-bar mini-screen-bar">
           {working && <span className="live-dot" aria-hidden="true" />}
           <span className="grow">{agent.name}{working ? ' · na tela' : ''}</span>
@@ -158,12 +200,13 @@ function AgentLiveScreen({ agent, working, variant = 'panel', onClose, messages,
           {onClose && <button type="button" className="icon-btn sm" onClick={onClose} aria-label="Fechar a tela"><Icon name="x" size={13} /></button>}
         </div>
         <div className="live-screen-body">
-          {frame && !big ? frame : <p className="mini-screen-msg">{err || (big ? 'Aberta em tela cheia.' : loading ? 'Ligando o computador…' : 'Ligando a tela…')}</p>}
+          {frame && !big ? frame : <p className="mini-screen-msg">{idle}</p>}
           {frame && !big && overlay}
+          {!frame && !big && <div className="vnc-off">{retry}</div>}
         </div>
       </aside>
     ) : (
-      <div className={`live-screen live-screen-panel agent-screen live-vnc ${working ? 'live' : ''} ${control ? 'controlling' : ''}`} data-live-screen="panel">
+      <div ref={rootRef} className={`live-screen live-screen-panel agent-screen live-vnc ${working ? 'live' : ''} ${control ? 'controlling' : ''}`} data-live-screen="panel">
         <div className="pc-bar">
           <i /><i /><i /><span>tela · {agent.name}</span>
           {working && <span className="live-dot">trabalhando</span>}
@@ -177,23 +220,23 @@ function AgentLiveScreen({ agent, working, variant = 'panel', onClose, messages,
         <div className="live-screen-body">
           {frame && !big ? frame : (
             <div className="vnc-off">
-              {err ? <p className="pc-idle">{err}</p> : <p className="pc-idle">{big ? 'Aberta em tela cheia.' : `Veja e controle a tela do computador de ${agent.name}. Liga o computador se estiver desligado.`}</p>}
-              {!big && <button type="button" className="btn btn-sm" onClick={connect} disabled={loading}>{loading ? 'Ligando o computador…' : 'Ver tela ao vivo'}</button>}
+              <p className="pc-idle">{idle}</p>
+              {retry}
             </div>
           )}
-          {frame && !big && overlay}
+          {overlay}
         </div>
       </div>
     )}
     {big && (
-      <div className="vnc-full" role="dialog" aria-modal="true" aria-label={`Tela de ${agent.name}`} onClick={e => { if (e.target === e.currentTarget) closeFull(); }}>
+      <div ref={fullRef} className="vnc-full" role="dialog" aria-modal="true" aria-label={`Tela de ${agent.name}`} onClick={e => { if (e.target === e.currentTarget) closeFull(); }}>
         <div className="vnc-full-bar">
           <b>Tela de {agent.name}</b>
           {working && <span className="live-dot">trabalhando</span>}
           {step && <span className="live-screen-step-inline">{step}</span>}
           <div className="grow" />
           <button type="button" className={`btn btn-sm ${control ? 'btn-primary' : ''}`} onClick={() => setControl(c => !c)}>{control ? 'Soltar controle' : 'Assumir controle'}</button>
-          <button type="button" className="btn btn-sm" onClick={closeFull}><Icon name="x" size={14} />Fechar</button>
+          <button type="button" ref={closeBtn} className="btn btn-sm" onClick={closeFull}><Icon name="x" size={14} />Fechar</button>
         </div>
         {frame}
         {step && <p className="live-screen-step live-screen-step-full" aria-live="polite">{step}</p>}
@@ -237,7 +280,7 @@ function Computer({ members, messages, busy, S_mode }) {
           </div>
         );
       })}
-      {S_mode === 'docker' && withPc.map(a => <AgentLiveScreen key={a.id} agent={a} working={!!busy[a.id]} messages={messages} autoConnect={!!busy[a.id] || log.some(s => s.agentId === a.id)} />)}
+      {S_mode === 'docker' && withPc.map(a => <AgentLiveScreen key={a.id} agent={a} working={!!busy[a.id]} messages={messages} autoConnect={!!busy[a.id]} />)}
       <div className={`pc-screen ${working ? 'live' : ''}`} ref={screen} aria-label="Tela do computador" role="log">
         <div className="pc-bar"><i /><i /><i /><span>{withPc.length > 1 ? 'computadores' : withPc[0].name.toLowerCase().replace(/\s+/g, '-')}</span>{working && <ThinkingOrb state="working" size={20} />}</div>
         {log.length === 0
@@ -260,15 +303,19 @@ export default function ChatPanel({ members, project, chatId, messages, files, o
   // Nesta tela, "trabalhando" é desta conversa (não de outra em que o agente esteja).
   const busy = chatId && busyChats[chatId] ? busyAgents : {};
   const [tab, setTab] = useState('details');
-  const memberIds = members.map(x => x.id);
-  const liveKey = liveScreenAutoKey({ messages, working: workingNow, busy, agentIds: memberIds });
+  const memberKey = members.map(x => x.id).join();
+  const liveKey = useMemo(
+    () => liveScreenAutoKey({ messages, working: workingNow, busy, agentIds: memberKey ? memberKey.split(',') : [] }),
+    [messages, workingNow, busy, memberKey]
+  );
   const openedLive = useRef('');
+  useEffect(() => { openedLive.current = ''; }, [chatId]);
   useEffect(() => { const show = () => setTab('computer'); addEventListener('ripper:computer', show); return () => removeEventListener('ripper:computer', show); }, []);
   useEffect(() => {
     if (S.settings.computer?.mode !== 'docker') return;
-    if (!liveKey || liveKey === openedLive.current) return;
-    openedLive.current = liveKey;
-    setTab('computer');
+    const next = consumeLiveTabOpen(openedLive.current, liveKey);
+    openedLive.current = next.openedKey;
+    if (next.open) setTab('computer');
   }, [liveKey, S.settings.computer?.mode]);
   const group = members.length > 1, a = members[0];
   const working = members.some(x => busy[x.id]);

@@ -13,19 +13,25 @@ export function isLiveScreenTool(tool) {
   return /^(computer_|browser_)/.test(tool || '');
 }
 
+function messagesOf(agentId, messages) {
+  return (messages || []).filter(m => {
+    if (!agentId) return true;
+    if (m.agentId) return m.agentId === agentId;
+    return false;
+  });
+}
+
+function hasLiveTool(messages, agentId) {
+  return messagesOf(agentId, messages).some(m => (m.steps || []).some(s => isLiveScreenTool(s.tool)));
+}
+
 /**
  * Passo para mostrar por cima da tela ao vivo.
- * Ordem: rótulo explícito → último passo da mensagem atual → último uso de computador/navegador → working → “Trabalhando…”.
+ * Só computador/navegador (não WebSearch nem mensagem sua).
  */
 export function liveScreenStep({ working, messages, agentId, busy, step } = {}) {
   if (step) return step;
-  const mine = (messages || []).filter(m => !agentId || !m.agentId || m.agentId === agentId);
-  const lastMsg = mine[mine.length - 1];
-  const lastSteps = lastMsg?.steps || [];
-  const last = lastSteps[lastSteps.length - 1];
-  if (last && (last.kind === 'tool' || last.tool) && last.kind !== 'screen' && last.kind !== 'note') {
-    return last.label || stepLabel(last.tool);
-  }
+  const mine = messagesOf(agentId, messages);
   for (let i = mine.length - 1; i >= 0; i--) {
     const steps = mine[i].steps || [];
     for (let j = steps.length - 1; j >= 0; j--) {
@@ -33,34 +39,66 @@ export function liveScreenStep({ working, messages, agentId, busy, step } = {}) 
     }
   }
   const w = working?.[agentId];
-  if (w?.task) return w.task;
-  if (w?.tool) return stepLabel(w.tool);
+  if (w?.task && isLiveScreenTool(w.tool)) return w.task;
+  if (w?.tool && isLiveScreenTool(w.tool)) return stepLabel(w.tool);
+  if (w?.task && busy) return w.task;
   if (busy) return 'Trabalhando…';
   return null;
 }
 
-/** Chave que muda quando o agente começa (ou troca) um passo de computador/navegador nesta conversa. */
+/**
+ * Identidade do turno em que a tela importa — estável enquanto o agente
+ * continua no mesmo trabalho (não muda a cada passo de computador ou navegador).
+ */
 export function liveScreenAutoKey({ messages, working, busy, agentIds } = {}) {
   const ids = agentIds || [];
-  const fromWorking = ids.map(id => {
+  const liveIds = ids.filter(id => {
     const w = working?.[id];
-    return w && isLiveScreenTool(w.tool) ? `w:${id}:${w.tool}:${w.since || 0}` : '';
-  }).filter(Boolean);
-  if (fromWorking.length) return fromWorking.join('|');
-  if (!ids.some(id => busy?.[id])) return '';
-  let n = 0;
-  let last = '';
-  for (const m of messages || []) {
-    if (m.agentId && ids.length && !ids.includes(m.agentId)) continue;
-    for (const s of m.steps || []) {
-      if (isLiveScreenTool(s.tool)) { n += 1; last = s.tool; }
-    }
-  }
-  return n ? `m:${last}:${n}` : '';
+    if (w && isLiveScreenTool(w.tool)) return true;
+    return busy?.[id] && hasLiveTool(messages, id);
+  });
+  if (!liveIds.length) return '';
+  return liveIds.map(id => {
+    const w = working?.[id];
+    return `turn:${id}:${w?.since || 'busy'}`;
+  }).join('|');
 }
 
-/** Abrir a tela ao vivo: só com Docker, e só enquanto o agente usa computador ou navegador. */
+/** Abrir a aba: só Docker, e só neste turno (chave estável). */
 export function shouldOpenLiveScreen({ mode, messages, working, busy, agentIds } = {}) {
   if (mode && mode !== 'docker') return false;
   return Boolean(liveScreenAutoKey({ messages, working, busy, agentIds }));
+}
+
+/**
+ * Primeira vez do turno → abrir a aba. Mesmo turno de novo → não rouba.
+ * Turno acabou (liveKey vazio) → esquece, para o próximo turno poder abrir.
+ */
+export function consumeLiveTabOpen(openedKey, liveKey) {
+  if (!liveKey) return { openedKey: '', open: false };
+  if (liveKey === openedKey) return { openedKey, open: false };
+  return { openedKey: liveKey, open: true };
+}
+
+/** Ligar o VNC sozinho: só se o agente está nesse trabalho agora. Histórico antigo não conta. */
+export function shouldAutoConnect({ working, autoConnect } = {}) {
+  return !!(working || autoConnect);
+}
+
+/** Nova tentativa: clique sempre; automático só neste turno e não em loop depois do erro. */
+export function shouldRetryConnect({ url, loading, err, live, alreadyTried, fromUser } = {}) {
+  if (loading) return false;
+  if (fromUser) return true;
+  if (url) return false;
+  if (!live) return false;
+  if (alreadyTried && err) return false;
+  return true;
+}
+
+/** Esc: tela cheia sempre; miniatura só com o foco nela. Composer e menus ficam de fora. */
+export function shouldHandleLiveScreenEscape({ key, big, float, focusInside } = {}) {
+  if (key !== 'Escape') return null;
+  if (big) return 'close-full';
+  if (float && focusInside) return 'close-float';
+  return null;
 }
