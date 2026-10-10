@@ -4,6 +4,12 @@ import {
   INPUT_DENIED,
   USER_CONTROL_MSG,
   USER_CONTROL_TTL_MS,
+  TYPE_RECORD_MAX,
+  TYPE_RECORD_TTL_MS,
+  QUEUE_IDLE_MS,
+  QUEUE_MAX,
+  _computerInputCacheStats,
+  pruneComputerInputCaches,
   _resetComputerInputForTests,
   computerInputLabel,
   computerInputNeedsApproval,
@@ -219,6 +225,10 @@ test('trava Assumir controle: dono, expiração e MiniScreen não solta a de out
 
   const again = setUserScreenControl('ag1', true, 'mini-2', t0 + USER_CONTROL_TTL_MS + 2);
   assert.equal(again.owner, 'mini-2');
+  const noOwner = setUserScreenControl('ag1', false, undefined, t0 + USER_CONTROL_TTL_MS + 3);
+  assert.equal(noOwner.control, true, 'PUT control=false sem dono não solta a trava');
+  assert.equal(noOwner.owner, 'mini-2');
+  assert.equal(setUserScreenControl('ag1', false, '', t0 + USER_CONTROL_TTL_MS + 3).control, true);
   assert.equal(setUserScreenControl('ag1', false, 'mini-2', t0 + USER_CONTROL_TTL_MS + 3).control, false);
 });
 
@@ -251,4 +261,23 @@ test('fila comum por display e trava valem para browser_*', async () => {
   assert.equal(await browser.type('q', 'oi'), USER_CONTROL_MSG);
   setUserScreenControl('ag1', false, 'live');
   assert.equal(await browser.read(), 'read');
+});
+
+test('filas e registro de digitação: TTL e limite', async () => {
+  _resetComputerInputForTests();
+  for (let i = 0; i < TYPE_RECORD_MAX + 8; i++) {
+    await withTypeIdempotency('c1', `req-${i}`, async ({ markTyped }) => { markTyped(); return 'ok'; });
+  }
+  assert.ok(_computerInputCacheStats().types <= TYPE_RECORD_MAX);
+
+  await withTypeIdempotency('c1', 'keep', async ({ markTyped }) => { markTyped(); return 'ok'; });
+  pruneComputerInputCaches(Date.now() + TYPE_RECORD_TTL_MS + 1);
+  const again = await withTypeIdempotency('c1', 'keep', async ({ markTyped }) => { markTyped(); return 'novo'; });
+  assert.equal(again, 'novo', 'registro expirado não bloqueia retry');
+
+  _resetComputerInputForTests();
+  await serializeCall('idle-q', async () => 'ok');
+  assert.ok(_computerInputCacheStats().queues <= QUEUE_MAX);
+  pruneComputerInputCaches(Date.now() + QUEUE_IDLE_MS + 1);
+  assert.equal(_computerInputCacheStats().queues, 0);
 });
