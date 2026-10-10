@@ -23,6 +23,7 @@ test('rateLimitBucket classifica chat e APIs pesadas', () => {
   assert.equal(rateLimitBucket('POST', '/api/data/restore'), 'api');
   assert.equal(rateLimitBucket('GET', '/api/metering/export'), 'api');
   assert.equal(rateLimitBucket('GET', '/api/health'), null);
+  assert.equal(rateLimitBucket('GET', '/api/events'), null);
 });
 
 test('normalizeRateLimit aplica env RIPPER_RATE_*', () => {
@@ -51,6 +52,16 @@ test('checkRateLimit bloqueia segunda requisição na janela', () => {
   const second = checkRateLimit({ req, settings, ripperToken: 'tok', method: 'POST', path: '/api/chat' });
   assert.equal(second.ok, false);
   assert.ok(second.retryAfterSec >= 1);
+  _resetRateLimitForTests();
+});
+
+test('GET /api/events fica fora do rate limit (reconexão do EventSource)', () => {
+  _resetRateLimitForTests();
+  const settings = { rateLimit: { enabled: true, chatPerMinute: 1, apiPerMinute: 1, windowMs: 60_000 } };
+  const req = { headers: {}, socket: { remoteAddress: '127.0.0.1' } };
+  for (let i = 0; i < 8; i++) {
+    assert.equal(checkRateLimit({ req, settings, ripperToken: 'tok', method: 'GET', path: '/api/events' }).ok, true);
+  }
   _resetRateLimitForTests();
 });
 

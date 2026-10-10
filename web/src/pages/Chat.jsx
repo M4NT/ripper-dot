@@ -24,7 +24,7 @@ import { botAvatarPalette } from 'bot-avatars';
 import { FirstRunChecklist } from '../firstRunChecklist.jsx';
 import { findChatMatches } from '../../../lib/chat-edit.mjs';
 import ErrorNote from '../errorNote.jsx';
-import { subscribeUserEvents, useUserEventsConnected } from '../userEvents.js';
+import { subscribeUserEvents, useUserEventsConnected, watchUserChat, applyChatDelta, liveRecordForChat, USER_EVENTS_SAFETY_MS } from '../userEvents.js';
 
 // Cor do agente como TEXTO: misturada com a tinta para passar contraste nos dois temas (a pura dava 3,3:1).
 const agentColor = a => `color-mix(in srgb, ${nameColor(a, botAvatarPalette)} 58%, var(--ink))`;
@@ -362,6 +362,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   const animateFrom = useRef(Infinity);
   const [thread, setThread] = useState(null); // conversa entre agentes aberta ao lado
   const [chatId, setChatId] = useState(initialId || null);
+  useEffect(() => watchUserChat(chatId), [chatId]);
   const [loading, setLoading] = useState(!!initialId);
   const [notFound, setNotFound] = useState(false);
   const [live, setLive] = useState(null); // mensagem em construção
@@ -410,7 +411,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
     const apply = pending => { if (on) setPendAprov((pending || []).filter(a => a.chatId === chatId).length); };
     const load = () => api('/api/approvals').then(r => apply(r.pending)).catch(() => {});
     const unsub = subscribeUserEvents(ev => {
-      if (ev.type === 'approvals' || ev.type === 'snapshot') apply(ev.approvals);
+      if ((ev.type === 'approvals' || ev.type === 'snapshot') && ev.approvals) apply(ev.approvals);
     });
     load();
     const h = eventsOpen ? null : setInterval(load, 10000);
@@ -444,22 +445,31 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   useEffect(() => {
     if (!watching || !chatId) return;
     let alive = true;
+    const liveRef = { current: null };
     const paint = rec => {
       if (!alive || !rec) return false;
       if (rec.streaming) {
-        if (rec.live?.agentId) setLive({ role: 'assistant', agentId: rec.live.agentId, content: rec.live.content, steps: (rec.live.steps || []).map(s => s.kind === 'tool' ? { ...s, label: stepLabel(s.tool) } : s), at: rec.live.at });
+        const body = rec.live || rec;
+        if (body.agentId || body.content) {
+          const msg = { role: 'assistant', agentId: body.agentId, content: body.content || '', steps: (body.steps || []).map(s => s.kind === 'tool' ? { ...s, label: stepLabel(s.tool) } : s), at: body.at };
+          liveRef.current = msg;
+          setLive(msg);
+        }
         setBusyChats(b => ({ ...b, [chatId]: true }));
         return true;
       }
+      liveRef.current = null;
       setLive(null);
       setBusyChats(b => { const n = { ...b }; delete n[chatId]; return n; });
       api(`/api/chats/${chatId}`).then(c => { if (alive && c) { setChat(c); setInterrupted(!!c.interrupted); } }).catch(() => {});
       return false;
     };
     const fromEvent = ev => {
-      if (ev.type === 'chat.done' && ev.chatId === chatId) { paint({ streaming: false }); return; }
-      if (ev.type !== 'chat.live' && ev.type !== 'snapshot') return;
-      const rec = ev.live?.[chatId] || ev.chats?.[chatId];
+      if (ev.type === 'chat.delta' && ev.chatId === chatId) {
+        paint(applyChatDelta(liveRef.current, ev));
+        return;
+      }
+      const rec = liveRecordForChat(ev, chatId);
       if (rec) paint(rec);
     };
     const unsub = subscribeUserEvents(fromEvent);
@@ -467,9 +477,10 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
       const r = await api(`/api/chats/${chatId}/live`).catch(() => null);
       if (!paint(r)) clearInterval(t);
     };
-    const t = eventsOpen ? null : setInterval(tick, 1000);
+    // Com SSE: poll lento de reserva (chat.done perdido). Sem SSE: 1 s como antes.
+    const t = setInterval(tick, eventsOpen ? USER_EVENTS_SAFETY_MS : 1000);
     tick();
-    return () => { alive = false; unsub(); if (t) clearInterval(t); };
+    return () => { alive = false; unsub(); clearInterval(t); };
   }, [watching, chatId, eventsOpen]);
   const waiting = chatId && S.pendingInbox?.[chatId];
   const flowLive = ['running', 'waiting'].includes(chat?.flowRun?.status); // fluxo roda no servidor: a conversa se atualiza sozinha
@@ -481,7 +492,9 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
       refresh();
     };
     const unsub = subscribeUserEvents(ev => {
-      if (ev.type === 'inbox' || ev.type === 'flows' || ev.type === 'snapshot') pull();
+      if (ev.type === 'inbox' && ev.pendingInbox && (chatId in ev.pendingInbox || waiting)) pull();
+      else if (ev.type === 'flows' && ev.flows && (chatId in ev.flows || flowLive)) pull();
+      else if (ev.type === 'snapshot' && (ev.pendingInbox?.[chatId] != null || ev.flows?.[chatId] != null || waiting || flowLive)) pull();
     });
     const t = eventsOpen ? null : setInterval(pull, 4000);
     return () => { unsub(); if (t) clearInterval(t); };
