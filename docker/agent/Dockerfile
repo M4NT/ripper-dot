@@ -1,5 +1,5 @@
 # Imagem de referência dos agentes do Ripper: tudo pré-instalado, então criar a VM de um agente leva segundos.
-# Linux + Node 22 + Python 3 + Chromium + tela virtual (Xvfb) + acesso pela web (noVNC).
+# Linux + Node 22 + Python 3 + Chromium + tela virtual (Xvfb) + acesso pela web (noVNC) + xdotool.
 FROM node:22-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -10,7 +10,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       chromium fonts-liberation fonts-noto-core fonts-noto-color-emoji \
-      xvfb x11vnc novnc websockify \
+      xvfb x11vnc novnc websockify xdotool \
       procps curl ca-certificates git python3-pip jq locales \
   && sed -i 's/# pt_BR.UTF-8/pt_BR.UTF-8/' /etc/locale.gen && locale-gen \
   && rm -rf /var/lib/apt/lists/*

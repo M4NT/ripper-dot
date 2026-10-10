@@ -243,6 +243,7 @@ import {
   mutatingOriginError
 } from './lib/security-headers.mjs';
 import { resolveHttpBudget, rejectOversizeBody, attachHttpTimeout } from './lib/http-budget.mjs';
+import { vncClientUrl, readVncPassword, proxyVncHttp, attachVncUpgrade, createCachedLoader, forwardUpgrade } from './lib/vnc-proxy.mjs';
 import {
   chatIdempotencyContext,
   replayIdempotentResponse,
@@ -481,6 +482,20 @@ async function streamChatResponse(req, c, { text, fileIds, mcpSession, resume = 
 const projectOr404 = pid => db.projects.find(p => p.id === pid) || (() => { throw new HttpError(404, 'Projeto não encontrado.'); })();
 const projectTaskOr404 = (pid, tid) => (projectOr404(pid), (db.projectTasks || []).find(t => t.id === tid && t.projectId === pid)) || (() => { throw new HttpError(404, 'Tarefa não encontrada.'); })();
 const agentOr404 = aid => db.agents.find(a => a.id === aid) || (() => { throw new HttpError(404, 'Agente não encontrado.'); })();
+async function vncTarget(aid) {
+  const a = agentOr404(aid);
+  if (db.settings.computer.mode !== 'docker') throw new HttpError(409, 'A tela ao vivo precisa do computador em modo Docker.');
+  const pc = computerFor(a, db.settings, save);
+  const sc = await pc.screen();
+  if (!sc) throw new HttpError(503, 'A tela ainda não subiu. Tente de novo em alguns segundos.');
+  return { port: sc.port, password: readVncPassword(a.id) };
+}
+const vncTargetCached = createCachedLoader(vncTarget);
+async function serveAgentVncProxy(req, [aid, rest], url, res) {
+  if (rest.includes('..')) throw new HttpError(400, 'Caminho inválido.');
+  const t = await vncTargetCached(aid);
+  await proxyVncHttp(req, res, { port: t.port, backendPath: `/${rest}`, search: url.search, password: t.password });
+}
 const syncedBoatFiles = new Set();
 
 function authed(req) {
@@ -3082,13 +3097,11 @@ const routes = [
   ['GET', /^\/api\/sandbox\/status$/, async () => sandboxStatus(db.settings)],
   ['POST', /^\/api\/computer\/image$/, async () => { ensureImage().then(() => { resolveSystemAlert('agent-image'); save(); }).catch(e => console.error('imagem', e.message)); return { image: await imageStatus() }; }],
   ['GET', /^\/api\/agents\/([\w-]+)\/vnc$/, async (req, [aid]) => {
-    const a = agentOr404(aid);
-    if (db.settings.computer.mode !== 'docker') throw new HttpError(409, 'A tela ao vivo precisa do computador em modo Docker.');
-    const pc = computerFor(a, db.settings, save);
-    const sc = await pc.screen();
-    if (!sc) throw new HttpError(503, 'A tela ainda não subiu. Tente de novo em alguns segundos.');
-    return { url: `http://127.0.0.1:${sc.port}/vnc.html?autoconnect=1&resize=scale&reconnect=1&show_dot=1`, port: sc.port };
+    const t = await vncTarget(aid);
+    return { url: vncClientUrl(aid, { password: t.password }), port: t.port };
   }],
+  ['GET', /^\/api\/agents\/([\w-]+)\/vnc\/(.+)$/, serveAgentVncProxy],
+  ['HEAD', /^\/api\/agents\/([\w-]+)\/vnc\/(.+)$/, serveAgentVncProxy],
   ['GET', /^\/api\/messages$/, () => db.messages.slice(-100).reverse().map(m => ({ ...m, fromName: db.agents.find(a => a.id === m.from)?.name, toName: db.agents.find(a => a.id === m.to)?.name }))],
   ['GET', /^\/api\/approvals$/, () => ({
     pending: db.approvals.filter(a => a.status === 'pending').map(approvalView),
@@ -4046,6 +4059,10 @@ const server = createServer(async (req, res) => {
   }
   });
 });
+attachVncUpgrade(server, {
+  isSignedIn: signedIn,
+  resolvePort: async aid => (await vncTargetCached(aid)).port
+});
 
 let activeHttpConnections = 0;
 server.on('connection', socket => {
@@ -4082,6 +4099,7 @@ async function setLan(on) {
   const ip = lanAddress();
   if (!ip) { lanError = 'Nenhuma rede local encontrada.'; return; }
   const s = createServer((req, res) => server.emit('request', req, res));
+  forwardUpgrade(s, server);
   await new Promise(r => { s.once('error', e => { lanError = e.message; r(); }); s.listen(PORT, ip, () => { lanServer = s; console.log(`Ripper na rede: http://${ip}:${PORT}`); r(); }); });
 }
 if (db.lanAccess) setLan(true).catch(e => console.error('[rede]', e.message));
@@ -4097,6 +4115,7 @@ async function setTail(on) {
   const ip = tailscaleAddress();
   if (!ip) { tailError = 'Tailscale não encontrado neste computador. Instale e entre na sua conta.'; return; }
   const s = createServer((req, res) => server.emit('request', req, res));
+  forwardUpgrade(s, server);
   await new Promise(r => { s.once('error', e => { tailError = e.message; r(); }); s.listen(PORT, ip, () => { tailServer = s; console.log(`Ripper no Tailscale: http://${ip}:${PORT}`); r(); }); });
 }
 if (db.tailAccess) setTail(true).catch(e => console.error('[tailscale]', e.message));
