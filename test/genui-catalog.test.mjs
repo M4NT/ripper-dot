@@ -63,7 +63,7 @@ test('JSON incremental fecha chaves e strings no streaming', () => {
   const mid = parseIncrementalJson('{"title":"Oi","opt');
   assert.equal(mid.complete, false);
   assert.equal(mid.state, 'input-streaming');
-  assert.ok(mid.value);
+  assert.deepEqual(mid.value, { title: 'Oi' });
   const closed = closePartialJson('{"rows":[{"dia":');
   assert.equal(closed.ok, true);
   assert.ok(closed.value.rows);
