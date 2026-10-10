@@ -22,6 +22,7 @@ test('normalizeMetricRoute reduz ids e mantém rotas literais', () => {
   );
   assert.equal(normalizeMetricRoute('/assets/main-abc123.js'), '/assets/:file');
   assert.equal(normalizeMetricRoute('/api/mcp/connectors/my-plugin'), '/api/mcp/connectors/:id');
+  assert.equal(normalizeMetricRoute('/api/events'), '/api/events');
 });
 
 test('contadores HTTP e chat no formato Prometheus', () => {
