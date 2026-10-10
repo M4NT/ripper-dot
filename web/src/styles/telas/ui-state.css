@@ -25,20 +25,23 @@
 
 /* ---- Empty (ícone opcional; .empty/.empty-title/.empty-body ficam em styles.css) ---- */
 .ui-empty-icon {
-  display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: var(--space-2);
-  border-radius: var(--raio-cartao); background: var(--surface-2); color: var(--muted);
+  display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: var(--space-2);
+  border-radius: var(--raio-controle); background: var(--surface-2); color: var(--ink);
 }
 
-/* ---- Error ---- */
+/* ---- Error (alert destrutivo da ObsidianUI, sem Tailwind) ---- */
 .ui-error {
-  display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2);
-  padding: var(--space-6); border-radius: var(--r-xl); background: var(--surface-2); color: var(--ink);
+  display: grid; grid-template-columns: 22px 1fr; gap: var(--space-2) var(--space-3); align-items: start;
+  width: 100%; padding: var(--space-4); border: 1px solid var(--line); border-radius: var(--r);
+  background: var(--surface); color: var(--ink);
 }
-.ui-error-title { font-weight: 500; font-size: var(--fs-md); }
+.ui-error-ico { margin-top: 2px; color: var(--err); }
+.ui-error-copy { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); min-width: 0; }
+.ui-error-title { font-weight: 500; font-size: var(--fs-md); letter-spacing: -.015em; }
 .ui-error-body { color: var(--muted); max-width: 52ch; }
-.ui-error-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+.ui-error-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-1); }
 .ui-error-actions .btn { min-height: var(--ctl-touch); }
-.ui-error-details { margin-top: var(--space-2); width: 100%; font-size: var(--fs-sm); color: var(--muted); }
+.ui-error-details { margin-top: var(--space-1); width: 100%; font-size: var(--fs-sm); color: var(--muted); }
 .ui-error-details summary { cursor: pointer; min-height: var(--ctl-touch); display: inline-flex; align-items: center; }
 .ui-error-details pre {
   margin: var(--space-2) 0 0; padding: var(--space-3); border-radius: var(--raio-controle);
@@ -47,10 +50,17 @@
 
 /* ---- Card ---- */
 .ui-card {
-  background: var(--surface-2); color: var(--ink); border: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: var(--space-3);
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line);
   border-radius: var(--raio-cartao); min-width: 0;
 }
 .ui-card-pad { padding: var(--space-4); }
+.ui-card-head { display: grid; gap: 2px; min-width: 0; }
+.ui-card-title { font-weight: 600; letter-spacing: -.015em; line-height: 1.25; }
+.ui-card-desc { color: var(--muted); font-size: var(--fs-sm); }
+.ui-card-body { min-width: 0; }
+.ui-card-foot { display: flex; align-items: center; gap: var(--space-2); }
+.ui-card-action { justify-self: end; }
 .ui-card-pending { box-shadow: inset 3px 0 0 var(--warn); }
 .ui-card-ok { box-shadow: inset 3px 0 0 var(--ok); }
 .ui-card-err { box-shadow: inset 3px 0 0 var(--err); }

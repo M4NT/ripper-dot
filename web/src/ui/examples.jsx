@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { BottomSheet, Card, EmptyState, ErrorState, Icon, Skeleton, VirtualList } from '../ui.jsx';
+import { BottomSheet, Card, CardDescription, CardHeader, CardTitle, EmptyState, ErrorState, Icon, Skeleton, VirtualList } from '../ui.jsx';
 
 const MIL = Array.from({ length: 10_000 }, (_, i) => ({
   id: 'm' + i,
@@ -56,16 +56,22 @@ export function UiExamples() {
         <h2>Card</h2>
         <div className="ui-ex-grid cols-2">
           <Card status="pending">
-            <p><b>Aprovar envio</b></p>
-            <p className="muted">O agente quer mandar o e-mail. Nada sai sem o seu ok.</p>
+            <CardHeader>
+              <CardTitle>Aprovar envio</CardTitle>
+              <CardDescription>O agente quer mandar o e-mail. Nada sai sem o seu ok.</CardDescription>
+            </CardHeader>
           </Card>
           <Card status="ok">
-            <p><b>Rotina ligada</b></p>
-            <p className="muted">Próxima execução amanhã às 9h.</p>
+            <CardHeader>
+              <CardTitle>Rotina ligada</CardTitle>
+              <CardDescription>Próxima execução amanhã às 9h.</CardDescription>
+            </CardHeader>
           </Card>
           <Card status="err">
-            <p><b>Conexão falhou</b></p>
-            <p className="muted">O conector do Gmail não respondeu.</p>
+            <CardHeader>
+              <CardTitle>Conexão falhou</CardTitle>
+              <CardDescription>O conector do Gmail não respondeu.</CardDescription>
+            </CardHeader>
           </Card>
         </div>
       </section>

@@ -64,7 +64,7 @@ for (const [nome, dados] of [['claro', claro], ['escuro', { ...claro, ...escuro 
 
 test('ui.jsx reexporta os primitivos novos e a API antiga', () => {
   for (const nome of ['Skeleton', 'EmptyState', 'ErrorState', 'Card', 'BottomSheet', 'VirtualList']) {
-    assert.match(uiJsx, new RegExp(`export \\{ ${nome} \\}`));
+    assert.match(uiJsx, new RegExp(`export \\{[^}]*\\b${nome}\\b`));
   }
   assert.match(emptySrc, /export function EmptyState\(\{ title, body, action/);
   assert.match(skelSrc, /export function Skeleton\(\{ rows = 3, label = 'Carregando'/);
@@ -179,4 +179,17 @@ test('exemplos cobrem os seis primitivos', () => {
     assert.match(ex, new RegExp(`<${nome}\\b`));
   }
   assert.match(ex, /10_000|10000/);
+});
+
+test('primitivos carregam slots da ObsidianUI sem Tailwind nem Motion', () => {
+  assert.match(src('ui/state/Skeleton.jsx'), /data-slot="skeleton"/);
+  assert.match(src('ui/state/EmptyState.jsx'), /data-slot="empty"/);
+  assert.match(src('ui/state/ErrorState.jsx'), /data-slot="alert"/);
+  assert.match(src('ui/Card.jsx'), /data-slot="card"/);
+  assert.match(src('ui/Card.jsx'), /export function CardHeader/);
+  assert.match(src('ui/BottomSheet.jsx'), /data-slot="sheet"/);
+  const pkg = readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8');
+  assert.equal(/"tailwindcss"|"motion"|"gsap"|"vaul"|"@radix-ui\/react-dialog"/.test(pkg), false);
+  assert.match(src('ui/obsidian/LICENSE'), /Copyright \(c\) 2026 ObsidianUI/);
+  assert.match(src('ui/obsidian/README.md'), /Tailwind/);
 });

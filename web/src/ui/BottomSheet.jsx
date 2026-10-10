@@ -1,3 +1,5 @@
+/* Adaptado de ObsidianUI sheet + drawer (MIT): slots e handle.
+   Sem Radix/Vaul — arrastar, Esc e foco preso ficam aqui. Ver web/src/ui/obsidian/LICENSE */
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { focusables, trapTab } from './focusTrap.js';
@@ -53,8 +55,8 @@ export function BottomSheet({ open, onClose, title, label, children, className =
 
   if (!open || typeof document === 'undefined') return null;
   return createPortal(
-    <div className="ui-sheet-root" data-open="1">
-      <button type="button" className="ui-sheet-scrim" aria-label="Fechar" onClick={() => onClose?.()} />
+    <div className="ui-sheet-root" data-slot="sheet" data-open="1">
+      <button type="button" className="ui-sheet-scrim" data-slot="sheet-overlay" aria-label="Fechar" onClick={() => onClose?.()} />
       <div
         ref={sheet}
         role="dialog"
@@ -62,10 +64,12 @@ export function BottomSheet({ open, onClose, title, label, children, className =
         aria-label={label || title || 'Painel'}
         tabIndex={-1}
         className={'ui-sheet' + (className ? ' ' + className : '')}
+        data-slot="sheet-content"
         style={oy ? { transform: `translateY(${oy}px)` } : undefined}
       >
         <div
           className="ui-sheet-handle-wrap"
+          data-slot="drawer-handle"
           onPointerDown={down}
           onPointerMove={move}
           onPointerUp={up}
@@ -73,15 +77,15 @@ export function BottomSheet({ open, onClose, title, label, children, className =
         >
           <div className="ui-sheet-handle" />
         </div>
-        <div className="ui-sheet-head">
-          {title ? <h2>{title}</h2> : <span />}
-          <button type="button" className="ui-sheet-close" aria-label="Fechar" onClick={() => onClose?.()}>
+        <div className="ui-sheet-head" data-slot="sheet-header">
+          {title ? <h2 data-slot="sheet-title">{title}</h2> : <span />}
+          <button type="button" className="ui-sheet-close" data-slot="sheet-close" aria-label="Fechar" onClick={() => onClose?.()}>
             <svg className="icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
               <path d="M18 6 6 18M6 6l12 12" />
             </svg>
           </button>
         </div>
-        <div className="ui-sheet-body">{children}</div>
+        <div className="ui-sheet-body" data-slot="sheet-body">{children}</div>
       </div>
     </div>,
     document.body,

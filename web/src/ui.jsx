@@ -319,7 +319,7 @@ export const StatusDot = ({ status }) => {
 export { Skeleton } from './ui/state/Skeleton.jsx';
 export { EmptyState } from './ui/state/EmptyState.jsx';
 export { ErrorState } from './ui/state/ErrorState.jsx';
-export { Card } from './ui/Card.jsx';
+export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, CardAction } from './ui/Card.jsx';
 export { BottomSheet } from './ui/BottomSheet.jsx';
 export { VirtualList } from './ui/VirtualList.jsx';
 export { BP_PHONE, BP_TABLET, QUERY as UI_BREAKPOINTS } from './ui/breakpoints.js';

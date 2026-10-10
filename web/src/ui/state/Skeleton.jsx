@@ -1,3 +1,4 @@
+/* Adaptado de ObsidianUI skeleton (MIT). Ver web/src/ui/obsidian/LICENSE */
 import '../../tokens.css';
 import '../../styles/telas/ui-state.css';
 
@@ -8,7 +9,7 @@ export function Skeleton({ rows = 3, label = 'Carregando', variant = 'list' }) {
     return (
       <div className="ui-skel-msg" role="status" aria-label={label}>
         {Array.from({ length: rows }, (_, i) => (
-          <div key={i} className={'ui-skel-bubble' + (i % 2 ? ' user' : '')} aria-hidden="true" />
+          <div key={i} className={'ui-skel-bubble' + (i % 2 ? ' user' : '')} data-slot="skeleton" aria-hidden="true" />
         ))}
       </div>
     );
@@ -17,22 +18,22 @@ export function Skeleton({ rows = 3, label = 'Carregando', variant = 'list' }) {
     return (
       <div className="ui-skel-panel" role="status" aria-label={label}>
         {Array.from({ length: rows }, (_, i) => (
-          <span key={i} className={'ui-skel-block' + (i === 0 ? ' wide' : i === rows - 1 ? ' short' : ' mid')} aria-hidden="true" />
+          <span key={i} className={'ui-skel-block' + (i === 0 ? ' wide' : i === rows - 1 ? ' short' : ' mid')} data-slot="skeleton" aria-hidden="true" />
         ))}
       </div>
     );
   }
   if (variant === 'line') {
     return (
-      <span className="ui-skel-line" role="status" aria-label={label} />
+      <span className="ui-skel-line" data-slot="skeleton" role="status" aria-label={label} />
     );
   }
   return (
     <div className="skeleton-list" role="status" aria-label={label}>
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="skeleton-row" aria-hidden="true">
-          <span className="skeleton-dot" />
-          <span className="skeleton-lines"><span className="skeleton-line" /><span className="skeleton-line short" /></span>
+          <span className="skeleton-dot" data-slot="skeleton" />
+          <span className="skeleton-lines"><span className="skeleton-line" data-slot="skeleton" /><span className="skeleton-line short" data-slot="skeleton" /></span>
         </div>
       ))}
     </div>
