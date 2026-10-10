@@ -932,6 +932,8 @@ const approvalView = a => ({ ...a, agentName: db.agents.find(x => x.id === a.age
 
 /** Computador com portão: comandos de risco (ou tudo, na máquina do usuário) esperam sua aprovação. */
 const browsers = new Map();
+// Cartões salvos na resposta do turno em andamento, por conversa: o pedido decidido fica na conversa depois do fim.
+const turnCards = new WeakMap();
 async function askApproval({ agent, chat, emit, signal }, kind, command, reason, remember = true) {
   const rec = { id: id(), agentId: agent.id, chatId: chat.id, kind, command, reason, status: 'pending', createdAt: Date.now() };
   db.approvals.push(rec);
@@ -940,6 +942,8 @@ async function askApproval({ agent, chat, emit, signal }, kind, command, reason,
   notifyApproval(agent, command, rec);
   const done = await gate.request(rec, signal);
   emit({ approvalDone: { id: rec.id, status: done.status } });
+  const { expiresAt: _exp, ...visto } = approvalView(rec);
+  turnCards.get(chat)?.push({ kind: 'approval', rec: visto, status: done.status });
   if (remember && done.status === 'approved' && done.remember) rememberAllowedCommand(chat, command);
   return done.status === 'approved';
 }
@@ -1223,7 +1227,8 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
     }
   }
   const x9Sources = () => collectX9Sources({ db, settings: s });
-  const cardSteps = []; // cartões que ficam salvos na resposta (campanha de e-mail em demonstração)
+  const cardSteps = []; // cartões que ficam salvos na resposta (campanha de e-mail em demonstração, pedidos decididos)
+  turnCards.set(chat, cardSteps);
   const delivered = []; // arquivos entregues neste turno: viram botões na resposta
   const sentDelegations = []; // pedidos a colegas (send_message/call_agent): viram cartões na resposta
   const ctx = {

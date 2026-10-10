@@ -2060,3 +2060,10 @@ body.agent-dragging .side-list { overflow: hidden; }
 
 /* Erro de campo padrão: vermelho, pequeno, logo abaixo do campo. */
 .campo-erro { margin: 4px 2px 0; font-size: var(--fs-sm); color: var(--err); }
+
+/* Alvos de toque de 44 px no celular, sem mudar o desenho: borda/padding transparente com margem negativa igual. */
+@media (max-width: 900px), (pointer: coarse) {
+  .switch { box-sizing: content-box; border: 11px solid transparent; background-clip: padding-box; margin: -11px; }
+  .seg button, .mp-tabs button, .mp-installed, .link-btn, select.select, .select { min-height: 44px; }
+  a:not([class]) { display: inline-block; padding: 12px 0; margin: -12px 0; }
+}
