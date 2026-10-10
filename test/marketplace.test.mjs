@@ -4,7 +4,9 @@ import { CONNECTORS, filterCatalog, matchesQuery, catalogById } from '../web/src
 import {
   STATUS, installPlugin, isPluginInstalled, primaryAction, resolveConnectorStatus, filterByStatus
 } from '../web/src/marketplace/state.js';
-import { authorizationRequestParams, generatePkce, oauthCallbackHtml, escapeHtml } from '../lib/mcp-oauth.mjs';
+import { runInNewContext } from 'node:vm';
+import { authorizationRequestParams, generatePkce, oauthCallbackHtml, oauthCallbackScript, escapeHtml } from '../lib/mcp-oauth.mjs';
+import { isTrustedOAuthEvent, OAUTH_MESSAGE_TYPE } from '../web/src/marketplace/mcpOAuth.js';
 
 test('catálogo único: busca acha GitHub e Stripe na lista toda', () => {
   assert.ok(CONNECTORS.some(c => c.id === 'github'));
@@ -133,12 +135,48 @@ test('authorize envia resource (RFC 8707) e PKCE S256', () => {
   assert.ok(params.get('code_challenge'));
 });
 
-test('página do callback fala com o opener e nunca leva o token', () => {
+test('página do callback usa script externo e não reflete texto externo no script', () => {
   const html = oauthCallbackHtml({ status: 'complete', message: 'Login concluído.', origin: 'http://127.0.0.1:3000' });
-  assert.match(html, /postMessage/);
-  assert.match(html, /ripper-mcp-oauth/);
-  assert.doesNotMatch(html, /access_token|refresh_token|Bearer /);
-  const evil = oauthCallbackHtml({ status: 'error', message: '<script>alert(1)</script>', origin: 'http://127.0.0.1:3000' });
-  assert.match(evil, /&#60;script&#62;/);
+  assert.match(html, /src="\/oauth-callback\.js"/);
+  assert.match(html, /data-status="complete"/);
+  assert.doesNotMatch(html, /postMessage|ripper-mcp-oauth|access_token|refresh_token|Bearer /);
+  const payload = '</script><script>alert(1)</script>';
+  const evil = oauthCallbackHtml({ status: 'error', message: payload, origin: 'http://127.0.0.1:3000' });
+  assert.match(evil, /&#60;\/script&#62;/);
+  assert.doesNotMatch(evil, /<script>alert/);
+  assert.match(evil, /data-status="error"/);
+  assert.doesNotMatch(evil, /data-error|error_description/);
   assert.equal(escapeHtml('<x>'), '&#60;x&#62;');
+});
+
+test('oauth-callback.js envia só status, fecha o popup e respeita a origem', () => {
+  const js = oauthCallbackScript();
+  assert.match(js, /postMessage/);
+  assert.match(js, /window\.close/);
+  assert.doesNotMatch(js, /error_description|access_token/);
+  let closed = false;
+  let posted = null;
+  const scheduled = [];
+  runInNewContext(js, {
+    document: { currentScript: { getAttribute: n => (n === 'data-status' ? 'complete' : n === 'data-origin' ? 'http://127.0.0.1:3000' : '') } },
+    window: {
+      opener: { postMessage: (m, o) => { posted = { m, o }; } },
+      close: () => { closed = true; }
+    },
+    location: { origin: 'http://127.0.0.1:3000' },
+    setTimeout: (fn, ms) => { scheduled.push({ fn, ms }); }
+  });
+  assert.deepEqual(posted.m, { type: 'ripper-mcp-oauth', status: 'complete' });
+  assert.equal(posted.o, 'http://127.0.0.1:3000');
+  assert.equal(scheduled[0].ms, 800);
+  scheduled[0].fn();
+  assert.equal(closed, true);
+});
+
+test('postMessage OAuth exige origin e event.source === popup', () => {
+  const popup = { id: 'popup' };
+  const ok = { origin: 'http://app', source: popup, data: { type: OAUTH_MESSAGE_TYPE, status: 'complete' } };
+  assert.equal(isTrustedOAuthEvent(ok, popup, 'http://app'), true);
+  assert.equal(isTrustedOAuthEvent({ ...ok, source: { id: 'other' } }, popup, 'http://app'), false);
+  assert.equal(isTrustedOAuthEvent({ ...ok, origin: 'http://evil' }, popup, 'http://app'), false);
 });

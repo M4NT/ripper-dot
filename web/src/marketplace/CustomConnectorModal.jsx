@@ -76,11 +76,7 @@ export default function CustomConnectorModal({ open, onClose, onSaved }) {
       });
 
       if (oauthNeeded && authMode === 'oauth_now' && verify?.login?.discovery?.authorizationServer) {
-        await runMcpOAuthLogin({
-          pluginName: trimmed,
-          url: url.trim(),
-          discovery: verify.login.discovery
-        });
+        await runMcpOAuthLogin({ pluginName: trimmed });
       }
 
       onSaved?.();

@@ -186,7 +186,7 @@ export default function Marketplace() {
       }
       if (type === 'oauth') extra = { auth: { mode: 'oauth_now' } };
       await api('/api/settings', { method: 'PUT', body: { plugins: installPlugin(item.id, settings, extra) } });
-      if (type === 'oauth') await runMcpOAuthLogin({ pluginName: item.id, url: item.connect.url });
+      if (type === 'oauth') await runMcpOAuthLogin({ pluginName: item.id });
       await refresh();
       loadLive();
       await enableAgentsIfNeeded(item.name);
@@ -213,7 +213,7 @@ export default function Marketplace() {
         if (st?.state === 'expired_refreshable') {
           await refreshMcpOAuth(item.id);
         } else {
-          await runMcpOAuthLogin({ pluginName: item.id, url: plugin?.url || item.connect.url });
+          await runMcpOAuthLogin({ pluginName: item.id });
         }
       }
       const probe = await api('/api/mcp/verify', {
@@ -267,7 +267,7 @@ export default function Marketplace() {
           setConnecting(item.id);
           try {
             if (authByName[item.id]?.state === 'expired_refreshable') await refreshMcpOAuth(item.id);
-            else await runMcpOAuthLogin({ pluginName: item.id, url: item.connect.url });
+            else await runMcpOAuthLogin({ pluginName: item.id });
             await refresh();
             loadLive();
           } catch (e) {

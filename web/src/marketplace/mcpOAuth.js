@@ -13,17 +13,14 @@ function waitForOAuthResult(flowId, popup) {
       else reject(value instanceof Error ? value : new Error(String(value)));
     };
     const onMsg = e => {
-      if (e.origin !== location.origin) return;
+      if (!isTrustedOAuthEvent(e, popup, location.origin)) return;
       const d = e.data;
-      if (!d || d.type !== MSG_TYPE) return;
       if (d.status === 'complete') finish(true, d);
-      else finish(false, new Error(d.error || 'Login OAuth falhou.'));
+      else poll();
     };
     const poll = async () => {
       if (Date.now() > deadline) return finish(false, new Error('Tempo esgotado aguardando o login OAuth.'));
-      if (popup && popup.closed) {
-        // popup fechou: ainda confere o servidor (postMessage pode ter se perdido)
-      }
+      const closed = !!(popup && popup.closed);
       try {
         const st = await api(`/api/mcp/oauth/status/${flowId}`);
         if (st.status === 'complete') return finish(true, st);
@@ -33,6 +30,7 @@ function waitForOAuthResult(flowId, popup) {
       } catch (e) {
         if (e.status === 404) return finish(false, new Error('Fluxo OAuth expirado. Tente de novo.'));
       }
+      if (closed) return finish(false, new Error('Janela de login fechada.'));
       timer = setTimeout(poll, 900);
     };
     window.addEventListener('message', onMsg);
@@ -40,11 +38,17 @@ function waitForOAuthResult(flowId, popup) {
   });
 }
 
+export function isTrustedOAuthEvent(e, popup, origin) {
+  if (!e || e.origin !== origin) return false;
+  if (popup && e.source !== popup) return false;
+  return !!(e.data && e.data.type === MSG_TYPE);
+}
+
 /** Abre o navegador do usuário e aguarda o callback no servidor Ripper (postMessage + polling). */
-export async function runMcpOAuthLogin({ pluginName, url, discovery }) {
+export async function runMcpOAuthLogin({ pluginName }) {
   const started = await api('/api/mcp/oauth/start', {
     method: 'POST',
-    body: { pluginName, url, discovery }
+    body: { pluginName }
   });
   const popup = window.open(started.authorizeUrl, 'ripper_mcp_oauth', 'width=520,height=720');
   if (!popup) {

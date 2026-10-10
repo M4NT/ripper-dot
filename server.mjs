@@ -156,8 +156,10 @@ import {
   oauthRedirectUri,
   escapeHtml,
   oauthCallbackHtml,
+  oauthCallbackScript,
   pluginOAuthStatus,
-  startMcpOAuthFlow
+  startMcpOAuthFlow,
+  isSafeOutboundUrl
 } from './lib/mcp-oauth.mjs';
 import {
   persistArtifactContent,
@@ -394,6 +396,15 @@ function publicBaseUrl(req) {
   const host = req.headers.host || `127.0.0.1:${PORT}`;
   const proto = req.headers['x-forwarded-proto'] || (HOST === '0.0.0.0' ? 'http' : 'http');
   return `${proto}://${host}`;
+}
+
+/** Liga o state OAuth à sessão/cookie do dono que iniciou o login. */
+function oauthCallerSessionKey(req) {
+  const s = sessionCookie(req);
+  if (s) return `s:${s}`;
+  const d = deviceCookie(req);
+  if (d) return `d:${d}`;
+  return '';
 }
 // Prévias em texto puro: nada de ** ou # aparecendo nas listas.
 const plain = s => String(s || '').replace(/```[\s\S]*?```/g, ' ').replace(/[*_`#>]+/g, '').replace(/\s+/g, ' ').trim();
@@ -865,7 +876,7 @@ async function pluginsForTurn(s, agent) {
     if (pl.type === 'http' && o?.refreshToken && o.expiresAt && o.expiresAt < Date.now() + 120_000) {
       const r = await refreshPluginOAuthToken(pl).catch(e => ({ ok: false, error: e.message }));
       if (r.ok && r.tokens?.accessToken) {
-        const flow = { clientId: pl.auth.clientId, clientSecret: pl.auth.clientSecret, tokenEndpoint: pl.auth.tokenEndpoint };
+        const flow = { clientId: pl.auth.clientId, clientSecret: pl.auth.clientSecret, tokenEndpoint: pl.auth.tokenEndpoint, resource: pl.auth.resource };
         const idx = db.settings.plugins.findIndex(x => x.name === orig.name);
         if (idx >= 0) { db.settings.plugins[idx] = persistOAuthTokensInVault(db.settings.plugins[idx], r.tokens, flow); save(); }
         pl = applyOAuthTokensToPlugin(pl, r.tokens, flow);
@@ -2458,22 +2469,29 @@ const routes = [
       throw new HttpError(400, e.message || 'Falha ao atualizar OAuth.');
     }
   }],
-  ['POST', /^\/api\/mcp\/oauth\/start$/, async (req, _, url) => {
+  ['POST', /^\/api\/mcp\/oauth\/start$/, async req => {
     const b = await body(req);
     const name = String(b.pluginName || '').trim();
     if (!name) throw new HttpError(400, 'Informe pluginName.');
     const plugin = (db.settings.plugins || []).find(p => p.name === name && p.type === 'http');
     if (!plugin) throw new HttpError(404, 'Conector HTTP não encontrado.');
-    const mcpUrl = String(b.url || plugin.url || '');
-    if (!/^https:\/\//.test(mcpUrl)) throw new HttpError(400, 'URL MCP HTTPS inválida.');
-    let discovery = b.discovery;
-    if (!discovery?.authorizationServer) {
+    const mcpUrl = String(plugin.url || '');
+    if (!isSafeOutboundUrl(mcpUrl)) throw new HttpError(400, 'URL MCP inválida para OAuth.');
+    let discovery;
+    try {
       const probe = await fetch(mcpUrl, { method: 'GET', headers: { accept: 'application/json' } }).catch(() => null);
       discovery = await discoverMcpOAuth(mcpUrl, { probeHeaders: probe?.headers });
+    } catch (e) {
+      throw new HttpError(400, e.message || 'Não foi possível obter metadados OAuth deste servidor.');
     }
     if (!discovery?.authorizationServer) throw new HttpError(400, 'Não foi possível obter metadados OAuth deste servidor.');
     const redirectUri = oauthRedirectUri(publicBaseUrl(req));
-    const started = await startMcpOAuthFlow({ plugin, discovery, redirectUri });
+    const started = await startMcpOAuthFlow({
+      plugin,
+      discovery,
+      redirectUri,
+      sessionKey: oauthCallerSessionKey(req)
+    });
     return { ...started, redirectUri };
   }],
   ['GET', /^\/api\/mcp\/oauth\/status\/([\w-]+)$/, (req, [flowId]) => {
@@ -3872,6 +3890,10 @@ const server = createServer(async (req, res) => {
       res.writeHead(302, { 'set-cookie': `ripper_token=${encodeURIComponent(TOKEN)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`, location: '/' });
       return res.end();
     }
+    if (req.method === 'GET' && p === '/oauth-callback.js') {
+      res.writeHead(200, hdr(req, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache' }));
+      return res.end(oauthCallbackScript());
+    }
     if (req.method === 'GET' && p === '/metrics') {
       if (!metricsAccessAllowed(signedIn(req))) throw new HttpError(401, 'Entre com a senha do Ripper.');
       const metricsBody = formatPrometheusExposition();
@@ -4028,7 +4050,7 @@ const server = createServer(async (req, res) => {
         res.writeHead(code, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
         res.end(oauthCallbackHtml({ status, message, origin }));
       };
-      const flow = findOAuthFlowByState(state);
+      const flow = findOAuthFlowByState(state, { sessionKey: oauthCallerSessionKey(req) });
       if (!flow) {
         html('error', 'Fluxo inválido ou expirado. Feche esta janela e tente de novo no Ripper.', 400);
         return;
