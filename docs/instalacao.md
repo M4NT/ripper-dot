@@ -246,21 +246,25 @@ node scripts/staging.mjs status
 node scripts/staging.mjs smoke       # npm run smoke contra o staging
 node scripts/staging.mjs restart     # derruba e sobe de novo; os dados ficam
 node scripts/staging.mjs down        # para; os dados ficam
-node scripts/staging.mjs reset       # apaga o volume/pasta e semeia de novo
+RIPPER_ENV=staging node scripts/staging.mjs reset   # apaga só o staging e semeia de novo
 ```
 
 Atalho npm: `npm run staging -- up` (o `--` passa o comando). Sem Docker: `node scripts/staging.mjs up --local`.
 
+O script **não lê** `RIPPER_DATA`, `RIPPER_TOKEN`, `HOST` nem `PORT` de produção. Só `RIPPER_STAGING_*`. `reset` e `seed --force` exigem `RIPPER_ENV=staging` e a pasta `data/staging` (ou o marcador `.ripper-staging`). Sem isso o comando recusa — não apaga a instalação real.
+
+A porta do Compose é `127.0.0.1:3010` (não escuta na LAN). O token **não tem padrão fixo**: o primeiro `up` gera um `RIPPER_STAGING_TOKEN` em `deploy/staging/.env` (fora do Git). O Compose exige `${RIPPER_STAGING_TOKEN:?…}`.
+
 | | Padrão | Onde mudar |
 | --- | --- | --- |
-| URL | http://127.0.0.1:3010 | `RIPPER_STAGING_PORT` ou `RIPPER_URL` |
-| Token | `ripper-staging-token` | `RIPPER_TOKEN` (obrigatório no Compose: o contêiner escuta em `0.0.0.0`) |
+| URL | http://127.0.0.1:3010 | `RIPPER_STAGING_PORT` ou `RIPPER_STAGING_URL` |
+| Token | gerado no primeiro `up` | `RIPPER_STAGING_TOKEN` |
 | Senha da UI | `staging-ok-8` | `RIPPER_STAGING_PASSWORD` |
-| Provedor | `stream` (`lib/test-provider.mjs`) | `RIPPER_TEST_PROVIDER` |
-| Dados (local) | `data/staging/` | `RIPPER_DATA` |
-| Dados (Docker) | volume `ripper-staging-data` → `/data` | `docker compose down -v` apaga |
+| Provedor | `stream` (`lib/test-provider.mjs`) | `RIPPER_STAGING_PROVIDER` |
+| Dados (local) | `data/staging/` | `RIPPER_STAGING_DATA` |
+| Dados (Docker) | volume `ripper-staging-data` → `/data` | `RIPPER_ENV=staging node scripts/staging.mjs reset` |
 
-Abra http://127.0.0.1:3010/?token=ripper-staging-token ou entre com a senha. O seed traz dois agentes (Assistente e Relator), uma memória e uma rotina — o fluxo de grupo do smoke precisa de um segundo agente.
+Depois do `up`, o próprio comando imprime o token. Abra `http://127.0.0.1:3010/?token=<token>` ou entre com a senha. O seed traz dois agentes (Assistente e Relator), uma memória e uma rotina — o fluxo de grupo do smoke precisa de um segundo agente.
 
 Arquivos:
 
@@ -272,7 +276,7 @@ Arquivos:
 | `deploy/staging/.env.example` | Copie para `.env` na mesma pasta se quiser trocar token/porta |
 | `scripts/staging.mjs` | `up` / `down` / `restart` / `smoke` / `seed` / `reset` / `serve` |
 
-O `smoke` contra o staging define `RIPPER_URL`, `RIPPER_TOKEN` e `SMOKE_TEST_PROVIDER=1`, para os fluxos de chat/aprovação/grupo rodarem no provedor falso em vez de serem pulados.
+O `smoke` contra o staging envia só `RIPPER_URL` / `RIPPER_TOKEN` / `RIPPER_PASSWORD` do staging e `SMOKE_TEST_PROVIDER=1` — sem herdar chaves de produção — para os fluxos de chat/aprovação/grupo rodarem no provedor falso.
 
 Isto **não** é a imagem dos agentes (`docker/agent/`) nem um empacotamento de produção. É o ambiente fixo para conferir que o Ripper volta depois de um reinício e que o smoke diário passa.
 

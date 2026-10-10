@@ -1,9 +1,10 @@
 # Staging reproduzível do Ripper: provedor de teste, dados de exemplo, volume persistente.
 # Uso: node scripts/staging.mjs up
 # Ou, nesta pasta: docker compose up -d --build
+# (exige RIPPER_STAGING_TOKEN no .env desta pasta; o `up` gera se faltar)
 #
-# O volume ripper-staging-data sobrevive a `restart` e a `down` sem `-v`.
-# `node scripts/staging.mjs reset` (ou `docker compose down -v`) recomeça do seed.
+# Porta só em 127.0.0.1. O volume ripper-staging-data sobrevive a `restart` e a `down` sem `-v`.
+# RIPPER_ENV=staging node scripts/staging.mjs reset  (ou docker compose down -v) recomeça do seed.
 
 name: ripper-staging
 
@@ -16,14 +17,15 @@ services:
     container_name: ripper-staging
     restart: unless-stopped
     ports:
-      - "${RIPPER_STAGING_PORT:-3010}:3000"
+      - "127.0.0.1:${RIPPER_STAGING_PORT:-3010}:3000"
     environment:
-      HOST: "0.0.0.0"
-      PORT: "3000"
-      RIPPER_DATA: /data
-      RIPPER_TEST_PROVIDER: ${RIPPER_TEST_PROVIDER:-stream}
-      RIPPER_TOKEN: ${RIPPER_TOKEN:-ripper-staging-token}
+      RIPPER_ENV: staging
+      RIPPER_STAGING_HOST: "0.0.0.0"
+      RIPPER_STAGING_LISTEN: "3000"
+      RIPPER_STAGING_DATA: /data
+      RIPPER_STAGING_TOKEN: ${RIPPER_STAGING_TOKEN:?defina RIPPER_STAGING_TOKEN}
       RIPPER_STAGING_PASSWORD: ${RIPPER_STAGING_PASSWORD:-staging-ok-8}
+      RIPPER_STAGING_PROVIDER: stream
       JULIA_AUTOSTART: "0"
       RIPPER_NO_PREWARM: "1"
     volumes:

@@ -1,5 +1,6 @@
 # Imagem do servidor Ripper só para staging (provedor de teste + seed).
 # Não substitui a imagem dos agentes em docker/agent/.
+# Sem marcar o processo como produção: o sinal de ambiente é RIPPER_ENV=staging.
 FROM node:22-bookworm-slim
 
 WORKDIR /app
@@ -16,11 +17,11 @@ COPY deploy/staging ./deploy/staging
 
 RUN npm run build
 
-ENV NODE_ENV=production \
-    HOST=0.0.0.0 \
-    PORT=3000 \
-    RIPPER_DATA=/data \
-    RIPPER_TEST_PROVIDER=stream \
+ENV RIPPER_ENV=staging \
+    RIPPER_STAGING_HOST=0.0.0.0 \
+    RIPPER_STAGING_LISTEN=3000 \
+    RIPPER_STAGING_DATA=/data \
+    RIPPER_STAGING_PROVIDER=stream \
     JULIA_AUTOSTART=0 \
     RIPPER_NO_PREWARM=1
 
