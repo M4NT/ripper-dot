@@ -1,5 +1,5 @@
 import { memo, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ThinkingOrb } from 'thinking-orbs';
+import { ThinkingOrb } from '../fx/ThinkingOrb.jsx';
 import WorkspaceBar from '../workspaceBar.jsx';
 import { api, go, fmtTime, fmtSize, stepLabel, seenLabel, useMediaQuery, local, nameColor, speak, canSpeak } from '../lib.js';
 import { markdown, closeOpen, plain, tabelaParaCsv, titulosDo } from '../markdown.js';
@@ -20,7 +20,7 @@ import { OpenUIBlock, splitOpenUi } from '../openui/library.jsx';
 import ActionLine, { Fontes, StallNote } from '../actionLine.jsx';
 import { useChatMenu } from '../actions.jsx';
 import { useOv } from '../overlay.jsx';
-import { botAvatarPalette } from 'bot-avatars';
+import { botAvatarPalette } from '../fx/botAvatarPalette.js';
 import { FirstRunChecklist } from '../firstRunChecklist.jsx';
 import { findChatMatches } from '../../../lib/chat-edit.mjs';
 import ErrorNote from '../errorNote.jsx';

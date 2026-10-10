@@ -209,6 +209,10 @@ code { font: .88em var(--mono); }
 .toolbar.wrap { flex-wrap: wrap; }
 .page-loading, .boot { display: grid; place-items: center; min-height: 40vh; }
 .boot { min-height: 100dvh; align-content: center; gap: 12px; text-align: center; padding: 24px; }
+.fx-orb-fallback { display: inline-block; border-radius: 50%; background: color-mix(in srgb, var(--ink) 18%, transparent); animation: fx-orb-pulse 1.2s ease-in-out infinite; }
+@keyframes fx-orb-pulse { 50% { opacity: .4; transform: scale(.92); } }
+@media (prefers-reduced-motion: reduce) { .fx-orb-fallback { animation: none; } }
+.fx-avatar-fallback { display: inline-block; border-radius: 50%; background: var(--ink-2); }
 .login { place-items: stretch; width: min(360px, 100%); margin: 0 auto; text-align: left; }
 .login h1 { display: flex; align-items: center; justify-content: center; gap: 10px; font: 600 28px/1 var(--font); letter-spacing: -.02em; margin-bottom: 4px; }
 .login > p.muted { text-align: center; margin-bottom: 12px; }
@@ -512,7 +516,9 @@ p.ws-warn { border-radius: var(--raio-controle); padding: 6px 10px; margin: 6px 
 
 /* composer */
 .composer-wrap { position: relative; }
-.composer-voice { display: block; border-radius: var(--raio-folha); }
+.composer-voice { display: block; position: relative; border-radius: var(--raio-folha); }
+.fx-voice-layer { position: absolute; inset: 0; pointer-events: none; border-radius: inherit; }
+.fx-voice-slot { display: block; width: 100%; height: 100%; }
 .composer { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--raio-folha); padding: 16px 14px 12px 20px; box-shadow: var(--shadow-2); transition: border-color .2s, box-shadow .25s var(--out); }
 .composer:focus-within { border-color: var(--line-2); box-shadow: var(--shadow-2), 0 0 0 4px color-mix(in srgb, var(--ink) 5%, transparent); }
 .composer.drag { border-color: var(--ink); border-style: dashed; }

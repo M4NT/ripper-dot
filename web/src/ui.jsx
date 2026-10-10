@@ -1,7 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { BotAvatar } from 'bot-avatars';
-import { Liquid } from 'liquid-gooey';
+import { BotAvatar } from './fx/BotAvatar.jsx';
 import { useT } from './i18n/index.jsx';
 
 /* ---------- ícones: um só traço, 1.6px, desenhados à mão ---------- */
@@ -89,6 +88,8 @@ export function AgentAvatar({ agent, size = 40, state, interactive = false, anim
 export function Segmented({ items, value, onChange, className = '', size = 'md', label }) {
   const ref = useRef(null);
   const [box, setBox] = useState(null);
+  const [Liquid, setLiquid] = useState(null);
+  useEffect(() => { import('liquid-gooey').then(m => setLiquid(() => m.Liquid)).catch(() => {}); }, []);
   useLayoutEffect(() => {
     const measure = () => {
       const el = ref.current?.querySelector(`[data-value="${CSS.escape(String(value))}"]`);
@@ -110,13 +111,15 @@ export function Segmented({ items, value, onChange, className = '', size = 'md',
   };
   return (
     <div className={`seg seg-${size} ${className}`} ref={ref} role="tablist" aria-label={label} onKeyDown={onKey}>
-      {box && (
+      {box && (Liquid ? (
         <Liquid className="seg-liquid" fill="var(--seg-thumb)" shadow="0 1px 2px rgba(20,18,15,.10), 0 2px 8px rgba(20,18,15,.06)" blur={5} contrast={16}>
           <Liquid.Item effect="move" move={{ springiness: 0.55, trail: 0.45, wobble: 0.4 }}>
             <div className="seg-thumb" style={{ width: box.w, height: box.h, transform: `translate(${box.x}px, ${box.y}px)` }} />
           </Liquid.Item>
         </Liquid>
-      )}
+      ) : (
+        <div className="seg-thumb" style={{ width: box.w, height: box.h, transform: `translate(${box.x}px, ${box.y}px)` }} />
+      ))}
       {items.map(([v, l, count]) => (
         <button key={v} type="button" role="tab" data-value={v} aria-selected={v === value} tabIndex={v === value ? 0 : -1}
           className={v === value ? 'on' : ''} onClick={() => onChange(v)}>

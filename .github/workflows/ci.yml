@@ -34,6 +34,9 @@ jobs:
       - name: Build web (Vite)
         run: npm run build
 
+      - name: Orçamento do JS inicial
+        run: npm run check:bundle
+
       # Abre todas as telas num navegador de verdade e manda um prompt com ferramentas.
       # Pega o que os testes de Node não veem (ex.: tela "Algo quebrou" no chat).
       - name: Install Firefox (Playwright)

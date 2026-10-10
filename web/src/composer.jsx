@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { VoiceBeam, useMicrophone } from 'voice-glow';
+import { VoiceBeam, useMicrophone } from './fx/voiceGlow.jsx';
 import { api, fmtSize, go, local, useDark, canSpeak } from './lib.js';
 import { AgentAvatar, Icon, useToast } from './ui.jsx';
 import { useApp } from './app.jsx';
@@ -131,7 +131,7 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
     if (listening) { rec.current?.stop(); mic.stop(); setListening(false); return; }
     if (transcribing) return;
     const stream = await mic.start();
-    if (!stream) return toast('Sem acesso ao microfone. Libere nas permissões do navegador.', 'error');
+    if (!stream) return toast(mic.hint || 'Sem acesso ao microfone. Libere nas permissões do navegador.', 'error');
     if (!SpeechRec) {
       // Firefox, Safari e afins: grava e transcreve no Whisper local do Ripper.
       const chunks = [];

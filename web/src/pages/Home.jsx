@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { MetalFx } from 'metal-fx';
+import { MetalFx } from '../fx/metal.jsx';
 import { api, go, local, useDark } from '../lib.js';
 import { AgentAvatar, Icon, Menu, Dialog } from '../ui.jsx';
 import { useApp } from '../app.jsx';

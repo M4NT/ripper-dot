@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { BotAvatar } from 'bot-avatars';
+import { BotAvatar } from '../fx/BotAvatar.jsx';
 import { useApp } from '../app.jsx';
 import { api, go, useRoute, fmtSize, TOOL_INFO, TONES, useDark } from '../lib.js';
 import { AgentAvatar, Icon, Select, Switch, useErroCampo } from '../ui.jsx';

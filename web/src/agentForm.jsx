@@ -1,4 +1,4 @@
-import { BotAvatar } from 'bot-avatars';
+import { BotAvatar } from './fx/BotAvatar.jsx';
 import { TOOL_INFO, TONES, FORMALITIES, useDark } from './lib.js';
 import { AgentAvatar, Icon, Switch } from './ui.jsx';
 import { useApp } from './app.jsx';

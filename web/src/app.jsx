@@ -1,15 +1,14 @@
-import { createContext, lazy as reactLazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { ThinkingOrb } from 'thinking-orbs';
+import { createContext, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { lazyReload as lazy } from './lazyReload.js';
+import { ThinkingOrb } from './fx/ThinkingOrb.jsx';
 import { api, go, useRoute, useTheme, useMediaQuery, fmtAgo, local, brandLogoSrc, brandTitle, stepLabel } from './lib.js';
 import { Icon, AgentAvatar, ToastProvider, useToast, Dialog, Menu, MenuItem } from './ui.jsx';
-import Home from './pages/Home.jsx';
 import { OverlayProvider } from './overlay.jsx';
 import ChatAvatar, { isGroupChat } from './chatAvatar.jsx';
 import { useChatMenu } from './actions.jsx';
 import { ApprovalTray } from './approvals.jsx';
 import { FirstRunWizard } from './firstRunWizard.jsx';
 import { ResizeHandle } from './resize.jsx';
-import Chat from './pages/Chat.jsx';
 import { useSidebarDrag, useFlip } from './agentDrag.jsx';
 import UiModeToggle from './uiModeToggle.jsx';
 import { getUiMode, isEnterpriseMode, isRouteAllowed, brandForChrome } from './uiMode.js';
@@ -18,11 +17,8 @@ import { subscribeUserEvents, watchUserEventsStatus } from './userEvents.js';
 
 // Telas fora do caminho principal carregam sob demanda. Se o build mudou desde que a aba abriu,
 // o pedaço antigo não existe mais: recarrega uma vez para pegar a versão nova.
-const lazy = load => reactLazy(() => load().catch(err => {
-  const last = +sessionStorage.getItem('ripper.reloaded') || 0;
-  if (Date.now() - last > 30_000) { sessionStorage.setItem('ripper.reloaded', Date.now()); location.reload(); return new Promise(() => {}); }
-  throw err;
-}));
+const Home = lazy(() => import('./pages/Home.jsx'));
+const Chat = lazy(() => import('./pages/Chat.jsx'));
 const Agents = lazy(() => import('./pages/Agents.jsx'));
 const Inbox = lazy(() => import('./pages/Inbox.jsx'));
 const ExternalLog = lazy(() => import('./pages/ExternalLog.jsx'));
@@ -520,5 +516,11 @@ function Shell() {
 }
 
 export default function App() {
+  useEffect(() => {
+    const ric = globalThis.requestIdleCallback || (fn => setTimeout(fn, 400));
+    const cancel = globalThis.cancelIdleCallback || clearTimeout;
+    const id = ric(() => import('./pages/Chat.jsx'));
+    return () => cancel(id);
+  }, []);
   return <ToastProvider><Provider><OverlayProvider><Shell /></OverlayProvider></Provider></ToastProvider>;
 }
