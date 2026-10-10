@@ -18,6 +18,7 @@ import {
   daemonHeartbeatFresh,
   writeJsonAtomic,
   writeFileNoFollow,
+  ensureDirNoFollow,
   readJsonIf,
   readFileNoFollow,
   browserFor,
@@ -201,6 +202,16 @@ test('writeFileNoFollow não segue symlink para arquivo do host', () => {
   const other = join(dir, '.ripper', 'res.json');
   symlinkSync(victim, other);
   assert.throws(() => readFileNoFollow(pathToFileURL(other)), /symlink/i);
+});
+
+test('ensureDirNoFollow recusa .ripper symlink mesmo com barra no URL', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ripper-br-'));
+  const real = join(dir, 'real');
+  mkdirSync(real, { recursive: true });
+  const link = join(dir, '.ripper');
+  symlinkSync(real, link);
+  assert.throws(() => ensureDirNoFollow(pathToFileURL(link + '/')), /symlink/i);
+  assert.throws(() => ensureDirNoFollow(pathToFileURL(link)), /symlink/i);
 });
 
 test('sanitizeBrowserCommand: allowlist, url e dy', () => {
