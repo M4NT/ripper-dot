@@ -1,0 +1,115 @@
+/* Primitivos de estado e casca Grok Bot (UI-2). Sem :root de cor — tokens ficam em tokens.css. */
+
+/* ---- Skeleton (variantes novas; .skeleton-* continua o da lista antiga) ---- */
+.ui-skel-msg { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3) 0; }
+.ui-skel-bubble {
+  height: 56px; width: min(72%, 420px); border-radius: var(--r-xl);
+  background: var(--surface-2); animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+.ui-skel-bubble.user { align-self: flex-end; width: min(48%, 280px); }
+.ui-skel-panel { display: grid; gap: var(--space-3); padding: var(--space-3) 0; }
+.ui-skel-block {
+  height: 12px; border-radius: var(--raio-controle); background: var(--surface-2);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+.ui-skel-block.wide { width: 88%; }
+.ui-skel-block.mid { width: 64%; }
+.ui-skel-block.short { width: 40%; height: 10px; }
+.ui-skel-line {
+  display: block; height: 10px; width: 70%; border-radius: var(--raio-controle);
+  background: var(--surface-2); animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-skel-bubble, .ui-skel-block, .ui-skel-line { animation: none; }
+}
+
+/* ---- Empty (ícone opcional; .empty/.empty-title/.empty-body ficam em styles.css) ---- */
+.ui-empty-icon {
+  display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: var(--space-2);
+  border-radius: var(--raio-cartao); background: var(--surface-2); color: var(--muted);
+}
+
+/* ---- Error ---- */
+.ui-error {
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2);
+  padding: var(--space-6); border-radius: var(--r-xl); background: var(--surface-2); color: var(--ink);
+}
+.ui-error-title { font-weight: 500; font-size: var(--fs-md); }
+.ui-error-body { color: var(--muted); max-width: 52ch; }
+.ui-error-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+.ui-error-actions .btn { min-height: var(--ctl-touch); }
+.ui-error-details { margin-top: var(--space-2); width: 100%; font-size: var(--fs-sm); color: var(--muted); }
+.ui-error-details summary { cursor: pointer; min-height: var(--ctl-touch); display: inline-flex; align-items: center; }
+.ui-error-details pre {
+  margin: var(--space-2) 0 0; padding: var(--space-3); border-radius: var(--raio-controle);
+  background: var(--bg); color: var(--ink-2); overflow: auto; white-space: pre-wrap; font-family: var(--mono); font-size: var(--fs-xs);
+}
+
+/* ---- Card ---- */
+.ui-card {
+  background: var(--surface-2); color: var(--ink); border: 1px solid var(--line);
+  border-radius: var(--raio-cartao); min-width: 0;
+}
+.ui-card-pad { padding: var(--space-4); }
+.ui-card-pending { box-shadow: inset 3px 0 0 var(--warn); }
+.ui-card-ok { box-shadow: inset 3px 0 0 var(--ok); }
+.ui-card-err { box-shadow: inset 3px 0 0 var(--err); }
+
+/* ---- Bottom sheet (celular) ---- */
+.ui-sheet-root {
+  position: fixed; inset: 0; z-index: 80; height: 100dvh; width: 100%;
+  display: flex; flex-direction: column; justify-content: flex-end;
+}
+.ui-sheet-scrim { position: absolute; inset: 0; background: rgb(0 0 0 / .48); border: 0; padding: 0; cursor: pointer; }
+.ui-sheet {
+  position: relative; z-index: 1; display: flex; flex-direction: column;
+  width: 100%; max-height: min(92dvh, 100dvh); min-height: 20dvh;
+  background: var(--surface); color: var(--ink);
+  border-radius: var(--raio-folha) var(--raio-folha) 0 0;
+  box-shadow: var(--shadow-3);
+  padding: 0 var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom));
+  touch-action: none;
+}
+.ui-sheet-handle-wrap {
+  display: flex; justify-content: center; align-items: center; min-height: var(--ctl-touch);
+  cursor: grab; touch-action: none;
+}
+.ui-sheet-handle { width: 40px; height: 4px; border-radius: var(--raio-pilula); background: var(--line-2); }
+.ui-sheet-head {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  padding-bottom: var(--space-3);
+}
+.ui-sheet-head h2 { font-size: var(--fs-lg); font-weight: 500; letter-spacing: -.02em; }
+.ui-sheet-close {
+  width: var(--ctl-touch); height: var(--ctl-touch); flex: none;
+  display: grid; place-items: center; border-radius: var(--raio-controle); color: var(--ink-2);
+}
+.ui-sheet-close:hover { background: var(--surface-2); color: var(--ink); }
+.ui-sheet-body { overflow: auto; min-height: 0; overscroll-behavior: contain; }
+@keyframes ui-sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes ui-sheet-fade { from { opacity: 0; } to { opacity: 1; } }
+.ui-sheet-root[data-open="1"] .ui-sheet { animation: ui-sheet-up .28s var(--out); }
+.ui-sheet-root[data-open="1"] .ui-sheet-scrim { animation: ui-sheet-fade .2s var(--out); }
+@media (prefers-reduced-motion: reduce) {
+  .ui-sheet-root[data-open="1"] .ui-sheet,
+  .ui-sheet-root[data-open="1"] .ui-sheet-scrim { animation: none; }
+}
+
+/* ---- Virtual list ---- */
+.ui-vlist { overflow: auto; min-height: 0; height: 100%; overscroll-behavior: contain; }
+.ui-vlist-inner { position: relative; width: 100%; }
+.ui-vlist-window { position: absolute; left: 0; right: 0; top: 0; will-change: transform; }
+
+/* ---- Galeria de exemplos (dev) ---- */
+.ui-ex { max-width: 920px; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-10); display: grid; gap: var(--space-7); }
+.ui-ex h1 { font-size: var(--fs-2xl); font-weight: 500; letter-spacing: -.03em; }
+.ui-ex-lead { color: var(--muted); max-width: 60ch; }
+.ui-ex-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.ui-ex-section { display: grid; gap: var(--space-3); }
+.ui-ex-section h2 { font-size: var(--fs-lg); font-weight: 500; }
+.ui-ex-grid { display: grid; gap: var(--space-4); }
+@media (min-width: 641px) { .ui-ex-grid.cols-2 { grid-template-columns: 1fr 1fr; } }
+.ui-ex-vlist { height: 360px; border: 1px solid var(--line); border-radius: var(--raio-cartao); background: var(--bg); }
+.ui-ex-row { padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--line); color: var(--ink); }
+.ui-ex-row small { display: block; color: var(--muted); font-size: var(--fs-sm); }
+.ui-ex-preview { min-height: 100dvh; background: var(--bg); color: var(--ink); }
