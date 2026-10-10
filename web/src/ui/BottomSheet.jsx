@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { focusables, trapTab } from './focusTrap.js';
-import '../tokens.css';
-import '../styles/telas/ui-state.css';
+import './styles.js';
+import '../styles/telas/ui-shell.css';
 
 const FECHA = 120;
 
@@ -13,6 +13,8 @@ export function BottomSheet({ open, onClose, title, label, children, className =
   const sheet = useRef(null);
   const voltar = useRef(null);
   const drag = useRef(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const [oy, setOy] = useState(0);
 
   useEffect(() => {
@@ -22,18 +24,21 @@ export function BottomSheet({ open, onClose, title, label, children, className =
     const first = focusables(root)[0];
     (first || root)?.focus();
     const onKey = e => {
-      if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); onClose?.(); }
+      if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); onCloseRef.current?.(); }
       else trapTab(e, root);
     };
     document.addEventListener('keydown', onKey, true);
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+    const fundo = document.getElementById('root');
+    if (fundo) fundo.inert = true;
     return () => {
       document.removeEventListener('keydown', onKey, true);
       document.body.style.overflow = prev;
+      if (fundo) fundo.inert = false;
       if (typeof voltar.current?.focus === 'function') voltar.current.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   const down = e => {
     drag.current = { y: e.clientY, oy: 0 };
@@ -50,13 +55,13 @@ export function BottomSheet({ open, onClose, title, label, children, className =
     const dy = drag.current.oy;
     drag.current = null;
     setOy(0);
-    if (dy >= FECHA) onClose?.();
+    if (dy >= FECHA) onCloseRef.current?.();
   };
 
   if (!open || typeof document === 'undefined') return null;
   return createPortal(
     <div className="ui-sheet-root" data-slot="sheet" data-open="1">
-      <button type="button" className="ui-sheet-scrim" data-slot="sheet-overlay" aria-label="Fechar" onClick={() => onClose?.()} />
+      <button type="button" className="ui-sheet-scrim" data-slot="sheet-overlay" aria-label="Fechar" onClick={() => onCloseRef.current?.()} />
       <div
         ref={sheet}
         role="dialog"
@@ -79,7 +84,7 @@ export function BottomSheet({ open, onClose, title, label, children, className =
         </div>
         <div className="ui-sheet-head" data-slot="sheet-header">
           {title ? <h2 data-slot="sheet-title">{title}</h2> : <span />}
-          <button type="button" className="ui-sheet-close" data-slot="sheet-close" aria-label="Fechar" onClick={() => onClose?.()}>
+          <button type="button" className="ui-sheet-close" data-slot="sheet-close" aria-label="Fechar" onClick={() => onCloseRef.current?.()}>
             <svg className="icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
               <path d="M18 6 6 18M6 6l12 12" />
             </svg>

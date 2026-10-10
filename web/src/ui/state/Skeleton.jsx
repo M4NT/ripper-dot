@@ -1,6 +1,5 @@
 /* Adaptado de ObsidianUI skeleton (MIT). Ver web/src/ui/obsidian/LICENSE */
-import '../../tokens.css';
-import '../../styles/telas/ui-state.css';
+import '../styles.js';
 
 /** Esqueleto de lista: linhas com forma da lista real, no lugar do texto "Carregando…".
  *  variant: 'list' (padrão, API antiga) · 'message' · 'panel' · 'line' */
@@ -25,7 +24,7 @@ export function Skeleton({ rows = 3, label = 'Carregando', variant = 'list' }) {
   }
   if (variant === 'line') {
     return (
-      <span className="ui-skel-line" data-slot="skeleton" role="status" aria-label={label} />
+      <div className="ui-skel-line" data-slot="skeleton" role="status" aria-label={label} />
     );
   }
   return (

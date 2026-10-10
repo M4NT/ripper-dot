@@ -1,6 +1,6 @@
 /* Adaptado de ObsidianUI card (MIT). Ver web/src/ui/obsidian/LICENSE */
-import '../tokens.css';
-import '../styles/telas/ui-state.css';
+import './styles.js';
+import '../styles/telas/ui-shell.css';
 
 /**
  * Casca de cartão inline (registro de kinds vem no UI-3).

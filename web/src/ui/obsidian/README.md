@@ -5,7 +5,7 @@ Registro lido em 10/10/2026. Os componentes de lá são copiados para o projeto 
 
 ## O que entrou
 
-Só o que mapeia aos primitivos da UI-2. Reescritos em CSS do Ripper (`tokens.css` + `ui-state.css`), **sem Tailwind**.
+Só o que mapeia aos primitivos da UI-2. Reescritos em CSS do Ripper (`tokens.css` + `ui-state.css` / `ui-shell.css`), **sem Tailwind**.
 
 | ObsidianUI | Nosso primitivo | O que veio |
 |---|---|---|

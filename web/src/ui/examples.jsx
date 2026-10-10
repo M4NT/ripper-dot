@@ -82,6 +82,10 @@ export function UiExamples() {
         <BottomSheet open={sheet} onClose={() => setSheet(false)} title="Painel do agente" label="Painel do agente">
           <p className="muted">No celular o painel lateral vira esta folha. Arraste para baixo, aperte Esc ou toque fora.</p>
           <p style={{ marginTop: 12 }}>Abas: Visão geral · Rotinas · Mídia · Computador · Membros</p>
+          <label className="field" style={{ marginTop: 12 }}>
+            Nome
+            <input type="text" placeholder="Digite sem perder o foco" />
+          </label>
         </BottomSheet>
       </section>
 
@@ -92,6 +96,7 @@ export function UiExamples() {
           className="ui-ex-vlist"
           items={itens}
           followEnd
+          role="log"
           estimateSize={64}
           renderItem={item => (
             <div className="ui-ex-row" style={item.extra ? { paddingTop: 18, paddingBottom: 18 } : undefined}>

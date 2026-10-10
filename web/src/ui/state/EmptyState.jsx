@@ -1,6 +1,5 @@
 /* Adaptado de ObsidianUI empty (MIT). Ver web/src/ui/obsidian/LICENSE */
-import '../../tokens.css';
-import '../../styles/telas/ui-state.css';
+import '../styles.js';
 
 /**
  * Estado vazio. API antiga: { title, body, action } — mesma marcação e classes.

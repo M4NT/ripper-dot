@@ -15,6 +15,13 @@ export function prefixHeights(items, getKey, measured, estimate) {
   return prefix;
 }
 
+export function patchPrefix(prefix, fromIndex, delta) {
+  if (!delta || !prefix) return prefix;
+  const next = prefix.slice();
+  for (let i = fromIndex + 1; i < next.length; i++) next[i] += delta;
+  return next;
+}
+
 /** Primeiro índice cujo fundo passa de `value` (prefix[i] <= value < prefix[i+1]). */
 export function lowerBound(prefix, value) {
   let lo = 0;
@@ -27,10 +34,10 @@ export function lowerBound(prefix, value) {
   return Math.max(0, lo - 1);
 }
 
-export function visibleRange({ items, getKey, measured, estimate, scrollTop, viewport, overscan = 6 }) {
+export function visibleRange({ items, getKey, measured, estimate, scrollTop, viewport, overscan = 6, prefix: given }) {
   const n = items.length;
-  if (!n) return { start: 0, end: 0, total: 0, offset: 0 };
-  const prefix = prefixHeights(items, getKey, measured, estimate);
+  if (!n) return { start: 0, end: 0, total: 0, offset: 0, prefix: given || [0] };
+  const prefix = given && given.length === n + 1 ? given : prefixHeights(items, getKey, measured, estimate);
   const total = prefix[n];
   const vh = viewport > 0 ? viewport : estimate * 10;
   const top = Math.max(0, scrollTop);
@@ -38,7 +45,7 @@ export function visibleRange({ items, getKey, measured, estimate, scrollTop, vie
   const endRaw = Math.min(n, lowerBound(prefix, top + vh) + 1);
   const start = Math.max(0, startRaw - overscan);
   const end = Math.min(n, endRaw + overscan);
-  return { start, end, total, offset: prefix[start] };
+  return { start, end, total, offset: prefix[start], prefix };
 }
 
 export function nearEnd(scrollTop, scrollHeight, clientHeight, threshold = 48) {
@@ -47,4 +54,43 @@ export function nearEnd(scrollTop, scrollHeight, clientHeight, threshold = 48) {
 
 export function endScrollTop(scrollHeight, clientHeight) {
   return Math.max(0, scrollHeight - clientHeight);
+}
+
+/** Se o item medido está acima da janela, o scroll precisa acompanhar o delta. */
+export function scrollCompensation(itemTop, scrollTop, delta) {
+  if (!delta || itemTop >= scrollTop) return 0;
+  return delta;
+}
+
+/** Itens novos no topo (mensagens antigas): desloca o scroll pela altura prependida. */
+export function prependShift(prevFirstKey, items, getKey, measured, estimate) {
+  if (prevFirstKey == null || !items.length) return 0;
+  if (getKey(items[0], 0) === prevFirstKey) return 0;
+  let shift = 0;
+  for (let i = 0; i < items.length; i++) {
+    const k = getKey(items[i], i);
+    if (k === prevFirstKey) return shift;
+    shift += sizeOf(k, measured, estimate);
+  }
+  return 0;
+}
+
+export function liveKeysOf(items, getKey) {
+  const s = new Set();
+  for (let i = 0; i < items.length; i++) s.add(getKey(items[i], i));
+  return s;
+}
+
+export function pruneMeasured(measured, liveKeys) {
+  for (const k of [...measured.keys()]) {
+    if (!liveKeys.has(k)) measured.delete(k);
+  }
+  return measured;
+}
+
+export function indexOfKey(items, getKey, key) {
+  for (let i = 0; i < items.length; i++) {
+    if (getKey(items[i], i) === key) return i;
+  }
+  return -1;
 }
