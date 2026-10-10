@@ -516,7 +516,9 @@ p.ws-warn { border-radius: var(--raio-controle); padding: 6px 10px; margin: 6px 
 
 /* composer */
 .composer-wrap { position: relative; }
-.composer-voice { display: block; border-radius: var(--raio-folha); }
+.composer-voice { display: block; position: relative; border-radius: var(--raio-folha); }
+.fx-voice-layer { position: absolute; inset: 0; pointer-events: none; border-radius: inherit; }
+.fx-voice-slot { display: block; width: 100%; height: 100%; }
 .composer { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--raio-folha); padding: 16px 14px 12px 20px; box-shadow: var(--shadow-2); transition: border-color .2s, box-shadow .25s var(--out); }
 .composer:focus-within { border-color: var(--line-2); box-shadow: var(--shadow-2), 0 0 0 4px color-mix(in srgb, var(--ink) 5%, transparent); }
 .composer.drag { border-color: var(--ink); border-style: dashed; }

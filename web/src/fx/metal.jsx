@@ -1,21 +1,27 @@
 import { lazy, Suspense } from 'react';
+import { FxBoundary } from './FxBoundary.jsx';
+import { catchFx } from './loadFx.js';
 
-const RealFx = lazy(() => import('metal-fx').then(m => ({ default: m.MetalFx })));
-const RealBadge = lazy(() => import('metal-fx').then(m => ({ default: m.MetalBadge })));
+function Passthrough({ children }) { return children; }
+function BadgeFallback({ children }) { return <span className="tag">{children}</span>; }
+
+const RealFx = lazy(() => catchFx(() => import('metal-fx').then(m => ({ default: m.MetalFx })), Passthrough));
+const RealBadge = lazy(() => catchFx(() => import('metal-fx').then(m => ({ default: m.MetalBadge })), BadgeFallback));
 
 /** Shader de metal: o filho (botão, texto) aparece na hora; o WebGL chega depois. */
 export function MetalFx({ children, ...rest }) {
   return (
-    <Suspense fallback={children}>
-      <RealFx {...rest}>{children}</RealFx>
-    </Suspense>
+    <FxBoundary fallback={children}>
+      <Suspense fallback={children}><RealFx {...rest}>{children}</RealFx></Suspense>
+    </FxBoundary>
   );
 }
 
 export function MetalBadge({ children, ...rest }) {
+  const fallback = <BadgeFallback>{children}</BadgeFallback>;
   return (
-    <Suspense fallback={<span className="tag">{children}</span>}>
-      <RealBadge {...rest}>{children}</RealBadge>
-    </Suspense>
+    <FxBoundary fallback={fallback}>
+      <Suspense fallback={fallback}><RealBadge {...rest}>{children}</RealBadge></Suspense>
+    </FxBoundary>
   );
 }

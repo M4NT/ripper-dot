@@ -89,7 +89,7 @@ export function Segmented({ items, value, onChange, className = '', size = 'md',
   const ref = useRef(null);
   const [box, setBox] = useState(null);
   const [Liquid, setLiquid] = useState(null);
-  useEffect(() => { import('liquid-gooey').then(m => setLiquid(() => m.Liquid)); }, []);
+  useEffect(() => { import('liquid-gooey').then(m => setLiquid(() => m.Liquid)).catch(() => {}); }, []);
   useLayoutEffect(() => {
     const measure = () => {
       const el = ref.current?.querySelector(`[data-value="${CSS.escape(String(value))}"]`);

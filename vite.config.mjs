@@ -12,6 +12,7 @@ export default defineConfig({
     outDir: '../dist',
     // Mantém os arquivos de builds anteriores: uma aba aberta antes do deploy ainda os encontra.
     emptyOutDir: false,
+    manifest: true,
     target: 'es2022',
     // Efeitos WebGL/canvas e OpenUI nunca entram no modulepreload da primeira pintura.
     modulePreload: {

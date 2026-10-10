@@ -131,7 +131,7 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
     if (listening) { rec.current?.stop(); mic.stop(); setListening(false); return; }
     if (transcribing) return;
     const stream = await mic.start();
-    if (!stream) return toast('Sem acesso ao microfone. Libere nas permissões do navegador.', 'error');
+    if (!stream) return toast(mic.hint || 'Sem acesso ao microfone. Libere nas permissões do navegador.', 'error');
     if (!SpeechRec) {
       // Firefox, Safari e afins: grava e transcreve no Whisper local do Ripper.
       const chunks = [];

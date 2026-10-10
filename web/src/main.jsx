@@ -1,11 +1,15 @@
-import { StrictMode, Component, lazy, Suspense } from 'react';
+import { StrictMode, Component, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 import { restoreWidths } from './resize.jsx';
+import { lazyReload } from './lazyReload.js';
 restoreWidths();
 
-const App = lazy(() => import('./app.jsx'));
-const Login = lazy(() => import('./login.jsx'));
+// Baixa App e Login em paralelo com o /api/auth/status (não espera o JSON para começar o chunk).
+const appReady = import('./app.jsx');
+const loginReady = import('./login.jsx');
+const App = lazyReload(() => appReady);
+const Login = lazyReload(() => loginReady);
 const bootScreen = <div className="boot"><p className="muted">Conectando…</p></div>;
 
 // Última linha de defesa: um erro de tela nunca vira página em branco.
@@ -46,4 +50,3 @@ setInterval(() => fetch('/api/auth/status').then(r => r.json()).then(s => {
     document.body.append(b);
   }
 }).catch(() => {}), 60e3);
-
