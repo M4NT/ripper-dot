@@ -45,7 +45,7 @@ import {
 } from './lib/social-webhooks.mjs';
 import { listChatsPage } from './lib/history.mjs';
 import { tryClaimRoutine, releaseRoutineClaim } from './lib/persist-coord.mjs';
-import { browserFor, browserRisk } from './lib/browser.mjs';
+import { browserFor } from './lib/browser.mjs';
 import { runClaude, runCodex, systemPrompt, describeImage, CLAUDE_FAST_ENV } from './lib/providers.mjs';
 import { detectHardware, pickModel, LOCAL_MODELS, ollamaUp, pullModel } from './lib/local-models.mjs';
 import { runOpenRouter, syncOpenRouterModels, checkCompatKey, compatCatalog, COMPAT } from './lib/openrouter.mjs';
@@ -1242,7 +1242,8 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
     const ask = (action, opts, label) => {
       const autonomy = browserAutonomyGate(agent, action, s);
       if (typeof autonomy === 'string') return Promise.resolve(false);
-      const reason = autonomy === null ? null : browserRisk(action, opts);
+      // Refs (e7) resolvem pelo último snapshot em b.risk — senão o portão via o texto "e7".
+      const reason = autonomy === null ? null : b.risk(action, opts);
       if (!reason) return Promise.resolve(true);
       // Ação arriscada (envio, compra, login…) aprovada: entra no registro de ações externas.
       return askApproval({ agent, chat, emit, signal }, 'browser', label, reason).then(ok => {
@@ -1256,11 +1257,11 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
       open: url => { emit({ screen: true }); return display.open(url); },
       click: async t => {
         if (isUserScreenControl(agent.id)) return USER_CONTROL_MSG;
-        return (await ask('click', { target: t }, `clicar em “${t}”`)) ? display.click(t) : denied;
+        return (await ask('click', { target: t }, `clicar em “${b.labelOf(t)}”`)) ? display.click(t) : denied;
       },
       type: async (t, txt, submit) => {
         if (isUserScreenControl(agent.id)) return USER_CONTROL_MSG;
-        return (await ask('type', { target: t, submit }, `digitar em “${t}”${submit ? ' e enviar' : ''}`)) ? display.type(t, txt, submit) : denied;
+        return (await ask('type', { target: t, submit }, `digitar em “${b.labelOf(t)}”${submit ? ' e enviar' : ''}`)) ? display.type(t, txt, submit) : denied;
       },
       scroll: dy => display.scroll(dy),
       read: () => display.read()

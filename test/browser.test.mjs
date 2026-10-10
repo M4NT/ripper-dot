@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync, readFileSync, renameSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, renameSync, existsSync, symlinkSync, unlinkSync } from 'node:fs';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -12,35 +12,61 @@ import {
   formatBrowserReply,
   wantsScreenshot,
   actionDelayMs,
+  actionTimeoutMs,
   accessibleName,
   daemonSource,
   daemonHeartbeatFresh,
   writeJsonAtomic,
+  writeFileNoFollow,
   readJsonIf,
+  readFileNoFollow,
   browserFor,
-  browserRisk
+  browserRisk,
+  resolveRiskTarget,
+  sanitizeBrowserCommand,
+  sanitizeBrowserUrl,
+  shouldAcceptCommand,
+  signBrowserCommand,
+  verifyBrowserCommand,
+  assignSnapshotRefs,
+  redactResult,
+  isSensitiveField
 } from '../lib/browser.mjs';
 
-function fakeDaemon(scriptsDir, handle) {
+function fakeDaemon(scriptsDir, handle, { bootAt = Date.now() } = {}) {
   mkdirSync(scriptsDir, { recursive: true });
   const cmdPath = join(scriptsDir, 'cmd.json');
   const resPath = join(scriptsDir, 'res.json');
   const alivePath = join(scriptsDir, 'alive');
-  let last = '';
-  const t = setInterval(() => {
-    writeFileSync(alivePath, String(Date.now()));
+  const lastIds = new Set();
+  const beat = () => writeFileSync(alivePath, JSON.stringify({ t: Date.now(), chromium: true }));
+  const tick = () => {
+    beat();
     let raw;
     try { raw = readFileSync(cmdPath, 'utf8'); } catch { return; }
-    if (raw === last) return;
-    last = raw;
     let cmd;
     try { cmd = JSON.parse(raw); } catch { return; }
+    if (!shouldAcceptCommand(cmd, { bootAt, lastIds })) return;
+    lastIds.add(cmd.id);
+    try { unlinkSync(cmdPath); } catch {}
     const out = handle(cmd) || {};
-    writeFileSync(resPath + '.tmp', JSON.stringify({ id: cmd.id, ok: true, ...out }));
-    renameSync(resPath + '.tmp', resPath);
-  }, 10);
-  writeFileSync(alivePath, String(Date.now()));
+    const tmp = resPath + '.' + Date.now() + '.tmp';
+    writeFileSync(tmp, JSON.stringify({ id: cmd.id, ok: true, ...out }));
+    renameSync(tmp, resPath);
+  };
+  const t = setInterval(tick, 10);
+  beat();
+  tick();
   return () => clearInterval(t);
+}
+
+function rawReady(scripts) {
+  return {
+    async exec(cmd) {
+      writeFileSync(join(scripts, 'alive'), JSON.stringify({ t: Date.now(), chromium: true }));
+      return 'RIPPER_BROWSER_READY\nRIPPER_BROWSER_DAEMON\n' + String(cmd || '').slice(0, 80);
+    }
+  };
 }
 
 test('parseBrowserRef aceita e12, @e12 e ref=e12', () => {
@@ -78,20 +104,23 @@ test('renderA11ySnapshot lista role, nome e ref', () => {
   assert.match(snap, /button "Enviar" disabled \[ref=e3\]/);
 });
 
-test('formatBrowserReply usa snapshot e ignora innerText longo', () => {
+test('formatBrowserReply usa snapshot; read inclui texto da página', () => {
   const s = formatBrowserReply({
     ok: true,
     title: 'Home',
     url: 'https://h.test/',
-    nodes: [{ ref: 'e1', role: 'link', name: 'Docs' }],
-    text: 'xxxx'.repeat(400),
-    controls: ['velho']
+    nodes: [{ ref: 'e1', role: 'link', name: 'Docs' }]
   });
   assert.match(s, /Página: Home/);
   assert.match(s, /URL: https:\/\/h\.test\//);
   assert.match(s, /\[ref=e1\]/);
-  assert.doesNotMatch(s, /xxxx/);
-  assert.doesNotMatch(s, /velho/);
+  const read = formatBrowserReply({
+    ok: true, title: 'Artigo', url: 'https://a.test/',
+    nodes: [{ ref: 'e1', role: 'heading', name: 'Olá' }],
+    text: 'Corpo do artigo aqui'
+  });
+  assert.match(read, /Snapshot:/);
+  assert.match(read, /Texto:\nCorpo do artigo aqui/);
 });
 
 test('formatBrowserReply reporta erro e fallback legado', () => {
@@ -101,7 +130,7 @@ test('formatBrowserReply reporta erro e fallback legado', () => {
   assert.match(legacy, /Texto:\nolá/);
 });
 
-test('wantsScreenshot só sob demanda', () => {
+test('wantsScreenshot marca pedido explícito; print leve é do daemon', () => {
   assert.equal(wantsScreenshot({ action: 'go' }), false);
   assert.equal(wantsScreenshot({ action: 'click' }), false);
   assert.equal(wantsScreenshot({ action: 'read' }), false);
@@ -109,12 +138,12 @@ test('wantsScreenshot só sob demanda', () => {
   assert.equal(wantsScreenshot({ action: 'click', screenshot: true }), true);
 });
 
-test('actionDelayMs é zero por padrão', () => {
+test('actionDelayMs é zero por padrão; timeout por ação existe', () => {
   assert.equal(actionDelayMs({}), 0);
   assert.equal(actionDelayMs({ action: 'click' }, {}), 0);
-  assert.equal(actionDelayMs({}, { RIPPER_BROWSER_PACE: '' }), 0);
   assert.equal(actionDelayMs({ pace: 'human' }), 700);
-  assert.equal(actionDelayMs({}, { RIPPER_BROWSER_PACE: 'human' }), 700);
+  assert.ok(actionTimeoutMs('go') > actionTimeoutMs('click'));
+  assert.ok(actionTimeoutMs('type') > 0);
 });
 
 test('accessibleName junta label, aria e placeholder', () => {
@@ -123,32 +152,102 @@ test('accessibleName junta label, aria e placeholder', () => {
   assert.equal(accessibleName({ labelText: 'Senha', name: 'pw' }), 'Senha');
 });
 
-test('daemonSource: sem pausa/print automáticos; com refs e screenshot sob demanda', () => {
+test('daemonSource: sem think, sem data-ripper-ref plantável, com fila e shred', () => {
   const src = daemonSource();
   assert.doesNotMatch(src, /\bthink\b/);
   assert.doesNotMatch(src, /delay:\s*45\s*\+/);
-  assert.match(src, /data-ripper-ref/);
-  assert.match(src, /wantsScreenshot/);
-  assert.match(src, /cmd\.json/);
+  assert.doesNotMatch(src, /data-ripper-ref/);
+  assert.match(src, /pageFindByFingerprint/);
+  assert.match(src, /shouldAcceptCommand/);
+  assert.match(src, /mouse\.wheel/);
+  assert.match(src, /includeText/);
   assert.doesNotMatch(src, /bctl\.mjs/);
 });
 
-test('writeJsonAtomic / readJsonIf / heartbeat', () => {
+test('writeJsonAtomic / readJsonIf / heartbeat com liveness do Chromium', () => {
   const dir = mkdtempSync(join(tmpdir(), 'ripper-br-'));
   const url = pathToFileURL(dir + '/');
   const file = new URL('x.json', url);
   writeJsonAtomic(file, { a: 1 });
   assert.deepEqual(readJsonIf(file), { a: 1 });
   assert.equal(readJsonIf(new URL('missing.json', url)), null);
-  writeFileSync(join(dir, 'alive'), '1');
+  writeJsonAtomic(new URL('alive', url), { t: Date.now(), chromium: true });
   assert.equal(daemonHeartbeatFresh(url, Date.now(), 4000), true);
-  assert.equal(daemonHeartbeatFresh(url, Date.now() + 10_000, 4000), false);
+  writeJsonAtomic(new URL('alive', url), { t: Date.now(), chromium: false });
+  assert.equal(daemonHeartbeatFresh(url, Date.now(), 4000), false);
+});
+
+test('writeFileNoFollow não segue symlink para arquivo do host', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ripper-br-'));
+  mkdirSync(join(dir, '.ripper'), { recursive: true });
+  const victim = join(dir, 'segredo-host.txt');
+  writeFileSync(victim, 'NAO-MEXER');
+  const dest = join(dir, '.ripper', 'cmd.json');
+  symlinkSync(victim, dest);
+  writeFileNoFollow(pathToFileURL(dest), '{"ok":1}');
+  assert.equal(readFileSync(victim, 'utf8'), 'NAO-MEXER');
+  assert.equal(readFileSync(dest, 'utf8'), '{"ok":1}');
+  const other = join(dir, '.ripper', 'res.json');
+  symlinkSync(victim, other);
+  assert.throws(() => readFileNoFollow(pathToFileURL(other)), /symlink/i);
+});
+
+test('sanitizeBrowserCommand: allowlist, url e dy', () => {
+  const ts = Date.now();
+  assert.equal(sanitizeBrowserCommand({ id: '1', ts, action: 'rm' }), null);
+  assert.equal(sanitizeBrowserCommand({ id: '1', ts, action: 'go', url: 'javascript:alert(1)' }), null);
+  assert.equal(sanitizeBrowserUrl('javascript:alert(1)'), null);
+  const go = sanitizeBrowserCommand({ id: '1', ts, action: 'go', url: 'ex.test/a' });
+  assert.equal(go.url, 'https://ex.test/a');
+  const sc = sanitizeBrowserCommand({ id: '1', ts, action: 'scroll', dy: 99999 });
+  assert.equal(sc.dy, 4000);
+  assert.ok(sanitizeBrowserCommand({ id: '1', ts, action: 'read' }));
+});
+
+test('shouldAcceptCommand recusa id repetido e cmd anterior ao boot', () => {
+  const lastIds = new Set(['abc']);
+  assert.equal(shouldAcceptCommand({ id: 'abc', ts: 10 }, { lastIds, bootAt: 5 }), false);
+  assert.equal(shouldAcceptCommand({ id: 'novo', ts: 3 }, { lastIds, bootAt: 5 }), false);
+  assert.equal(shouldAcceptCommand({ id: 'novo', ts: 5 }, { lastIds, bootAt: 5 }), true);
+  assert.equal(shouldAcceptCommand({ id: 'novo', ts: 9 }, { lastIds, bootAt: 5 }), true);
+});
+
+test('HMAC do comando', () => {
+  const c = { id: '1', ts: 1, action: 'read' };
+  const mac = signBrowserCommand(c, 'tok');
+  assert.ok(verifyBrowserCommand({ ...c, mac }, 'tok'));
+  assert.equal(verifyBrowserCommand({ ...c, mac }, 'outro'), false);
+  assert.equal(verifyBrowserCommand({ ...c, mac: '0'.repeat(32) }, 'tok'), false);
+});
+
+test('assignSnapshotRefs e redactResult escondem valor sensível', () => {
+  const nodes = assignSnapshotRefs([
+    { role: 'textbox', name: 'Senha', type: 'password', value: 'abc' },
+    { role: 'button', name: 'Entrar' }
+  ]);
+  assert.equal(nodes[0].ref, 'e1');
+  assert.equal(nodes[0].value, undefined);
+  assert.equal(nodes[1].ref, 'e2');
+  const red = redactResult({ nodes: [{ ref: 'e1', name: 'Token', value: 'xyz' }] }, { secret: true, target: 'Token' });
+  assert.equal(red.nodes[0].value, undefined);
+  assert.ok(isSensitiveField('Senha'));
+});
+
+test('browserRisk resolve ref pelo snapshot (não pelo texto e7)', () => {
+  const nodes = [{ ref: 'e7', role: 'button', name: 'Finalizar compra' }, { ref: 'e3', role: 'textbox', name: 'Senha' }];
+  assert.equal(resolveRiskTarget('e7', nodes), 'Finalizar compra');
+  assert.ok(browserRisk('click', { target: 'e7', nodes }));
+  assert.equal(browserRisk('click', { target: 'e7' }), null);
+  assert.ok(browserRisk('type', { target: 'e3', nodes }));
+  assert.ok(browserRisk('click', { target: 'Excluir conta' }));
 });
 
 test('API pública de browserFor: open/click/type/scroll/back/read', () => {
   const dir = mkdtempSync(join(tmpdir(), 'ripper-br-'));
   const b = browserFor({ exec: async () => '' }, pathToFileURL(dir + '/'));
   for (const k of ['open', 'click', 'type', 'scroll', 'back', 'read']) assert.equal(typeof b[k], 'function', k);
+  assert.equal(typeof b.risk, 'function');
+  assert.equal(typeof b.labelOf, 'function');
 });
 
 test('browserFor: uma preparação via exec; ações falam com o daemon por arquivo', async () => {
@@ -156,17 +255,20 @@ test('browserFor: uma preparação via exec; ações falam com o daemon por arqu
   const scripts = join(dir, '.ripper');
   const cmds = [];
   let execs = 0;
+  let lastExec = '';
   const stop = fakeDaemon(scripts, cmd => {
     cmds.push(cmd);
     if (cmd.action === 'go') return { title: 'Exemplo', url: 'https://ex.test/', nodes: [{ ref: 'e1', role: 'button', name: 'Entrar' }] };
     if (cmd.action === 'click') return { title: 'Exemplo', url: 'https://ex.test/in', nodes: [{ ref: 'e1', role: 'button', name: 'Entrar' }, { ref: 'e2', role: 'textbox', name: 'E-mail' }] };
     if (cmd.action === 'type') return { title: 'Exemplo', url: 'https://ex.test/in', nodes: [{ ref: 'e2', role: 'textbox', name: 'E-mail', value: cmd.text }] };
+    if (cmd.action === 'read') return { title: 'Exemplo', url: 'https://ex.test/', nodes: [{ ref: 'e1', role: 'button', name: 'Entrar' }], text: 'Bem-vindo ao exemplo' };
     return { title: 'Exemplo', url: 'https://ex.test/', nodes: [{ ref: 'e1', role: 'button', name: 'Entrar' }] };
   });
   const raw = {
-    async exec() {
+    async exec(cmd) {
       execs += 1;
-      writeFileSync(join(scripts, 'alive'), String(Date.now()));
+      lastExec = cmd;
+      writeFileSync(join(scripts, 'alive'), JSON.stringify({ t: Date.now(), chromium: true }));
       return 'RIPPER_BROWSER_READY\nRIPPER_BROWSER_DAEMON';
     }
   };
@@ -177,6 +279,7 @@ test('browserFor: uma preparação via exec; ações falam com o daemon por arqu
     const typed = await b.type('e2', 'ana@ex.test', false);
     const read = await b.read();
     assert.equal(execs, 1);
+    assert.match(lastExec, /\/opt\/ripper-browser\/browserd\.mjs/);
     assert.equal(cmds.map(c => c.action).join(','), 'go,click,type,read');
     assert.equal(cmds[0].url, 'https://ex.test/');
     assert.equal(cmds[1].target, 'e1');
@@ -184,14 +287,16 @@ test('browserFor: uma preparação via exec; ações falam com o daemon por arqu
     assert.match(opened, /\[ref=e1\]/);
     assert.match(clicked, /textbox "E-mail"/);
     assert.match(typed, /ana@ex\.test/);
-    assert.match(read, /Página: Exemplo/);
-    assert.ok(existsSync(join(scripts, 'browserd.mjs')));
-    assert.ok(existsSync(join(scripts, 'bstart.mjs')));
-    assert.ok(!existsSync(join(scripts, 'bctl.mjs')));
+    assert.match(read, /Texto:\nBem-vindo ao exemplo/);
+    assert.ok(!existsSync(join(scripts, 'cmd.json')));
+    assert.ok(!existsSync(join(scripts, 'res.json')));
+    assert.ok(!existsSync(join(scripts, 'browserd.mjs')));
+    assert.equal(b.labelOf('e1'), 'Entrar');
+    assert.ok(!b.risk('click', { target: 'e1' }));
   } finally { stop(); }
 });
 
-test('browserFor: screenshot só quando pedido', async () => {
+test('browserFor: screenshot explícito continua opt-in no comando', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'ripper-br-'));
   const scripts = join(dir, '.ripper');
   const cmds = [];
@@ -199,14 +304,8 @@ test('browserFor: screenshot só quando pedido', async () => {
     cmds.push(cmd);
     return { title: 'T', url: 'https://t.test/', nodes: [] };
   });
-  const raw = {
-    async exec() {
-      writeFileSync(join(scripts, 'alive'), String(Date.now()));
-      return 'RIPPER_BROWSER_READY';
-    }
-  };
   try {
-    const b = browserFor(raw, pathToFileURL(dir + '/'), { timeoutMs: 3000, pollMs: 10 });
+    const b = browserFor(rawReady(scripts), pathToFileURL(dir + '/'), { timeoutMs: 3000, pollMs: 10 });
     await b.open('https://t.test/');
     await b.read();
     await b.click('e1', { screenshot: true });
@@ -214,7 +313,7 @@ test('browserFor: screenshot só quando pedido', async () => {
     assert.equal(cmds[0].action, 'go');
     assert.ok(!cmds[0].screenshot);
     assert.equal(cmds[1].action, 'read');
-    assert.ok(!cmds[1].screenshot);
+    assert.ok(cmds[1].includeText);
     assert.equal(cmds[2].screenshot, true);
     assert.equal(cmds[3].action, 'screenshot');
   } finally { stop(); }
@@ -225,14 +324,8 @@ test('browserFor: type(target, text, submit) continua o contrato de 3 args', asy
   const scripts = join(dir, '.ripper');
   let seen;
   const stop = fakeDaemon(scripts, cmd => { seen = cmd; return { title: 'F', url: 'u', nodes: [] }; });
-  const raw = {
-    async exec() {
-      writeFileSync(join(scripts, 'alive'), String(Date.now()));
-      return 'RIPPER_BROWSER_READY';
-    }
-  };
   try {
-    const b = browserFor(raw, pathToFileURL(dir + '/'), { timeoutMs: 3000, pollMs: 10 });
+    const b = browserFor(rawReady(scripts), pathToFileURL(dir + '/'), { timeoutMs: 3000, pollMs: 10 });
     await b.type('Buscar', 'gato', true);
     assert.equal(seen.action, 'type');
     assert.equal(seen.target, 'Buscar');
@@ -241,7 +334,78 @@ test('browserFor: type(target, text, submit) continua o contrato de 3 args', asy
   } finally { stop(); }
 });
 
-test('browserRisk permanece o mesmo', () => {
+test('browserFor: comando antigo não reexecuta após “restart” do daemon', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ripper-br-'));
+  const scripts = join(dir, '.ripper');
+  mkdirSync(scripts, { recursive: true });
+  const leftover = { id: 'old-buy', ts: Date.now() - 8000, action: 'click', target: 'Finalizar compra' };
+  leftover.mac = signBrowserCommand(leftover, 'ignored');
+  writeFileSync(join(scripts, 'cmd.json'), JSON.stringify(leftover));
+  const seen = [];
+  const stop = fakeDaemon(scripts, cmd => {
+    seen.push(cmd.action + ':' + (cmd.target || cmd.url || ''));
+    return { title: 'Loja', url: 'https://loja.test/', nodes: [{ ref: 'e1', role: 'button', name: 'Finalizar compra' }] };
+  }, { bootAt: Date.now() });
+  try {
+    const b = browserFor(rawReady(scripts), pathToFileURL(dir + '/'), { timeoutMs: 3000, pollMs: 10 });
+    await b.open('https://loja.test/');
+    assert.ok(!seen.some(s => s.startsWith('click:Finalizar')));
+    assert.ok(seen.some(s => s.startsWith('go:')));
+    assert.ok(!existsSync(join(scripts, 'cmd.json')));
+  } finally { stop(); }
+});
+
+test('browserFor.risk usa o snapshot: e7 perigoso pede aprovação', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ripper-br-'));
+  const scripts = join(dir, '.ripper');
+  const stop = fakeDaemon(scripts, cmd => {
+    if (cmd.action === 'go') return { title: 'Loja', url: 'https://loja.test/', nodes: [{ ref: 'e7', role: 'button', name: 'Finalizar compra' }] };
+    return { title: 'Loja', url: 'https://loja.test/', nodes: [{ ref: 'e7', role: 'button', name: 'Finalizar compra' }] };
+  });
+  try {
+    const b = browserFor(rawReady(scripts), pathToFileURL(dir + '/'), { timeoutMs: 3000, pollMs: 10 });
+    assert.equal(b.risk('click', { target: 'e7' }), null);
+    await b.open('https://loja.test/');
+    assert.equal(b.labelOf('e7'), 'Finalizar compra');
+    assert.ok(b.risk('click', { target: 'e7' }));
+    assert.match(b.risk('click', { target: 'e7' }), /Finalizar compra/);
+  } finally { stop(); }
+});
+
+test('browserFor: senha não permanece em cmd/res nem volta no texto', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ripper-br-'));
+  const scripts = join(dir, '.ripper');
+  const stop = fakeDaemon(scripts, cmd => ({
+    title: 'Login',
+    url: 'https://l.test/',
+    nodes: [{ ref: 'e1', role: 'textbox', name: 'Senha', type: 'password', value: cmd.text }]
+  }));
+  try {
+    const b = browserFor(rawReady(scripts), pathToFileURL(dir + '/'), { timeoutMs: 3000, pollMs: 10 });
+    const out = await b.type('Senha', 'segredo123', false);
+    assert.match(out, /Página: Login/);
+    assert.doesNotMatch(out, /segredo123/);
+    assert.ok(!existsSync(join(scripts, 'cmd.json')));
+    assert.ok(!existsSync(join(scripts, 'res.json')));
+  } finally { stop(); }
+});
+
+test('browserFor serializa ações concorrentes', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ripper-br-'));
+  const scripts = join(dir, '.ripper');
+  const order = [];
+  const stop = fakeDaemon(scripts, cmd => {
+    order.push(cmd.target);
+    return { title: 'T', url: 'u', nodes: [] };
+  });
+  try {
+    const b = browserFor(rawReady(scripts), pathToFileURL(dir + '/'), { timeoutMs: 3000, pollMs: 10 });
+    await Promise.all([b.click('um'), b.click('dois'), b.click('tres')]);
+    assert.deepEqual(order, ['um', 'dois', 'tres']);
+  } finally { stop(); }
+});
+
+test('browserRisk permanece o mesmo para texto puro', () => {
   assert.ok(browserRisk('click', { target: 'Finalizar compra' }));
   assert.equal(browserRisk('click', { target: 'Próxima página' }), null);
   assert.equal(browserRisk('type', { target: 'Buscar' }), null);
