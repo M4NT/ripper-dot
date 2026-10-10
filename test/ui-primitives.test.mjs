@@ -274,8 +274,8 @@ test('primitivos não usados ficam de fora do bundle (reexport + CSS próprio)',
   assert.match(uiJsx, /export \{ BottomSheet \} from/);
   assert.match(uiJsx, /export \{ VirtualList \} from/);
   assert.match(uiJsx, /export \{ Card/);
-  assert.match(skelSrc, /from ['"]\.\.\/styles\.js['"]/);
-  assert.match(emptySrc, /from ['"]\.\.\/styles\.js['"]/);
+  assert.match(skelSrc, /import ['"]\.\.\/styles\.js['"]/);
+  assert.match(emptySrc, /import ['"]\.\.\/styles\.js['"]/);
   assert.equal(/ui-shell/.test(skelSrc), false);
   assert.equal(/ui-shell/.test(emptySrc), false);
   assert.match(src('ui/Card.jsx'), /ui-shell/);
