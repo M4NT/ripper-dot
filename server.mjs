@@ -2487,7 +2487,7 @@ const routes = [
     const started = await startMcpOAuthFlow({ plugin, discovery, redirectUri });
     const { cookieRaw, ...pub } = started;
     json(res, { ...pub, redirectUri }, 200, {
-      'set-cookie': oauthBindingCookie(cookieRaw, { secure: oauthCookieSecure(req) })
+      'set-cookie': oauthBindingCookie(cookieRaw, { state: started.state, secure: oauthCookieSecure(req) })
     }, req);
     return undefined;
   }],
@@ -4044,13 +4044,16 @@ const server = createServer(async (req, res) => {
       const err = url.searchParams.get('error');
       const origin = publicBaseUrl(req);
       const html = (status, message, code) => {
-        res.writeHead(code, hdr(req, {
-          'content-type': 'text/html; charset=utf-8',
-          'set-cookie': oauthBindingCookie('', { clear: true, secure: oauthCookieSecure(req) })
-        }));
+        const headers = { 'content-type': 'text/html; charset=utf-8' };
+        try {
+          headers['set-cookie'] = oauthBindingCookie('', { state, clear: true, secure: oauthCookieSecure(req) });
+        } catch { /* state inválido — sem cookie para apagar */ }
+        res.writeHead(code, hdr(req, headers));
         res.end(oauthCallbackHtml({ status, message, origin }));
       };
-      const flow = findOAuthFlowByState(state, { cookie: readOAuthBindingCookie(req) });
+      let cookie = '';
+      try { cookie = readOAuthBindingCookie(req, state); } catch { cookie = ''; }
+      const flow = findOAuthFlowByState(state, { cookie });
       if (!flow) {
         html('error', 'Fluxo inválido ou expirado. Feche esta janela e tente de novo no Ripper.', 400);
         return;

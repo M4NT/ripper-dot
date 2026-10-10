@@ -33,9 +33,12 @@ import {
   safeFetch,
   refreshPluginOAuthToken,
   oauthBindingCookie,
+  oauthCookieName,
+  readOAuthBindingCookie,
   OAUTH_COOKIE_NAME,
   OAUTH_CALLBACK_PATH,
-  OAUTH_FLOW_TTL_MS
+  OAUTH_FLOW_TTL_MS,
+  OAUTH_FETCH_MAX_BODY
 } from '../lib/mcp-oauth.mjs';
 
 function setCookieLines(res) {
@@ -44,8 +47,9 @@ function setCookieLines(res) {
     : [res.headers.get('set-cookie')].filter(Boolean);
 }
 
-function oauthCookieHeader(res) {
-  return setCookieLines(res).find(c => c.startsWith(`${OAUTH_COOKIE_NAME}=`)) || '';
+function oauthCookieHeader(res, state) {
+  const prefix = state ? `${OAUTH_COOKIE_NAME}_${state}=` : `${OAUTH_COOKIE_NAME}_`;
+  return setCookieLines(res).find(c => c.startsWith(prefix)) || '';
 }
 
 function publicDiscovery(overrides = {}) {
@@ -259,6 +263,7 @@ test('callback OAuth via servidor Ripper', async () => {
   assert.match(startedCookie, new RegExp(`Path=${OAUTH_CALLBACK_PATH.replace(/\//g, '\\/')}`));
   assert.doesNotMatch(startedCookie, /ripper_session|SameSite=Strict/);
   const started = await startRes.json();
+  assert.match(startedCookie, new RegExp(`^${OAUTH_COOKIE_NAME}_${started.state}=`));
   assert.equal(started.cookieRaw, undefined);
   assert.match(started.authorizeUrl, new RegExp(`127\\.0\\.0\\.1:${idpPort}`));
   assert.doesNotMatch(started.authorizeUrl, /evil\.example/);
@@ -287,8 +292,9 @@ test('callback OAuth via servidor Ripper', async () => {
     headers: { ...auth, 'content-type': 'application/json' },
     body: JSON.stringify({ pluginName: 'oauth-demo' })
   });
-  const bindCookie = oauthCookieHeader(bindRes);
   const bound = await bindRes.json();
+  const bindCookie = oauthCookieHeader(bindRes, bound.state);
+  assert.match(bindCookie, new RegExp(`^${OAUTH_COOKIE_NAME}_${bound.state}=`));
   const stolen = await fetch(`${base}/api/mcp/oauth/callback?code=abc&state=${bound.state}`);
   assert.equal(stolen.status, 400);
   const owned = await fetch(`${base}/api/mcp/oauth/callback?code=abc&state=${bound.state}`, {
@@ -347,7 +353,14 @@ test('SSRF: descoberta e DCR não seguem endereço interno', async () => {
   assert.equal(isBlockedIp('::ffff:169.254.169.254'), true);
   assert.equal(isBlockedIp('fe90::1'), true);
   assert.equal(isBlockedIp('fe80::1'), true);
+  assert.equal(isBlockedIp('224.0.0.1'), true);
+  assert.equal(isBlockedIp('239.255.255.255'), true);
+  assert.equal(isBlockedIp('240.0.0.1'), true);
+  assert.equal(isBlockedIp('255.255.255.255'), true);
+  assert.equal(isBlockedIp('2002:c000:201::1'), true);
+  assert.equal(isBlockedIp('64:ff9b::c000:201'), true);
   assert.equal(isBlockedIp('8.8.8.8'), false);
+  assert.equal(isBlockedIp('2001:4860:4860::8888'), false);
 
   await assert.rejects(
     () => resolvePublicAddresses('127.0.0.1.nip.io', {
@@ -414,8 +427,11 @@ test('state expirado não vale; cookie OAuth é exigido e de uso único', async 
     discovery: publicDiscovery(),
     redirectUri: 'https://ripper.example/cb'
   });
-  assert.match(oauthBindingCookie(cookieRaw), /SameSite=Lax/);
-  assert.match(oauthBindingCookie(cookieRaw), new RegExp(`Path=${OAUTH_CALLBACK_PATH.replace(/\//g, '\\/')}`));
+  const setCookie = oauthBindingCookie(cookieRaw, { state });
+  assert.match(setCookie, /SameSite=Lax/);
+  assert.match(setCookie, new RegExp(`Path=${OAUTH_CALLBACK_PATH.replace(/\//g, '\\/')}`));
+  assert.match(setCookie, new RegExp(`^${OAUTH_COOKIE_NAME}_${state}=`));
+  assert.throws(() => oauthBindingCookie(cookieRaw), /state OAuth ausente/);
   assert.equal(findOAuthFlowByState(state), null);
   assert.equal(findOAuthFlowByState(state, { cookie: 'errado' }), null);
   assert.ok(findOAuthFlowByState(state, { cookie: cookieRaw }));
@@ -473,4 +489,140 @@ test('applyOAuthTokensToPlugin guarda resource para o refresh', async () => {
     expiresAt: Date.now() + 1000
   }, { clientId: 'c', tokenEndpoint: 'https://idp.example.com/token', resource: 'https://mcp.example.com/mcp' });
   assert.equal(merged.auth.resource, 'https://mcp.example.com/mcp');
+});
+
+test('307/308 POST não reenvia code/code_verifier/client_secret cross-origin', async () => {
+  const secretBody = 'grant_type=authorization_code&code=abc&code_verifier=pkce&client_secret=s3cret';
+  const hops = [];
+  const lookupFn = async () => [{ address: '203.0.113.10', family: 4 }];
+  const fetch = async (url, init) => {
+    hops.push({ url: String(url), method: String(init?.method || 'GET').toUpperCase(), body: init?.body });
+    return {
+      ok: false,
+      status: 307,
+      headers: new Headers({ location: 'https://evil.example/token' }),
+      arrayBuffer: async () => new ArrayBuffer(0)
+    };
+  };
+  await assert.rejects(
+    () => safeFetch('https://idp.example/token', { method: 'POST', body: secretBody }, { lookupFn, fetch }),
+    /cross-origin recusado/
+  );
+  assert.deepEqual(hops.map(h => h.url), ['https://idp.example/token']);
+  assert.ok(!hops.some(h => String(h.url).includes('evil.example')));
+
+  hops.length = 0;
+  const sameOrigin = async (url, init) => {
+    hops.push({ url: String(url), method: String(init?.method || 'GET').toUpperCase(), body: init?.body });
+    if (String(url).endsWith('/token')) {
+      return {
+        ok: false,
+        status: 308,
+        headers: new Headers({ location: 'https://idp.example/token2' }),
+        arrayBuffer: async () => new ArrayBuffer(0)
+      };
+    }
+    return { ok: true, status: 200, json: async () => ({ access_token: 'x' }) };
+  };
+  const kept = await safeFetch('https://idp.example/token', { method: 'POST', body: secretBody }, { lookupFn, fetch: sameOrigin });
+  assert.equal(kept.status, 200);
+  assert.equal(hops[1].url, 'https://idp.example/token2');
+  assert.equal(hops[1].method, 'POST');
+  assert.match(String(hops[1].body), /code_verifier=pkce/);
+  assert.match(String(hops[1].body), /client_secret=s3cret/);
+
+  hops.length = 0;
+  const via302 = async (url, init) => {
+    hops.push({ url: String(url), method: String(init?.method || 'GET').toUpperCase(), body: init?.body });
+    if (String(url).includes('idp.example')) {
+      return {
+        ok: false,
+        status: 302,
+        headers: new Headers({ location: 'https://other.example/token' }),
+        arrayBuffer: async () => new ArrayBuffer(0)
+      };
+    }
+    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+  };
+  await safeFetch('https://idp.example/token', { method: 'POST', body: secretBody }, { lookupFn, fetch: via302 });
+  assert.equal(hops[1].url, 'https://other.example/token');
+  assert.equal(hops[1].method, 'GET');
+  assert.equal(hops[1].body, undefined);
+});
+
+test('cookie OAuth por fluxo: nome inclui o state e dois fluxos convivem', async () => {
+  _clearOAuthFlows();
+  const plugin = { name: 'demo', url: 'https://mcp.example.com/mcp', auth: { oauthClient: 'custom', clientId: 'cid' } };
+  const a = await startMcpOAuthFlow({ plugin, discovery: publicDiscovery(), redirectUri: 'https://ripper.example/cb' });
+  const b = await startMcpOAuthFlow({ plugin, discovery: publicDiscovery(), redirectUri: 'https://ripper.example/cb' });
+  assert.notEqual(a.state, b.state);
+  assert.equal(oauthCookieName(a.state), `${OAUTH_COOKIE_NAME}_${a.state}`);
+  assert.notEqual(oauthCookieName(a.state), oauthCookieName(b.state));
+  const cookieA = oauthBindingCookie(a.cookieRaw, { state: a.state });
+  const cookieB = oauthBindingCookie(b.cookieRaw, { state: b.state });
+  assert.match(cookieA, new RegExp(`^${OAUTH_COOKIE_NAME}_${a.state}=`));
+  assert.match(cookieB, new RegExp(`^${OAUTH_COOKIE_NAME}_${b.state}=`));
+  const both = `${cookieA.split(';')[0]}; ${cookieB.split(';')[0]}`;
+  const req = { headers: { cookie: both } };
+  const rawA = readOAuthBindingCookie(req, a.state);
+  const rawB = readOAuthBindingCookie(req, b.state);
+  assert.equal(rawA, a.cookieRaw);
+  assert.equal(rawB, b.cookieRaw);
+  assert.equal(findOAuthFlowByState(b.state, { cookie: rawA }), null);
+  assert.ok(findOAuthFlowByState(a.state, { cookie: rawA }));
+  assert.equal(findOAuthFlowByState(a.state, { cookie: rawA }), null);
+  assert.ok(findOAuthFlowByState(b.state, { cookie: rawB }));
+  _clearOAuthFlows();
+});
+
+test('pinnedRequest recusa corpo acima do teto e valida todos os IPs do DNS', async () => {
+  const srv = createServer((req, res) => {
+    if (req.url === '/big') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end('x'.repeat(OAUTH_FETCH_MAX_BODY + 1));
+      return;
+    }
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end('{"ok":true}');
+  });
+  const port = await new Promise((resolve, reject) => {
+    srv.listen(0, '127.0.0.1', () => resolve(srv.address().port));
+    srv.on('error', reject);
+  });
+  await assert.rejects(
+    () => safeFetch(`http://127.0.0.1:${port}/big`, {}, { allowPrivate: true }),
+    /grande demais/
+  );
+  const ok = await safeFetch(`http://127.0.0.1:${port}/ok`, {}, { allowPrivate: true });
+  assert.equal(ok.status, 200);
+  assert.deepEqual(await ok.json(), { ok: true });
+  srv.close();
+
+  await assert.rejects(
+    () => resolvePublicAddresses('mixed.example', {
+      lookupFn: async () => [
+        { address: '203.0.113.10', family: 4 },
+        { address: '224.0.0.1', family: 4 }
+      ]
+    }),
+    /bloqueada/
+  );
+  await assert.rejects(
+    () => resolvePublicAddresses('nat64.example', {
+      lookupFn: async () => [
+        { address: '8.8.8.8', family: 4 },
+        { address: '64:ff9b::c000:201', family: 6 }
+      ]
+    }),
+    /bloqueada/
+  );
+  await assert.rejects(
+    () => resolvePublicAddresses('sixtofour.example', {
+      lookupFn: async () => [
+        { address: '2002:c000:201::1', family: 6 },
+        { address: '1.1.1.1', family: 4 }
+      ]
+    }),
+    /bloqueada/
+  );
 });
