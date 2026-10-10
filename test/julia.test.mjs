@@ -4,7 +4,7 @@ import http from 'node:http';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { juliaChoose, juliaOnline, juliaPostChoose, resetJuliaProbe, measureTriagePromptChars, RISK_OPTIONS } from '../lib/julia.mjs';
+import { juliaChoose, juliaOnline, juliaPostChoose, resetJuliaProbe, measureTriagePromptChars, RISK_OPTIONS, JULIA_FAST_TIMEOUT_MS, _setJuliaFetchForTests } from '../lib/julia.mjs';
 import { route } from '../lib/router.mjs';
 
 function withJuliaTelemetry(fn) {
@@ -59,12 +59,29 @@ test('middleware da Julia: escolhe, respeita confiança mínima e cai para a res
   srv.close();
 });
 
-test('juliaPostChoose reporta motivo quando health falha', async () => {
+test('juliaPostChoose reporta motivo quando a Julia está fora do ar', async () => {
   resetJuliaProbe();
   const settings = { julia: { url: 'http://127.0.0.1:1' } };
   const r = await juliaPostChoose(settings, { question: 'oi', options: ['a', 'b'] }, { timeout: 400 });
   assert.equal(r.ok, false);
-  assert.match(r.reason, /unreachable|health/);
+  assert.match(r.reason, /choose_|unreachable|health|offline/);
+});
+
+test('juliaPostChoose vai direto ao /choose sem esperar /health', async () => {
+  resetJuliaProbe();
+  const paths = [];
+  _setJuliaFetchForTests(async (url) => {
+    paths.push(new URL(url).pathname);
+    return { ok: true, status: 200, json: async () => ({ best: 0, scores: [0.9, 0.1] }) };
+  });
+  try {
+    const r = await juliaPostChoose({ julia: { url: 'http://127.0.0.1:8765' } }, { question: 'x', options: ['a', 'b'] }, { timeout: JULIA_FAST_TIMEOUT_MS });
+    assert.equal(r.ok, true);
+    assert.deepEqual(paths, ['/choose']);
+  } finally {
+    _setJuliaFetchForTests(null);
+    resetJuliaProbe();
+  }
 });
 
 test('measureTriagePromptChars soma contexto, pergunta e opções', () => {
