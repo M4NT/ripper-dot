@@ -456,7 +456,15 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   useEffect(() => () => ctrl.current?.abort(), []);
   // Reabriu a página com o agente ainda respondendo (o turno segue no servidor): mostra a resposta chegando e,
   // ao terminar, carrega a conversa salva.
-  const watching = !!chat?.streaming && !ctrl.current;
+  const [teamLive, setTeamLive] = useState(false);
+  useEffect(() => {
+    if (!chatId) { setTeamLive(false); return undefined; }
+    return subscribeUserEvents(ev => {
+      if (ev.type !== 'teamTask' || ev.chatId !== chatId || !ev.teamTask) return;
+      setTeamLive(ev.teamTask.status === 'doing' || ev.teamTask.status === 'blocked');
+    });
+  }, [chatId]);
+  const watching = (!!chat?.streaming || teamLive) && !ctrl.current;
   useEffect(() => {
     if (!watching || !chatId) return;
     let alive = true;

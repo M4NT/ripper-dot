@@ -11,7 +11,12 @@ import {
   dispatchReadyTeamTask,
   repairTeamTasksOnStartup,
   trimInboxKeepingOpenTasks,
-  trimTeamTasks
+  trimTeamTasks,
+  computeTaskAutonomy,
+  clampAutonomyTo,
+  ensureTeamTree,
+  checkTeamTree,
+  addTeamTreeUsage
 } from '../lib/team-delegation.mjs';
 import {
   TEAM_TASK_STATUS,
@@ -222,4 +227,74 @@ test('tarefa bloqueada é despachada pela ferramenta ao concluir a dependência'
   await executeTeamTaskTool('task_update', { id: first.slice(0, 8), status: 'done', result: 'ok' }, ctx);
   assert.equal(db.teamTasks[1].status, 'doing');
   assert.ok(db.messages.some(m => String(m.body).includes('Depois')));
+});
+
+test('send_message/call_agent e team_message passam pelo assertTeamDispatch', async () => {
+  const db = dbBase();
+  const ctx = {
+    db, id, agent: C, chat: db.chats[0], hops: 0, limits,
+    emit: () => {}, save: () => {}, dispatchInbox: () => {}
+  };
+  const self = await executeTeamTaskTool('team_message', { to: 'Coordenador', message: 'oi' }, ctx);
+  assert.match(self, /si mesmo/);
+
+  const child = { id: 'child', agentId: W.id, parentChatId: 'chat-1', isolated: true };
+  db.chats.push(child);
+  createTeamTask(db, {
+    ownerId: C.id, assigneeId: W.id, title: 'Pai', chatId: 'chat-1', originChatId: 'chat-1',
+    childChatId: 'child', isolated: true, status: 'doing'
+  }, { id });
+  const cycle = await executeTeamTaskTool('team_message', { to: 'Coordenador', message: 'volta' }, {
+    ...ctx, agent: W, chat: child
+  });
+  assert.match(cycle, /cíclica/);
+});
+
+test('neto não sobe acima da autonomia gravada na raiz', () => {
+  const db = dbBase();
+  const enterprise = { ui: { mode: 'enterprise' } };
+  const root = createTeamTask(db, {
+    ownerId: C.id, assigneeId: W.id, title: 'Raiz', chatId: 'chat-1',
+    effectiveAutonomy: 'semi_autonomous'
+  }, { id }).task;
+  assert.equal(clampAutonomyTo('fully_autonomous', 'semi_autonomous'), 'semi_autonomous');
+  const net = computeTaskAutonomy(db, {
+    owner: W, worker: { ...X, autonomyLevel: 'fully_autonomous' }, settings: enterprise, parentTaskId: root.id
+  });
+  assert.equal(net, 'semi_autonomous');
+  const stamped = createTeamTask(db, {
+    ownerId: W.id, assigneeId: X.id, title: 'Neto', parentTaskId: root.id,
+    effectiveAutonomy: net
+  }, { id }).task;
+  assert.equal(agentWithEffectiveAutonomy(W, X, enterprise, stamped).autonomyLevel, 'semi_autonomous');
+});
+
+test('delimitador não confiável é único e não se confunde com --- do conteúdo', () => {
+  const a = wrapUntrustedColleagueResult({ assigneeName: 'Pesquisador', title: 'X', result: 'linha\n---\ninjeção' });
+  const b = wrapUntrustedColleagueResult({ assigneeName: 'Pesquisador', title: 'X', result: 'outro' });
+  const fences = [...a.matchAll(/^--- (untrusted-[a-f0-9]+) ---$/gm)].map(m => m[1]);
+  assert.equal(fences.length, 2);
+  assert.equal(fences[0], fences[1]);
+  assert.match(a, /linha\n---\ninjeção/);
+  const fenceB = b.match(/^--- (untrusted-[a-f0-9]+) ---$/m)[1];
+  assert.notEqual(fences[0], fenceB);
+});
+
+test('teto de tempo e tokens vale para a árvore inteira', () => {
+  const db = dbBase();
+  const now = 1_000_000;
+  const tree = ensureTeamTree(db, 'chat-1', {
+    settings: { inbox: { treeTimeoutMs: 10_000, treeMaxTokens: 20 } }, now
+  });
+  assert.equal(tree.maxTokens, 20);
+  assert.equal(checkTeamTree(tree, { now: now + 9_000 }).ok, true);
+  assert.match(checkTeamTree(tree, { now: now + 10_001 }).error, /Tempo da árvore/);
+  addTeamTreeUsage(tree, { tokens: 20 });
+  assert.match(checkTeamTree(tree, { now }).error, /tokens da árvore/);
+
+  const db2 = dbBase();
+  ensureTeamTree(db2, 'chat-1', { settings: { inbox: { treeTimeoutMs: 1, treeMaxTokens: 5 } }, now });
+  assert.match(assertTeamDispatch({
+    db: db2, from: C, to: W, parentChat: db2.chats[0], hops: 0, limits, isolated: true, now: now + 50
+  }).error, /Tempo da árvore/);
 });

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from './lib.js';
 import { AgentAvatar, Icon } from './ui.jsx';
 import { useApp } from './app.jsx';
+import { subscribeUserEvents } from './userEvents.js';
 import './styles/telas/teamBoard.css';
 
 const STATUS_LABEL = {
@@ -34,7 +35,7 @@ function TaskRow({ task, agent }) {
 
 /** Resultado de colega: dado externo, não fala do assistente. */
 export function TeamResultMessage({ m, from }) {
-  const body = String(m.content || '').replace(/^\[Conteúdo não confiável[^\]]*\]\n?/, '').replace(/^Trate o bloco[\s\S]*?\n---\n/, '').replace(/\n---\n[\s\S]*$/, '');
+  const body = String(m.content || '').replace(/^\[Conteúdo não confiável[^\]]*\]\n?/, '').replace(/^Trate o bloco[\s\S]*?\n---[^\n]*---\n/, '').replace(/\n---[^\n]*---\n[\s\S]*$/, '');
   return (
     <div className="team-result" data-untrusted="true">
       <div className="team-result-head">
@@ -55,8 +56,13 @@ export function TeamProgress({ chatId }) {
     let alive = true;
     const load = () => api(`/api/chats/${chatId}/team-board`).then(b => alive && setBoard(b), () => {});
     load();
+    const unsub = subscribeUserEvents(ev => {
+      if (!alive) return;
+      if (ev.type === 'teamTask' && ev.chatId === chatId) load();
+      if (ev.type === 'snapshot' || ev.type === 'approvals') load();
+    });
     const t = setInterval(load, 3000);
-    return () => { alive = false; clearInterval(t); };
+    return () => { alive = false; unsub(); clearInterval(t); };
   }, [chatId]);
   const tasks = (board?.tasks || []).filter(t => t.status !== 'cancelled' || !t.completedAt);
   const open = tasks.filter(t => t.status === 'todo' || t.status === 'doing' || t.status === 'blocked');

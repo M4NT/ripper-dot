@@ -56,7 +56,11 @@ import {
   repairTeamTasksOnStartup,
   trimTeamTasks,
   trimInboxKeepingOpenTasks,
-  rootChatId
+  rootChatId,
+  computeTaskAutonomy,
+  addTeamTreeUsage,
+  ensureTeamTree,
+  parentTaskIdForChat
 } from './lib/team-delegation.mjs';
 import { patchTask, taskPrompt } from './lib/project-tasks.mjs';
 import { closeTaskFromInboxReply } from './lib/task-closure.mjs';
@@ -441,7 +445,7 @@ const summary = ({ messages, ...c }) => ({ ...c, preview: plain(messages.findLas
 function chatDetail(c, cid) {
   return {
     ...c,
-    streaming: isChatStreaming(cid),
+    streaming: isChatStreaming(cid) || isolatedLive.has(cid),
     run: chatRunPublic(c.run),
     interrupted: c.run?.status === 'interrupted',
     // estado dos pedidos a colegas que saíram desta conversa (cartões de delegação)
@@ -453,6 +457,18 @@ function chatDetail(c, cid) {
 
 // Foto ao vivo da resposta em andamento (por conversa): quem fala, texto até agora e ações. Para quem reabre a página.
 const liveByChat = new Map();
+const isolatedLive = new Set(); // conversas raiz com subagente isolado ainda rodando
+function emitTeamLive(rootId, ev) {
+  if (!rootId) return;
+  trackLive(rootId, ev);
+  if (ev.teamTask) publishUserEvent('owner', { type: 'teamTask', chatId: rootId, teamTask: ev.teamTask });
+  if (ev.approval || ev.approvalDone) {
+    publishUserEvent('owner', {
+      type: 'approvals',
+      approvals: db.approvals.filter(a => a.status === 'pending').map(approvalView)
+    });
+  }
+}
 function trackLive(chatId, e) {
   if (!e) return;
   let cur = liveByChat.get(chatId);
@@ -720,7 +736,13 @@ async function runInboxDelivery(m, { signal } = {}) {
     at: Date.now()
   });
   const lenBeforeTurn = c.messages.length;
-  await turn({ agent: to, chat: c, text: m.body, prompt, images: [], group: inGroup ? groupMembers(origin, db.agents) : null, hops: m.hops, signal, forName: from.name }, () => {});
+  const linkedTask = findTeamTaskByInboxMessageId(db, m.id);
+  const worker = linkedTask
+    ? agentWithEffectiveAutonomy(from, to, db.settings, linkedTask)
+    : to;
+  await turn({ agent: worker, chat: c, text: m.body, prompt, images: [], group: inGroup ? groupMembers(origin, db.agents) : null, hops: m.hops, signal, forName: from.name }, ev => {
+    if (origin?.id && (ev.approval || ev.tool || ev.text)) emitTeamLive(rootChatId(db, origin) || origin.id, ev);
+  });
   const parsed = interpretInboxReply(c.messages, lenBeforeTurn);
   c.updatedAt = Date.now(); c.unread = true;
   m.threadChatId = c.id;
@@ -1052,6 +1074,11 @@ function spawnIsolatedSubagent({ task, worker, prompt, parentChat, hops = 0, own
   };
   db.messages.push(tracking);
   trimInboxKeepingOpenTasks(db);
+  const rootId = rootChatId(db, parentChat) || parentChat?.id;
+  if (rootId) {
+    isolatedLive.add(rootId);
+    trackLive(rootId, { speaker: worker.id });
+  }
   inboxBusy.add(worker.id);
   const ac = registerDeliveryAbort(task.id, { originChatId: parentChat.id, childChatId: spawned.child.id });
   const timeout = setTimeout(() => {
@@ -1074,6 +1101,12 @@ function spawnIsolatedSubagent({ task, worker, prompt, parentChat, hops = 0, own
       unregisterDeliveryAbort(task.id);
       inboxBusy.delete(worker.id);
       if (tracking.status === 'delivering') tracking.status = 'delivered';
+      const rid = rootChatId(db, parentChat) || parentChat?.id;
+      const still = (db.teamTasks || []).some(t =>
+        t.id !== task.id && t.status === TEAM_TASK_STATUS.doing && t.isolated
+        && (rootChatId(db, t.originChatId || t.chatId) === rid)
+      );
+      if (rid && !still) isolatedLive.delete(rid);
     });
   }, 50);
   return { childChatId: spawned.child.id, timeoutMs: gate.timeoutMs };
@@ -1086,14 +1119,17 @@ async function runIsolatedSubagentTurn({ child, worker, prompt, task, parentChat
   const parentEmit = getChatStream(rootId)?.emit || getChatStream(parentChat.id)?.emit;
   const emitParent = ev => {
     parentEmit?.(ev);
+    emitTeamLive(rootId, ev);
     if (ev.tool || ev.text || ev.approval) {
-      parentEmit?.({
+      const teamEv = {
         teamTask: {
           ...publicTeamTask(findTeamTask(db, task.id) || task, db),
           status: TEAM_TASK_STATUS.doing,
           progress: { note: ev.approval ? 'aguardando aprovação' : (ev.tool || 'trabalhando'), at: Date.now() }
         }
-      });
+      };
+      parentEmit?.(teamEv);
+      emitTeamLive(rootId, teamEv);
     }
   };
   const finish = (status, resultText, note) => updateTeamTask(db, task.id, {
@@ -1113,7 +1149,7 @@ async function runIsolatedSubagentTurn({ child, worker, prompt, task, parentChat
   });
   try {
     await turn({
-      agent: agentWithEffectiveAutonomy(owner, worker, db.settings),
+      agent: agentWithEffectiveAutonomy(owner, worker, db.settings, findTeamTask(db, task.id) || task),
       chat: child,
       text: prompt,
       prompt: text,
@@ -1145,7 +1181,9 @@ async function runIsolatedSubagentTurn({ child, worker, prompt, task, parentChat
       });
     }
     if (tracking) tracking.status = status === TEAM_TASK_STATUS.cancelled ? 'failed' : 'delivered';
-    parentEmit?.({ teamTask: publicTeamTask(findTeamTask(db, task.id) || task, db) });
+    const doneEv = { teamTask: publicTeamTask(findTeamTask(db, task.id) || task, db) };
+    parentEmit?.(doneEv);
+    emitTeamLive(rootId, doneEv);
   } catch (e) {
     const cancelled = !!(signal?.aborted && signal.reason !== 'timeout');
     finish(
@@ -1186,7 +1224,8 @@ const approvalView = a => ({ ...a, agentName: db.agents.find(x => x.id === a.age
 function eventsSnapshot() {
   const live = {};
   for (const id of listStreamingChatIds()) live[id] = { streaming: true, live: liveByChat.get(id) || null };
-  for (const [id, rec] of liveByChat) if (!live[id]) live[id] = { streaming: isChatStreaming(id), live: rec };
+  for (const id of isolatedLive) live[id] = { streaming: true, live: liveByChat.get(id) || live[id]?.live || null };
+  for (const [id, rec] of liveByChat) if (!live[id]) live[id] = { streaming: isChatStreaming(id) || isolatedLive.has(id), live: rec };
   return {
     working: Object.fromEntries(working),
     approvals: db.approvals.filter(a => a.status === 'pending').map(approvalView),
@@ -1685,23 +1724,19 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
       send: a => {
         const to = findAgentByName(a.to, db.agents);
         const limits = { maxPerHour: 20, maxHops: 3, ...(s.inbox || {}) };
-        const chk = checkSend({ from: agent, to, messages: db.messages, hops: hops + 1, limits, busyToIds: inboxBusy });
-        if (chk.error) return chk.error;
-        if (to) {
-          const gate = canDelegate(
-            { type: 'agent', id: agent.id },
-            { type: 'agent', id: to.id },
-            'send_message',
-            db.accessControl,
-            { agents: db.agents }
-          );
-          const denied = delegationDeniedMessage(gate);
-          if (denied) return denied;
-        }
+        const gate = assertTeamDispatch({
+          db, from: agent, to, parentChat: chat, hops, limits, busyToIds: inboxBusy,
+          accessControl: db.accessControl, settings: s, isolated: false
+        });
+        if (gate.error) return gate.error;
         const m = { id: id(), from: agent.id, to: to.id, body: String(a.message).slice(0, 4000), priority: a.priority || 'normal', status: 'queued', hops: hops + 1, originChatId: chat.id, createdAt: Date.now() };
         db.messages.push(m);
         trackInboxDelegation(db, m, { id });
-        const linked = linkOrCreateTeamTaskFromInbox(db, m, { id, ownerId: agent.id });
+        const linked = linkOrCreateTeamTaskFromInbox(db, m, {
+          id, ownerId: agent.id,
+          parentTaskId: parentTaskIdForChat(db, chat.id),
+          effectiveAutonomy: computeTaskAutonomy(db, { owner: agent, worker: to, settings: s, chat })
+        });
         trimInboxKeepingOpenTasks(db);
         const card = { to: to.id, task: oneLineTask(m.body), messageId: m.id };
         sentDelegations.push(card);
@@ -1712,27 +1747,23 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
       call: async a => {
         const to = findAgentByName(a.to, db.agents);
         const limits = { maxPerHour: 20, maxHops: 3, ...(s.inbox || {}) };
-        const chk = checkSend({ from: agent, to, messages: db.messages, hops: hops + 1, limits, busyToIds: inboxBusy });
-        if (chk.error) return formatCallAgentResult({ ok: false, error: chk.error });
-        if (to) {
-          const gate = canDelegate(
-            { type: 'agent', id: agent.id },
-            { type: 'agent', id: to.id },
-            'send_message',
-            db.accessControl,
-            { agents: db.agents }
-          );
-          const denied = delegationDeniedMessage(gate);
-          if (denied) return formatCallAgentResult({ ok: false, error: denied });
-        }
-        const timeoutMs = clampCallTimeoutMs(a.timeout_seconds, s.inbox || {});
+        const gate = assertTeamDispatch({
+          db, from: agent, to, parentChat: chat, hops, limits, busyToIds: inboxBusy,
+          accessControl: db.accessControl, settings: s, isolated: false
+        });
+        if (gate.error) return formatCallAgentResult({ ok: false, error: gate.error });
+        const timeoutMs = Math.min(clampCallTimeoutMs(a.timeout_seconds, s.inbox || {}), gate.timeoutMs || Infinity);
         const m = {
           id: id(), from: agent.id, to: to.id, kind: 'call',
           body: String(a.message).slice(0, 4000), priority: 'now', status: 'delivering',
           hops: hops + 1, originChatId: chat.id, createdAt: Date.now()
         };
         db.messages.push(m);
-        const linkedCall = linkOrCreateTeamTaskFromInbox(db, m, { id, ownerId: agent.id });
+        const linkedCall = linkOrCreateTeamTaskFromInbox(db, m, {
+          id, ownerId: agent.id,
+          parentTaskId: parentTaskIdForChat(db, chat.id),
+          effectiveAutonomy: computeTaskAutonomy(db, { owner: agent, worker: to, settings: s, chat })
+        });
         if (linkedCall?.task) sentTeamTasks.push(publicTeamTask(linkedCall.task, db));
         trimInboxKeepingOpenTasks(db);
         inboxBusy.add(to.id);
@@ -2322,6 +2353,16 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
         clientId: resolveClient(db.clients, chat)?.id,
         costUsd: turnCost
       });
+      if (chat.isolated || chat.parentChatId) {
+        const rid = rootChatId(db, chat);
+        if (rid) {
+          addTeamTreeUsage(ensureTeamTree(db, rid, { settings: db.settings }), {
+            charsIn: (text?.length || 0) + (prompt?.length || 0),
+            charsOut: out.length,
+            usd: turnCost
+          });
+        }
+      }
       if (canUseSemanticCache) {
         storeSemanticCacheEntry({
           agentId: agent.id,
@@ -4097,7 +4138,7 @@ const routes = [
     if (!allAccounts(db.settings).some(a => a.id === aid)) throw new HttpError(404, 'Conta não encontrada. Salve as configurações primeiro.');
     return testAccount(aid, CLAUDE_FAST_ENV);
   }],
-  ['GET', /^\/api\/chats\/([\w-]+)\/live$/, (req, [cid]) => ({ streaming: isChatStreaming(cid), live: liveByChat.get(cid) || null })],
+  ['GET', /^\/api\/chats\/([\w-]+)\/live$/, (req, [cid]) => ({ streaming: isChatStreaming(cid) || isolatedLive.has(cid), live: liveByChat.get(cid) || null })],
   ['POST', /^\/api\/chats\/([\w-]+)\/ui-parts$/, async (req, [cid]) => {
     const c = db.chats.find(x => x.id === cid);
     if (!c) throw new HttpError(404, 'Conversa não encontrada.');
