@@ -44,6 +44,13 @@ import {
   MAC_REJECT,
   runBrowserGate
 } from '../lib/browser.mjs';
+import {
+  _resetComputerInputForTests,
+  isUserScreenControl,
+  setUserScreenControl,
+  wrapDisplaySession,
+  USER_CONTROL_MSG
+} from '../lib/computer-input.mjs';
 
 function fakeDaemon(scriptsDir, handle, { bootAt = Date.now() } = {}) {
   mkdirSync(scriptsDir, { recursive: true });
@@ -785,44 +792,57 @@ test('browserFor: busca aproximada por texto leva o fingerprint do snapshot', as
 });
 
 test('trava ativa bloqueia o clique sem consumir o alvo aprovado', async () => {
+  _resetComputerInputForTests();
   const dir = mkdtempSync(join(tmpdir(), 'ripper-br-'));
   const scripts = join(dir, '.ripper');
   const cmds = [];
+  const agentId = 'ag-br-lock';
   const stop = fakeDaemon(scripts, cmd => {
     cmds.push(cmd);
     return { title: 'T', url: 'https://t.test/', nodes: [{ ref: 'e1', role: 'button', name: 'Entrar' }] };
   });
   try {
     const b = browserFor(rawReady(scripts), pathToFileURL(dir + '/'), { timeoutMs: 3000, pollMs: 10 });
+    const display = wrapDisplaySession(b, agentId);
     await b.open('https://t.test/');
     assert.equal(b.risk('click', { target: 'e1' }), null);
     assert.equal(b.hasApprovedExpect('click', 'e1'), true);
-    let locked = false;
     const afterAsk = await runBrowserGate({
-      locked: () => locked,
-      ask: async () => { locked = true; return true; },
-      run: () => b.click('e1'),
+      locked: () => isUserScreenControl(agentId),
+      lockedMsg: USER_CONTROL_MSG,
+      ask: async () => {
+        assert.equal(b.labelOf('e1'), 'Entrar');
+        setUserScreenControl(agentId, true, 'live');
+        return true;
+      },
+      run: () => display.click('e1'),
       denied: 'negado'
     });
-    assert.match(afterAsk, /assumiu o controle/);
+    assert.equal(afterAsk, USER_CONTROL_MSG);
     assert.equal(b.hasApprovedExpect('click', 'e1'), true);
     assert.equal(cmds.filter(c => c.action === 'click').length, 0);
-    locked = false;
+    setUserScreenControl(agentId, false, 'live');
     const ok = await runBrowserGate({
-      locked: () => locked,
+      locked: () => isUserScreenControl(agentId),
+      lockedMsg: USER_CONTROL_MSG,
       ask: async () => true,
-      run: () => b.click('e1'),
+      run: () => display.click('e1'),
       denied: 'negado'
     });
     assert.match(ok, /Página: T/);
     assert.equal(b.hasApprovedExpect('click', 'e1'), false);
     assert.equal(cmds.filter(c => c.action === 'click').length, 1);
-  } finally { stop(); }
+  } finally {
+    stop();
+    _resetComputerInputForTests();
+  }
 });
 
 test('mudança de página após aprovação é recusada (gate)', async () => {
+  _resetComputerInputForTests();
   const dir = mkdtempSync(join(tmpdir(), 'ripper-br-'));
   const scripts = join(dir, '.ripper');
+  const agentId = 'ag-br-page';
   const stop = fakeDaemon(scripts, cmd => {
     if (cmd.action === 'go') {
       return {
@@ -840,17 +860,23 @@ test('mudança de página após aprovação é recusada (gate)', async () => {
   });
   try {
     const b = browserFor(rawReady(scripts), pathToFileURL(dir + '/'), { timeoutMs: 3000, pollMs: 10 });
+    const display = wrapDisplaySession(b, agentId);
     await b.open('https://loja.test/passo');
     const out = await runBrowserGate({
-      locked: () => false,
+      locked: () => isUserScreenControl(agentId),
+      lockedMsg: USER_CONTROL_MSG,
       ask: async () => {
         assert.equal(b.risk('click', { target: 'e7' }), null);
+        assert.equal(b.labelOf('e7'), 'Próxima página');
         return true;
       },
-      run: () => b.click('e7'),
+      run: () => display.click('e7'),
       denied: 'negado'
     });
     assert.match(out, /A página mudou/);
     assert.match(out, /Próxima página/);
-  } finally { stop(); }
+  } finally {
+    stop();
+    _resetComputerInputForTests();
+  }
 });
