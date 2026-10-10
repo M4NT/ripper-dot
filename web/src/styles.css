@@ -1214,22 +1214,38 @@ html.lightbox-open { overflow: hidden; }
 .av-box { display: inline-grid; place-items: center; flex: none; line-height: 0; }
 .av-box > canvas { flex: none; max-width: none; }
 
-/* ============ tela da VM ao vivo (noVNC) ============ */
-.live-vnc iframe { display: block; width: 100%; aspect-ratio: 16 / 10; border: 0; background: #000; }
+/* ============ tela ao vivo (painel e miniatura — mesmo componente) ============ */
+.live-screen { position: relative; }
+.live-screen-body { position: relative; }
+.live-vnc iframe, .live-screen iframe { display: block; width: 100%; aspect-ratio: 16 / 10; border: 0; background: #000; }
 .live-vnc.controlling { box-shadow: inset 0 0 0 1px var(--term-linha), 0 0 0 3px color-mix(in srgb, var(--warn) 45%, transparent); }
 .vnc-off { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 18px 12px 20px; text-align: center; }
 .vnc-off .pc-idle { padding: 0; }
-.vnc-btn { display: inline-flex; align-items: center; gap: 5px; margin-left: 6px; padding: 3px 8px; border-radius: var(--raio-controle); color: var(--term-texto3); background: var(--term-linha); font: 500 12px var(--font); }
+.vnc-btn { display: inline-flex; align-items: center; gap: 5px; margin-left: 6px; padding: 3px 8px; border-radius: var(--raio-pilula); color: var(--term-texto3); background: var(--term-linha); font: 500 12px var(--font); white-space: nowrap; }
 .vnc-btn:hover { background: var(--term-botao); }
 .vnc-btn.on { background: var(--warn); color: #fff; }
 .vnc-btn.icon { padding: 3px 6px; }
 .pc-bar .live-dot { margin-left: auto; }
+.live-screen-step {
+  position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 2;
+  display: flex; align-items: center; gap: 8px; margin: 0;
+  padding: 8px 12px; border-radius: 14px;
+  background: color-mix(in srgb, var(--term-barra) 88%, transparent);
+  color: var(--term-texto); font: 500 var(--fs-sm) / 1.35 var(--font);
+  box-shadow: var(--shadow-2); pointer-events: none; overflow-wrap: anywhere;
+}
+.live-screen-step .live-dot { flex: none; }
+.live-screen-step-inline {
+  min-width: 0; color: var(--term-texto3); font: 500 var(--fs-sm) / 1.35 var(--font);
+  overflow-wrap: anywhere;
+}
 .vnc-full { position: fixed; inset: 0; z-index: 1500; display: flex; flex-direction: column; gap: 10px; padding: 16px 20px 12px; background: rgb(11 11 11 / .94); backdrop-filter: blur(6px); animation: fade .2s var(--out); }
-.vnc-full-bar { display: flex; align-items: center; gap: 10px; color: var(--term-texto); }
+.vnc-full-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; color: var(--term-texto); }
 .vnc-full-bar .btn { background: var(--term-linha); color: var(--term-texto); border-color: var(--term-botao); }
 .vnc-full-bar .btn-primary { background: var(--warn); border-color: var(--warn); color: #fff; }
 .vnc-full iframe { flex: 1; width: 100%; border: 0; border-radius: var(--raio-controle); background: #000; }
-.vnc-hint { text-align: center; color: var(--term-muted3); font-size: var(--fs-sm); }
+.vnc-hint { text-align: center; color: var(--term-muted3); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.vnc-full .live-screen-step-full { position: static; left: auto; right: auto; bottom: auto; margin: 0 auto; max-width: min(640px, 100%); }
 
 /* ============ barras redimensionáveis ============ */
 .shell { grid-template-columns: var(--side-w, 264px) minmax(0, 1fr); }
@@ -1516,15 +1532,35 @@ code, .mono, pre { overflow-wrap: anywhere; }
 
 /* Atividade do agente (linha do tempo) */
 
-/* tela do agente em miniatura dentro da conversa */
-.mini-screen { position: fixed; right: 20px; bottom: 120px; z-index: 40; width: min(340px, calc(100vw - 32px)); border-radius: var(--raio-cartao); overflow: hidden; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-3); animation: pop .25s var(--out); }
-.mini-screen.live { border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
-.mini-screen-bar { display: flex; align-items: center; gap: 6px; padding: 4px 4px 4px 12px; font-size: var(--fs-sm); color: var(--ink-2); border-bottom: 1px solid var(--line); }
-.mini-screen-bar .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mini-screen-bar .live-dot { width: 7px; height: 7px; padding: 0; border-radius: 50%; background: var(--ok); font-size: 0; }
-.mini-screen iframe { display: block; width: 100%; aspect-ratio: 16 / 10; border: 0; pointer-events: none; background: #000; }
-.mini-screen-msg { margin: 0; padding: 28px 14px; text-align: center; color: var(--muted); font-size: var(--fs-sm); }
-@media (max-width: 720px) { .mini-screen { right: 16px; bottom: 110px; width: min(240px, calc(100vw - 32px)); } }
+/* tela do agente em miniatura dentro da conversa (mesmo componente do painel) */
+.live-screen-float, .mini-screen { position: fixed; right: 20px; bottom: 120px; z-index: 40; width: min(340px, calc(100vw - 32px)); border-radius: var(--raio-cartao); overflow: hidden; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-3); animation: pop .25s var(--out); }
+.live-screen-float.live, .mini-screen.live { border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
+.live-screen-bar, .mini-screen-bar { display: flex; align-items: center; gap: 6px; padding: 4px 4px 4px 12px; font-size: var(--fs-sm); color: var(--ink-2); border-bottom: 1px solid var(--line); }
+.live-screen-bar .grow, .mini-screen-bar .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.live-screen-bar .live-dot, .mini-screen-bar .live-dot { width: 7px; height: 7px; padding: 0; border-radius: 50%; background: var(--ok); font-size: 0; }
+.live-screen-float iframe, .mini-screen iframe { display: block; width: 100%; aspect-ratio: 16 / 10; border: 0; pointer-events: none; background: #000; }
+.mini-screen-msg { margin: 0; padding: 28px 14px; text-align: center; color: var(--muted); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+/* celular 375: a miniatura usa a largura da conversa; alvos de toque 44px; passo quebra linha */
+@media (max-width: 400px) {
+  .live-screen-float, .mini-screen { left: 8px; right: 8px; bottom: 96px; width: auto; }
+  .live-screen-bar .icon-btn, .mini-screen-bar .icon-btn { width: var(--ctl-touch); height: var(--ctl-touch); }
+  .live-screen-step { left: 8px; right: 8px; bottom: 8px; padding: 8px 10px; }
+  .vnc-full { padding: 8px; gap: 8px; }
+  .vnc-full-bar { gap: 8px; }
+  .pc-bar { flex-wrap: wrap; }
+  .vnc-btn { margin: 2px 0 0; }
+}
+@media (max-width: 720px) and (min-width: 401px) {
+  .live-screen-float, .mini-screen { right: 16px; bottom: 110px; width: min(240px, calc(100vw - 32px)); }
+}
+/* desktop 1280: miniatura ao lado do composer, sem invadir o painel */
+@media (min-width: 1280px) {
+  .live-screen-float, .mini-screen { width: min(340px, calc(100vw - 40px)); right: 24px; bottom: 128px; }
+}
+/* desktop 1440: um pouco maior, ainda flutuando só na conversa */
+@media (min-width: 1440px) {
+  .live-screen-float, .mini-screen { width: min(380px, calc(100vw - 48px)); right: 28px; bottom: 132px; }
+}
 
 /* novo agente: criar em 1 frase */
 

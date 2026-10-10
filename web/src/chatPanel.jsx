@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
-import { api, fmtAgo, TOOL_INFO, stepLabel } from './lib.js';
+import { api, fmtAgo, TOOL_INFO } from './lib.js';
 import { AgentAvatar, Icon, Menu, Segmented, StatusDot } from './ui.jsx';
 import { useApp } from './app.jsx';
 import { uploadFile } from './composer.jsx';
@@ -8,6 +8,8 @@ import { ResizeHandle } from './resize.jsx';
 import { AutonomySemaphore, autonomyMeta } from './autonomy.jsx';
 import { ArtifactList } from './actions.jsx';
 import ConversationMedia from './ConversationMedia.jsx';
+import { doingLine, isLiveScreenTool, liveScreenAutoKey, liveScreenStep } from './liveScreenLogic.js';
+export { doingLine };
 const COMP_LABEL = { running: 'Ligado', stopped: 'Parado', 'not started': 'Ainda não iniciado', local: 'Pasta local', off: 'Desligado', 'no key': 'Falta a chave do boat.dev', unknown: 'Sem resposta da VM' };
 
 /** Engrenagem: as ferramentas de cada agente ficam "anexadas" aqui, sem ocupar o painel. */
@@ -48,14 +50,6 @@ function AgentBrief({ a, S }) {
     <div className="autonomy-brief"><AutonomySemaphore level={a.autonomyLevel} settings={S.settings} /><small>{auto.desc}</small></div>
     {routines > 0 && <p className="muted small"><Icon name="clock" size={13} /> {routines} rotina{routines > 1 ? 's' : ''} ativa{routines > 1 ? 's' : ''}</p>}
   </>;
-}
-
-/** "Quem está fazendo o quê": tarefa atual, há quanto tempo e para quem vai (de /api/agents/working, atualizado a cada 4 s). */
-export function doingLine(w, now = Date.now()) {
-  if (!w) return null;
-  const min = Math.max(0, Math.round((now - w.since) / 60000));
-  const what = w.task || (w.tool ? stepLabel(w.tool) : 'trabalhando');
-  return `${what} · ${min ? `há ${min} min` : 'agora'} · para ${w.forName || 'você'}`;
 }
 
 function Details({ members, project, S, working = {} }) {
@@ -104,54 +98,106 @@ function Files({ members, project, chatId, files, refresh, toast }) {
 }
 
 /**
- * Tela da VM ao vivo (noVNC). Por padrão só assiste; "Assumir controle" libera mouse e teclado
- * para você mostrar ao agente como fazer algo. Tudo roda na sua máquina, sem custo.
+ * Tela ao vivo do computador (noVNC) — um componente só, em dois modos:
+ * painel (aba Computador) e miniatura flutuante. Liga sozinha; o passo atual
+ * fica por cima da tela. Por padrão só assiste; “Assumir controle” libera mouse e teclado.
  */
-function LiveScreen({ agent, working }) {
+function AgentLiveScreen({ agent, working, variant = 'panel', onClose, messages, step: stepProp, autoConnect = false }) {
+  const { working: workingNow } = useApp();
   const [url, setUrl] = useState(null);
   const [err, setErr] = useState(null);
   const [control, setControl] = useState(false);
   const [big, setBig] = useState(false);
   const [loading, setLoading] = useState(false);
+  const tried = useRef('');
+  const float = variant === 'float';
+  const hasHistory = (messages || []).some(m => (m.steps || []).some(s => isLiveScreenTool(s.tool)));
+  const step = liveScreenStep({ working: workingNow, messages, agentId: agent.id, busy: working, step: stepProp });
+  const closeFull = () => { setBig(false); setControl(false); };
+
   async function connect() {
+    if (loading) return;
     setLoading(true); setErr(null);
     try { setUrl((await api(`/api/agents/${agent.id}/vnc`)).url); }
     catch (e) { setErr(e.message); }
     setLoading(false);
   }
-  // Liga sozinho quando o agente começa a trabalhar nesta conversa.
-  useEffect(() => { if (working && !url && !loading) connect(); }, [working]);
-  const src = url && `${url}&view_only=${control ? 0 : 1}`;
-  const frame = src && <iframe key={src} src={src} title={`Tela de ${agent.name}`} allow="clipboard-read; clipboard-write" />;
+  useEffect(() => {
+    const want = working || float || autoConnect || hasHistory;
+    if (!want || url || loading || tried.current === agent.id) return;
+    tried.current = agent.id;
+    connect();
+  }, [working, float, autoConnect, hasHistory, agent.id, url, loading]);
+  useEffect(() => {
+    const onKey = e => {
+      if (e.key !== 'Escape') return;
+      if (big) { e.preventDefault(); closeFull(); return; }
+      if (float && onClose) { e.preventDefault(); onClose(); }
+    };
+    addEventListener('keydown', onKey);
+    return () => removeEventListener('keydown', onKey);
+  }, [big, float, onClose]);
+
+  const canControl = float ? big && control : control;
+  const src = url && `${url}&view_only=${canControl ? 0 : 1}`;
+  const frame = src && <iframe key={src} src={src} title={`Tela de ${agent.name}`} allow="clipboard-read; clipboard-write" tabIndex={float && !big ? -1 : undefined} />;
+  const overlay = step && (
+    <p className="live-screen-step" aria-live="polite">
+      {working && <span className="live-dot" aria-hidden="true" />}
+      <span>{step}</span>
+    </p>
+  );
+
   return <>
-    <div className={`agent-screen live-vnc ${working ? 'live' : ''} ${control ? 'controlling' : ''}`}>
-      <div className="pc-bar">
-        <i /><i /><i /><span>tela · {agent.name}</span>
-        {working && <span className="live-dot">trabalhando</span>}
-        {url && <>
-          <button className={`vnc-btn ${control ? 'on' : ''}`} onClick={() => setControl(c => !c)} title={control ? 'Voltar a só assistir' : 'Usar mouse e teclado na VM'}>
-            <Icon name={control ? 'x' : 'edit'} size={12} />{control ? 'Soltar controle' : 'Assumir controle'}
-          </button>
-          <button className="vnc-btn icon" onClick={() => setBig(true)} title="Tela cheia" aria-label="Tela cheia"><Icon name="share" size={12} /></button>
-        </>}
-      </div>
-      {frame && !big ? frame : (
-        <div className="vnc-off">
-          {err ? <p className="pc-idle">{err}</p> : <p className="pc-idle">{big ? 'Aberta em tela cheia.' : `Veja e controle a tela da VM de ${agent.name}. Liga o computador se estiver desligado.`}</p>}
-          {!big && <button className="btn btn-sm" onClick={connect} disabled={loading}>{loading ? 'Ligando a VM…' : 'Ver tela ao vivo'}</button>}
+    {float ? (
+      <aside className={`live-screen live-screen-float mini-screen ${working ? 'live' : ''}`} data-live-screen="float" aria-label={`Tela de ${agent.name} ao vivo`}>
+        <div className="live-screen-bar mini-screen-bar">
+          {working && <span className="live-dot" aria-hidden="true" />}
+          <span className="grow">{agent.name}{working ? ' · na tela' : ''}</span>
+          <button type="button" className="icon-btn sm" onClick={() => setBig(true)} aria-label="Tela cheia"><Icon name="share" size={13} /></button>
+          {onClose && <button type="button" className="icon-btn sm" onClick={onClose} aria-label="Fechar a tela"><Icon name="x" size={13} /></button>}
         </div>
-      )}
-    </div>
+        <div className="live-screen-body">
+          {frame && !big ? frame : <p className="mini-screen-msg">{err || (big ? 'Aberta em tela cheia.' : loading ? 'Ligando o computador…' : 'Ligando a tela…')}</p>}
+          {frame && !big && overlay}
+        </div>
+      </aside>
+    ) : (
+      <div className={`live-screen live-screen-panel agent-screen live-vnc ${working ? 'live' : ''} ${control ? 'controlling' : ''}`} data-live-screen="panel">
+        <div className="pc-bar">
+          <i /><i /><i /><span>tela · {agent.name}</span>
+          {working && <span className="live-dot">trabalhando</span>}
+          {url && <>
+            <button type="button" className={`vnc-btn ${control ? 'on' : ''}`} onClick={() => setControl(c => !c)} title={control ? 'Voltar a só assistir' : 'Usar mouse e teclado no computador'}>
+              <Icon name={control ? 'x' : 'edit'} size={12} />{control ? 'Soltar controle' : 'Assumir controle'}
+            </button>
+            <button type="button" className="vnc-btn icon" onClick={() => setBig(true)} title="Tela cheia" aria-label="Tela cheia"><Icon name="share" size={12} /></button>
+          </>}
+        </div>
+        <div className="live-screen-body">
+          {frame && !big ? frame : (
+            <div className="vnc-off">
+              {err ? <p className="pc-idle">{err}</p> : <p className="pc-idle">{big ? 'Aberta em tela cheia.' : `Veja e controle a tela do computador de ${agent.name}. Liga o computador se estiver desligado.`}</p>}
+              {!big && <button type="button" className="btn btn-sm" onClick={connect} disabled={loading}>{loading ? 'Ligando o computador…' : 'Ver tela ao vivo'}</button>}
+            </div>
+          )}
+          {frame && !big && overlay}
+        </div>
+      </div>
+    )}
     {big && (
-      <div className="vnc-full" role="dialog" aria-label={`Tela de ${agent.name}`}>
+      <div className="vnc-full" role="dialog" aria-modal="true" aria-label={`Tela de ${agent.name}`} onClick={e => { if (e.target === e.currentTarget) closeFull(); }}>
         <div className="vnc-full-bar">
-          <b>Tela de {agent.name}</b>{working && <span className="live-dot">trabalhando</span>}
+          <b>Tela de {agent.name}</b>
+          {working && <span className="live-dot">trabalhando</span>}
+          {step && <span className="live-screen-step-inline">{step}</span>}
           <div className="grow" />
-          <button className={`btn btn-sm ${control ? 'btn-primary' : ''}`} onClick={() => setControl(c => !c)}>{control ? 'Soltar controle' : 'Assumir controle'}</button>
-          <button className="btn btn-sm" onClick={() => setBig(false)}><Icon name="x" size={14} />Fechar</button>
+          <button type="button" className={`btn btn-sm ${control ? 'btn-primary' : ''}`} onClick={() => setControl(c => !c)}>{control ? 'Soltar controle' : 'Assumir controle'}</button>
+          <button type="button" className="btn btn-sm" onClick={closeFull}><Icon name="x" size={14} />Fechar</button>
         </div>
         {frame}
-        <p className="vnc-hint">{control ? 'Você está no controle: mouse e teclado vão para a VM. Mostre a tarefa e depois peça ao agente para repetir.' : 'Só assistindo. Clique em “Assumir controle” para usar mouse e teclado.'}</p>
+        {step && <p className="live-screen-step live-screen-step-full" aria-live="polite">{step}</p>}
+        <p className="vnc-hint">{control ? 'Você está no controle: mouse e teclado vão para o computador. Mostre a tarefa e depois peça ao agente para repetir.' : 'Só assistindo. Clique em “Assumir controle” para usar mouse e teclado.'}</p>
       </div>
     )}
   </>;
@@ -170,7 +216,7 @@ function Computer({ members, messages, busy, S_mode }) {
     return () => { alive = false; clearInterval(t); };
   }, [withPc.map(a => a.id).join()]);
   const log = useMemo(() => messages.flatMap(m => (m.steps || [])
-    .filter(s => /^(computer_|browser_)/.test(s.tool || ''))
+    .filter(s => isLiveScreenTool(s.tool))
     .map(s => ({ ...s, agentId: m.agentId, at: s.at || m.at }))), [messages]);
   const screen = useRef(null);
   useEffect(() => { screen.current?.scrollTo({ top: 1e9 }); }, [log.length]);
@@ -191,7 +237,7 @@ function Computer({ members, messages, busy, S_mode }) {
           </div>
         );
       })}
-      {S_mode === 'docker' && withPc.map(a => <LiveScreen key={a.id} agent={a} working={!!busy[a.id]} />)}
+      {S_mode === 'docker' && withPc.map(a => <AgentLiveScreen key={a.id} agent={a} working={!!busy[a.id]} messages={messages} autoConnect={!!busy[a.id] || log.some(s => s.agentId === a.id)} />)}
       <div className={`pc-screen ${working ? 'live' : ''}`} ref={screen} aria-label="Tela do computador" role="log">
         <div className="pc-bar"><i /><i /><i /><span>{withPc.length > 1 ? 'computadores' : withPc[0].name.toLowerCase().replace(/\s+/g, '-')}</span>{working && <ThinkingOrb state="working" size={20} />}</div>
         {log.length === 0
@@ -214,7 +260,16 @@ export default function ChatPanel({ members, project, chatId, messages, files, o
   // Nesta tela, "trabalhando" é desta conversa (não de outra em que o agente esteja).
   const busy = chatId && busyChats[chatId] ? busyAgents : {};
   const [tab, setTab] = useState('details');
+  const memberIds = members.map(x => x.id);
+  const liveKey = liveScreenAutoKey({ messages, working: workingNow, busy, agentIds: memberIds });
+  const openedLive = useRef('');
   useEffect(() => { const show = () => setTab('computer'); addEventListener('ripper:computer', show); return () => removeEventListener('ripper:computer', show); }, []);
+  useEffect(() => {
+    if (S.settings.computer?.mode !== 'docker') return;
+    if (!liveKey || liveKey === openedLive.current) return;
+    openedLive.current = liveKey;
+    setTab('computer');
+  }, [liveKey, S.settings.computer?.mode]);
   const group = members.length > 1, a = members[0];
   const working = members.some(x => busy[x.id]);
   const arts = S.artifacts.filter(x => project ? x.projectId === project.id : chatId && x.chatId === chatId);
@@ -246,42 +301,9 @@ export default function ChatPanel({ members, project, chatId, messages, files, o
 }
 
 /**
- * Miniatura da tela do agente dentro da conversa (canto, por cima): aparece sozinha quando ele
- * abre o navegador. Só assiste; "Ampliar" abre em tela cheia com a opção de assumir o controle.
+ * Miniatura da tela do agente (canto da conversa). Mesmo componente da aba Computador.
+ * Chat.jsx continua importando MiniScreen — a API { agent, working, onClose } não muda.
  */
-export function MiniScreen({ agent, working, onClose }) {
-  const [url, setUrl] = useState(null);
-  const [err, setErr] = useState(null);
-  const [big, setBig] = useState(false);
-  const [control, setControl] = useState(false);
-  useEffect(() => {
-    let alive = true;
-    api(`/api/agents/${agent.id}/vnc`).then(r => alive && setUrl(r.url), e => alive && setErr(e.message));
-    return () => { alive = false; };
-  }, [agent.id]);
-  const src = url && `${url}&view_only=${big && control ? 0 : 1}`;
-  return <>
-    <aside className={`mini-screen ${working ? 'live' : ''}`} aria-label={`Tela de ${agent.name} ao vivo`}>
-      <div className="mini-screen-bar">
-        {working && <span className="live-dot" aria-hidden="true" />}
-        <span className="grow">{agent.name} · {working ? 'usando o navegador' : 'tela'}</span>
-        <button type="button" className="icon-btn sm" onClick={() => setBig(true)} aria-label="Ampliar a tela"><Icon name="share" size={13} /></button>
-        <button type="button" className="icon-btn sm" onClick={onClose} aria-label="Fechar a miniatura"><Icon name="x" size={13} /></button>
-      </div>
-      {src && !big ? <iframe src={src} title={`Tela de ${agent.name}`} tabIndex={-1} />
-        : <p className="mini-screen-msg">{err || (big ? 'Aberta em tela cheia.' : 'Ligando a tela…')}</p>}
-    </aside>
-    {big && src && (
-      <div className="vnc-full" role="dialog" aria-label={`Tela de ${agent.name}`}>
-        <div className="vnc-full-bar">
-          <b>Tela de {agent.name}</b>{working && <span className="live-dot">trabalhando</span>}
-          <div className="grow" />
-          <button className={`btn btn-sm ${control ? 'btn-primary' : ''}`} onClick={() => setControl(c => !c)}>{control ? 'Soltar controle' : 'Assumir controle'}</button>
-          <button className="btn btn-sm" onClick={() => { setBig(false); setControl(false); }}><Icon name="x" size={14} />Fechar</button>
-        </div>
-        <iframe key={src} src={src} title={`Tela de ${agent.name}`} allow="clipboard-read; clipboard-write" />
-        <p className="vnc-hint">{control ? 'Você está no controle: mouse e teclado vão para a VM.' : 'Só assistindo. Clique em “Assumir controle” para usar mouse e teclado.'}</p>
-      </div>
-    )}
-  </>;
+export function MiniScreen(props) {
+  return <AgentLiveScreen {...props} variant="float" />;
 }
