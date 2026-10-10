@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canUseFile, selectSpeakers, routineDue, mayFallback, mentionOrder, Floor, isPass, heuristicSpeaker, trimHistory, turnPlanIds, delegationCardState, ownerBlockedReason, oneLineTask, ambiguousMentions, isAck, summarizeTools, toProviderMessages, continueHistoryAfterConnectors, estimateHistoryTokens, estimateTextTokens, skipStreamedPrefix, SIDE_EFFECT_TOOLS } from '../lib/agent-flow.mjs';
+import { canUseFile, selectSpeakers, routineDue, mayFallback, mentionOrder, Floor, isPass, heuristicSpeaker, trimHistory, turnPlanIds, delegationCardState, ownerBlockedReason, oneLineTask, ambiguousMentions, isAck, summarizeTools, toProviderMessages, continueHistoryAfterConnectors, estimateHistoryTokens, estimateTextTokens, skipStreamedPrefix, SIDE_EFFECT_TOOLS, labelMessageForAgent, toolCallKey, messageForProvider } from '../lib/agent-flow.mjs';
 
 test('@menção tolerante a nome; ambígua não chama ninguém', () => {
   const eng = { id: 'e', name: 'Engenheiro de Software (Ripper)' };
@@ -194,9 +194,38 @@ test('skipStreamedPrefix e ferramentas com efeito na continuação', () => {
   assert.deepEqual(skipStreamedPrefix('Hello!', 'Hello'), { text: '!', rest: '' });
   assert.ok(SIDE_EFFECT_TOOLS.has('remember'));
   assert.ok(SIDE_EFFECT_TOOLS.has('computer_exec'));
-  const cont = continueHistoryAfterConnectors([], 'agenda', { text: 'ok', tools: [{ tool: 'remember' }, { tool: 'use_connectors' }] });
-  assert.deepEqual(cont.doneTools, ['remember']);
+  const first = { tool: 'remember', input: { text: 'café' } };
+  const cont = continueHistoryAfterConnectors([], 'agenda', { text: 'ok', tools: [first, { tool: 'use_connectors' }] });
+  assert.deepEqual(cont.doneTools, [toolCallKey('remember', { text: 'café' })]);
+  assert.ok(!cont.doneTools.includes(toolCallKey('remember', { text: 'chá' })));
   assert.equal(cont.streamedText, 'ok');
+  assert.match(cont.prompt, /pode usar de novo/i);
+});
+
+test('trimHistory preserva model; em grupo só o agente que responde mantém o dele', () => {
+  const history = [
+    { role: 'user', content: 'escreve o script' },
+    { role: 'assistant', agentId: 'dev', content: 'fiz o arquivo', model: 'codex' },
+    { role: 'assistant', agentId: 'ana', content: 'fico no texto', model: 'claude-sonnet-5-5' },
+    { role: 'user', content: 'sim' }
+  ];
+  const kept = trimHistory(history);
+  assert.equal(kept[1].model, 'codex');
+  assert.equal(kept[1].agentId, 'dev');
+  assert.equal(kept[2].model, 'claude-sonnet-5-5');
+  assert.equal(kept[2].agentId, 'ana');
+  assert.equal(messageForProvider(history[1]).model, 'codex');
+
+  const name = id => ({ dev: 'Dev', ana: 'Ana' }[id] || id);
+  const forDev = kept.map(m => labelMessageForAgent(m, 'dev', name, { group: true }));
+  assert.equal(forDev[1].role, 'assistant');
+  assert.equal(forDev[1].model, 'codex');
+  assert.equal(forDev[2].role, 'user');
+  assert.equal(forDev[2].model, undefined);
+  assert.match(forDev[2].content, /Ana disse/);
+
+  const lastModel = [...forDev].reverse().find(m => m.model)?.model;
+  assert.equal(lastModel, 'codex');
 });
 
 test('anexo de outro agente não atravessa projeto', () => {

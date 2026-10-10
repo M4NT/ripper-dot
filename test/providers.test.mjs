@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   claudeAllowedTools,
   buildCodexSpawnArgs,
@@ -15,9 +19,13 @@ import {
   buildCodexPrompt,
   codexSandboxMode,
   codexAskForApproval,
-  codexChildEnv
+  codexChildEnv,
+  codexWriteEnabled,
+  codexUsesApiKeyAuth,
+  defaultCodexHome,
+  isolatedCodexProcessHome
 } from '../lib/providers.mjs';
-import { continueHistoryAfterConnectors, skipStreamedPrefix } from '../lib/agent-flow.mjs';
+import { continueHistoryAfterConnectors, skipStreamedPrefix, toolCallKey } from '../lib/agent-flow.mjs';
 import { createRipperMcpBridge } from '../lib/ripper-mcp-bridge.mjs';
 import { ripperClaudeToolAllowlist } from '../lib/ripper-builtin-tools.mjs';
 
@@ -83,28 +91,60 @@ test('buildCodexSpawnArgs: sandbox read-only sem computador isolado, MCP stdio/h
   assert.ok(args.includes('/tmp/x.png'));
 });
 
-test('Codex no host fica read-only; escrita só com opção explícita e sem pedir aprovação', () => {
-  assert.equal(codexSandboxMode(baseAgent, { computer: { mode: 'docker' } }), 'read-only');
-  assert.equal(codexSandboxMode(baseAgent, { computer: { mode: 'boat' } }), 'read-only');
-  assert.equal(codexSandboxMode(baseAgent, { computer: { mode: 'local', allowLocalCommands: true }, approvalPolicy: 'risky' }), 'read-only');
-  assert.equal(codexSandboxMode(baseAgent, { computer: { mode: 'local', allowLocalCommands: true }, approvalPolicy: 'never' }), 'workspace-write');
-  assert.equal(codexSandboxMode(baseAgent, { computer: { mode: 'local', allowLocalCommands: false }, approvalPolicy: 'never' }), 'read-only');
-  assert.equal(codexSandboxMode({ ...baseAgent, autonomyLevel: 'read_only' }, { computer: { mode: 'local', allowLocalCommands: true }, approvalPolicy: 'never' }), 'read-only');
+test('Codex no host fica read-only; escrita só com RIPPER_CODEX_WRITE=1, opção explícita e sem pedir aprovação', () => {
+  const writeSettings = { computer: { mode: 'local', allowLocalCommands: true }, approvalPolicy: 'never' };
+  assert.equal(codexWriteEnabled({}), false);
+  assert.equal(codexWriteEnabled({ RIPPER_CODEX_WRITE: '1' }), true);
+  assert.equal(codexSandboxMode(baseAgent, writeSettings, {}), 'read-only');
+  assert.equal(codexSandboxMode(baseAgent, { computer: { mode: 'docker' } }, { RIPPER_CODEX_WRITE: '1' }), 'read-only');
+  assert.equal(codexSandboxMode(baseAgent, { computer: { mode: 'boat' } }, { RIPPER_CODEX_WRITE: '1' }), 'read-only');
+  assert.equal(codexSandboxMode(baseAgent, { computer: { mode: 'local', allowLocalCommands: true }, approvalPolicy: 'risky' }, { RIPPER_CODEX_WRITE: '1' }), 'read-only');
+  assert.equal(codexSandboxMode(baseAgent, writeSettings, { RIPPER_CODEX_WRITE: '1' }), 'workspace-write');
+  assert.equal(codexSandboxMode(baseAgent, { computer: { mode: 'local', allowLocalCommands: false }, approvalPolicy: 'never' }, { RIPPER_CODEX_WRITE: '1' }), 'read-only');
+  assert.equal(codexSandboxMode({ ...baseAgent, autonomyLevel: 'read_only' }, writeSettings, { RIPPER_CODEX_WRITE: '1' }), 'read-only');
   assert.equal(codexAskForApproval(baseAgent, { approvalPolicy: 'risky' }), 'on-request');
   assert.equal(codexAskForApproval(baseAgent, { approvalPolicy: 'never' }), 'never');
   assert.equal(codexAskForApproval({ ...baseAgent, autonomyLevel: 'read_only' }, { approvalPolicy: 'never' }), 'untrusted');
-  const dockerArgs = buildCodexSpawnArgs({ agent: baseAgent, settings: { ...settings, computer: { mode: 'docker' } } }).join(' ');
+  const dockerArgs = buildCodexSpawnArgs({ agent: baseAgent, settings: { ...settings, computer: { mode: 'docker' } }, env: {} }).join(' ');
   assert.match(dockerArgs, /--sandbox read-only/);
   assert.match(dockerArgs, /sandbox_workspace_write\.network_access=false/);
-  assert.match(dockerArgs, /--ask-for-approval on-request/);
+  assert.match(dockerArgs, /approval_policy=on-request/);
+  assert.doesNotMatch(dockerArgs, /--ask-for-approval/);
   const writeArgs = buildCodexSpawnArgs({
     agent: baseAgent,
-    settings: { ...settings, computer: { mode: 'local', allowLocalCommands: true }, approvalPolicy: 'never' }
+    settings: { ...settings, ...writeSettings },
+    env: { RIPPER_CODEX_WRITE: '1' }
   });
   assert.deepEqual(writeArgs.slice(0, 5), ['exec', '--json', '--skip-git-repo-check', '--sandbox', 'workspace-write']);
+  assert.ok(writeArgs.includes('approval_policy=never'));
 });
 
-test('Codex recebe só um env mínimo, sem chaves do servidor', () => {
+test('CLI real do Codex: --ask-for-approval depois de exec falha; -c approval_policy vale', () => {
+  const localBin = '/tmp/codex-cli/node_modules/.bin/codex';
+  const which = spawnSync('which', ['codex'], { encoding: 'utf8' });
+  const bin = (process.env.CODEX_BIN && existsSync(process.env.CODEX_BIN) && process.env.CODEX_BIN)
+    || (existsSync(localBin) && localBin)
+    || (which.status === 0 && which.stdout.trim())
+    || '';
+  if (!bin) {
+    const args = buildCodexSpawnArgs({ agent: baseAgent, settings, env: {} });
+    assert.equal(args[0], 'exec');
+    assert.ok(args.includes('approval_policy=on-request'));
+    assert.ok(!args.includes('--ask-for-approval'));
+    return;
+  }
+  const after = spawnSync(bin, ['exec', '--ask-for-approval', 'never', '--version'], { encoding: 'utf8' });
+  assert.notEqual(after.status, 0, after.stderr || after.stdout);
+  assert.match(`${after.stderr}${after.stdout}`, /unexpected argument|--ask-for-approval/i);
+  const viaConfig = spawnSync(bin, ['exec', '-c', 'approval_policy=never', '--version'], { encoding: 'utf8' });
+  assert.equal(viaConfig.status, 0, viaConfig.stderr || viaConfig.stdout);
+  const before = spawnSync(bin, ['--ask-for-approval', 'never', 'exec', '--version'], { encoding: 'utf8' });
+  assert.equal(before.status, 0, before.stderr || before.stdout);
+});
+
+test('Codex recebe env mínimo, HOME isolado, CODEX_HOME e OPENAI_API_KEY só na auth por chave', () => {
+  const isolated = join(tmpdir(), 'ripper-codex-home-test');
+  const login = join(tmpdir(), 'ripper-codex-login');
   const env = codexChildEnv({
     PATH: '/bin',
     HOME: '/home/ripper',
@@ -113,16 +153,36 @@ test('Codex recebe só um env mínimo, sem chaves do servidor', () => {
     RIPPER_TOKEN: 'tok',
     OPENAI_API_KEY: 'sk-openai',
     AWS_SECRET_ACCESS_KEY: 'aws',
-    CODEX_HOME: '/home/ripper/.codex'
-  });
+    CODEX_HOME: login,
+    XDG_CONFIG_HOME: '/home/ripper/.config',
+    USERPROFILE: 'C:\\Users\\ripper'
+  }, { isolatedHome: isolated, codexHome: login });
   assert.equal(env.PATH, '/bin');
-  assert.equal(env.HOME, '/home/ripper');
-  assert.equal(env.CODEX_HOME, '/home/ripper/.codex');
+  assert.equal(env.HOME, isolated);
+  assert.notEqual(env.HOME, '/home/ripper');
+  assert.equal(env.CODEX_HOME, login);
+  assert.equal(env.XDG_CONFIG_HOME, undefined);
   assert.equal(env.ANTHROPIC_API_KEY, undefined);
   assert.equal(env.GITHUB_TOKEN, undefined);
   assert.equal(env.RIPPER_TOKEN, undefined);
-  assert.equal(env.OPENAI_API_KEY, undefined);
   assert.equal(env.AWS_SECRET_ACCESS_KEY, undefined);
+  assert.equal(env.OPENAI_API_KEY, 'sk-openai');
+  assert.equal(codexUsesApiKeyAuth({ OPENAI_API_KEY: 'sk-openai' }, login), true);
+
+  mkdirSync(login, { recursive: true });
+  writeFileSync(join(login, 'auth.json'), JSON.stringify({ tokens: { access_token: 'chatgpt' } }));
+  const withLogin = codexChildEnv({
+    PATH: '/bin',
+    HOME: '/home/ripper',
+    OPENAI_API_KEY: 'sk-openai',
+    CODEX_HOME: login
+  }, { isolatedHome: isolated, codexHome: login });
+  assert.equal(withLogin.OPENAI_API_KEY, undefined);
+  assert.equal(withLogin.CODEX_HOME, login);
+  assert.equal(withLogin.HOME, isolated);
+  assert.equal(codexUsesApiKeyAuth({ OPENAI_API_KEY: 'sk-openai' }, login), false);
+  assert.equal(defaultCodexHome({ CODEX_HOME: login }), login);
+  assert.match(isolatedCodexProcessHome({}), /ripper-codex-home/);
 });
 
 test('buildClaudeQueryOptions registra MCP ripper e conectores só com plugins', () => {
@@ -172,6 +232,22 @@ test('Codex transmite só deltas da mensagem do agente', () => {
   assert.equal(parseCodexJsonEvent({ msg: { type: 'agent_reasoning_delta', delta: 'hmm' } }), null);
 });
 
+test('Codex não duplica a segunda mensagem do mesmo turno no stream', () => {
+  const state = { last: '' };
+  applyCodexTextEvent(parseCodexJsonEvent({ type: 'item.updated', item: { id: 'm1', type: 'agent_message', text: 'Primeira' } }), state);
+  applyCodexTextEvent(parseCodexJsonEvent({ type: 'item.completed', item: { id: 'm1', type: 'agent_message', text: 'Primeira' } }), state);
+  const d1 = applyCodexTextEvent(parseCodexJsonEvent({ type: 'item.agent_message_delta', item: { id: 'm2', type: 'agent_message_delta', delta: 'Segunda' } }), state);
+  const d2 = applyCodexTextEvent(parseCodexJsonEvent({ type: 'item.completed', item: { id: 'm2', type: 'agent_message', text: 'Segunda' } }), state);
+  assert.deepEqual(d1, { text: 'Segunda' });
+  assert.equal(d2, null);
+
+  const noId = { last: 'Primeira' };
+  const streamed = applyCodexTextEvent({ text: 'Segunda' }, noId);
+  const snap = applyCodexTextEvent({ text: 'Segunda', snapshot: true }, noId);
+  assert.deepEqual(streamed, { text: 'Segunda' });
+  assert.equal(snap, null, 'snapshot da 2ª mensagem não reenvia o que já saiu em delta');
+});
+
 test('histórico vai ao Claude e ao Codex como mensagens reais', () => {
   const history = [
     { role: 'user', content: 'lembra o café' },
@@ -198,17 +274,19 @@ test('histórico vai ao Claude e ao Codex como mensagens reais', () => {
   assert.doesNotMatch(prompt, /Usuário: lembra o café/);
 });
 
-test('use_connectors continua o turno sem duplicar texto nem ferramenta com efeito', () => {
+test('use_connectors continua o turno sem duplicar texto; 2º uso legítimo da ferramenta passa', () => {
   const cont = continueHistoryAfterConnectors(
     [{ role: 'user', content: 'oi' }],
     'vê a agenda',
-    { text: 'vou abrir', tools: [{ tool: 'remember', detail: 'x' }, { tool: 'use_connectors' }] }
+    { text: 'vou abrir', tools: [{ tool: 'remember', input: { text: 'x' }, detail: 'x' }, { tool: 'use_connectors' }] }
   );
   assert.equal(cont.history.length, 3);
   assert.equal(cont.history[1].content, 'vê a agenda');
   assert.match(cont.history[2].content, /vou abrir/);
-  assert.match(cont.prompt, /não chame de novo/i);
-  assert.deepEqual(cont.doneTools, ['remember']);
+  assert.match(cont.prompt, /pode usar de novo/i);
+  assert.deepEqual(cont.doneTools, [toolCallKey('remember', { text: 'x' })]);
+  assert.ok(!cont.doneTools.includes('remember'));
+  assert.ok(!cont.doneTools.includes(toolCallKey('remember', { text: 'outro fato' })));
   assert.equal(cont.streamedText, 'vou abrir');
   assert.deepEqual(skipStreamedPrefix('vou abrir a agenda', cont.streamedText), { text: ' a agenda', rest: '' });
 });
