@@ -10,6 +10,9 @@
 .team-st.todo, .team-st.blocked { color: var(--warn); }
 .team-st.doing { color: var(--ok); }
 .team-st.done { color: var(--ok); }
-.team-st.cancelled { color: var(--err); }
+.team-st.cancelled, .team-st.failed { color: var(--err); }
+.team-result { margin: 8px 0; padding: 10px 12px; border-radius: var(--raio-cartao); background: var(--surface); border: 1px dashed var(--line); }
+.team-result-head { display: flex; gap: 8px; align-items: baseline; margin-bottom: 6px; }
+.team-result-body { font-size: var(--fs-sm); color: var(--ink-2); white-space: pre-wrap; }
 .team-members-task { display: block; color: var(--muted); font-size: var(--fs-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .team-members-task.is-working { color: var(--ok); }

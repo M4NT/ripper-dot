@@ -89,10 +89,51 @@ test('quadro do time: API cria tarefa, board e cancel em cascata', async () => {
     assert.equal(patched.status, 'doing');
     assert.equal(patched.progress.percent, 30);
 
+    const later = await (await req('/api/team-tasks', {
+      ownerId: a.id, title: 'Montar tabela', chatId, deps: [created.id]
+    })).json();
+    assert.equal(later.status, 'blocked');
+    const cycle = await fetch(base + `/api/team-tasks/${created.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', origin: base },
+      body: JSON.stringify({ deps: [later.id] })
+    });
+    assert.equal(cycle.status, 400);
+
+    const other = await (await req('/api/agents', { name: 'Pesquisador Extra' })).json();
+    const forbidden = await fetch(base + `/api/team-tasks/${created.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', origin: base },
+      body: JSON.stringify({ status: 'done', agentId: other.id })
+    });
+    assert.equal(forbidden.status, 403);
+
+    const short = await fetch(base + `/api/team-tasks/${created.id.slice(0, 8)}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', origin: base },
+      body: JSON.stringify({ progress: { percent: 50, note: 'meio' } })
+    });
+    assert.equal(short.status, 200);
+    assert.equal((await short.json()).progress.percent, 50);
+
+    const self = await req(`/api/agents/${a.id}/delegate`, {
+      ownerId: a.id, originChatId: chatId, title: 'auto', prompt: 'não'
+    });
+    assert.equal(self.status, 400);
+
+    const del = await req(`/api/agents/${other.id}/delegate`, {
+      ownerId: a.id, originChatId: chatId, title: 'Isolada', prompt: 'resuma em uma linha', isolated: true
+    });
+    assert.equal(del.status, 200);
+    const delegated = await del.json();
+    assert.equal(delegated.task.assigneeId, other.id);
+    assert.ok(delegated.childChatId);
+
     const cancel = await req(`/api/chats/${chatId}/cancel`, {});
     assert.equal(cancel.status, 200);
     const after = await (await req(`/api/team-tasks?chatId=${chatId}`, null, 'GET')).json();
-    assert.equal(after.items[0].status, 'cancelled');
+    assert.ok(after.items.some(t => t.id === created.id && t.status === 'cancelled'));
+    assert.ok(!after.items.some(t => t.status === 'doing'));
   } finally {
     child.kill();
   }

@@ -88,7 +88,23 @@ test('inbox: liga mensagem, conclui e acorda o dono', () => {
   assert.ok(wake.ok);
   assert.equal(wake.message.to, C.id);
   assert.equal(wake.message.priority, 'now');
-  assert.match(wake.message.body, /Resultado da tarefa/);
+  assert.match(wake.message.body, /não confiável/);
+});
+
+test('inbox: falha marca failed e não desbloqueia dependentes', () => {
+  const db = freshDb();
+  const queued = enqueuePeerMessage({
+    db, id, from: C, to: W, body: 'Base', originChatId: 'chat-1', hops: 0,
+    limits: { maxPerHour: 20, maxHops: 5 }, now: 10
+  });
+  const { task } = linkOrCreateTeamTaskFromInbox(db, queued.message, { id, ownerId: C.id, now: 10 });
+  const blocked = createTeamTask(db, {
+    ownerId: C.id, title: 'Depois', deps: [task.id], chatId: 'chat-1'
+  }, { id }).task;
+  const failed = applyInboxResultToTeamTask(db, queued.message, 'estouro', { failed: true, now: 20 });
+  assert.equal(failed.task.status, TEAM_TASK_STATUS.failed);
+  assert.equal(failed.unblocked.length, 0);
+  assert.equal(findReloaded(db, blocked.id).status, TEAM_TASK_STATUS.blocked);
 });
 
 test('teamBoardForChat: membros + tarefa atual', () => {

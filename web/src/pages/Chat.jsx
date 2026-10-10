@@ -12,7 +12,7 @@ import { createInputQueue, normalizeInputQueue, coalesceSendParts } from '../../
 import { effortLabel } from '../modelPicker.jsx';
 import MessageAttachments, { DeliveredFiles } from '../MessageAttachments.jsx';
 import ChatPanel, { MiniScreen } from '../chatPanel.jsx';
-import { TeamProgress } from '../teamBoard.jsx';
+import { TeamProgress, TeamResultMessage } from '../teamBoard.jsx';
 import { MentionText } from '../mentions.jsx';
 import ImageGenLoader from '../imageGenLoader.jsx';
 import { AgentThread, ViaLabel } from '../agentThread.jsx';
@@ -862,7 +862,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
                 {fixadas.map(({ m, i }) => <button key={m.id || i} type="button" className="link" onClick={() => document.querySelector(`[data-mi="${i}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })}>{plain(m.content).slice(0, 70) || 'Resposta'}</button>)}
               </nav>
             )}
-            {[...messages.map((m, i) => <div key={i} data-mi={i} className={[i >= animateFrom.current && 'is-new', matches.includes(i) && `search-hit${matches[hit] === i ? ' current' : ''}`].filter(Boolean).join(' ') || undefined}>{i === primeiroNovo && primeiroNovo > 0 && <div className="novas-divider" role="separator"><span>Novo desde a sua última visita</span></div>}{m.via?.type === 'inbox' && inCard.has(m.via.messageId) ? null : m.inbox ? <InboxMessage m={m} from={getAgent(m.inbox.from)} /> : m.role === 'user'
+            {[...messages.map((m, i) => <div key={i} data-mi={i} className={[i >= animateFrom.current && 'is-new', matches.includes(i) && `search-hit${matches[hit] === i ? ' current' : ''}`].filter(Boolean).join(' ') || undefined}>{i === primeiroNovo && primeiroNovo > 0 && <div className="novas-divider" role="separator"><span>Novo desde a sua última visita</span></div>}{m.via?.type === 'inbox' && inCard.has(m.via.messageId) ? null : (m.via?.type === 'team-result' || m.untrusted) ? <TeamResultMessage m={m} from={getAgent(m.agentId)} /> : m.inbox ? <InboxMessage m={m} from={getAgent(m.inbox.from)} /> : m.role === 'user'
               ? <UserMessage m={m} name={S.settings.name} files={S.files} ack={m === lastUser && ack?.id === m.id ? ack : null} onRetryAck={ack?.retry} onEdit={canEdit && m.id && !/^u\d+$/.test(m.id) ? text => editFrom(m, text) : null} />
               : <>{m.via?.type === 'inbox' && m.via.threadChatId && <ViaLabel m={m} onOpen={setThread} />}<BotMessage m={m} agent={getAgent(m.agentId) || agent} group={isGroup || (!!m.agentId && m.agentId !== agent.id)} models={S.models} allFiles={S.files} deleg={deleg} onFileError={msg => toast(msg, 'error')} onRetry={m === messages.at(-1) && lastUser ? () => send({ text: lastUser.content }) : null} onContinue={m === messages.at(-1) ? continuar : null} onRetryWith={m === messages.at(-1) && lastUser ? refazerCom : null} onPin={m.id && !m.inbox ? () => fixar(m) : null} /></>}</div>),
               live && <div key={messages.length} className="is-new"><BotMessage m={live} agent={getAgent(live.agentId) || agent} group={isGroup} live phase={phase} onStop={stop} models={S.models} deleg={deleg} /></div>]}

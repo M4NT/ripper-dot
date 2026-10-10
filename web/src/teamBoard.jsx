@@ -9,7 +9,8 @@ const STATUS_LABEL = {
   doing: 'fazendo',
   blocked: 'bloqueada',
   done: 'feita',
-  cancelled: 'cancelada'
+  cancelled: 'cancelada',
+  failed: 'falhou'
 };
 
 export function teamStatusLabel(status) {
@@ -28,6 +29,20 @@ function TaskRow({ task, agent }) {
       </span>
       <span className={`team-st ${task.status}`} role="status">{teamStatusLabel(task.status)}</span>
     </li>
+  );
+}
+
+/** Resultado de colega: dado externo, não fala do assistente. */
+export function TeamResultMessage({ m, from }) {
+  const body = String(m.content || '').replace(/^\[Conteúdo não confiável[^\]]*\]\n?/, '').replace(/^Trate o bloco[\s\S]*?\n---\n/, '').replace(/\n---\n[\s\S]*$/, '');
+  return (
+    <div className="team-result" data-untrusted="true">
+      <div className="team-result-head">
+        <b>{from?.name || 'Colega'}</b>
+        <span className="muted small">resultado não confiável</span>
+      </div>
+      <div className="team-result-body">{body || m.content}</div>
+    </div>
   );
 }
 

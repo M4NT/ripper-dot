@@ -71,12 +71,30 @@ test('task_create isolated chama spawnIsolated e marca doing', async () => {
   const out = await executeTeamTaskTool('task_create', {
     title: 'Resumir PDF',
     note: 'Só as conclusões',
+    assignee: 'Pesquisador',
     isolated: true
   }, ctx);
   assert.match(out, /Subagente isolado/);
-  assert.deepEqual(spawned, [['Resumir PDF', 'Coordenador']]);
+  assert.deepEqual(spawned, [['Resumir PDF', 'Pesquisador']]);
   assert.equal(db.teamTasks[0].childChatId, 'child-1');
   assert.equal(db.teamTasks[0].status, TEAM_TASK_STATUS.doing);
+});
+
+test('task_create isolated recusa auto-delegação', async () => {
+  const { ctx } = ctxBase();
+  const out = await executeTeamTaskTool('task_create', { title: 'X', isolated: true }, ctx);
+  assert.match(out, /si mesmo|colega responsável/);
+  const self = await executeTeamTaskTool('task_create', { title: 'Y', assignee: 'Coordenador', isolated: true }, ctx);
+  assert.match(self, /si mesmo/);
+});
+
+test('task_update aceita prefixo único do id', async () => {
+  const { db, ctx } = ctxBase();
+  await executeTeamTaskTool('task_create', { title: 'A', assignee: 'Pesquisador' }, ctx);
+  const short = db.teamTasks[0].id.slice(0, 8);
+  const upd = await executeTeamTaskTool('task_update', { id: short, status: 'done', result: 'ok' }, ctx);
+  assert.match(upd, /done/);
+  assert.equal(db.teamTasks[0].status, 'done');
 });
 
 test('task_list e task_update acompanham o quadro', async () => {
