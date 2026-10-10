@@ -30,6 +30,39 @@ import {
   MESSAGE_KIND
 } from './lib/manager-worker-protocol.mjs';
 import { trackInboxDelegation, taskItemsSummary } from './lib/task-items.mjs';
+import {
+  createTeamTask,
+  updateTeamTask,
+  listTeamTasks,
+  findTeamTask,
+  linkOrCreateTeamTaskFromInbox,
+  applyInboxResultToTeamTask,
+  enqueueOwnerWake,
+  enqueuePeerMessage,
+  teamBoardForChat,
+  publicTeamTask,
+  findTeamTaskByInboxMessageId,
+  resolveTeamTaskRef,
+  TEAM_TASK_STATUS
+} from './lib/team-tasks.mjs';
+import { executeTeamTaskTool } from './lib/team-task-tools.mjs';
+import { cancelCascade, cascadeTouched, registerDeliveryAbort, unregisterDeliveryAbort } from './lib/cascade-stop.mjs';
+import { createIsolatedChildChat, isolatedSubagentPrompt } from './lib/team-subagent.mjs';
+import {
+  assertTeamDispatch,
+  agentWithEffectiveAutonomy,
+  teamResultMessage,
+  dispatchReadyTeamTasks,
+  repairTeamTasksOnStartup,
+  trimTeamTasks,
+  trimInboxKeepingOpenTasks,
+  rootChatId,
+  computeTaskAutonomy,
+  applyTeamTreeUsage,
+  beginRootUserTurn,
+  teamTreeRootForChat,
+  parentTaskIdForChat
+} from './lib/team-delegation.mjs';
 import { patchTask, taskPrompt } from './lib/project-tasks.mjs';
 import { closeTaskFromInboxReply } from './lib/task-closure.mjs';
 import { createGoogleTasksSync } from './lib/google-tasks-sync.mjs';
@@ -116,8 +149,8 @@ import { parseWhatsappMessages, whatsappPrompt, sendWhatsappText, whatsappReady 
 import { evolutionSecrets, connectInstance, instanceState, disconnectInstance, sendText as sendEvolutionText, parseEvolutionAny, parseEvolutionGroup, groupName, evolutionMedia, withMediaText, downloadMedia, contactMode, isAllowed, makeRateLimiter, channelSafeAgent } from './lib/evolution.mjs';
 import { history as waHistory, recordMessage as recordWaMessage, listChats as waListChats, readChat as waReadChat, findContacts as waFindContacts, styleProfile as waStyleProfile, styleHint, stats as waStats, wipeHistory as waWipeHistory } from './lib/whatsapp-store.mjs';
 import { timingSafeEqual, randomBytes } from 'node:crypto';
-import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStreaming, activeChatStreamCount, listStreamingChatIds } from './lib/chat-stream.mjs';
-import { handleEventsRoute, closeAllUserEvents, userKeyFromAuth } from './lib/events-route.mjs';
+import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStreaming, activeChatStreamCount, listStreamingChatIds, getChatStream } from './lib/chat-stream.mjs';
+import { handleEventsRoute, closeAllUserEvents, userKeyFromAuth, publishUserEvent } from './lib/events-route.mjs';
 import { truncateChatFrom } from './lib/chat-edit.mjs';
 import { mergeAgentChats, unmergeChat } from './lib/merge-agent-chats.mjs';
 import { settingCardView, settingPatch } from './lib/setting-cards.mjs';
@@ -413,17 +446,30 @@ const summary = ({ messages, ...c }) => ({ ...c, preview: plain(messages.findLas
 function chatDetail(c, cid) {
   return {
     ...c,
-    streaming: isChatStreaming(cid),
+    streaming: isChatStreaming(cid) || isolatedLive.has(cid),
     run: chatRunPublic(c.run),
     interrupted: c.run?.status === 'interrupted',
     // estado dos pedidos a colegas que saíram desta conversa (cartões de delegação)
     inboxStatus: Object.fromEntries(db.messages.filter(m => m.originChatId === c.id).map(m => [m.id, { status: m.status, ...(m.error ? { error: m.error } : {}), ...(m.reply ? { reply: m.reply } : {}) }])),
+    teamBoard: teamBoardForChat(db, c),
     ...(c.workspace?.kind === 'folder' ? { workspaceBranch: gitBranch(c.workspace.path) } : {})
   };
 }
 
 // Foto ao vivo da resposta em andamento (por conversa): quem fala, texto até agora e ações. Para quem reabre a página.
 const liveByChat = new Map();
+const isolatedLive = new Set(); // conversas raiz com subagente isolado ainda rodando
+function emitTeamLive(rootId, ev) {
+  if (!rootId) return;
+  trackLive(rootId, ev);
+  if (ev.teamTask) publishUserEvent('owner', { type: 'teamTask', chatId: rootId, teamTask: ev.teamTask });
+  if (ev.approval || ev.approvalDone) {
+    publishUserEvent('owner', {
+      type: 'approvals',
+      approvals: db.approvals.filter(a => a.status === 'pending').map(approvalView)
+    });
+  }
+}
 function trackLive(chatId, e) {
   if (!e) return;
   let cur = liveByChat.get(chatId);
@@ -467,7 +513,8 @@ async function streamChatResponse(req, c, { text, fileIds, mcpSession, resume = 
   };
   try {
     await chat({
-      chat: c, text, fileIds, signal: streamSignal, mcpSession, skipUserPush: resume, credentialRefs, voice
+      chat: c, text, fileIds, signal: streamSignal, mcpSession, skipUserPush: resume, credentialRefs, voice,
+      fromChatScreen: !resume
     }, chatEmit);
     completed = !streamSignal.aborted;
   } finally {
@@ -685,13 +732,21 @@ async function runInboxDelivery(m, { signal } = {}) {
     : m.protocol?.id === PROTOCOL_ID
       ? `${m.body}\n\nResponda de forma direta; para delegações use JSON manager-worker na primeira linha (accept, progress, complete ou reject).`
       : inboxPrompt(m, from.name);
+  if (!inGroup && origin) c.originChatId = origin.id;
   c.messages.push({
     id: id(), role: 'user', content: prompt,
     inbox: { from: from.id, messageId: m.id, priority: m.priority, kind: m.kind || 'message' },
     at: Date.now()
   });
   const lenBeforeTurn = c.messages.length;
-  await turn({ agent: to, chat: c, text: m.body, prompt, images: [], group: inGroup ? groupMembers(origin, db.agents) : null, hops: m.hops, signal, forName: from.name }, () => {});
+  const linkedTask = findTeamTaskByInboxMessageId(db, m.id);
+  const worker = linkedTask
+    ? agentWithEffectiveAutonomy(from, to, db.settings, linkedTask)
+    : to;
+  const turnChat = inGroup && origin ? { ...c, originChatId: origin.id } : c;
+  await turn({ agent: worker, chat: turnChat, text: m.body, prompt, images: [], group: inGroup ? groupMembers(origin, db.agents) : null, hops: m.hops, signal, forName: from.name }, ev => {
+    if (origin?.id && (ev.approval || ev.tool || ev.text)) emitTeamLive(rootChatId(db, origin) || origin.id, ev);
+  });
   const parsed = interpretInboxReply(c.messages, lenBeforeTurn);
   c.updatedAt = Date.now(); c.unread = true;
   m.threadChatId = c.id;
@@ -890,15 +945,24 @@ async function pluginsForTurn(s, agent) {
 
 async function deliver(m) {
   const to = db.agents.find(a => a.id === m.to), from = db.agents.find(a => a.id === m.from);
-  if (!to || !from) { markInboxDeliveryFailed(m, 'Agente não existe mais.'); save(); return; }
+  if (!to || !from) {
+    markInboxDeliveryFailed(m, 'Agente não existe mais.');
+    if (m.status === 'failed') applyInboxResultToTeamTask(db, m, m.error, { failed: true });
+    save();
+    return;
+  }
   // Aviso de encerramento é só registro: a resposta já foi para a conversa; rodar um turno nele vira "Recebido" à toa.
   // Confirmação de colega ("ok", "recebido", 👍) também encerra a troca: responder a ela vira pingue-pongue.
   if (m.taskClosure || isAck(m.body)) { m.status = 'delivered'; m.deliveredAt = Date.now(); save(); return; }
   inboxBusy.add(to.id); m.status = 'delivering'; save();
+  const deliveryAc = registerDeliveryAbort(m.id, { originChatId: m.originChatId, childChatId: m.threadChatId || null });
   try {
-    const result = await runInboxDelivery(m, {});
+    const result = await runInboxDelivery(m, { signal: deliveryAc.signal });
     if (result.ok) { m.status = 'delivered'; m.error = null; }
-    else markInboxDeliveryFailed(m, result.error || 'Sem resposta do destinatário.');
+    else {
+      markInboxDeliveryFailed(m, result.error || 'Sem resposta do destinatário.');
+      if (m.status === 'failed') applyInboxResultToTeamTask(db, m, m.error, { failed: true });
+    }
     if (result.reply?.content && m.protocol?.id === PROTOCOL_ID && m.protocol.delegationId && to.id === findDelegation(db, m.protocol.delegationId)?.workerId) {
       ingestWorkerInboxReply({
         db,
@@ -914,14 +978,33 @@ async function deliver(m) {
     const origin = db.chats.find(x => x.id === m.originChatId);
     // resposta já ficou no grupo (conversa aconteceu lá): não duplica
     if (origin && result.reply?.content && result.threadChatId !== origin.id) {
-      origin.messages.push({
-        id: id(), role: 'assistant', agentId: to.id, content: result.reply.content, model: result.reply.model,
-        via: { type: 'inbox', from: from.id, messageId: m.id, threadChatId: result.threadChatId }, at: Date.now()
-      });
+      const linked = findTeamTaskByInboxMessageId(db, m.id);
+      origin.messages.push(linked
+        ? teamResultMessage({
+          id, worker: to, task: linked, result: result.reply.content, childChatId: result.threadChatId
+        })
+        : {
+          id: id(), role: 'assistant', agentId: to.id, content: result.reply.content, model: result.reply.model,
+          via: { type: 'inbox', from: from.id, messageId: m.id, threadChatId: result.threadChatId }, at: Date.now()
+        });
       origin.updatedAt = Date.now(); origin.unread = true;
     }
-    if (result.reply?.content && result.ok) {
+    if (result.reply?.content && result.ok && !m.teamTaskWake && !m.taskClosure) {
       try {
+        const closed = applyInboxResultToTeamTask(db, m, result.reply.content);
+        if (closed?.unblocked?.length) {
+          dispatchReadyTeamTasks(closed.unblocked, teamDispatchCtx(m.originChatId, m.hops || 0));
+        }
+        if (closed?.task && closed.ok) {
+          const owner = db.agents.find(a => a.id === closed.task.ownerId);
+          if (owner && owner.id !== to.id) {
+            enqueueOwnerWake({
+              db, id, from: to, to: owner, task: closed.task,
+              result: result.reply.content, hops: m.hops || 0, limits: inboxLimits()
+            });
+          }
+          getChatStream(m.originChatId)?.emit?.({ teamTask: publicTeamTask(closed.task, db) });
+        }
         await closeTaskFromInboxReply({
           db,
           inboxMessage: m,
@@ -934,8 +1017,12 @@ async function deliver(m) {
         });
       } catch (e) { console.error('task-closure', ...redactForLog(db.settings, e.message)); }
     }
-  } catch (e) { markInboxDeliveryFailed(m, e.message); console.error('mensagem', ...redactForLog(db.settings, e.message)); }
-  finally { inboxBusy.delete(m.to); save(); setTimeout(dispatchInbox, 50); }
+  } catch (e) {
+    markInboxDeliveryFailed(m, e.message);
+    if (m.status === 'failed') applyInboxResultToTeamTask(db, m, e.message, { failed: true });
+    console.error('mensagem', ...redactForLog(db.settings, e.message));
+  }
+  finally { unregisterDeliveryAbort(m.id); inboxBusy.delete(m.to); save(); setTimeout(dispatchInbox, 50); }
 }
 function dispatchInbox() {
   try {
@@ -944,9 +1031,189 @@ function dispatchInbox() {
     console.error('inbox.dispatch_failed', e?.code || e?.message || String(e));
   }
 }
+
+function teamDispatchCtx(originChatId, hops = 0) {
+  const parentChat = (db.chats || []).find(c => c.id === originChatId);
+  return {
+    db, id, hops, limits: inboxLimits(), save,
+    dispatchInbox: () => setTimeout(dispatchInbox, 50),
+    spawnIsolated: ({ task, worker, prompt, owner }) => spawnIsolatedSubagent({
+      task, worker, prompt, parentChat, hops, owner
+    }),
+    busyToIds: inboxBusy,
+    settings: db.settings,
+    cancelChatStream,
+    decideApproval: aid => gate.cancel(aid)
+  };
+}
+
+function spawnIsolatedSubagent({ task, worker, prompt, parentChat, hops = 0, owner }) {
+  const gate = assertTeamDispatch({
+    db,
+    from: owner,
+    to: worker,
+    parentChat,
+    hops,
+    limits: inboxLimits(),
+    busyToIds: inboxBusy,
+    accessControl: db.accessControl,
+    settings: db.settings,
+    isolated: true,
+    exceptTaskId: task?.id,
+    cancelChatStream,
+    decideApproval: aid => gate.cancel(aid)
+  });
+  if (gate.error) return gate;
+
+  const spawned = createIsolatedChildChat({ db, id, parentChat, agent: worker, title: task.title });
+  if (spawned.error) return spawned;
+  const tracking = {
+    id: id(),
+    from: owner.id,
+    to: worker.id,
+    body: String(prompt || task.title || '').slice(0, 4000),
+    priority: task.priority || 'now',
+    status: 'delivering',
+    hops: hops + 1,
+    originChatId: parentChat.id,
+    createdAt: Date.now(),
+    isolated: true,
+    teamTaskId: task.id
+  };
+  db.messages.push(tracking);
+  trimInboxKeepingOpenTasks(db);
+  const rootId = rootChatId(db, parentChat) || parentChat?.id;
+  if (rootId) {
+    isolatedLive.add(rootId);
+    trackLive(rootId, { speaker: worker.id });
+  }
+  inboxBusy.add(worker.id);
+  const ac = registerDeliveryAbort(task.id, { originChatId: parentChat.id, childChatId: spawned.child.id });
+  const timeout = setTimeout(() => {
+    if (!ac.signal.aborted) ac.abort('timeout');
+  }, gate.timeoutMs);
+  if (typeof timeout.unref === 'function') timeout.unref();
+  setTimeout(() => {
+    runIsolatedSubagentTurn({
+      child: spawned.child,
+      worker,
+      prompt,
+      task,
+      parentChat,
+      signal: ac.signal,
+      hops,
+      owner,
+      tracking
+    }).finally(() => {
+      clearTimeout(timeout);
+      unregisterDeliveryAbort(task.id);
+      inboxBusy.delete(worker.id);
+      if (tracking.status === 'delivering') tracking.status = 'delivered';
+      const rid = rootChatId(db, parentChat) || parentChat?.id;
+      const still = (db.teamTasks || []).some(t =>
+        t.id !== task.id && t.status === TEAM_TASK_STATUS.doing && t.isolated
+        && (rootChatId(db, t.originChatId || t.chatId) === rid)
+      );
+      if (rid && !still) isolatedLive.delete(rid);
+    });
+  }, 50);
+  return { childChatId: spawned.child.id, timeoutMs: gate.timeoutMs };
+}
+
+async function runIsolatedSubagentTurn({ child, worker, prompt, task, parentChat, signal, hops = 0, owner, tracking }) {
+  const text = isolatedSubagentPrompt({ title: task.title, note: prompt, ownerName: owner?.name });
+  child.messages.push({ id: id(), role: 'user', content: text, at: Date.now() });
+  const rootId = rootChatId(db, parentChat) || parentChat.id;
+  const parentEmit = getChatStream(rootId)?.emit || getChatStream(parentChat.id)?.emit;
+  const emitParent = ev => {
+    parentEmit?.(ev);
+    emitTeamLive(rootId, ev);
+    if (ev.tool || ev.text || ev.approval) {
+      const teamEv = {
+        teamTask: {
+          ...publicTeamTask(findTeamTask(db, task.id) || task, db),
+          status: TEAM_TASK_STATUS.doing,
+          progress: { note: ev.approval ? 'aguardando aprovação' : (ev.tool || 'trabalhando'), at: Date.now() }
+        }
+      };
+      parentEmit?.(teamEv);
+      emitTeamLive(rootId, teamEv);
+    }
+  };
+  const finish = (status, resultText, note) => updateTeamTask(db, task.id, {
+    status,
+    result: resultText,
+    progress: { percent: status === TEAM_TASK_STATUS.done ? 100 : undefined, note }
+  }, {
+    onUnblocked: ready => dispatchReadyTeamTasks(ready, {
+      db, id, hops, limits: inboxLimits(), save,
+      dispatchInbox: () => setTimeout(dispatchInbox, 50),
+      spawnIsolated: ({ task: t, worker: w, prompt: p, owner: o }) => spawnIsolatedSubagent({
+        task: t, worker: w, prompt: p, parentChat, hops, owner: o || owner
+      }),
+      busyToIds: inboxBusy,
+      settings: db.settings
+    })
+  });
+  try {
+    await turn({
+      agent: agentWithEffectiveAutonomy(owner, worker, db.settings, findTeamTask(db, task.id) || task),
+      chat: child,
+      text: prompt,
+      prompt: text,
+      images: [],
+      group: null,
+      hops: hops + 1,
+      signal,
+      forName: owner?.name || parentChat.title || 'time'
+    }, emitParent);
+    const reply = child.messages.findLast(m => m.role === 'assistant' && m.content);
+    const timedOut = !!(signal?.aborted && signal.reason === 'timeout');
+    const cancelled = !!(signal?.aborted && signal.reason !== 'timeout') || !!reply?.stopped;
+    const resultText = reply?.content || (cancelled ? 'Interrompido.' : timedOut ? 'Tempo esgotado aguardando o subagente.' : '');
+    const status = cancelled
+      ? TEAM_TASK_STATUS.cancelled
+      : (!reply?.content || timedOut) ? TEAM_TASK_STATUS.failed : TEAM_TASK_STATUS.done;
+    const updated = finish(status, resultText, status === TEAM_TASK_STATUS.done ? 'concluída' : status === TEAM_TASK_STATUS.cancelled ? 'interrompido' : 'falhou');
+    if (reply?.content && parentChat.id !== child.id) {
+      parentChat.messages.push(teamResultMessage({
+        id, worker, task: updated.task || task, result: reply.content, childChatId: child.id
+      }));
+      parentChat.updatedAt = Date.now();
+      parentChat.unread = true;
+    }
+    if (status === TEAM_TASK_STATUS.done && reply?.content && owner && owner.id !== worker.id) {
+      enqueueOwnerWake({
+        db, id, from: worker, to: owner, task: updated.task || task,
+        result: reply.content, hops, limits: inboxLimits()
+      });
+    }
+    if (tracking) tracking.status = status === TEAM_TASK_STATUS.cancelled ? 'failed' : 'delivered';
+    const doneEv = { teamTask: publicTeamTask(findTeamTask(db, task.id) || task, db) };
+    parentEmit?.(doneEv);
+    emitTeamLive(rootId, doneEv);
+  } catch (e) {
+    const cancelled = !!(signal?.aborted && signal.reason !== 'timeout');
+    finish(
+      cancelled ? TEAM_TASK_STATUS.cancelled : TEAM_TASK_STATUS.failed,
+      e.message,
+      cancelled ? 'interrompido' : 'falhou'
+    );
+    if (tracking) {
+      tracking.status = 'failed';
+      tracking.error = e.message;
+    }
+    parentEmit?.({ teamTask: publicTeamTask(findTeamTask(db, task.id) || task, db) });
+    console.error('subagent', ...redactForLog(db.settings, e.message));
+  } finally {
+    save();
+    setTimeout(dispatchInbox, 50);
+  }
+}
 const inboxTimer = setInterval(dispatchInbox, 5_000);
 if (typeof inboxTimer.unref === 'function') inboxTimer.unref();
 repairInboxOnStartup(db.messages);
+repairTeamTasksOnStartup(db);
 save();
 dispatchInbox();
 startRetentionScheduler({ db, save, isStreaming: isChatStreaming });
@@ -965,7 +1232,8 @@ const approvalView = a => ({ ...a, agentName: db.agents.find(x => x.id === a.age
 function eventsSnapshot() {
   const live = {};
   for (const id of listStreamingChatIds()) live[id] = { streaming: true, live: liveByChat.get(id) || null };
-  for (const [id, rec] of liveByChat) if (!live[id]) live[id] = { streaming: isChatStreaming(id), live: rec };
+  for (const id of isolatedLive) live[id] = { streaming: true, live: liveByChat.get(id) || live[id]?.live || null };
+  for (const [id, rec] of liveByChat) if (!live[id]) live[id] = { streaming: isChatStreaming(id) || isolatedLive.has(id), live: rec };
   return {
     working: Object.fromEntries(working),
     approvals: db.approvals.filter(a => a.status === 'pending').map(approvalView),
@@ -979,8 +1247,12 @@ function eventsSnapshot() {
 const browsers = new Map();
 // Cartões salvos na resposta do turno em andamento, por conversa: o pedido decidido fica na conversa depois do fim.
 const turnCards = new WeakMap();
+function approvalChatId(chat) {
+  return rootChatId(db, chat) || chat?.parentChatId || chat?.id;
+}
+
 async function askApproval({ agent, chat, emit, signal }, kind, command, reason, remember = true) {
-  const rec = { id: id(), agentId: agent.id, chatId: chat.id, kind, command, reason, status: 'pending', createdAt: Date.now() };
+  const rec = { id: id(), agentId: agent.id, chatId: approvalChatId(chat), sourceChatId: chat.id, kind, command, reason, status: 'pending', createdAt: Date.now() };
   db.approvals.push(rec);
   if (db.approvals.length > 300) db.approvals.splice(0, db.approvals.length - 300);
   emit({ approval: approvalView(rec) });
@@ -1073,7 +1345,7 @@ setInterval(async () => {
  * A sua resposta volta para ele como texto e a tarefa continua de onde parou. Espera até 2h.
  */
 async function askOwner({ agent, chat, emit, signal }, question, context, options = []) {
-  const rec = { id: id(), agentId: agent.id, chatId: chat.id, kind: 'question', command: String(question).slice(0, 1000), reason: String(context || '').slice(0, 2000),
+  const rec = { id: id(), agentId: agent.id, chatId: approvalChatId(chat), sourceChatId: chat.id, kind: 'question', command: String(question).slice(0, 1000), reason: String(context || '').slice(0, 2000),
     options: options.map(o => String(o).slice(0, 80)).filter(Boolean).slice(0, 5), status: 'pending', createdAt: Date.now(), timeoutMs: 2 * 3600_000 };
   db.approvals.push(rec);
   if (db.approvals.length > 300) db.approvals.splice(0, db.approvals.length - 300);
@@ -1092,7 +1364,7 @@ async function offerSetting({ agent, chat, emit, signal }, { key, on, reason }) 
   const view = settingCardView(db.settings, key, on);
   if (!view) return `Configuração desconhecida: ${key}.`;
   if (view.current === view.proposed) return `"${view.label}" já está ${view.current ? 'ligado' : 'desligado'}. Avise o usuário; não precisa oferecer.`;
-  const rec = { id: id(), agentId: agent.id, chatId: chat.id, kind: 'setting', command: view.label, reason: String(reason || view.desc).slice(0, 300),
+  const rec = { id: id(), agentId: agent.id, chatId: approvalChatId(chat), sourceChatId: chat.id, kind: 'setting', command: view.label, reason: String(reason || view.desc).slice(0, 300),
     setting: view, status: 'pending', createdAt: Date.now(), timeoutMs: 2 * 3600_000 };
   db.approvals.push(rec);
   if (db.approvals.length > 300) db.approvals.splice(0, db.approvals.length - 300);
@@ -1153,7 +1425,7 @@ function patchGenuiSettingPart(chat, partId, patch) {
 function guarded(computer, { agent, chat, emit, signal }) {
   const ask = async (kind, command, reason, rememberKey = command, meta = {}) => {
     const rememberable = meta.rememberable !== false && rememberKey != null && rememberKey !== '';
-    const rec = { id: id(), agentId: agent.id, chatId: chat.id, kind, command, reason, status: 'pending', createdAt: Date.now(), rememberable };
+    const rec = { id: id(), agentId: agent.id, chatId: approvalChatId(chat), sourceChatId: chat.id, kind, command, reason, status: 'pending', createdAt: Date.now(), rememberable };
     db.approvals.push(rec);
     if (db.approvals.length > 300) db.approvals.splice(0, db.approvals.length - 300);
     emit({ approval: approvalView(rec) });
@@ -1345,6 +1617,7 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
   turnCards.set(chat, cardSteps);
   const delivered = []; // arquivos entregues neste turno: viram botões na resposta
   const sentDelegations = []; // pedidos a colegas (send_message/call_agent): viram cartões na resposta
+  const sentTeamTasks = []; // quadro do time criado/atualizado neste turno
   const ctx = {
     db,
     settings: s,
@@ -1459,66 +1732,69 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
       send: a => {
         const to = findAgentByName(a.to, db.agents);
         const limits = { maxPerHour: 20, maxHops: 3, ...(s.inbox || {}) };
-        const chk = checkSend({ from: agent, to, messages: db.messages, hops: hops + 1, limits, busyToIds: inboxBusy });
-        if (chk.error) return chk.error;
-        if (to) {
-          const gate = canDelegate(
-            { type: 'agent', id: agent.id },
-            { type: 'agent', id: to.id },
-            'send_message',
-            db.accessControl,
-            { agents: db.agents }
-          );
-          const denied = delegationDeniedMessage(gate);
-          if (denied) return denied;
-        }
+        const gate = assertTeamDispatch({
+          db, from: agent, to, parentChat: chat, hops, limits, busyToIds: inboxBusy,
+          accessControl: db.accessControl, settings: s, isolated: false, cancelChatStream,
+          decideApproval: aid => gate.cancel(aid)
+        });
+        if (gate.error) return gate.error;
         const m = { id: id(), from: agent.id, to: to.id, body: String(a.message).slice(0, 4000), priority: a.priority || 'normal', status: 'queued', hops: hops + 1, originChatId: chat.id, createdAt: Date.now() };
         db.messages.push(m);
         trackInboxDelegation(db, m, { id });
-        if (db.messages.length > 1000) db.messages.splice(0, db.messages.length - 1000);
+        const linked = linkOrCreateTeamTaskFromInbox(db, m, {
+          id, ownerId: agent.id,
+          parentTaskId: parentTaskIdForChat(db, chat.id),
+          effectiveAutonomy: computeTaskAutonomy(db, { owner: agent, worker: to, settings: s, chat })
+        });
+        trimInboxKeepingOpenTasks(db);
         const card = { to: to.id, task: oneLineTask(m.body), messageId: m.id };
         sentDelegations.push(card);
-        save(); emit({ sent: { to: to.name, priority: m.priority }, delegation: { from: agent.id, ...card } }); setTimeout(dispatchInbox, 50);
+        if (linked?.task) sentTeamTasks.push(publicTeamTask(linked.task, db));
+        save(); emit({ sent: { to: to.name, priority: m.priority }, delegation: { from: agent.id, ...card }, ...(linked?.task ? { teamTask: publicTeamTask(linked.task, db) } : {}) }); setTimeout(dispatchInbox, 50);
         return `Mensagem enviada para ${to.name}${m.priority === 'now' ? ' (urgente)' : ''}. A resposta aparece nesta conversa quando chegar; não espere por ela nem invente o que ${to.name} vai dizer.`;
       },
       call: async a => {
         const to = findAgentByName(a.to, db.agents);
         const limits = { maxPerHour: 20, maxHops: 3, ...(s.inbox || {}) };
-        const chk = checkSend({ from: agent, to, messages: db.messages, hops: hops + 1, limits, busyToIds: inboxBusy });
-        if (chk.error) return formatCallAgentResult({ ok: false, error: chk.error });
-        if (to) {
-          const gate = canDelegate(
-            { type: 'agent', id: agent.id },
-            { type: 'agent', id: to.id },
-            'send_message',
-            db.accessControl,
-            { agents: db.agents }
-          );
-          const denied = delegationDeniedMessage(gate);
-          if (denied) return formatCallAgentResult({ ok: false, error: denied });
-        }
-        const timeoutMs = clampCallTimeoutMs(a.timeout_seconds, s.inbox || {});
+        const gate = assertTeamDispatch({
+          db, from: agent, to, parentChat: chat, hops, limits, busyToIds: inboxBusy,
+          accessControl: db.accessControl, settings: s, isolated: false, cancelChatStream,
+          decideApproval: aid => gate.cancel(aid)
+        });
+        if (gate.error) return formatCallAgentResult({ ok: false, error: gate.error });
+        const timeoutMs = Math.min(clampCallTimeoutMs(a.timeout_seconds, s.inbox || {}), gate.timeoutMs || Infinity);
         const m = {
           id: id(), from: agent.id, to: to.id, kind: 'call',
           body: String(a.message).slice(0, 4000), priority: 'now', status: 'delivering',
           hops: hops + 1, originChatId: chat.id, createdAt: Date.now()
         };
         db.messages.push(m);
-        if (db.messages.length > 1000) db.messages.splice(0, db.messages.length - 1000);
+        const linkedCall = linkOrCreateTeamTaskFromInbox(db, m, {
+          id, ownerId: agent.id,
+          parentTaskId: parentTaskIdForChat(db, chat.id),
+          effectiveAutonomy: computeTaskAutonomy(db, { owner: agent, worker: to, settings: s, chat })
+        });
+        if (linkedCall?.task) sentTeamTasks.push(publicTeamTask(linkedCall.task, db));
+        trimInboxKeepingOpenTasks(db);
         inboxBusy.add(to.id);
         save();
         const card = { to: to.id, task: oneLineTask(m.body), messageId: m.id };
         sentDelegations.push(card);
-        emit({ callAgent: { to: to.name, timeoutMs }, delegation: { from: agent.id, ...card }, delegationStatus: { messageId: m.id, status: 'delivering' } });
-        const ac = new AbortController();
+        emit({ callAgent: { to: to.name, timeoutMs }, delegation: { from: agent.id, ...card }, delegationStatus: { messageId: m.id, status: 'delivering' }, ...(linkedCall?.task ? { teamTask: publicTeamTask(linkedCall.task, db) } : {}) });
+        const ac = registerDeliveryAbort(m.id, { originChatId: chat.id });
+        if (signal) {
+          if (signal.aborted) ac.abort(signal.reason || 'cascade');
+          else signal.addEventListener('abort', () => { if (!ac.signal.aborted) ac.abort('cascade'); }, { once: true });
+        }
         const timer = setTimeout(() => ac.abort(), timeoutMs);
         let result;
         try {
           result = await runInboxDelivery(m, { signal: ac.signal });
           if (result.ok) { m.status = 'delivered'; m.error = null; m.reply = String(result.reply?.content || '').slice(0, 4000); } // cartão "Ver resultado"
           else {
+            const stop = ac.signal.aborted && ac.signal.reason === 'cascade';
             const err = ac.signal.aborted && !result.error?.includes('interrompida')
-              ? `Tempo esgotado (${Math.round(timeoutMs / 1000)}s) aguardando ${to.name}.`
+              ? (stop ? 'Chamada interrompida.' : `Tempo esgotado (${Math.round(timeoutMs / 1000)}s) aguardando ${to.name}.`)
               : (result.error || 'Sem resposta do destinatário.');
             markInboxDeliveryFailed(m, err);
             result = { ok: false, error: err };
@@ -1528,8 +1804,18 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
           result = { ok: false, error: e.message };
         } finally {
           clearTimeout(timer);
+          unregisterDeliveryAbort(m.id);
           inboxBusy.delete(to.id);
-          emit({ delegationStatus: { messageId: m.id, status: m.status, ...(m.error ? { error: m.error } : {}), ...(m.reply ? { reply: m.reply } : {}) } }); // cartão: "feito"/"falhou" ao vivo
+          if (result?.ok && m.reply) applyInboxResultToTeamTask(db, m, m.reply);
+          else if (!result?.ok) {
+            const stop = ac.signal.aborted && ac.signal.reason === 'cascade';
+            applyInboxResultToTeamTask(db, m, result?.error || m.error, stop ? { cancelled: true } : { failed: true });
+          }
+          const cardTask = findTeamTaskByInboxMessageId(db, m.id);
+          emit({
+            delegationStatus: { messageId: m.id, status: m.status, ...(m.error ? { error: m.error } : {}), ...(m.reply ? { reply: m.reply } : {}) },
+            ...(cardTask ? { teamTask: publicTeamTask(cardTask, db) } : {})
+          });
           save();
           setTimeout(dispatchInbox, 50);
         }
@@ -1887,6 +2173,35 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
       return results.join('\n\n');
     }
   };
+  if (!chat.channel) {
+    ctx.isolatedChat = !!chat.isolated;
+    ctx.teamBoard = {
+      run: (name, args) => executeTeamTaskTool(name, args, {
+        db,
+        id,
+        agent,
+        chat,
+        hops,
+        limits: inboxLimits(),
+        save,
+        busyToIds: inboxBusy,
+        settings: db.settings,
+        dispatchInbox: () => setTimeout(dispatchInbox, 50),
+        emit: ev => {
+          if (ev.teamTask) sentTeamTasks.push(ev.teamTask);
+          if (ev.delegation && !sentDelegations.some(d => d.messageId && d.messageId === ev.delegation.messageId)) {
+            sentDelegations.push({ to: ev.delegation.to, task: ev.delegation.task, messageId: ev.delegation.messageId });
+          }
+          emit(ev);
+        },
+        spawnIsolated: ({ task, worker, prompt, owner }) => spawnIsolatedSubagent({
+          task, worker, prompt, parentChat: chat, hops, owner: owner || agent
+        }),
+        cancelChatStream,
+        decideApproval: aid => gate.cancel(aid)
+      })
+    };
+  }
   const project = chat.projectId && db.projects.find(p => p.id === chat.projectId);
   const systemStable = systemPrompt(agent, s);
   const system = [
@@ -1903,7 +2218,7 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
     (() => {
       const others = db.agents.filter(a => a.id !== agent.id && a.status !== 'paused' && peerAllowed(agent, a));
       if (!others.length) return '';
-      return `Colegas A2A — call_agent (resposta imediata, espere o retorno) ou send_message (assíncrono, não espere): ${others.map(a => `${a.name} (${a.description || a.category})`).join('; ')}.`;
+      return `Colegas A2A — call_agent (resposta imediata, espere o retorno) ou send_message (assíncrono, não espere): ${others.map(a => `${a.name} (${a.description || a.category})`).join('; ')}. Quadro do time: task_create (dividir e delegar; isolated=true = subagente com contexto próprio), task_list, task_update, team_message (priority now = acordar agora; normal/low = lido no próximo turno). Quando um colega terminar, você é avisado: resuma o resultado para o usuário.`;
     })(),
     visibleSkills(chat).length ? `Skills no banco (use_skill / list_skills): ${visibleSkills(chat).map(k => `${k.name}: ${k.description}`).join(' | ')}` : 'Skills extras podem vir de skills/ ou ~/.cursor/skills-cursor — use list_skills. Quando um passo a passo funcionar, guarde com save_skill.',
     group && [
@@ -1950,7 +2265,8 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
     chat.messages.push({
       id: id(), role: 'assistant', agentId: agent.id, content: out, at: Date.now(),
       ...(merged.length ? { steps: merged } : {}),
-      ...(sentDelegations.length ? { delegations: [...sentDelegations] } : {}), ...extra
+      ...(sentDelegations.length ? { delegations: [...sentDelegations] } : {}),
+      ...(sentTeamTasks.length ? { teamTasks: [...sentTeamTasks] } : {}), ...extra
     });
   };
 
@@ -2049,6 +2365,21 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
         clientId: resolveClient(db.clients, chat)?.id,
         costUsd: turnCost
       });
+      const rid = teamTreeRootForChat(db, chat);
+      if (rid && (chat.isolated || chat.parentChatId || chat.originChatId)) {
+        const used = applyTeamTreeUsage(db, rid, {
+          charsIn: (text?.length || 0) + (prompt?.length || 0),
+          charsOut: out.length,
+          usd: turnCost
+        }, { settings: db.settings, cancelChatStream, decideApproval: aid => gate.cancel(aid), id });
+        if (used?.exhausted) {
+          if (used.note) emitTeamLive(rid, { warn: used.error, stopped: true });
+          publishUserEvent('owner', {
+            type: 'approvals',
+            approvals: db.approvals.filter(a => a.status === 'pending').map(approvalView)
+          });
+        }
+      }
       if (canUseSemanticCache) {
         storeSemanticCacheEntry({
           agentId: agent.id,
@@ -2065,7 +2396,15 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
       }
     },
     onAttemptFailed: async ({ model: m, error: e, aborted, canFallback, out, steps }) => {
-      if (aborted) { push(out, steps, { model: m, stopped: true, stopReason: typeof signal?.reason === 'string' ? signal.reason : 'user' }); return; }
+      if (aborted) {
+        const stopReason = typeof signal?.reason === 'string' ? signal.reason : 'user';
+        const tree = db.teamTrees?.[teamTreeRootForChat(db, chat)];
+        const stopMessage = (stopReason === 'tree' || stopReason === 'cascade') && tree?.exhaustedReason
+          ? tree.exhaustedReason
+          : undefined;
+        push(out, steps, { model: m, stopped: true, stopReason, ...(stopMessage ? { stopMessage } : {}) });
+        return;
+      }
       const prov = MODELS[m].provider;
       const limitSig = parseProviderLimitFromError(e);
       if (limitSig) {
@@ -2092,7 +2431,7 @@ async function chat(args, emit) {
   activeTurns++;
   try { return await chatTurn(args, emit); } finally { activeTurns--; forgetUiParts(args.chat?.id); }
 }
-async function chatTurn({ chat, text, fileIds, signal, mcpSession, skipUserPush = false, credentialRefs, voice }, emit) {
+async function chatTurn({ chat, text, fileIds, signal, mcpSession, skipUserPush = false, credentialRefs, voice, fromChatScreen = false }, emit) {
   logger.info('chat.turn.start', { chatId: chat.id, resume: skipUserPush });
   const refs = (credentialRefs || []).filter(isVaultRef);
   try {
@@ -2107,6 +2446,7 @@ async function chatTurn({ chat, text, fileIds, signal, mcpSession, skipUserPush 
     if (chat.run?.status === 'running' && !chat.run.userMessageId) chat.run.userMessageId = uid;
     // Você respondeu na conversa: o "<Agente> precisa de você" desta conversa sai da Caixa.
     for (const a of db.systemAlerts || []) if (!a.done && a.key?.startsWith(`blocked:${chat.id}:`)) a.done = true;
+    if (fromChatScreen) beginRootUserTurn(db, chat, { settings: db.settings });
   }
   // @Nome de quem não está na conversa (ex.: 1:1) traz o agente para esta rodada, sem virar grupo.
   const base = groupMembers(chat, db.agents);
@@ -3638,6 +3978,116 @@ const routes = [
     setTimeout(dispatchInbox, 50);
     return { delegation: out.delegation, messageId: out.notifyMessage.id };
   }],
+  ['GET', /^\/api\/team-tasks$/, (_, __, url) => {
+    const filters = {
+      chatId: url.searchParams.get('chatId') || undefined,
+      ownerId: url.searchParams.get('ownerId') || undefined,
+      assigneeId: url.searchParams.get('assigneeId') || undefined,
+      status: url.searchParams.get('status') || undefined
+    };
+    const items = listTeamTasks(db, filters).slice(0, 200).map(t => publicTeamTask(t, db));
+    return { items };
+  }],
+  ['POST', /^\/api\/team-tasks$/, async req => {
+    const b = await body(req);
+    const owner = agentOr404(b.ownerId || b.agentId);
+    let assigneeId = b.assigneeId || null;
+    if (b.assignee) {
+      const to = findAgentByName(b.assignee, db.agents);
+      if (!to) throw new HttpError(400, 'Agente responsável não encontrado.');
+      assigneeId = to.id;
+    }
+    const out = createTeamTask(db, {
+      ownerId: owner.id,
+      assigneeId,
+      title: b.title,
+      note: b.note,
+      deps: b.deps,
+      priority: b.priority,
+      isolated: b.isolated,
+      chatId: b.chatId || b.originChatId,
+      originChatId: b.originChatId || b.chatId
+    }, { id });
+    if (out.error) throw new HttpError(400, out.error);
+    save();
+    return publicTeamTask(out.task, db);
+  }],
+  ['PATCH', /^\/api\/team-tasks\/([\w-]+)$/, async (req, [tid]) => {
+    const b = await body(req);
+    const found = resolveTeamTaskRef(db, tid);
+    if (found.error) throw new HttpError(found.error.includes('não encontrada') ? 404 : 400, found.error);
+    const actorId = b.agentId || b.actorId || null;
+    const { agentId: _a, actorId: _b, ...patch } = b;
+    const out = updateTeamTask(db, found.task.id, patch, {
+      actorId,
+      onUnblocked: ready => dispatchReadyTeamTasks(ready, teamDispatchCtx(found.task.originChatId || found.task.chatId))
+    });
+    if (out.error) {
+      const code = out.error.includes('não encontrada') ? 404 : out.error.includes('Só o dono') ? 403 : 400;
+      throw new HttpError(code, out.error);
+    }
+    save();
+    return publicTeamTask(out.task, db);
+  }],
+  ['GET', /^\/api\/chats\/([\w-]+)\/team-board$/, (req, [cid]) => {
+    const c = db.chats.find(x => x.id === cid);
+    if (!c) throw new HttpError(404, 'Conversa não encontrada.');
+    return teamBoardForChat(db, c);
+  }],
+  ['POST', /^\/api\/agents\/([\w-]+)\/delegate$/, async (req, [aid]) => {
+    const worker = agentOr404(aid);
+    const b = await body(req);
+    const origin = b.originChatId ? db.chats.find(c => c.id === b.originChatId) : null;
+    if (b.originChatId && !origin) throw new HttpError(404, 'Conversa de origem não encontrada.');
+    const owner = (b.ownerId ? agentOr404(b.ownerId) : (origin ? db.agents.find(a => a.id === origin.agentId) : worker)) || worker;
+    if (owner.id === worker.id) throw new HttpError(400, 'Não é permitido delegar para si mesmo.');
+    const isolated = b.isolated !== false;
+    const gate = assertTeamDispatch({
+      db, from: owner, to: worker, parentChat: origin, hops: 0,
+      limits: inboxLimits(), busyToIds: inboxBusy,
+      accessControl: db.accessControl, settings: db.settings, isolated,
+      cancelChatStream, decideApproval: aid => gate.cancel(aid)
+    });
+    if (gate.error) throw new HttpError(400, gate.error);
+    const title = String(b.title || b.prompt || 'Subtarefa').slice(0, 200);
+    const note = String(b.prompt || b.note || title).slice(0, 4000);
+    const created = createTeamTask(db, {
+      ownerId: owner.id,
+      assigneeId: worker.id,
+      title,
+      note,
+      priority: b.priority || 'now',
+      isolated: b.isolated !== false,
+      chatId: origin?.id || null,
+      originChatId: origin?.id || null,
+      status: TEAM_TASK_STATUS.todo
+    }, { id });
+    if (created.error) throw new HttpError(400, created.error);
+    let childChatId = null;
+    if (created.task.isolated && origin) {
+      const spawned = spawnIsolatedSubagent({
+        task: created.task,
+        worker,
+        prompt: note,
+        parentChat: origin,
+        hops: 0,
+        owner
+      });
+      if (spawned.error) throw new HttpError(400, spawned.error);
+      childChatId = spawned.childChatId;
+      updateTeamTask(db, created.task.id, { childChatId, status: TEAM_TASK_STATUS.doing, assigneeId: worker.id });
+    } else if (origin) {
+      const queued = enqueuePeerMessage({
+        db, id, from: owner, to: worker, body: note,
+        priority: b.priority || 'now', originChatId: origin.id, hops: 0, limits: inboxLimits()
+      });
+      if (queued.error) throw new HttpError(400, queued.error);
+      updateTeamTask(db, created.task.id, { inboxMessageId: queued.message.id, status: TEAM_TASK_STATUS.doing });
+      setTimeout(dispatchInbox, 50);
+    }
+    save();
+    return { task: publicTeamTask(findTeamTask(db, created.task.id), db), childChatId };
+  }],
   ['GET', /^\/api\/chats\/([\w-]+)$/, (req, [cid]) => {
     const c = db.chats.find(c => c.id === cid);
     if (!c) throw new HttpError(404, 'Conversa não encontrada.');
@@ -3715,7 +4165,7 @@ const routes = [
     if (!allAccounts(db.settings).some(a => a.id === aid)) throw new HttpError(404, 'Conta não encontrada. Salve as configurações primeiro.');
     return testAccount(aid, CLAUDE_FAST_ENV);
   }],
-  ['GET', /^\/api\/chats\/([\w-]+)\/live$/, (req, [cid]) => ({ streaming: isChatStreaming(cid), live: liveByChat.get(cid) || null })],
+  ['GET', /^\/api\/chats\/([\w-]+)\/live$/, (req, [cid]) => ({ streaming: isChatStreaming(cid) || isolatedLive.has(cid), live: liveByChat.get(cid) || null })],
   ['POST', /^\/api\/chats\/([\w-]+)\/ui-parts$/, async (req, [cid]) => {
     const c = db.chats.find(x => x.id === cid);
     if (!c) throw new HttpError(404, 'Conversa não encontrada.');
@@ -3828,8 +4278,11 @@ const routes = [
   }],
   ['POST', /^\/api\/chats\/([\w-]+)\/cancel$/, (req, [cid]) => {
     db.chats.find(c => c.id === cid) || (() => { throw new HttpError(404, 'Conversa não encontrada.'); })();
-    if (!cancelChatStream(cid)) throw new HttpError(404, 'Nenhuma resposta em andamento.');
-    return { ok: true };
+    const hadStream = isChatStreaming(cid);
+    const cascade = cancelCascade({ chatId: cid, db, cancelChatStream, decideApproval: aid => gate.cancel(aid), now: Date.now() });
+    if (!hadStream && !cascadeTouched(cascade)) throw new HttpError(404, 'Nenhuma resposta em andamento.');
+    save();
+    return { ok: true, cascade: { chats: cascade.chats.length, messages: cascade.messages.length, tasks: cascade.tasks.length } };
   }],
   ['POST', /^\/api\/chats\/([\w-]+)\/truncate$/, async (req, [cid]) => {
     // Editar e reenviar: apaga a mensagem escolhida e tudo depois; o cliente reenvia via POST /api/chat.

@@ -120,6 +120,7 @@ export const STEP_LABEL = {
   show_chart: 'Mostrando gráfico', show_progress: 'Mostrando progresso', show_link_preview: 'Mostrando link',
   show_pr_card: 'Mostrando PR', show_file_card: 'Mostrando arquivo', show_media_gallery: 'Mostrando galeria',
   show_html_preview: 'Mostrando prévia HTML', show_slides: 'Mostrando slides', show_setting: 'Mostrando configuração',
+  task_create: 'Criando tarefa do time', task_list: 'Listando tarefas do time', task_update: 'Atualizando tarefa do time', team_message: 'Mandando recado do time',
   dfe_listar_notas_recebidas: 'Listando notas recebidas', dfe_sincronizar: 'Buscando notas na Receita', nfse_listar_notas_recebidas: 'Listando notas de serviço recebidas',
   nfse_sincronizar: 'Buscando notas de serviço na prefeitura', compras_fechar_elo: 'Montando o elo de compras', mostrar_documento: 'Mostrando o cartão da nota', nfe_manifestar_ciencia: 'Registrando a ciência da nota'
 };

@@ -12,6 +12,7 @@ import { createInputQueue, normalizeInputQueue, coalesceSendParts } from '../../
 import { effortLabel } from '../modelPicker.jsx';
 import MessageAttachments, { DeliveredFiles } from '../MessageAttachments.jsx';
 import ChatPanel, { MiniScreen } from '../chatPanel.jsx';
+import { TeamProgress, TeamResultMessage } from '../teamBoard.jsx';
 import { MentionText } from '../mentions.jsx';
 import ImageGenLoader from '../imageGenLoader.jsx';
 import { AgentThread, ViaLabel } from '../agentThread.jsx';
@@ -40,7 +41,9 @@ const STOP_REASON = {
   user: 'Você interrompeu a resposta.',
   connection: 'A conexão caiu antes do fim (aba fechada ou rede).',
   tool_loop: 'Parada automática: o agente repetiu a mesma ferramenta em loop.',
-  budget: 'Parada pelo orçamento de tokens.'
+  budget: 'Parada pelo orçamento de tokens.',
+  tree: 'A delegação desta conversa esgotou o tempo ou o orçamento.',
+  cascade: 'A delegação foi interrompida.'
 };
 const ORB = { route: 'connecting', WebSearch: 'searching', WebFetch: 'searching', computer_exec: 'working', computer_share: 'working', remember: 'weaving', schedule_routine: 'shaping', think: 'solving', text: 'composing' };
 
@@ -261,11 +264,11 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, on
           {m.content ? (live ? <LiveText text={m.content} /> : <Recolhivel><Markdown text={m.content} skipGenui /></Recolhivel>)
             : live ? <div className="typing" role="status" aria-live="polite"><span className="typing-dots" aria-hidden="true"><i /><i /><i /></span><span>{typingLabel(phase)}</span></div>
             : m.error ? <ErrorNote raw={m.error} onRetry={onRetry} contexto={contextoDoErro(m)} />
-            : m.stopped ? <p className="muted">{STOP_REASON[m.stopReason] || 'Resposta interrompida.'}</p> : null}
+            : m.stopped ? <p className="muted">{m.stopMessage || STOP_REASON[m.stopReason] || 'Resposta interrompida.'}</p> : null}
           {!live && <Fontes steps={m.steps} />}
           {(m.stopped || m.truncated) && !live && onContinue && (
             <div className="continuar-resposta">
-              <p>{m.truncated ? 'A resposta parou no limite de tamanho.' : 'Você interrompeu a resposta.'}</p>
+              <p>{m.truncated ? 'A resposta parou no limite de tamanho.' : (m.stopMessage || STOP_REASON[m.stopReason] || 'Você interrompeu a resposta.')}</p>
               <button type="button" className="btn btn-sm" onClick={onContinue}>Continuar de onde parou</button>
             </div>
           )}
@@ -455,7 +458,15 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   useEffect(() => () => ctrl.current?.abort(), []);
   // Reabriu a página com o agente ainda respondendo (o turno segue no servidor): mostra a resposta chegando e,
   // ao terminar, carrega a conversa salva.
-  const watching = !!chat?.streaming && !ctrl.current;
+  const [teamLive, setTeamLive] = useState(false);
+  useEffect(() => {
+    if (!chatId) { setTeamLive(false); return undefined; }
+    return subscribeUserEvents(ev => {
+      if (ev.type !== 'teamTask' || ev.chatId !== chatId || !ev.teamTask) return;
+      setTeamLive(ev.teamTask.status === 'doing' || ev.teamTask.status === 'blocked');
+    });
+  }, [chatId]);
+  const watching = (!!chat?.streaming || teamLive) && !ctrl.current;
   useEffect(() => {
     if (!watching || !chatId) return;
     let alive = true;
@@ -843,6 +854,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
         <div className="thread" ref={scroller} onScroll={onScroll} onContextMenu={openMenu}>
           <div className="thread-inner">
             {chat?.flowRun && <FlowProgress run={chat.flowRun} />}
+            {chatId && <TeamProgress chatId={chatId} />}
             {messages.length === 0 && !live && (
               <div className="chat-empty">
                 {isGroup ? <div className="avatar-stack xl">{members.slice(0, 5).map(a => <AgentAvatar key={a.id} agent={a} size={72} interactive />)}</div> : <AgentAvatar agent={agent} size={96} interactive />}
@@ -860,7 +872,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
                 {fixadas.map(({ m, i }) => <button key={m.id || i} type="button" className="link" onClick={() => document.querySelector(`[data-mi="${i}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })}>{plain(m.content).slice(0, 70) || 'Resposta'}</button>)}
               </nav>
             )}
-            {[...messages.map((m, i) => <div key={i} data-mi={i} className={[i >= animateFrom.current && 'is-new', matches.includes(i) && `search-hit${matches[hit] === i ? ' current' : ''}`].filter(Boolean).join(' ') || undefined}>{i === primeiroNovo && primeiroNovo > 0 && <div className="novas-divider" role="separator"><span>Novo desde a sua última visita</span></div>}{m.via?.type === 'inbox' && inCard.has(m.via.messageId) ? null : m.inbox ? <InboxMessage m={m} from={getAgent(m.inbox.from)} /> : m.role === 'user'
+            {[...messages.map((m, i) => <div key={i} data-mi={i} className={[i >= animateFrom.current && 'is-new', matches.includes(i) && `search-hit${matches[hit] === i ? ' current' : ''}`].filter(Boolean).join(' ') || undefined}>{i === primeiroNovo && primeiroNovo > 0 && <div className="novas-divider" role="separator"><span>Novo desde a sua última visita</span></div>}{m.via?.type === 'inbox' && inCard.has(m.via.messageId) ? null : (m.via?.type === 'team-result' || m.untrusted) ? <TeamResultMessage m={m} from={getAgent(m.agentId)} /> : m.inbox ? <InboxMessage m={m} from={getAgent(m.inbox.from)} /> : m.role === 'user'
               ? <UserMessage m={m} name={S.settings.name} files={S.files} ack={m === lastUser && ack?.id === m.id ? ack : null} onRetryAck={ack?.retry} onEdit={canEdit && m.id && !/^u\d+$/.test(m.id) ? text => editFrom(m, text) : null} />
               : <>{m.via?.type === 'inbox' && m.via.threadChatId && <ViaLabel m={m} onOpen={setThread} />}<BotMessage m={m} agent={getAgent(m.agentId) || agent} group={isGroup || (!!m.agentId && m.agentId !== agent.id)} models={S.models} allFiles={S.files} deleg={deleg} onFileError={msg => toast(msg, 'error')} onRetry={m === messages.at(-1) && lastUser ? () => send({ text: lastUser.content }) : null} onContinue={m === messages.at(-1) ? continuar : null} onRetryWith={m === messages.at(-1) && lastUser ? refazerCom : null} onPin={m.id && !m.inbox ? () => fixar(m) : null} /></>}</div>),
               live && <div key={messages.length} className="is-new"><BotMessage m={live} agent={getAgent(live.agentId) || agent} group={isGroup} live phase={phase} onStop={stop} models={S.models} deleg={deleg} /></div>]}
