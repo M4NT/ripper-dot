@@ -31,7 +31,7 @@ import {
   writeFileSync
 } from 'node:fs';
 import { createServer } from 'node:net';
-import { homedir } from 'node:os';
+import { userInfo } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hashPassword } from '../lib/auth.mjs';
@@ -236,11 +236,11 @@ export function isProductionDataDir(dataDir, processEnv = process.env) {
   return false;
 }
 
-/** Só o HOME real do SO. HOME=pasta-temp (isolamento do smoke) não conta. */
+/** HOME da conta (passwd), não o $HOME do processo — serve/smoke isolam HOME na pasta de dados. */
 export function homeDirs(_processEnv = process.env) {
   try {
-    const osHome = homedir();
-    return osHome ? [resolve(osHome)] : [];
+    const h = userInfo().homedir;
+    return h ? [resolve(h)] : [];
   } catch {
     return [];
   }
