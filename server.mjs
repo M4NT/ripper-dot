@@ -114,7 +114,8 @@ import { parseWhatsappMessages, whatsappPrompt, sendWhatsappText, whatsappReady 
 import { evolutionSecrets, connectInstance, instanceState, disconnectInstance, sendText as sendEvolutionText, parseEvolutionAny, parseEvolutionGroup, groupName, evolutionMedia, withMediaText, downloadMedia, contactMode, isAllowed, makeRateLimiter, channelSafeAgent } from './lib/evolution.mjs';
 import { history as waHistory, recordMessage as recordWaMessage, listChats as waListChats, readChat as waReadChat, findContacts as waFindContacts, styleProfile as waStyleProfile, styleHint, stats as waStats, wipeHistory as waWipeHistory } from './lib/whatsapp-store.mjs';
 import { timingSafeEqual, randomBytes } from 'node:crypto';
-import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStreaming, activeChatStreamCount } from './lib/chat-stream.mjs';
+import { registerChatStream, cancelChatStream, unregisterChatStream, isChatStreaming, activeChatStreamCount, listStreamingChatIds } from './lib/chat-stream.mjs';
+import { handleEventsRoute, closeAllUserEvents, userKeyFromAuth } from './lib/events-route.mjs';
 import { truncateChatFrom } from './lib/chat-edit.mjs';
 import { mergeAgentChats, unmergeChat } from './lib/merge-agent-chats.mjs';
 import { settingCardView, settingPatch } from './lib/setting-cards.mjs';
@@ -929,6 +930,18 @@ const gate = new ApprovalGate({
 });
 // expiresAt: quando um pedido pendente da Caixa vence (o ApprovalGate usa 10 min por padrão). Perguntas não expiram na tela.
 const approvalView = a => ({ ...a, agentName: db.agents.find(x => x.id === a.agentId)?.name, chatTitle: db.chats.find(c => c.id === a.chatId)?.title, ...(a.status === 'pending' && a.kind !== 'question' && a.createdAt ? { expiresAt: a.createdAt + 10 * 60_000 } : {}) });
+function eventsSnapshot() {
+  const live = {};
+  for (const id of listStreamingChatIds()) live[id] = { streaming: true, live: liveByChat.get(id) || null };
+  for (const [id, rec] of liveByChat) if (!live[id]) live[id] = { streaming: isChatStreaming(id), live: rec };
+  return {
+    working: Object.fromEntries(working),
+    approvals: db.approvals.filter(a => a.status === 'pending').map(approvalView),
+    live,
+    pendingInbox: db.messages.filter(m => m.status === 'queued' || m.status === 'delivering').reduce((o, m) => (o[m.originChatId] = (o[m.originChatId] || 0) + 1, o), {}),
+    flows: Object.fromEntries(db.chats.filter(c => ['running', 'waiting'].includes(c.flowRun?.status)).map(c => [c.id, c.flowRun.status]))
+  };
+}
 
 /** Computador com portão: comandos de risco (ou tudo, na máquina do usuário) esperam sua aprovação. */
 const browsers = new Map();
@@ -4008,6 +4021,7 @@ const server = createServer(async (req, res) => {
         json(res, { error: rl.message }, 429, { 'retry-after': String(rl.retryAfterSec) }, req);
         return;
       }
+      if (handleEventsRoute(req, res, p, { hdr, userKey: userKeyFromAuth, settings: () => db.settings, snapshot: eventsSnapshot })) return;
       for (const [method, re, fn] of routes) {
         const m = req.method === method && re.exec(p);
         if (!m) continue;
@@ -4125,6 +4139,7 @@ registerGracefulShutdown(server, {
   logger,
   onBeginShutdown: () => {
     clearInterval(routineTimer);
+    closeAllUserEvents();
     shutdownStdioSupervisors().catch(() => {});
     closeSpares();
   },

@@ -14,6 +14,7 @@ import { useSidebarDrag, useFlip } from './agentDrag.jsx';
 import UiModeToggle from './uiModeToggle.jsx';
 import { getUiMode, isEnterpriseMode, isRouteAllowed, brandForChrome } from './uiMode.js';
 import { I18nProvider, useT } from './i18n/index.jsx';
+import { subscribeUserEvents, watchUserEventsStatus } from './userEvents.js';
 
 // Telas fora do caminho principal carregam sob demanda. Se o build mudou desde que a aba abriu,
 // o pedaço antigo não existe mais: recarrega uma vez para pegar a versão nova.
@@ -53,11 +54,20 @@ function Provider({ children }) {
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState({}); // agentId -> true enquanto responde (em alguma conversa)
   const [busyChats, setBusyChats] = useState({}); // chatId -> true: só esta conversa anima
-  // Quem está trabalhando segundo o servidor (rotinas, WhatsApp, outra aba): a tela nunca fica parada
+  // Quem está trabalhando segundo o servidor (rotinas, WhatsApp, outra aba): SSE, com polling se o canal cair
   const [working, setWorking] = useState({});
   useEffect(() => {
     const load = () => document.visibilityState === 'visible' && api('/api/agents/working').then(r => setWorking(r.working || {}), () => {});
-    load(); const t = setInterval(load, 4000); return () => clearInterval(t);
+    const unsub = subscribeUserEvents(ev => {
+      if (ev.type === 'working' || ev.type === 'snapshot') setWorking(ev.working || {});
+    });
+    let t;
+    const apply = s => {
+      clearInterval(t);
+      if (s !== 'open') { load(); t = setInterval(load, 4000); }
+    };
+    const off = watchUserEventsStatus(apply);
+    return () => { unsub(); off(); clearInterval(t); };
   }, []);
   const toast = useToast();
   const refresh = useCallback(async () => {

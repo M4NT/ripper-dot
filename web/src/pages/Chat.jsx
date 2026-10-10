@@ -24,6 +24,7 @@ import { botAvatarPalette } from 'bot-avatars';
 import { FirstRunChecklist } from '../firstRunChecklist.jsx';
 import { findChatMatches } from '../../../lib/chat-edit.mjs';
 import ErrorNote from '../errorNote.jsx';
+import { subscribeUserEvents, useUserEventsConnected } from '../userEvents.js';
 
 // Cor do agente como TEXTO: misturada com a tinta para passar contraste nos dois temas (a pura dava 3,3:1).
 const agentColor = a => `color-mix(in srgb, ${nameColor(a, botAvatarPalette)} 58%, var(--ink))`;
@@ -351,6 +352,7 @@ const UserMessage = memo(function UserMessage({ m, name, files, onEdit, ack, onR
 
 export default function Chat({ chatId: initialId, agentId: initialAgent, projectId: initialProject, agentIds: initialMembers }) {
   const { S, agent: getAgent, refresh, toast, setBusy, busy, setBusyChats } = useApp();
+  const eventsOpen = useUserEventsConnected();
   const [pip, setPip] = useState(null); // agente cuja tela aparece em miniatura na conversa (painel fechado)
   const chatMenu = useChatMenu();
   const ov = useOv();
@@ -405,11 +407,15 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   useEffect(() => {
     if (!chatId) return;
     let on = true;
-    const t = () => api('/api/approvals').then(r => { if (on) setPendAprov(r.pending.filter(a => a.chatId === chatId).length); }).catch(() => {});
-    t();
-    const h = setInterval(t, 10000);
-    return () => { on = false; clearInterval(h); };
-  }, [chatId, live]);
+    const apply = pending => { if (on) setPendAprov((pending || []).filter(a => a.chatId === chatId).length); };
+    const load = () => api('/api/approvals').then(r => apply(r.pending)).catch(() => {});
+    const unsub = subscribeUserEvents(ev => {
+      if (ev.type === 'approvals' || ev.type === 'snapshot') apply(ev.approvals);
+    });
+    load();
+    const h = eventsOpen ? null : setInterval(load, 10000);
+    return () => { on = false; unsub(); if (h) clearInterval(h); };
+  }, [chatId, live, eventsOpen]);
   const [ack, setAck] = useState(null); // { id, state: 'wait'|'seen'|'late', label, retry } da última mensagem enviada
 
   const idRef = useRef(chatId);
@@ -438,35 +444,48 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
   useEffect(() => {
     if (!watching || !chatId) return;
     let alive = true;
-    const tick = async () => {
-      const r = await api(`/api/chats/${chatId}/live`).catch(() => null);
-      if (!alive || !r) return;
-      if (r.streaming) {
-        if (r.live?.agentId) setLive({ role: 'assistant', agentId: r.live.agentId, content: r.live.content, steps: r.live.steps.map(s => s.kind === 'tool' ? { ...s, label: stepLabel(s.tool) } : s), at: r.live.at });
+    const paint = rec => {
+      if (!alive || !rec) return false;
+      if (rec.streaming) {
+        if (rec.live?.agentId) setLive({ role: 'assistant', agentId: rec.live.agentId, content: rec.live.content, steps: (rec.live.steps || []).map(s => s.kind === 'tool' ? { ...s, label: stepLabel(s.tool) } : s), at: rec.live.at });
         setBusyChats(b => ({ ...b, [chatId]: true }));
-        return;
+        return true;
       }
-      clearInterval(t);
       setLive(null);
       setBusyChats(b => { const n = { ...b }; delete n[chatId]; return n; });
-      const c = await api(`/api/chats/${chatId}`).catch(() => null);
-      if (alive && c) { setChat(c); setInterrupted(!!c.interrupted); }
+      api(`/api/chats/${chatId}`).then(c => { if (alive && c) { setChat(c); setInterrupted(!!c.interrupted); } }).catch(() => {});
+      return false;
     };
-    const t = setInterval(tick, 1000);
+    const fromEvent = ev => {
+      if (ev.type === 'chat.done' && ev.chatId === chatId) { paint({ streaming: false }); return; }
+      if (ev.type !== 'chat.live' && ev.type !== 'snapshot') return;
+      const rec = ev.live?.[chatId] || ev.chats?.[chatId];
+      if (rec) paint(rec);
+    };
+    const unsub = subscribeUserEvents(fromEvent);
+    const tick = async () => {
+      const r = await api(`/api/chats/${chatId}/live`).catch(() => null);
+      if (!paint(r)) clearInterval(t);
+    };
+    const t = eventsOpen ? null : setInterval(tick, 1000);
     tick();
-    return () => { alive = false; clearInterval(t); };
-  }, [watching, chatId]);
+    return () => { alive = false; unsub(); if (t) clearInterval(t); };
+  }, [watching, chatId, eventsOpen]);
   const waiting = chatId && S.pendingInbox?.[chatId];
   const flowLive = ['running', 'waiting'].includes(chat?.flowRun?.status); // fluxo roda no servidor: a conversa se atualiza sozinha
   useEffect(() => {
     if (!waiting && !flowLive) return;
-    const t = setInterval(async () => {
+    const pull = async () => {
       if (ctrl.current) return;
       try { const c = await api(`/api/chats/${chatId}`); setChat(c); } catch {}
       refresh();
-    }, 4000);
-    return () => clearInterval(t);
-  }, [waiting, flowLive, chatId]);
+    };
+    const unsub = subscribeUserEvents(ev => {
+      if (ev.type === 'inbox' || ev.type === 'flows' || ev.type === 'snapshot') pull();
+    });
+    const t = eventsOpen ? null : setInterval(pull, 4000);
+    return () => { unsub(); if (t) clearInterval(t); };
+  }, [waiting, flowLive, chatId, eventsOpen]);
   useEffect(() => {
     if (!chatId) return;
     const refetch = async () => {

@@ -40,9 +40,11 @@ test('bodyByteLimit distingue upload de arquivo', () => {
   assert.equal(bodyByteLimit('GET', '/api/health', limits), null);
 });
 
-test('isSseChatRequest só POST /api/chat', () => {
+test('isSseChatRequest cobre chat e canal de eventos', () => {
   assert.equal(isSseChatRequest('POST', '/api/chat'), true);
+  assert.equal(isSseChatRequest('GET', '/api/events'), true);
   assert.equal(isSseChatRequest('GET', '/api/chat'), false);
+  assert.equal(isSseChatRequest('POST', '/api/events'), false);
 });
 
 test('rejectOversizeBody responde 413 antes de ler corpo', () => {
@@ -121,6 +123,31 @@ test('POST com corpo maior que RIPPER_MAX_BODY_BYTES retorna 413', async () => {
     assert.equal(r.status, 413);
     const body = await r.json();
     assert.match(body.error, /64 bytes/);
+  });
+});
+
+test('GET /api/events SSE não cai no timeout HTTP curto', async () => {
+  await withServer({
+    RIPPER_HTTP_TIMEOUT_MS: '80',
+    RIPPER_SSE_TIMEOUT_MS: '0'
+  }, async (base, token) => {
+    const ac = new AbortController();
+    const r = await fetch(base + '/api/events', {
+      headers: { authorization: `Bearer ${token}` },
+      signal: ac.signal
+    });
+    assert.equal(r.status, 200);
+    const reader = r.body.getReader();
+    const first = await reader.read();
+    assert.equal(first.done, false);
+    await new Promise(ok => setTimeout(ok, 150));
+    const second = await Promise.race([
+      reader.read().then(v => ({ ok: true, v })),
+      new Promise(ok => setTimeout(() => ok({ timeout: true }), 20))
+    ]);
+    assert.ok(second.timeout || second.ok, 'o stream continua aberto depois do timeout HTTP');
+    ac.abort();
+    try { reader.releaseLock(); } catch {}
   });
 });
 
