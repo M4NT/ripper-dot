@@ -12,6 +12,7 @@ import { createInputQueue, normalizeInputQueue, coalesceSendParts } from '../../
 import { effortLabel } from '../modelPicker.jsx';
 import MessageAttachments, { DeliveredFiles } from '../MessageAttachments.jsx';
 import ChatPanel, { MiniScreen } from '../chatPanel.jsx';
+import { TeamProgress } from '../teamBoard.jsx';
 import { MentionText } from '../mentions.jsx';
 import ImageGenLoader from '../imageGenLoader.jsx';
 import { AgentThread, ViaLabel } from '../agentThread.jsx';
@@ -843,6 +844,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
         <div className="thread" ref={scroller} onScroll={onScroll} onContextMenu={openMenu}>
           <div className="thread-inner">
             {chat?.flowRun && <FlowProgress run={chat.flowRun} />}
+            {chatId && <TeamProgress chatId={chatId} />}
             {messages.length === 0 && !live && (
               <div className="chat-empty">
                 {isGroup ? <div className="avatar-stack xl">{members.slice(0, 5).map(a => <AgentAvatar key={a.id} agent={a} size={72} interactive />)}</div> : <AgentAvatar agent={agent} size={96} interactive />}

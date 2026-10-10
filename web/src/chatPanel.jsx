@@ -15,6 +15,7 @@ import {
   shouldReleaseControlOnCloseFull, shouldRetryConnect
 } from './liveScreenLogic.js';
 import { useLiveComputerTab } from './liveScreenTab.js';
+import { TeamMembers } from './teamBoard.jsx';
 export { doingLine };
 const COMP_LABEL = { running: 'Ligado', stopped: 'Parado', 'not started': 'Ainda não iniciado', local: 'Pasta local', off: 'Desligado', 'no key': 'Falta a chave do boat.dev', unknown: 'Sem resposta da VM' };
 const tellScreenControl = (agentId, on, owner) =>
@@ -89,18 +90,20 @@ function AgentBrief({ a, S }) {
   </>;
 }
 
-function Details({ members, project, S, working = {} }) {
+function Details({ members, project, S, working = {}, chatId }) {
   const group = members.length > 1;
   const solo = !group && doingLine(working[members[0].id]);
   return (
     <div className="panel-tab">
       {group ? <>
+        {chatId ? <TeamMembers chatId={chatId} members={members} working={working} /> : (
         <ul className="member-list">
           {members.map(a => (
             <li key={a.id}><AgentAvatar agent={a} size={30} paused /><span><b>{a.name}</b><small className={working[a.id] ? 'is-working' : ''} title={doingLine(working[a.id]) || undefined}>{doingLine(working[a.id]) || a.description || a.category}</small></span>
               <a className="icon-btn sm" href={`#/agents/${a.id}/settings`} aria-label={`Configurar ${a.name}`} title="Configurar"><Icon name="gear" size={15} /></a></li>
           ))}
         </ul>
+        )}
         <p className="panel-note">Quem responde é escolhido pelo pedido. Escreva <b>@Nome</b> para chamar alguém direto; eles também passam tarefas entre si.</p>
       </> : <>
         {solo && <p className="panel-note is-working" aria-live="polite"><b>Agora:</b> {solo}</p>}
@@ -371,7 +374,7 @@ export default function ChatPanel({ members, project, chatId, messages, files, o
       </div>
       <Segmented label="Seções do painel" value={tab} onChange={setTab} size="sm" className="panel-tabs"
         items={[['details', 'Detalhes'], ['artifacts', 'Artefatos', arts.length || null], ['files', 'Arquivos', files.length || null], ['computer', 'Computador']]} />
-    {tab === 'details' && <Details members={members} project={project} S={S} working={workingNow} />}
+    {tab === 'details' && <Details members={members} project={project} S={S} working={workingNow} chatId={chatId} />}
       {tab === 'artifacts' && <div className="panel-tab">
         <ArtifactList items={arts} empty={project ? 'Nenhum artefato no projeto ainda. Peça: “salve isso como artefato”. Todos os agentes do projeto veem.' : 'Nenhum artefato ainda. Peça: “salve isso como artefato”.'} />
         {arts.length > 0 && <p className="muted small">{project ? 'Compartilhados com todos os agentes do projeto.' : 'Salvos nesta conversa.'}</p>}
