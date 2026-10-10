@@ -1,0 +1,47 @@
+# Staging reproduzível do Ripper: provedor de teste, dados de exemplo, volume persistente.
+# Uso: node scripts/staging.mjs up
+# Ou, nesta pasta: docker compose up -d --build
+# (exige RIPPER_STAGING_TOKEN no .env desta pasta; o `up` gera se faltar)
+#
+# Porta só em 127.0.0.1. O volume ripper-staging-data sobrevive a `restart` e a `down` sem `-v`.
+# RIPPER_ENV=staging node scripts/staging.mjs reset  (ou docker compose down -v) recomeça do seed.
+
+name: ripper-staging
+
+services:
+  ripper:
+    build:
+      context: ../..
+      dockerfile: deploy/staging/Dockerfile
+    image: ripper-staging:local
+    container_name: ripper-staging
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${RIPPER_STAGING_PORT:-3010}:3000"
+    environment:
+      RIPPER_ENV: staging
+      RIPPER_STAGING_HOST: "0.0.0.0"
+      RIPPER_STAGING_LISTEN: "3000"
+      RIPPER_STAGING_DATA: /data
+      RIPPER_STAGING_TOKEN: ${RIPPER_STAGING_TOKEN:?defina RIPPER_STAGING_TOKEN}
+      RIPPER_STAGING_PASSWORD: ${RIPPER_STAGING_PASSWORD:?defina RIPPER_STAGING_PASSWORD}
+      RIPPER_STAGING_PROVIDER: stream
+      JULIA_AUTOSTART: "0"
+      RIPPER_NO_PREWARM: "1"
+    volumes:
+      - ripper-staging-data:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+
+volumes:
+  ripper-staging-data:

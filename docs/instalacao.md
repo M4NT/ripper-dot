@@ -236,9 +236,53 @@ npm test
 
 Roda `node --test test/*.test.mjs`. Não exige Julia, PyTorch nem login Claude/Codex (testes usam `RIPPER_TEST_PROVIDER` e diretórios temporários via `RIPPER_DATA`).
 
+## Staging reproduzível
+
+O staging vive no repositório (não depende do branch `ripper/staging` nem de um `scripts/staging.sh` local). Sobe o Ripper com **dados de exemplo**, **provedor de teste** (`RIPPER_TEST_PROVIDER=stream`, sem gastar conta de IA) e **pasta/volume persistente** — reiniciar o processo ou o contêiner não apaga agentes, memórias nem rotinas.
+
+```sh
+node scripts/staging.mjs up          # Docker Compose se houver; senão, Node local
+node scripts/staging.mjs status
+node scripts/staging.mjs smoke       # npm run smoke contra o staging
+node scripts/staging.mjs restart     # derruba e sobe de novo; os dados ficam
+node scripts/staging.mjs down        # para; os dados ficam
+RIPPER_ENV=staging node scripts/staging.mjs reset   # apaga só o staging e semeia de novo
+```
+
+Atalho npm: `npm run staging -- up` (o `--` passa o comando). Sem Docker: `node scripts/staging.mjs up --local`.
+
+O script **não lê** `RIPPER_DATA`, `RIPPER_TOKEN`, `HOST` nem `PORT` de produção. Só `RIPPER_STAGING_*`. `reset` e `seed --force` exigem `RIPPER_ENV=staging` e a pasta **reivindicada** (`RIPPER_STAGING_ID` em `deploy/staging/.env` igual ao id de `.staging-claim`). Recusam qualquer pasta que **contenha** a produção (pai de `data/` ou de `RIPPER_DATA`, raiz do repo, `$HOME`, `/`) ou esteja **dentro** dela; symlink (com `realpath`); e pasta que já tinha arquivos — só se marca pasta **nova ou vazia**. Sem isso o comando recusa — não apaga a instalação real.
+
+A porta do Compose é `127.0.0.1:3010` (não escuta na LAN). Token e senha **não têm padrão fixo**: o primeiro `up` gera os dois em `deploy/staging/.env` (fora do Git). O Compose exige `${RIPPER_STAGING_TOKEN:?…}` e `${RIPPER_STAGING_PASSWORD:?…}`. A senha não é impressa.
+
+| | Padrão | Onde mudar |
+| --- | --- | --- |
+| URL | http://127.0.0.1:3010 | `RIPPER_STAGING_PORT` ou `RIPPER_STAGING_URL` |
+| Token | gerado no primeiro `up` | `RIPPER_STAGING_TOKEN` |
+| Senha da UI | gerada no primeiro `up` (não impressa) | `RIPPER_STAGING_PASSWORD` |
+| Provedor | `stream` (`lib/test-provider.mjs`) | `RIPPER_STAGING_PROVIDER` |
+| Dados (local) | `.staging-data/` (fora de `data/`, no `.gitignore`) | `RIPPER_STAGING_DATA` |
+| Dados (Docker) | volume `ripper-staging-data` → `/data` | `RIPPER_ENV=staging node scripts/staging.mjs reset` |
+
+Depois do `up`, o comando imprime o token (não a senha). Abra `http://127.0.0.1:3010/?token=<token>`. O seed traz dois agentes (Assistente e Relator), uma memória e uma rotina — o fluxo de grupo do smoke precisa de um segundo agente.
+
+Arquivos:
+
+| Caminho | Função |
+| --- | --- |
+| `deploy/staging/docker-compose.yml` | Serviço, healthcheck, volume, `RIPPER_TEST_PROVIDER` |
+| `deploy/staging/Dockerfile` | Imagem do servidor de staging (`CMD` = `staging.mjs serve`) |
+| `deploy/staging/seed/db.json` | Dados de exemplo |
+| `deploy/staging/.env.example` | Copie para `.env` na mesma pasta se quiser trocar token/porta |
+| `scripts/staging.mjs` | `up` / `down` / `restart` / `smoke` / `seed` / `reset` / `serve` |
+
+O `smoke` contra o staging envia só `RIPPER_URL` / `RIPPER_TOKEN` / `RIPPER_PASSWORD` do staging e `SMOKE_TEST_PROVIDER=1` — sem herdar chaves de produção — para os fluxos de chat/aprovação/grupo rodarem no provedor falso.
+
+Isto **não** é a imagem dos agentes (`docker/agent/`) nem um empacotamento de produção. É o ambiente fixo para conferir que o Ripper volta depois de um reinício e que o smoke diário passa.
+
 ## O que não está incluído
 
-- Instalador `.deb`/`.msi` ou imagem Docker “all-in-one” do servidor Ripper.
+- Instalador `.deb`/`.msi` ou imagem Docker “all-in-one” de produção do servidor Ripper (o Compose em `deploy/staging/` é só staging com provedor de teste).
 - Publicação no npm (`"private": true` em `package.json`).
 - Provisionamento automático de TLS/reverse proxy — use nginx/Caddy na sua infra se expor além de localhost.
 

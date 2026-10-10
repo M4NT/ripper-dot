@@ -1,9 +1,14 @@
 name: CI
 
 on:
+  # push em main e cursor/** registra job no SHA do commit (pull_request
+  # usa o merge commit; por isso ce6e55d não aparecia em `gh run list --commit`).
   push:
-    branches: [main]
+    branches: [main, 'cursor/**']
   pull_request:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -48,3 +53,12 @@ jobs:
       # As tarefas de referência no provedor de teste (não gasta nada): garante que o benchmark roda.
       - name: Benchmark (dry-run)
         run: node scripts/benchmark.mjs --limit 5 --out "$RUNNER_TEMP/benchmark.json"
+
+  staging-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build staging image
+        run: docker build -f deploy/staging/Dockerfile -t ripper-staging:ci .

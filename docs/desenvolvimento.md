@@ -36,6 +36,8 @@ npm run dev:web      # Vite com recarga; API continua no dev:server
 
 Para conversar sem gastar conta de IA, suba o servidor com `RIPPER_TEST_PROVIDER=stream` (provedor falso em `lib/test-provider.mjs`).
 
+Staging fixo (dados de exemplo + volume que sobrevive a reinício + smoke): `node scripts/staging.mjs up` e `node scripts/staging.mjs smoke`. Guia em [instalacao.md](instalacao.md).
+
 ## Testes
 
 | Comando | O que faz |

@@ -1,0 +1,11 @@
+node_modules
+dist
+data
+.staging-data
+.git
+.env
+*.log
+deploy/staging/.env
+julia/Julia-1
+.claude/worktrees
+undefined

@@ -19,7 +19,8 @@
     "data:clear-julia": "node scripts/ripper-data.mjs clear-julia --confirm",
     "test:ui": "node scripts/ui-smoke.mjs",
     "smoke": "node scripts/smoke.mjs",
-    "build:novnc": "node scripts/build-novnc.mjs"
+    "build:novnc": "node scripts/build-novnc.mjs",
+    "staging": "node scripts/staging.mjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.285",

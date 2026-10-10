@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 2,
+  "settings": {
+    "name": "Staging Ripper",
+    "customInstructions": "Ambiente de staging com provedor de teste. Não gasta conta de IA.",
+    "onboarded": true,
+    "defaultModel": "auto",
+    "memory": true,
+    "computer": {
+      "mode": "none",
+      "boatApiKey": "",
+      "vmSize": "default",
+      "idleStopMinutes": 10,
+      "allowLocalCommands": false
+    },
+    "backup": {
+      "enabled": true,
+      "intervalHours": 24,
+      "keepCount": 7,
+      "copyTo": "",
+      "choseAt": null
+    },
+    "checks": {
+      "smoke": false,
+      "audit": false
+    },
+    "pulse": {
+      "enabled": false,
+      "hour": 8,
+      "whatsapp": false,
+      "whatsappTo": ""
+    },
+    "ui": {
+      "mode": "simple",
+      "locale": "pt-BR"
+    }
+  },
+  "agents": [
+    {
+      "id": "stg-assistente",
+      "name": "Assistente",
+      "description": "Agente de exemplo do staging. Ajuda com tarefas do dia a dia.",
+      "category": "Produtividade",
+      "status": "online",
+      "instructions": "Você é o assistente do ambiente de staging. Responda em português.",
+      "tone": "direto",
+      "model": "auto",
+      "effort": "low",
+      "tools": ["web", "memory", "routines", "files"],
+      "avatar": { "type": "clover", "color": null, "face": "eyes" },
+      "autonomyLevel": "semi_autonomous",
+      "createdAt": 1728000000000,
+      "updatedAt": 1728000000000
+    },
+    {
+      "id": "stg-relator",
+      "name": "Relator",
+      "description": "Segundo agente de exemplo. O smoke de grupo precisa de um colega além do agente que ele cria.",
+      "category": "Operações",
+      "status": "online",
+      "instructions": "Você resume o que aconteceu no staging.",
+      "tone": "direto",
+      "model": "auto",
+      "effort": "low",
+      "tools": ["web", "memory", "routines"],
+      "avatar": { "type": "star", "color": null, "face": "eyes" },
+      "autonomyLevel": "read_only",
+      "createdAt": 1728000000000,
+      "updatedAt": 1728000000000
+    }
+  ],
+  "chats": [],
+  "files": [],
+  "memories": [
+    {
+      "id": "stg-mem-1",
+      "agentId": "stg-assistente",
+      "tier": "profile",
+      "text": "Este banco é o conjunto de dados de exemplo do staging. Reiniciar o servidor não deve apagá-lo.",
+      "createdAt": 1728000000000
+    }
+  ],
+  "routines": [
+    {
+      "id": "stg-rotina-resumo",
+      "agentId": "stg-relator",
+      "name": "Resumo do staging",
+      "prompt": "Liste o que o staging fez hoje.",
+      "dailyAt": "08:00"
+    }
+  ],
+  "projects": [],
+  "projectTasks": [],
+  "artifacts": [],
+  "messages": [],
+  "delegations": [],
+  "approvals": [],
+  "skills": [],
+  "flows": [],
+  "systemAlerts": []
+}
