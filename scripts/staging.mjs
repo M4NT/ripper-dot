@@ -13,20 +13,23 @@
  *   node scripts/staging.mjs serve     # primeiro plano (CMD do Docker)
  *
  * Só lê RIPPER_STAGING_* (nunca RIPPER_DATA / RIPPER_TOKEN / HOST / PORT de produção).
- * reset e seed --force exigem RIPPER_ENV=staging e pasta sob data/staging ou marcador .ripper-staging.
+ * reset e seed --force exigem RIPPER_ENV=staging e pasta reivindicada fora de data/
+ * (RIPPER_STAGING_ID em deploy/staging/.env + .staging-claim). Nunca a pasta de produção.
  */
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import {
   copyFileSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync
 } from 'node:fs';
 import { createServer } from 'node:net';
-import { dirname, join, resolve, sep } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hashPassword } from '../lib/auth.mjs';
 
@@ -37,14 +40,14 @@ export const COMPOSE_FILE = join(COMPOSE_DIR, 'docker-compose.yml');
 export const COMPOSE_ENV_FILE = join(COMPOSE_DIR, '.env');
 export const SEED_DIR = join(COMPOSE_DIR, 'seed');
 export const SEED_DB = join(SEED_DIR, 'db.json');
-export const STAGING_MARKER = '.ripper-staging';
 export const DEFAULT_STAGING_DATA = join(ROOT, 'data', 'staging');
+export const DEFAULT_PRODUCTION_DATA = join(ROOT, 'data');
+export const DEFAULT_CLAIM_FILE = join(COMPOSE_DIR, '.staging-claim');
 
 export const DEFAULTS = {
   port: 3010,
   host: '127.0.0.1',
   provider: 'stream',
-  password: 'staging-ok-8',
   listenInContainer: 3000
 };
 
@@ -57,6 +60,8 @@ export const STAGING_ENV_KEYS = [
   'RIPPER_STAGING_PASSWORD',
   'RIPPER_STAGING_URL',
   'RIPPER_STAGING_PROVIDER',
+  'RIPPER_STAGING_ID',
+  'RIPPER_STAGING_CLAIM',
   'RIPPER_ENV'
 ];
 
@@ -111,7 +116,7 @@ export function resolveConfig(env = {}, opts = {}) {
   const dataDir = resolve(env.RIPPER_STAGING_DATA || DEFAULT_STAGING_DATA);
   const token = env.RIPPER_STAGING_TOKEN || '';
   const provider = env.RIPPER_STAGING_PROVIDER || DEFAULTS.provider;
-  const password = env.RIPPER_STAGING_PASSWORD || DEFAULTS.password;
+  const password = env.RIPPER_STAGING_PASSWORD || '';
   const host = env.RIPPER_STAGING_HOST || DEFAULTS.host;
   const url = (env.RIPPER_STAGING_URL || `http://127.0.0.1:${hostPort}`).replace(/\/$/, '');
   return {
@@ -123,6 +128,8 @@ export function resolveConfig(env = {}, opts = {}) {
     provider,
     password,
     url,
+    claimFile: env.RIPPER_STAGING_CLAIM || DEFAULT_CLAIM_FILE,
+    envFile: opts.envFile || COMPOSE_ENV_FILE,
     pidFile: join(dataDir, 'staging.pid')
   };
 }
@@ -155,10 +162,12 @@ export function stagingEnv(cfg, extra = {}) {
 }
 
 export function smokeEnv(cfg) {
+  const home = cfg.smokeHome || cfg.dataDir;
+  if (!home) throw new Error('smoke exige pasta isolada (RIPPER_STAGING_DATA); não usa o HOME real.');
   return {
     ...pickPathEnv(),
-    HOME: process.env.HOME || cfg.dataDir,
-    USERPROFILE: process.env.USERPROFILE || cfg.dataDir,
+    HOME: home,
+    USERPROFILE: home,
     RIPPER_URL: cfg.url,
     RIPPER_TOKEN: cfg.token,
     RIPPER_PASSWORD: cfg.password,
@@ -167,37 +176,119 @@ export function smokeEnv(cfg) {
   };
 }
 
-export function markerPath(dataDir) {
-  return join(dataDir, STAGING_MARKER);
+export function samePath(a, b) {
+  const norm = p => resolve(p).replace(/[/\\]+$/, '');
+  return norm(a) === norm(b);
 }
 
-export function writeStagingMarker(dataDir) {
-  mkdirSync(dataDir, { recursive: true });
-  writeFileSync(markerPath(dataDir), 'ripper-staging\n', { mode: 0o644 });
+/** RIPPER_DATA=/x/staging não casa /x/staging-old. */
+export function environHasExact(environ, key, value) {
+  return String(environ || '')
+    .split('\0')
+    .flatMap(p => p.split(/\r?\n/))
+    .some(p => p === `${key}=${value}`);
 }
 
-export function isAllowedStagingDir(dataDir) {
+export function inspectDataDir(dataDir) {
   const resolved = resolve(dataDir);
-  const root = resolve(DEFAULT_STAGING_DATA);
-  if (resolved === root || resolved.startsWith(root + sep)) return true;
+  if (!existsSync(resolved)) return { resolved, real: resolved, symlink: false, exists: false };
+  const st = lstatSync(resolved);
+  const symlink = st.isSymbolicLink();
+  let real = resolved;
+  try { real = realpathSync(resolved); } catch { /* dangling */ }
+  return { resolved, real, symlink, exists: true };
+}
+
+export function productionDataDirs(processEnv = process.env) {
+  const out = [DEFAULT_PRODUCTION_DATA];
+  for (const src of [processEnv, process.env]) {
+    if (src?.RIPPER_DATA) out.push(resolve(src.RIPPER_DATA));
+  }
+  return [...new Set(out.map(p => resolve(p)))];
+}
+
+export function isProductionDataDir(dataDir, processEnv = process.env) {
+  const info = inspectDataDir(dataDir);
+  const candidates = [info.resolved, info.real];
+  for (const prod of productionDataDirs(processEnv)) {
+    const p = inspectDataDir(prod);
+    for (const t of candidates) {
+      if (samePath(t, prod) || samePath(t, p.resolved) || samePath(t, p.real)) return true;
+    }
+  }
+  return false;
+}
+
+export function readClaimedDir(claimFile = DEFAULT_CLAIM_FILE) {
   try {
-    return readFileSync(markerPath(resolved), 'utf8').includes('ripper-staging');
+    const raw = readFileSync(claimFile, 'utf8').trim();
+    return raw ? resolve(raw) : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
-export function assertDestructiveAllowed(dataDir, env = {}) {
+export function ensureStagingId({ envFile = COMPOSE_ENV_FILE } = {}) {
+  const file = loadStagingDotEnv(envFile);
+  if (file.RIPPER_STAGING_ID) return file.RIPPER_STAGING_ID;
+  const id = generateStagingSecret();
+  upsertDotEnv(envFile, { RIPPER_STAGING_ID: id });
+  return id;
+}
+
+export function claimStagingDir(dataDir, { claimFile = DEFAULT_CLAIM_FILE, envFile = COMPOSE_ENV_FILE } = {}) {
+  mkdirSync(dataDir, { recursive: true });
+  const info = inspectDataDir(dataDir);
+  if (info.symlink) throw new Error('Recusado: a pasta de staging é um symlink.');
+  if (isProductionDataDir(info.real) || isProductionDataDir(info.resolved)) {
+    throw new Error('Recusado: essa pasta é a de produção (data/ ou RIPPER_DATA).');
+  }
+  const id = ensureStagingId({ envFile });
+  mkdirSync(dirname(claimFile), { recursive: true });
+  writeFileSync(claimFile, `${info.real}\n`, { mode: 0o600 });
+  return { id, dataDir: info.real, claimFile };
+}
+
+export function isClaimedStagingDir(dataDir, { claimFile = DEFAULT_CLAIM_FILE } = {}) {
+  const claimed = readClaimedDir(claimFile);
+  if (!claimed) return false;
+  const info = inspectDataDir(dataDir);
+  return samePath(info.real, claimed) || samePath(info.resolved, claimed);
+}
+
+export function isAllowedStagingDir(dataDir, opts = {}) {
+  const processEnv = opts.processEnv || process.env;
+  if (isProductionDataDir(dataDir, processEnv)) return false;
+  const info = inspectDataDir(dataDir);
+  if (info.symlink) return false;
+  if (isProductionDataDir(info.real, processEnv)) return false;
+  return isClaimedStagingDir(dataDir, opts);
+}
+
+export function assertDestructiveAllowed(dataDir, env = {}, opts = {}) {
   if (env.RIPPER_ENV !== 'staging') {
     throw new Error('Recusado: reset/seed --force exigem RIPPER_ENV=staging (não usa a pasta de produção).');
   }
-  if (!isAllowedStagingDir(dataDir)) {
-    throw new Error(`Recusado: ${resolve(dataDir)} não é data/staging e não tem o marcador ${STAGING_MARKER}.`);
+  const info = inspectDataDir(dataDir);
+  if (info.symlink) {
+    throw new Error('Recusado: a pasta de staging é um symlink; recusado antes de seed --force/reset.');
+  }
+  const processEnv = opts.processEnv || env;
+  if (isProductionDataDir(dataDir, processEnv) || isProductionDataDir(info.real, processEnv)) {
+    throw new Error('Recusado: essa pasta é a de produção (data/ ou RIPPER_DATA).');
+  }
+  const claimFile = opts.claimFile || env.RIPPER_STAGING_CLAIM || DEFAULT_CLAIM_FILE;
+  if (!isClaimedStagingDir(dataDir, { claimFile })) {
+    throw new Error(`Recusado: ${info.resolved} não está registrada como staging (marcador fora de data/).`);
   }
 }
 
-export function generateStagingToken() {
+export function generateStagingSecret() {
   return randomBytes(24).toString('base64url');
+}
+
+export function generateStagingToken() {
+  return generateStagingSecret();
 }
 
 function upsertDotEnv(path, values) {
@@ -224,36 +315,64 @@ function upsertDotEnv(path, values) {
   writeFileSync(path, next.filter((l, i, a) => l !== '' || i < a.length - 1).join('\n').replace(/\n*$/, '\n'), { mode: 0o600 });
 }
 
-/** Gera RIPPER_STAGING_TOKEN no primeiro up e grava em deploy/staging/.env. */
-export function ensureStagingToken(env = {}, { envFile = COMPOSE_ENV_FILE } = {}) {
-  if (env.RIPPER_STAGING_TOKEN) return { token: env.RIPPER_STAGING_TOKEN, generated: false };
-  const fromFile = loadStagingDotEnv(envFile).RIPPER_STAGING_TOKEN;
-  if (fromFile) return { token: fromFile, generated: false, fromFile: true };
-  const token = generateStagingToken();
-  upsertDotEnv(envFile, { RIPPER_STAGING_TOKEN: token });
-  return { token, generated: true, envFile };
+/** Gera token e senha aleatórios no primeiro up e grava em deploy/staging/.env. Sem fallback fixo. */
+export function ensureStagingSecrets(env = {}, { envFile = COMPOSE_ENV_FILE } = {}) {
+  const file = loadStagingDotEnv(envFile);
+  const updates = {};
+  let token = env.RIPPER_STAGING_TOKEN || file.RIPPER_STAGING_TOKEN || '';
+  let password = env.RIPPER_STAGING_PASSWORD || file.RIPPER_STAGING_PASSWORD || '';
+  const generated = { token: false, password: false };
+  if (!token) {
+    token = generateStagingSecret();
+    updates.RIPPER_STAGING_TOKEN = token;
+    generated.token = true;
+  }
+  if (!password) {
+    password = generateStagingSecret();
+    updates.RIPPER_STAGING_PASSWORD = password;
+    generated.password = true;
+  }
+  if (!file.RIPPER_STAGING_ID && !env.RIPPER_STAGING_ID) {
+    updates.RIPPER_STAGING_ID = generateStagingSecret();
+  }
+  if (Object.keys(updates).length) upsertDotEnv(envFile, updates);
+  return { token, password, generated, envFile };
 }
 
-/** Copia o db.json de exemplo e grava a senha. force exige RIPPER_ENV=staging + pasta/marcador. */
+export function ensureStagingToken(env = {}, opts = {}) {
+  const out = ensureStagingSecrets(env, opts);
+  return { token: out.token, generated: out.generated.token, envFile: out.envFile };
+}
+
+/** Copia o db.json de exemplo. Não grava marcador dentro da pasta se já existe db.json.
+ * force exige RIPPER_ENV=staging + pasta reivindicada fora de data/ (não produção, não symlink). */
 export async function seedDataDir(dataDir, {
   force = false,
-  password = DEFAULTS.password,
+  password,
   env = {},
-  skipGuard = false
+  skipGuard = false,
+  claimFile = env.RIPPER_STAGING_CLAIM || DEFAULT_CLAIM_FILE,
+  envFile = COMPOSE_ENV_FILE,
+  processEnv = env
 } = {}) {
   if (!existsSync(SEED_DB)) throw new Error(`seed não encontrado: ${SEED_DB}`);
-  if (force && !skipGuard) assertDestructiveAllowed(dataDir, env);
-  mkdirSync(dataDir, { recursive: true });
-  const dest = join(dataDir, 'db.json');
-  const authPath = join(dataDir, 'auth.json');
-  if (existsSync(dest) && !force) {
-    if (!existsSync(markerPath(dataDir))) writeStagingMarker(dataDir);
-    return { seeded: false, reason: 'exists', dataDir };
+  if (isProductionDataDir(dataDir, processEnv)) {
+    throw new Error('Recusado: essa pasta é a de produção (data/ ou RIPPER_DATA).');
   }
+  if (force && !skipGuard) assertDestructiveAllowed(dataDir, env, { claimFile, processEnv });
+  const dest = join(dataDir, 'db.json');
+  if (existsSync(dest) && !force) {
+    return { seeded: false, reason: 'exists', dataDir, claimed: isClaimedStagingDir(dataDir, { claimFile }) };
+  }
+  const info = inspectDataDir(dataDir);
+  if (info.symlink) throw new Error('Recusado: a pasta de staging é um symlink.');
+  if (!password) throw new Error('RIPPER_STAGING_PASSWORD ausente. Rode `up` para gerar.');
+  mkdirSync(dataDir, { recursive: true });
+  if (inspectDataDir(dataDir).symlink) throw new Error('Recusado: a pasta de staging é um symlink.');
   copyFileSync(SEED_DB, dest);
   const hash = await hashPassword(password);
-  writeFileSync(authPath, JSON.stringify({ hash, updatedAt: Date.now() }), { mode: 0o600 });
-  writeStagingMarker(dataDir);
+  writeFileSync(join(dataDir, 'auth.json'), JSON.stringify({ hash, updatedAt: Date.now() }), { mode: 0o600 });
+  claimStagingDir(dataDir, { claimFile, envFile });
   try { rmSync(join(dataDir, 'setup-code.txt'), { force: true }); } catch { /* senha já existe */ }
   return { seeded: true, dataDir };
 }
@@ -291,8 +410,8 @@ Comandos:
 
 Variáveis: RIPPER_STAGING_DATA, RIPPER_STAGING_TOKEN, RIPPER_STAGING_PORT, RIPPER_STAGING_HOST.
 Não lê RIPPER_DATA / RIPPER_TOKEN / HOST / PORT de produção.
-Token: RIPPER_STAGING_TOKEN ou gerado no primeiro up (deploy/staging/.env).
-reset/seed --force: RIPPER_ENV=staging e pasta sob data/staging ou marcador ${STAGING_MARKER}.
+Token e senha: gerados no primeiro up (deploy/staging/.env); sem valor fixo.
+reset/seed --force: RIPPER_ENV=staging, pasta reivindicada fora de data/, sem symlink, nunca data/ de produção.
 Guia: docs/instalacao.md (seção Staging).`;
 }
 
@@ -316,7 +435,7 @@ export async function waitForHealth(url, token, ms = 60_000) {
 }
 
 export function writePid(cfg, pid) {
-  mkdirSync(cfg.dataDir, { recursive: true });
+  mkdirSync(dirname(cfg.pidFile), { recursive: true });
   writeFileSync(cfg.pidFile, JSON.stringify({ pid, dataDir: cfg.dataDir, createdAt: Date.now() }));
 }
 
@@ -360,8 +479,8 @@ export function isStagingServerPid(pid, cfg, inspection = readProcessInspection(
   const cmd = String(inspection.command || '');
   if (!/(^|[\s/])server\.mjs(\s|$)/.test(cmd)) return false;
   const env = String(inspection.environ || '');
-  if (env.includes('RIPPER_ENV=staging')) return true;
-  if (cfg?.dataDir && env.includes(`RIPPER_DATA=${cfg.dataDir}`)) return true;
+  if (environHasExact(env, 'RIPPER_ENV', 'staging')) return true;
+  if (cfg?.dataDir && environHasExact(env, 'RIPPER_DATA', cfg.dataDir)) return true;
   return false;
 }
 
@@ -393,7 +512,11 @@ function portFree(port, host = '127.0.0.1') {
 }
 
 async function upLocal(cfg) {
-  await seedDataDir(cfg.dataDir, { password: cfg.password });
+  await seedDataDir(cfg.dataDir, {
+    password: cfg.password,
+    claimFile: cfg.claimFile,
+    envFile: cfg.envFile
+  });
   if (pidAlive(readPid(cfg))) {
     const pid = readPid(cfg);
     if (isStagingServerPid(pid, cfg)) {
@@ -417,7 +540,7 @@ async function upLocal(cfg) {
   writePid(cfg, child.pid);
   await waitForHealth(cfg.url, cfg.token);
   console.log(`Staging local em ${cfg.url} (RIPPER_STAGING_DATA=${cfg.dataDir}, provedor=${cfg.provider})`);
-  console.log(`Entre com ?token=${cfg.token} ou senha ${cfg.password}`);
+  console.log(`Entre com ?token=${cfg.token}`);
 }
 
 function runCompose(args, { inherit = true } = {}) {
@@ -437,16 +560,16 @@ async function upDocker(cfg) {
   runCompose(['up', '-d', '--build']);
   await waitForHealth(cfg.url, cfg.token, 120_000);
   console.log(`Staging Docker em ${cfg.url} (volume ripper-staging-data, provedor=${cfg.provider})`);
-  console.log(`Entre com ?token=${cfg.token} ou senha ${cfg.password}`);
+  console.log(`Entre com ?token=${cfg.token}`);
 }
 
-function withToken(cfg, env) {
-  const ensured = ensureStagingToken(env);
-  return { ...cfg, token: ensured.token, generatedToken: ensured.generated };
+function withSecrets(cfg, env) {
+  const ensured = ensureStagingSecrets(env, { envFile: cfg.envFile });
+  return { ...cfg, token: ensured.token, password: ensured.password };
 }
 
 async function cmdUp(cfg, opts, env) {
-  const ready = withToken(cfg, env);
+  const ready = withSecrets(cfg, env);
   if (!opts.local && hasDockerCompose()) return upDocker(ready);
   if (!opts.local && !hasDockerCompose()) {
     console.log('Docker Compose não encontrado; subindo o equivalente local (Node).');
@@ -465,7 +588,7 @@ function cmdDown(cfg, opts) {
 }
 
 async function cmdRestart(cfg, opts, env) {
-  const ready = withToken(cfg, env);
+  const ready = withSecrets(cfg, env);
   if (!opts.local && hasDockerCompose()) {
     runCompose(['restart']);
     await waitForHealth(ready.url, ready.token, 120_000);
@@ -503,26 +626,46 @@ export function runSmoke(cfg, { json = false } = {}) {
 }
 
 async function cmdSeed(cfg, opts, env) {
-  const out = await seedDataDir(cfg.dataDir, { force: opts.force, password: cfg.password, env });
+  const ready = withSecrets(cfg, env);
+  const out = await seedDataDir(ready.dataDir, {
+    force: opts.force,
+    password: ready.password,
+    env,
+    claimFile: ready.claimFile,
+    envFile: ready.envFile
+  });
   console.log(out.seeded
     ? `Seed gravado em ${cfg.dataDir}`
     : `Já havia dados em ${cfg.dataDir} (passe --force para substituir; exige RIPPER_ENV=staging).`);
 }
 
 async function cmdReset(cfg, opts, env) {
-  assertDestructiveAllowed(cfg.dataDir, env);
+  const ready = withSecrets(cfg, env);
+  assertDestructiveAllowed(ready.dataDir, env, { claimFile: ready.claimFile });
   if (!opts.local && hasDockerCompose()) {
     runCompose(['down', '-v']);
   }
-  try { stopPid(cfg); } catch { /* processo alheio: pasta mesmo assim é de staging */ }
-  rmSync(cfg.dataDir, { recursive: true, force: true });
-  await seedDataDir(cfg.dataDir, { force: true, password: cfg.password, env, skipGuard: true });
-  console.log(`Staging resetado e semeado em ${cfg.dataDir}`);
+  try { stopPid(ready); } catch { /* processo alheio: pasta mesmo assim é de staging */ }
+  rmSync(ready.dataDir, { recursive: true, force: true });
+  await seedDataDir(ready.dataDir, {
+    force: true,
+    password: ready.password,
+    env,
+    claimFile: ready.claimFile,
+    envFile: ready.envFile,
+    skipGuard: true
+  });
+  console.log(`Staging resetado e semeado em ${ready.dataDir}`);
 }
 
 async function cmdServe(cfg, env) {
-  const ready = withToken(cfg, env);
-  await seedDataDir(ready.dataDir, { password: ready.password });
+  const ready = withSecrets(cfg, env);
+  await seedDataDir(ready.dataDir, {
+    password: ready.password,
+    env,
+    claimFile: ready.claimFile,
+    envFile: ready.envFile
+  });
   const child = spawn(process.execPath, [join(ROOT, 'server.mjs')], {
     cwd: ROOT,
     env: stagingEnv(ready),
@@ -549,7 +692,7 @@ export async function main(argv = process.argv.slice(2), processEnv = process.en
     down: () => cmdDown(cfg, opts),
     restart: () => cmdRestart(cfg, opts, env),
     status: () => cmdStatus(cfg),
-    smoke: () => { const code = runSmoke(withToken(cfg, env), opts); process.exitCode = code; },
+    smoke: () => { const code = runSmoke(withSecrets(cfg, env), opts); process.exitCode = code; },
     seed: () => cmdSeed(cfg, opts, env),
     reset: () => cmdReset(cfg, opts, env),
     serve: () => cmdServe(cfg, env)
