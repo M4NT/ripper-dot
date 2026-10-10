@@ -4,7 +4,7 @@ import http from 'node:http';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { juliaChoose, juliaOnline, juliaPostChoose, resetJuliaProbe, measureTriagePromptChars, RISK_OPTIONS, JULIA_FAST_TIMEOUT_MS } from '../lib/julia.mjs';
+import { juliaChoose, juliaOnline, juliaPostChoose, resetJuliaProbe, measureTriagePromptChars, RISK_OPTIONS, JULIA_FAST_TIMEOUT_MS, _setJuliaFetchForTests } from '../lib/julia.mjs';
 import { route } from '../lib/router.mjs';
 
 function withJuliaTelemetry(fn) {
@@ -69,21 +69,19 @@ test('juliaPostChoose reporta motivo quando a Julia está fora do ar', async () 
 
 test('juliaPostChoose vai direto ao /choose sem esperar /health', async () => {
   resetJuliaProbe();
-  let health = 0, chooses = 0;
-  const srv = mockJuliaServer((_req, res) => {
-    chooses++;
-    res.end(JSON.stringify({ best: 0, scores: [0.9, 0.1] }));
+  const paths = [];
+  _setJuliaFetchForTests(async (url) => {
+    paths.push(new URL(url).pathname);
+    return { ok: true, status: 200, json: async () => ({ best: 0, scores: [0.9, 0.1] }) };
   });
-  srv.on('request', req => {
-    if (req.url?.split('?')[0] === '/health') health++;
-  });
-  srv.listen(0);
-  const settings = { julia: { url: `http://127.0.0.1:${srv.address().port}` } };
-  const r = await juliaPostChoose(settings, { question: 'x', options: ['a', 'b'] }, { timeout: JULIA_FAST_TIMEOUT_MS });
-  srv.close();
-  assert.equal(r.ok, true);
-  assert.equal(chooses, 1);
-  assert.equal(health, 0);
+  try {
+    const r = await juliaPostChoose({ julia: { url: 'http://127.0.0.1:8765' } }, { question: 'x', options: ['a', 'b'] }, { timeout: JULIA_FAST_TIMEOUT_MS });
+    assert.equal(r.ok, true);
+    assert.deepEqual(paths, ['/choose']);
+  } finally {
+    _setJuliaFetchForTests(null);
+    resetJuliaProbe();
+  }
 });
 
 test('measureTriagePromptChars soma contexto, pergunta e opções', () => {

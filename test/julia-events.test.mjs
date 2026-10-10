@@ -50,6 +50,7 @@ test('appendJuliaDecision persiste e agrega sem USD', () =>
     assert.equal(s.answered, 1);
     assert.equal(s.fallbacks, 1);
     assert.equal(s.fallbacksByReason.offline, 1);
+    assert.equal(s.timeouts, 0);
     assert.equal(s.avoidedPromptChars.sum, 220);
     assert.equal(s.latencyMs.p50, 40);
     assert.equal(s.usdAvoidedEst, undefined);
@@ -58,4 +59,13 @@ test('appendJuliaDecision persiste e agrega sem USD', () =>
     const lim = accountLimits({}, {});
     assert.equal(lim.juliaRouting.decisions, 2);
     assert.equal(lim.juliaRouting.usdAvoidedEst, undefined);
+
+    appendJuliaDecision({
+      purpose: 'route',
+      latencyMs: 400,
+      optionCount: 3,
+      ok: false,
+      reason: 'choose_timeout'
+    });
+    assert.equal(juliaTelemetrySummary().timeouts, 1);
   }));
