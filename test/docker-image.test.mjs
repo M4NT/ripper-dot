@@ -3,9 +3,12 @@ import assert from 'node:assert/strict';
 import { pickOutdated, IMAGE, containerNameOf, hostnameOf, wsKeyOf } from '../lib/docker.mjs';
 
 test('pickOutdated: tag legada mais nova só quando falta a atual', () => {
+  assert.equal(IMAGE, 'ripper-agent:6');
   assert.equal(pickOutdated(['ripper-agent:1', 'ripper-agent:2', '']), 'ripper-agent:2');
   assert.equal(pickOutdated(['ripper-agent:1']), 'ripper-agent:1');
   assert.equal(pickOutdated(['ripper-agent:2', IMAGE]), null);
+  assert.equal(pickOutdated(['ripper-agent:4', 'ripper-agent:5']), 'ripper-agent:5');
+  assert.equal(pickOutdated(['ripper-agent:5', IMAGE]), null);
   assert.equal(pickOutdated(['node:22-bookworm', 'outra:latest']), null);
   assert.equal(pickOutdated([]), null);
 });

@@ -32,6 +32,8 @@ import {
   handleVncUpgrade,
   forwardUpgrade,
   proxyVncWebSocket,
+  VNC_PASSWORD_CHECK_SCRIPT,
+  VNC_PASSWORD_APPLY_SCRIPT,
   VncError
 } from '../lib/vnc-proxy.mjs';
 
@@ -95,6 +97,7 @@ test('estáticos vêm do Ripper, com X-Frame-Options e CSP', async () => {
   assert.ok(resolveVncStatic('vnc.html').endsWith('vnc.html'));
   assert.equal(resolveVncStatic('../package.json'), null);
   assert.equal(resolveVncStatic('app/ui.js'), null);
+  assert.throws(() => resolveVncStatic('%E0'), e => e instanceof VncError && e.code === 400);
   const headers = vncStaticHeaders('vnc.html');
   assert.equal(headers['x-frame-options'], 'SAMEORIGIN');
   assert.match(headers['content-security-policy'], /frame-ancestors 'self'/);
@@ -122,6 +125,9 @@ test('estáticos vêm do Ripper, com X-Frame-Options e CSP', async () => {
 
     const miss = await fetch(`http://127.0.0.1:${port}/api/agents/ag1/vnc/core/rfb.js`);
     assert.equal(miss.status, 404);
+
+    const bad = await fetch(`http://127.0.0.1:${port}/api/agents/ag1/vnc/%E0`);
+    assert.equal(bad.status, 400);
   } finally {
     server.close();
   }
@@ -226,17 +232,43 @@ test('filtro RFB recusa handshake acima do limite', () => {
   assert.equal(r.fail, 'limit');
 });
 
-test('applyVncPasswordForAgent recusa contêiner que continua com -nopw', async () => {
+test('applyVncPasswordForAgent não reinicia x11vnc se a senha já vale', async () => {
   const calls = [];
   const docker = async (args) => {
     calls.push(args);
     if (args[0] === 'ps') return { code: 0, out: 'abc123\n', err: '' };
-    if (args.includes('pgrep')) return { code: 0, out: '99 x11vnc -display :99 -nopw -rfbport 5900\n', err: '' };
+    if (args.includes(VNC_PASSWORD_CHECK_SCRIPT)) return { code: 0, out: 'RIPPER_VNC_OK\n', err: '' };
+    throw new Error('não deveria reaplicar a senha');
+  };
+  assert.equal(await applyVncPasswordForAgent('ag1', 'Abcdefgh1234', { docker }), 'unchanged');
+  assert.equal(calls.some(a => a.includes(VNC_PASSWORD_APPLY_SCRIPT)), false);
+});
+
+test('applyVncPasswordForAgent recusa contêiner que continua com -nopw', async () => {
+  const docker = async (args) => {
+    if (args[0] === 'ps') return { code: 0, out: 'abc123\n', err: '' };
+    if (args.includes(VNC_PASSWORD_CHECK_SCRIPT)) return { code: 0, out: 'RIPPER_VNC_NEED\n', err: '' };
+    if (args.includes(VNC_PASSWORD_APPLY_SCRIPT)) return { code: 1, out: '', err: 'fail' };
+    if (args.some(a => String(a).includes('pgrep'))) return { code: 0, out: '99 x11vnc -display :99 -nopw -rfbport 5900\n', err: '' };
     return { code: 1, out: '', err: 'fail' };
   };
   await assert.rejects(
     () => applyVncPasswordForAgent('ag1', 'Abcdefgh1234', { docker }),
     e => e instanceof VncError && e.code === 409 && /sem senha/.test(e.message)
+  );
+});
+
+test('applyVncPasswordForAgent devolve o erro real se a senha falhar sem -nopw', async () => {
+  const docker = async (args) => {
+    if (args[0] === 'ps') return { code: 0, out: 'abc123\n', err: '' };
+    if (args.includes(VNC_PASSWORD_CHECK_SCRIPT)) return { code: 0, out: 'RIPPER_VNC_NEED\n', err: '' };
+    if (args.includes(VNC_PASSWORD_APPLY_SCRIPT)) return { code: 1, out: '', err: 'x11vnc: display :99 not found' };
+    if (args.some(a => String(a).includes('pgrep'))) return { code: 0, out: '88 x11vnc -rfbauth /run/ripper-vnc.rfb\n', err: '' };
+    return { code: 1, out: '', err: 'fail' };
+  };
+  await assert.rejects(
+    () => applyVncPasswordForAgent('ag1', 'Abcdefgh1234', { docker }),
+    e => e instanceof VncError && e.code === 502 && /display :99 not found/.test(e.message)
   );
 });
 
@@ -277,8 +309,9 @@ test('handleVncUpgrade recusa sem sessão, origem cruzada e caminho alheio', asy
     { url: '/api/health', headers: {} },
     other.socket, Buffer.alloc(0),
     { isSignedIn: () => true, resolvePort: async () => 1 }
-  ), true);
-  assert.match(other.written(), /404/);
+  ), false);
+  assert.equal(other.written(), '');
+  assert.equal(other.socket.destroyed, false);
 });
 
 async function listen(server) {
@@ -443,6 +476,25 @@ test('forwardUpgrade: ouvinte secundário (LAN/Tailscale) repassa o WebSocket', 
     closeServer(main);
     closeServer(backend.server);
   }
+});
+
+test('rfb.bundle.js reproduz o build de @novnc/novnc', () => {
+  assert.match(readFileSync(new URL('../lib/novnc-static/LICENSE', import.meta.url), 'utf8'), /Mozilla Public License/);
+  assert.match(readFileSync(new URL('../lib/novnc-static/NOTICE', import.meta.url), 'utf8'), /noVNC/);
+  const r = spawn(process.execPath, [fileURLToPath(new URL('../scripts/build-novnc.mjs', import.meta.url)), '--check'], {
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+  return new Promise((resolve, reject) => {
+    let err = '';
+    r.stderr.on('data', d => { err += d; });
+    r.on('error', reject);
+    r.on('close', code => {
+      try {
+        assert.equal(code, 0, err || 'build:novnc --check falhou');
+        resolve();
+      } catch (e) { reject(e); }
+    });
+  });
 });
 
 test('imagem do agente: xdotool, VNC com senha em /run, sem -nopw no /work', () => {
