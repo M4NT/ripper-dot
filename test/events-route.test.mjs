@@ -95,6 +95,28 @@ test('publishUserEvent isola clientes de usuários diferentes', () => {
   assert.equal(userEventClientCount(), 0);
 });
 
+test('mudança no snapshot depois do hello vira evento working', async () => {
+  const req = new EventEmitter();
+  req.method = 'GET';
+  const res = mockRes();
+  let working = {};
+  assert.equal(handleEventsRoute(req, res, USER_EVENTS_PATH, {
+    userKey: () => 'owner',
+    snapshot: () => ({ working }),
+    pollMs: 20
+  }), true);
+  req.emit('close');
+  working = { ag1: { chatId: 'c1', tool: 'think' } };
+  await new Promise(r => setTimeout(r, 80));
+  const ev = parsed(res);
+  assert.equal(ev[0].type, 'hello');
+  assert.equal(ev[1].type, 'snapshot');
+  assert.deepEqual(ev[1].working, {});
+  const work = ev.find(e => e.type === 'working' && e.working.ag1?.chatId === 'c1');
+  assert.ok(work, 'poll deve emitir working, não outro snapshot');
+  res.end();
+});
+
 test('onChatStreamsChange avisa início e fim do turno', () => {
   const seen = [];
   const off = onChatStreamsChange(e => seen.push(e));
@@ -209,7 +231,7 @@ test('GET /api/events emite working enquanto o agente responde', async () => {
     await chatP.then(r => r.text()).catch(() => {});
     assert.ok(events.some(e => e.type === 'hello'));
     assert.ok(events.some(e => e.type === 'snapshot'));
-    const work = events.find(e => e.type === 'working' && Object.keys(e.working || {}).length);
+    const work = events.find(e => e.working && Object.keys(e.working).length);
     assert.ok(work, 'deveria emitir working com o agente ocupado');
     assert.ok(work.working[agent.id]?.chatId);
   });
