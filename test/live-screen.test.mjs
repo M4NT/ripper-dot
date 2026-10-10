@@ -4,10 +4,12 @@ import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
-  consumeLiveTabOpen, currentTurnMessages, doingLine, isLiveScreenTool, liveScreenAutoKey, liveScreenStep,
-  shouldAutoConnect, shouldConnectThisTurn, shouldHandleLiveScreenEscape, shouldOpenLiveScreen, shouldRetryConnect
+  consumeLiveTabOpen, currentTurnMessages, doingLine, isLiveScreenTool, liveScreenAutoKey, liveScreenCanControl,
+  liveScreenStep, screenControlAfterGrab, screenControlIsMine, screenControlPayload, screenControlReleaseForOwner,
+  shouldAutoConnect, shouldConnectThisTurn, shouldHandleLiveScreenEscape, shouldOpenLiveScreen,
+  shouldReleaseControlOnCloseFull, shouldRetryConnect
 } from '../web/src/liveScreenLogic.js';
-import { LiveComputerTab } from '../web/src/liveScreenTab.js';
+import { LiveComputerTab, LiveScreenControl, liveScreenControlState } from '../web/src/liveScreenTab.js';
 
 test('isLiveScreenTool: computador e navegador, mais nada', () => {
   assert.equal(isLiveScreenTool('computer_exec'), true);
@@ -193,4 +195,63 @@ test('render LiveComputerTab: histórico + texto não abre; working não reabre 
   assert.equal(later.connect, '0');
   assert.equal(later.open, '0');
   assert.equal(later.key, '');
+});
+
+test('Assumir controle: dono no PUT; miniatura não solta a trava do painel', () => {
+  assert.deepEqual(screenControlPayload(true, 'panel-1'), { control: true, owner: 'panel-1' });
+  assert.equal(screenControlIsMine({ control: true, owner: 'panel-1' }, 'panel-1'), true);
+  assert.equal(screenControlIsMine({ control: true, owner: 'panel-1' }, 'mini-2'), false);
+  assert.equal(screenControlAfterGrab(true, { control: true, owner: 'panel-1', conflict: true }, 'mini-2'), false);
+  assert.equal(screenControlAfterGrab(false, { control: true, owner: 'panel-1' }, 'mini-2'), false);
+  assert.equal(screenControlReleaseForOwner('panel-1', 'mini-2'), false);
+  assert.equal(screenControlReleaseForOwner('panel-1', 'panel-1'), true);
+  assert.equal(shouldReleaseControlOnCloseFull('float'), true);
+  assert.equal(shouldReleaseControlOnCloseFull('panel'), false);
+  assert.equal(liveScreenCanControl({ variant: 'panel', control: true, big: false }), true);
+  assert.equal(liveScreenCanControl({ variant: 'float', control: true, big: false }), false);
+  assert.equal(liveScreenCanControl({ variant: 'float', control: true, big: true }), true);
+});
+
+function renderLiveControl(props) {
+  const html = renderToStaticMarkup(createElement(LiveScreenControl, props));
+  return {
+    html,
+    variant: html.match(/data-live-screen="([^"]*)"/)?.[1],
+    can: html.match(/data-can-control="([^"]*)"/)?.[1],
+    closeFull: html.match(/data-release-on-close-full="([^"]*)"/)?.[1],
+    closeReleases: html.match(/data-close-releases="([^"]*)"/)?.[1],
+  };
+}
+
+test('render AgentLiveScreen painel e miniatura: trava com donos separados', () => {
+  const panel = liveScreenControlState({ variant: 'panel', control: true, owner: 'panel-1', lockOwner: 'panel-1' });
+  assert.equal(panel.canControl, true);
+  assert.equal(panel.releaseOnCloseFull, false);
+  assert.equal(panel.closeReleasesLock, true);
+
+  const miniWhilePanelHolds = liveScreenControlState({
+    variant: 'float', control: true, big: true, owner: 'mini-2', lockOwner: 'panel-1',
+  });
+  assert.equal(miniWhilePanelHolds.canControl, false, 'miniatura não assume a trava do painel');
+  assert.equal(miniWhilePanelHolds.closeReleasesLock, false, 'fechar miniatura não solta o painel');
+  assert.equal(miniWhilePanelHolds.releaseOnCloseFull, true);
+
+  const miniOwn = liveScreenControlState({
+    variant: 'float', control: true, big: true, owner: 'mini-2', lockOwner: 'mini-2',
+  });
+  assert.equal(miniOwn.canControl, true);
+  assert.equal(liveScreenControlState({
+    variant: 'float', control: true, big: false, owner: 'mini-2', lockOwner: 'mini-2',
+  }).canControl, false);
+
+  const panelHtml = renderLiveControl({ variant: 'panel', control: true, owner: 'panel-1', lockOwner: 'panel-1' });
+  assert.equal(panelHtml.variant, 'panel');
+  assert.equal(panelHtml.can, '1');
+  assert.equal(panelHtml.closeReleases, '1');
+
+  const miniHtml = renderLiveControl({ variant: 'float', control: true, big: true, owner: 'mini-2', lockOwner: 'panel-1' });
+  assert.equal(miniHtml.variant, 'float');
+  assert.equal(miniHtml.can, '0');
+  assert.equal(miniHtml.closeReleases, '0');
+  assert.equal(miniHtml.closeFull, '1');
 });

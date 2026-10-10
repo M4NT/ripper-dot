@@ -113,11 +113,11 @@ function DecisionCard({ rec, status, compact, onDone }) {
         <>
           <div className="approval-actions">
             <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => decide(true)}><Icon name="check" size={14} />{verbos.sim}</button>
-            {rec.kind !== 'documento' && <button className="btn btn-sm" disabled={busy} onClick={() => decide(true, true)} title="Não pergunta de novo por este mesmo comando nesta conversa">Aprovar sempre aqui</button>}
+            {rec.kind !== 'documento' && rec.rememberable !== false && <button className="btn btn-sm" disabled={busy} onClick={() => decide(true, true)} title="Não pergunta de novo por este mesmo comando nesta conversa">Aprovar sempre aqui</button>}
             <div className="grow" />
             <button className="btn btn-sm btn-danger" disabled={busy} onClick={() => decide(false)}>{verbos.nao}</button>
           </div>
-          {rec.kind !== 'documento' && <small className="approval-hint">"Aprovar sempre aqui" vale só para este comando, nesta conversa.</small>}
+          {rec.kind !== 'documento' && rec.rememberable !== false && <small className="approval-hint">"Aprovar sempre aqui" vale só para este comando, nesta conversa.</small>}
           {rec.expiresAt && <small className="approval-expira">Expira às {hora(rec.expiresAt)}</small>}
         </>
       ) : <p className={`approval-result ${st}`}><Icon name={st === 'approved' ? 'check' : 'x'} size={13} />{label}</p>}

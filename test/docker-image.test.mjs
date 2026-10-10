@@ -5,6 +5,7 @@ import { pickOutdated, IMAGE, containerNameOf, hostnameOf, wsKeyOf } from '../li
 test('pickOutdated: tag legada mais nova só quando falta a atual', () => {
   assert.equal(IMAGE, 'ripper-agent:6');
   assert.equal(pickOutdated(['ripper-agent:1', 'ripper-agent:2', '']), 'ripper-agent:2');
+  assert.equal(pickOutdated(['ripper-agent:1', 'ripper-agent:4']), 'ripper-agent:4');
   assert.equal(pickOutdated(['ripper-agent:1']), 'ripper-agent:1');
   assert.equal(pickOutdated(['ripper-agent:2', IMAGE]), null);
   assert.equal(pickOutdated(['ripper-agent:4', 'ripper-agent:5']), 'ripper-agent:5');
