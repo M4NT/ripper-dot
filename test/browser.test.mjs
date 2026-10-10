@@ -38,7 +38,10 @@ import {
   fingerprintsMatch,
   bindMismatchError,
   unknownRefError,
-  unknownRefRisk
+  unknownRefRisk,
+  pickFingerprintHit,
+  isMacReject,
+  MAC_REJECT
 } from '../lib/browser.mjs';
 
 function fakeDaemon(scriptsDir, handle, { bootAt = Date.now() } = {}) {
@@ -171,8 +174,12 @@ test('daemonSource: sem think, sem data-ripper-ref plantável, com fila e shred'
   assert.match(src, /includeText/);
   assert.match(src, /process\.stdin/);
   assert.match(src, /Ref sem elemento aprovado/);
+  assert.match(src, /if \(!TOKEN\)/);
+  assert.match(src, /process\.exit\(1\)/);
+  assert.match(src, /assinatura HMAC recusada/);
   assert.doesNotMatch(src, /RIPPER_BROWSER_TOKEN/);
   assert.doesNotMatch(src, /process\.env\.\w*TOKEN/);
+  assert.doesNotMatch(src, /if \(hits\.length === 1\)/);
   assert.doesNotMatch(src, /bctl\.mjs/);
 });
 
@@ -263,6 +270,8 @@ test('assignSnapshotRefs e redactResult escondem valor sensível', () => {
     assert.ok(isSensitiveField(t), t);
     assert.ok(browserRisk('type', { target: t }), t);
   }
+  assert.equal(isSensitiveField('tokens'), false);
+  assert.equal(isSensitiveField('descartar'), false);
   const otp = assignSnapshotRefs([{ role: 'textbox', name: 'OTP', value: '847291' }]);
   assert.equal(otp[0].value, undefined);
 });
@@ -282,6 +291,16 @@ test('fingerprint do elemento aprovado: papel, nome e nth', () => {
   assert.match(unknownRefError('e7'), /e7/);
   assert.match(unknownRefRisk('e7'), /ref desconhecida/);
   assert.ok(elementFingerprint(nodes[0]));
+  const withHref = elementFingerprint({
+    role: 'link', name: 'Docs', tag: 'a', nth: 0, href: '/docs', line: 'Leia Docs aqui'
+  });
+  assert.equal(withHref.href, '/docs');
+  assert.equal(withHref.line, 'Leia Docs aqui');
+  assert.equal(pickFingerprintHit(['a'], { nth: 0 }), 'a');
+  assert.equal(pickFingerprintHit(['a'], { nth: 1 }), null);
+  assert.equal(pickFingerprintHit(['a', 'b'], { nth: 1 }), 'b');
+  assert.ok(isMacReject({ ok: false, error: MAC_REJECT }));
+  assert.equal(isMacReject({ ok: true }), false);
 });
 
 test('browserRisk resolve ref pelo snapshot (não pelo texto e7)', () => {
@@ -315,10 +334,12 @@ test('browserFor: uma preparação via exec; ações falam com o daemon por arqu
     if (cmd.action === 'read') return { title: 'Exemplo', url: 'https://ex.test/', nodes: [{ ref: 'e1', role: 'button', name: 'Entrar' }], text: 'Bem-vindo ao exemplo' };
     return { title: 'Exemplo', url: 'https://ex.test/', nodes: [{ ref: 'e1', role: 'button', name: 'Entrar' }] };
   });
+  let lastOpts;
   const raw = {
-    async exec(cmd) {
+    async exec(cmd, opts) {
       execs += 1;
       lastExec = cmd;
+      lastOpts = opts;
       writeFileSync(join(scripts, 'alive'), JSON.stringify({ t: Date.now(), chromium: true }));
       return 'RIPPER_BROWSER_READY\nRIPPER_BROWSER_DAEMON';
     }
@@ -338,8 +359,9 @@ test('browserFor: uma preparação via exec; ações falam com o daemon por arqu
     assert.equal(cmds[2].text, 'ana@ex.test');
     assert.deepEqual(cmds[2].expect, { role: 'textbox', name: 'E-mail', nth: 0 });
     assert.doesNotMatch(lastExec, /RIPPER_BROWSER_TOKEN=/);
-    assert.match(lastExec, /printf '%s'/);
-    assert.match(lastExec, /nohup node \/opt\/ripper-browser\/browserd\.mjs/);
+    assert.match(lastExec, /cat \| nohup node \/opt\/ripper-browser\/browserd\.mjs/);
+    assert.ok(lastOpts && lastOpts.input);
+    assert.equal(lastExec.includes(lastOpts.input), false);
     assert.match(opened, /\[ref=e1\]/);
     assert.match(clicked, /textbox "E-mail"/);
     assert.match(typed, /ana@ex\.test/);
@@ -540,5 +562,147 @@ test('browserFor: .ripper vira symlink entre operações e a próxima recusa', a
     renameSync(scripts, moved);
     symlinkSync(moved, scripts);
     await assert.rejects(() => b.click('e1'), /symlink/i);
+  } finally { stop(); }
+});
+
+test('browserFor: primeira implantação da sessão reinicia daemon vivo; token só no stdin', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ripper-br-'));
+  const scripts = join(dir, '.ripper');
+  mkdirSync(scripts, { recursive: true });
+  writeFileSync(join(scripts, 'alive'), JSON.stringify({ t: Date.now(), chromium: true }));
+  let execs = 0, lastExec = '', lastOpts;
+  const stop = fakeDaemon(scripts, () => ({ title: 'T', url: 'https://t.test/', nodes: [] }));
+  const raw = {
+    async exec(cmd, opts) {
+      execs += 1;
+      lastExec = cmd;
+      lastOpts = opts;
+      writeFileSync(join(scripts, 'alive'), JSON.stringify({ t: Date.now(), chromium: true }));
+      return 'RIPPER_BROWSER_READY\nRIPPER_BROWSER_DAEMON';
+    }
+  };
+  try {
+    const b = browserFor(raw, pathToFileURL(dir + '/'), { timeoutMs: 3000, pollMs: 10, token: 'tok-sessao-abc' });
+    await b.open('https://t.test/');
+    assert.equal(execs, 1);
+    assert.match(lastExec, /pkill/);
+    assert.equal(lastOpts.input, 'tok-sessao-abc');
+    assert.doesNotMatch(lastExec, /tok-sessao-abc/);
+    assert.match(lastExec, /cat \| nohup node/);
+  } finally { stop(); }
+});
+
+test('browserFor: HMAC recusada reimplanta em vez de esperar', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ripper-br-'));
+  const scripts = join(dir, '.ripper');
+  let execs = 0;
+  let rejects = 1;
+  const stop = fakeDaemon(scripts, () => {
+    if (rejects > 0) {
+      rejects -= 1;
+      return { ok: false, error: MAC_REJECT };
+    }
+    return { title: 'T', url: 'https://t.test/', nodes: [{ ref: 'e1', role: 'button', name: 'Ok' }] };
+  });
+  const raw = {
+    async exec() {
+      execs += 1;
+      writeFileSync(join(scripts, 'alive'), JSON.stringify({ t: Date.now(), chromium: true }));
+      return 'RIPPER_BROWSER_READY\nRIPPER_BROWSER_DAEMON';
+    }
+  };
+  try {
+    const b = browserFor(raw, pathToFileURL(dir + '/'), { timeoutMs: 3000, pollMs: 10 });
+    const out = await b.open('https://t.test/');
+    assert.match(out, /Página: T/);
+    assert.equal(execs, 2);
+  } finally { stop(); }
+});
+
+test('browserFor: expect fica o da aprovação, não o do snapshot do clique', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ripper-br-'));
+  const scripts = join(dir, '.ripper');
+  const cmds = [];
+  const stop = fakeDaemon(scripts, cmd => {
+    cmds.push(cmd);
+    if (cmd.action === 'go') {
+      return {
+        title: 'A', url: 'https://loja.test/passo',
+        nodes: [{ ref: 'e7', role: 'button', name: 'Próxima página', tag: 'button', nth: 0 }]
+      };
+    }
+    if (cmd.action === 'read') {
+      return {
+        title: 'B', url: 'https://loja.test/fim',
+        nodes: [{ ref: 'e7', role: 'button', name: 'Finalizar compra', tag: 'button', nth: 0 }]
+      };
+    }
+    return { title: 'C', url: 'https://loja.test/fim', nodes: [] };
+  });
+  try {
+    const b = browserFor(rawReady(scripts), pathToFileURL(dir + '/'), { timeoutMs: 3000, pollMs: 10 });
+    await b.open('https://loja.test/passo');
+    assert.equal(b.risk('click', { target: 'e7' }), null);
+    await b.read();
+    assert.equal(b.labelOf('e7'), 'Finalizar compra');
+    await b.click('e7');
+    const click = cmds.find(c => c.action === 'click');
+    assert.deepEqual(click.expect, { role: 'button', name: 'Próxima página', tag: 'button', nth: 0 });
+  } finally { stop(); }
+});
+
+test('browserFor: nth=1 recusa se só sobrou um elemento igual', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ripper-br-'));
+  const scripts = join(dir, '.ripper');
+  const stop = fakeDaemon(scripts, cmd => {
+    if (cmd.action === 'go') {
+      return {
+        title: 'Form', url: 'https://f.test/',
+        nodes: [
+          { ref: 'e1', role: 'button', name: 'Enviar', tag: 'button', nth: 0 },
+          { ref: 'e2', role: 'button', name: 'Enviar', tag: 'button', nth: 1 }
+        ]
+      };
+    }
+    if (cmd.action === 'click') {
+      const live = [{ ref: 'e1', role: 'button', name: 'Enviar', tag: 'button', nth: 0 }];
+      const hits = live.filter(n => n.role === cmd.expect?.role && n.name === cmd.expect?.name);
+      const hit = pickFingerprintHit(hits, cmd.expect);
+      if (!hit) return { ok: false, error: bindMismatchError(cmd.expect), title: 'Form', url: 'https://f.test/', nodes: live };
+      return { title: 'Form', url: 'https://f.test/', nodes: live };
+    }
+    return { title: 'Form', url: 'https://f.test/', nodes: [] };
+  });
+  try {
+    const b = browserFor(rawReady(scripts), pathToFileURL(dir + '/'), { timeoutMs: 3000, pollMs: 10 });
+    await b.open('https://f.test/');
+    assert.ok(b.risk('click', { target: 'e2' }));
+    const out = await b.click('e2');
+    assert.match(out, /A página mudou/);
+  } finally { stop(); }
+});
+
+test('browserFor: busca aproximada por texto leva o fingerprint do snapshot', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ripper-br-'));
+  const scripts = join(dir, '.ripper');
+  const cmds = [];
+  const stop = fakeDaemon(scripts, cmd => {
+    cmds.push(cmd);
+    if (cmd.action === 'go') {
+      return {
+        title: 'L', url: 'https://l.test/',
+        nodes: [{ ref: 'e1', role: 'button', name: 'Entrar agora', tag: 'button', nth: 0, href: '' }]
+      };
+    }
+    return { title: 'L', url: 'https://l.test/', nodes: [] };
+  });
+  try {
+    const b = browserFor(rawReady(scripts), pathToFileURL(dir + '/'), { timeoutMs: 3000, pollMs: 10 });
+    await b.open('https://l.test/');
+    b.risk('click', { target: 'Entrar' });
+    await b.click('Entrar');
+    assert.equal(cmds[1].action, 'click');
+    assert.equal(cmds[1].expect.name, 'Entrar agora');
+    assert.equal(cmds[1].expect.role, 'button');
   } finally { stop(); }
 });
