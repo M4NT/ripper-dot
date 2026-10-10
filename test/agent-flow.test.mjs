@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canUseFile, selectSpeakers, routineDue, mayFallback, mentionOrder, Floor, isPass, heuristicSpeaker, trimHistory, turnPlanIds, delegationCardState, ownerBlockedReason, oneLineTask, ambiguousMentions, isAck } from '../lib/agent-flow.mjs';
+import { canUseFile, selectSpeakers, routineDue, mayFallback, mentionOrder, Floor, isPass, heuristicSpeaker, trimHistory, turnPlanIds, delegationCardState, ownerBlockedReason, oneLineTask, ambiguousMentions, isAck, summarizeTools, toProviderMessages, continueHistoryAfterConnectors, estimateHistoryTokens, estimateTextTokens, skipStreamedPrefix, SIDE_EFFECT_TOOLS, labelMessageForAgent, toolCallKey, messageForProvider } from '../lib/agent-flow.mjs';
 
 test('@menção tolerante a nome; ambígua não chama ninguém', () => {
   const eng = { id: 'e', name: 'Engenheiro de Software (Ripper)' };
@@ -120,11 +120,112 @@ test('heurística escolhe pela função quando não há Julia', () => {
   assert.equal(heuristicSpeaker('Qual público a campanha deve priorizar?', team).id, 'e');
 });
 
-test('histórico é cortado para economizar tokens', () => {
-  const msgs = Array.from({ length: 30 }, (_, i) => ({ role: 'user', content: 'x'.repeat(i === 29 ? 5000 : 10) }));
-  const h = trimHistory(msgs);
-  assert.equal(h.length, 12);
-  assert.ok(h.at(-1).content.length < 1600);
+test('histórico cabe por tokens, mantém mensagens reais e resume ferramentas', () => {
+  const small = Array.from({ length: 30 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', content: `msg ${i}` }));
+  const kept = trimHistory(small);
+  assert.ok(kept.length > 12, 'mensagens curtas não caem no teto antigo de 12');
+  assert.equal(kept.length, 30);
+  assert.equal(kept[0].role, 'user');
+  assert.equal(kept.at(-1).role, 'assistant');
+  assert.equal(kept.at(-1).content, 'msg 29');
+
+  const withTools = trimHistory([{
+    role: 'assistant',
+    content: 'pronto',
+    steps: [{ tool: 'remember', detail: 'gosta de café' }, { tool: 'computer_exec', detail: 'python app.py' }]
+  }]);
+  assert.match(withTools[0].content, /pronto/);
+  assert.match(withTools[0].content, /\[Ferramentas: remember: gosta de café · computer_exec: python app.py\]/);
+
+  const budget = trimHistory(
+    Array.from({ length: 40 }, (_, i) => ({ role: 'user', content: `bloco-${i} ${'y'.repeat(80)}` })),
+    { maxTokens: 256, keepRecent: 3, reserveSystemTokens: 0 }
+  );
+  assert.ok(budget.length >= 1);
+  assert.ok(budget.length < 40);
+  assert.match(budget.at(-1).content, /bloco-39/);
+  assert.ok(estimateHistoryTokens(budget) <= 256);
+
+  const many = Array.from({ length: 30 }, (_, i) => ({ role: 'user', content: `linha ${i} ${'w'.repeat(60)}` }));
+  const noSys = trimHistory(many, { maxTokens: 500, keepRecent: 2, system: '' });
+  const withSys = trimHistory(many, { maxTokens: 500, keepRecent: 2, system: 'Você é o agente. Instruções: ' + 'á'.repeat(400) });
+  assert.ok(withSys.length <= noSys.length);
+
+  const huge = trimHistory([{ role: 'user', content: 'z'.repeat(20_000) }]);
+  assert.ok(huge[0].content.length > 1600);
+  assert.match(huge[0].content, /\[…\]/);
+});
+
+test('toProviderMessages e continueHistoryAfterConnectors não achatam o turno', () => {
+  assert.equal(summarizeTools([{ tool: 'remember', detail: 'x' }]), 'remember: x');
+  const msgs = toProviderMessages([
+    { role: 'user', content: 'oi' },
+    { role: 'assistant', content: 'feito', steps: [{ tool: 'remember', detail: 'café' }] }
+  ]);
+  assert.deepEqual(msgs.map(m => m.role), ['user', 'assistant']);
+  assert.match(msgs[1].content, /\[Ferramentas: remember: café\]/);
+
+  const cont = continueHistoryAfterConnectors(
+    [{ role: 'user', content: 'oi' }],
+    'vê a agenda',
+    { text: 'vou ver', tools: [{ tool: 'use_connectors' }] }
+  );
+  assert.equal(cont.history[1].role, 'user');
+  assert.equal(cont.history[1].content, 'vê a agenda');
+  assert.equal(cont.history[2].role, 'assistant');
+  assert.match(cont.history[2].content, /vou ver/);
+  assert.match(cont.history[2].content, /use_connectors/);
+  assert.match(cont.prompt, /Continue de onde parou/);
+});
+
+test('estimativa de tokens pesa português, código e o prompt de sistema', () => {
+  const naive = s => Math.ceil(s.length / 4);
+  const pt = 'Olá, você está aí? Preciso da reunião amanhã na ação do café.';
+  const code = 'function foo() { return x + y; }\n```js\nconst a = 1;\n```';
+  assert.ok(estimateTextTokens(pt) > naive(pt));
+  assert.ok(estimateTextTokens(code) > naive(code));
+  const msgs = [{ role: 'user', content: 'oi' }];
+  assert.ok(estimateHistoryTokens(msgs, { system: 'Você é o agente com instruções longas áéí' }) > estimateHistoryTokens(msgs));
+});
+
+test('skipStreamedPrefix e ferramentas com efeito na continuação', () => {
+  assert.deepEqual(skipStreamedPrefix('Hel', ''), { text: 'Hel', rest: '' });
+  assert.deepEqual(skipStreamedPrefix('Hel', 'Hello'), { text: '', rest: 'lo' });
+  assert.deepEqual(skipStreamedPrefix('Hello!', 'Hello'), { text: '!', rest: '' });
+  assert.ok(SIDE_EFFECT_TOOLS.has('remember'));
+  assert.ok(SIDE_EFFECT_TOOLS.has('computer_exec'));
+  const first = { tool: 'remember', input: { text: 'café' } };
+  const cont = continueHistoryAfterConnectors([], 'agenda', { text: 'ok', tools: [first, { tool: 'use_connectors' }] });
+  assert.deepEqual(cont.doneTools, [toolCallKey('remember', { text: 'café' })]);
+  assert.ok(!cont.doneTools.includes(toolCallKey('remember', { text: 'chá' })));
+  assert.equal(cont.streamedText, 'ok');
+  assert.match(cont.prompt, /pode usar de novo/i);
+});
+
+test('trimHistory preserva model; em grupo só o agente que responde mantém o dele', () => {
+  const history = [
+    { role: 'user', content: 'escreve o script' },
+    { role: 'assistant', agentId: 'dev', content: 'fiz o arquivo', model: 'codex' },
+    { role: 'assistant', agentId: 'ana', content: 'fico no texto', model: 'claude-sonnet-5-5' },
+    { role: 'user', content: 'sim' }
+  ];
+  const kept = trimHistory(history);
+  assert.equal(kept[1].model, 'codex');
+  assert.equal(kept[1].agentId, 'dev');
+  assert.equal(kept[2].model, 'claude-sonnet-5-5');
+  assert.equal(kept[2].agentId, 'ana');
+  assert.equal(messageForProvider(history[1]).model, 'codex');
+
+  const name = id => ({ dev: 'Dev', ana: 'Ana' }[id] || id);
+  const forDev = kept.map(m => labelMessageForAgent(m, 'dev', name, { group: true }));
+  assert.equal(forDev[1].role, 'assistant');
+  assert.equal(forDev[1].model, 'codex');
+  assert.equal(forDev[2].role, 'user');
+  assert.equal(forDev[2].model, undefined);
+  assert.match(forDev[2].content, /Ana disse/);
+
+  const lastModel = [...forDev].reverse().find(m => m.model)?.model;
+  assert.equal(lastModel, 'codex');
 });
 
 test('anexo de outro agente não atravessa projeto', () => {
