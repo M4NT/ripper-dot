@@ -13,9 +13,11 @@ import {
   claudePromptMessages,
   claudePromptInput,
   buildCodexPrompt,
-  codexSandboxMode
+  codexSandboxMode,
+  codexAskForApproval,
+  codexChildEnv
 } from '../lib/providers.mjs';
-import { continueHistoryAfterConnectors } from '../lib/agent-flow.mjs';
+import { continueHistoryAfterConnectors, skipStreamedPrefix } from '../lib/agent-flow.mjs';
 import { createRipperMcpBridge } from '../lib/ripper-mcp-bridge.mjs';
 import { ripperClaudeToolAllowlist } from '../lib/ripper-builtin-tools.mjs';
 
@@ -81,15 +83,46 @@ test('buildCodexSpawnArgs: sandbox read-only sem computador isolado, MCP stdio/h
   assert.ok(args.includes('/tmp/x.png'));
 });
 
-test('Codex escreve no workspace quando o computador isola o agente', () => {
-  assert.equal(codexSandboxMode(baseAgent, { computer: { mode: 'docker' } }), 'workspace-write');
-  assert.equal(codexSandboxMode(baseAgent, { computer: { mode: 'boat' } }), 'workspace-write');
-  assert.equal(codexSandboxMode(baseAgent, { computer: { mode: 'local', allowLocalCommands: true } }), 'workspace-write');
-  assert.equal(codexSandboxMode(baseAgent, { computer: { mode: 'local', allowLocalCommands: false } }), 'read-only');
-  assert.equal(codexSandboxMode({ ...baseAgent, tools: ['web'] }, { computer: { mode: 'docker' } }), 'read-only');
-  assert.equal(codexSandboxMode({ ...baseAgent, autonomyLevel: 'read_only' }, { computer: { mode: 'docker' } }), 'read-only');
-  const dockerArgs = buildCodexSpawnArgs({ agent: baseAgent, settings: { ...settings, computer: { mode: 'docker' } } });
-  assert.deepEqual(dockerArgs.slice(0, 5), ['exec', '--json', '--skip-git-repo-check', '--sandbox', 'workspace-write']);
+test('Codex no host fica read-only; escrita só com opção explícita e sem pedir aprovação', () => {
+  assert.equal(codexSandboxMode(baseAgent, { computer: { mode: 'docker' } }), 'read-only');
+  assert.equal(codexSandboxMode(baseAgent, { computer: { mode: 'boat' } }), 'read-only');
+  assert.equal(codexSandboxMode(baseAgent, { computer: { mode: 'local', allowLocalCommands: true }, approvalPolicy: 'risky' }), 'read-only');
+  assert.equal(codexSandboxMode(baseAgent, { computer: { mode: 'local', allowLocalCommands: true }, approvalPolicy: 'never' }), 'workspace-write');
+  assert.equal(codexSandboxMode(baseAgent, { computer: { mode: 'local', allowLocalCommands: false }, approvalPolicy: 'never' }), 'read-only');
+  assert.equal(codexSandboxMode({ ...baseAgent, autonomyLevel: 'read_only' }, { computer: { mode: 'local', allowLocalCommands: true }, approvalPolicy: 'never' }), 'read-only');
+  assert.equal(codexAskForApproval(baseAgent, { approvalPolicy: 'risky' }), 'on-request');
+  assert.equal(codexAskForApproval(baseAgent, { approvalPolicy: 'never' }), 'never');
+  assert.equal(codexAskForApproval({ ...baseAgent, autonomyLevel: 'read_only' }, { approvalPolicy: 'never' }), 'untrusted');
+  const dockerArgs = buildCodexSpawnArgs({ agent: baseAgent, settings: { ...settings, computer: { mode: 'docker' } } }).join(' ');
+  assert.match(dockerArgs, /--sandbox read-only/);
+  assert.match(dockerArgs, /sandbox_workspace_write\.network_access=false/);
+  assert.match(dockerArgs, /--ask-for-approval on-request/);
+  const writeArgs = buildCodexSpawnArgs({
+    agent: baseAgent,
+    settings: { ...settings, computer: { mode: 'local', allowLocalCommands: true }, approvalPolicy: 'never' }
+  });
+  assert.deepEqual(writeArgs.slice(0, 5), ['exec', '--json', '--skip-git-repo-check', '--sandbox', 'workspace-write']);
+});
+
+test('Codex recebe só um env mínimo, sem chaves do servidor', () => {
+  const env = codexChildEnv({
+    PATH: '/bin',
+    HOME: '/home/ripper',
+    ANTHROPIC_API_KEY: 'sk-secret',
+    GITHUB_TOKEN: 'ghp_x',
+    RIPPER_TOKEN: 'tok',
+    OPENAI_API_KEY: 'sk-openai',
+    AWS_SECRET_ACCESS_KEY: 'aws',
+    CODEX_HOME: '/home/ripper/.codex'
+  });
+  assert.equal(env.PATH, '/bin');
+  assert.equal(env.HOME, '/home/ripper');
+  assert.equal(env.CODEX_HOME, '/home/ripper/.codex');
+  assert.equal(env.ANTHROPIC_API_KEY, undefined);
+  assert.equal(env.GITHUB_TOKEN, undefined);
+  assert.equal(env.RIPPER_TOKEN, undefined);
+  assert.equal(env.OPENAI_API_KEY, undefined);
+  assert.equal(env.AWS_SECRET_ACCESS_KEY, undefined);
 });
 
 test('buildClaudeQueryOptions registra MCP ripper e conectores só com plugins', () => {
@@ -125,7 +158,7 @@ test('parseCodexJsonEvent: mensagem, shell e mcp ripper', () => {
   );
 });
 
-test('Codex transmite texto aos poucos a partir de snapshot e delta', () => {
+test('Codex transmite só deltas da mensagem do agente', () => {
   const state = { last: '' };
   const a = applyCodexTextEvent(parseCodexJsonEvent({ type: 'item.updated', item: { type: 'agent_message', text: 'Hel' } }), state);
   const b = applyCodexTextEvent(parseCodexJsonEvent({ type: 'item.updated', item: { type: 'agent_message', text: 'Hello' } }), state);
@@ -134,6 +167,9 @@ test('Codex transmite texto aos poucos a partir de snapshot e delta', () => {
   assert.deepEqual(b, { text: 'lo' });
   assert.equal(c, null);
   assert.deepEqual(applyCodexTextEvent(parseCodexJsonEvent({ msg: { type: 'agent_message_delta', delta: '!' } }), { last: 'Hello' }), { text: '!' });
+  assert.equal(parseCodexJsonEvent({ type: 'item.updated', item: { type: 'reasoning', text: 'pensando' } }), null);
+  assert.equal(parseCodexJsonEvent({ type: 'item/commandExecution/outputDelta', delta: 'ls out' }), null);
+  assert.equal(parseCodexJsonEvent({ msg: { type: 'agent_reasoning_delta', delta: 'hmm' } }), null);
 });
 
 test('histórico vai ao Claude e ao Codex como mensagens reais', () => {
@@ -142,14 +178,16 @@ test('histórico vai ao Claude e ao Codex como mensagens reais', () => {
     { role: 'assistant', content: 'anotei', steps: [{ tool: 'remember', detail: 'café' }] }
   ];
   const msgs = claudePromptMessages(history, 'e o chá?');
-  assert.equal(msgs.length, 3);
-  assert.equal(msgs[0].shouldQuery, false);
+  assert.equal(msgs.length, 1);
+  assert.equal(msgs[0].shouldQuery, undefined);
+  assert.equal(msgs[0].client_composed, undefined);
+  assert.equal(msgs[0].type, 'user');
   assert.equal(msgs[0].message.role, 'user');
-  assert.equal(msgs[0].message.content, 'lembra o café');
-  assert.equal(msgs[1].message.role, 'assistant');
-  assert.match(msgs[1].message.content, /anotei/);
-  assert.match(msgs[1].message.content, /remember: café/);
-  assert.equal(msgs[2].message.content, 'e o chá?');
+  assert.ok(Array.isArray(msgs[0].message.content));
+  assert.match(msgs[0].message.content[0].text, /^user:\nlembra o café/);
+  assert.match(msgs[0].message.content[1].text, /^assistant:\nanotei/);
+  assert.match(msgs[0].message.content[1].text, /remember: café/);
+  assert.equal(msgs[0].message.content[2].text, 'e o chá?');
   assert.doesNotMatch(JSON.stringify(msgs), /Usuário: lembra/);
   assert.equal(claudePromptInput([], 'oi'), 'oi');
 
@@ -160,16 +198,19 @@ test('histórico vai ao Claude e ao Codex como mensagens reais', () => {
   assert.doesNotMatch(prompt, /Usuário: lembra o café/);
 });
 
-test('use_connectors continua o turno com o que já foi feito', () => {
+test('use_connectors continua o turno sem duplicar texto nem ferramenta com efeito', () => {
   const cont = continueHistoryAfterConnectors(
     [{ role: 'user', content: 'oi' }],
     'vê a agenda',
-    { text: 'vou abrir', tools: [{ tool: 'use_connectors' }] }
+    { text: 'vou abrir', tools: [{ tool: 'remember', detail: 'x' }, { tool: 'use_connectors' }] }
   );
   assert.equal(cont.history.length, 3);
   assert.equal(cont.history[1].content, 'vê a agenda');
   assert.match(cont.history[2].content, /vou abrir/);
-  assert.match(cont.prompt, /Continue de onde parou/);
+  assert.match(cont.prompt, /não chame de novo/i);
+  assert.deepEqual(cont.doneTools, ['remember']);
+  assert.equal(cont.streamedText, 'vou abrir');
+  assert.deepEqual(skipStreamedPrefix('vou abrir a agenda', cont.streamedText), { text: ' a agenda', rest: '' });
 });
 
 test('createRipperMcpBridge executa remember sem Codex', async () => {
