@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ThinkingOrb } from 'thinking-orbs';
+import { ThinkingOrb } from './fx/ThinkingOrb.jsx';
 import { stallLabel, stepLabel, TOOL_INFO } from './lib.js';
 import { Icon } from './ui.jsx';
 import CampaignCard from './campaignCard.jsx';

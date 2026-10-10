@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MetalBadge } from 'metal-fx';
+import { MetalBadge } from '../fx/metal.jsx';
 import { useApp } from '../app.jsx';
 import { api, useDark, useRoute } from '../lib.js';
 import { Icon, Switch, Select, useConfirm } from '../ui.jsx';

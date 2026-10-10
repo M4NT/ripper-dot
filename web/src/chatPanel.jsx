@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ThinkingOrb } from 'thinking-orbs';
+import { ThinkingOrb } from './fx/ThinkingOrb.jsx';
 import { api, fmtAgo, TOOL_INFO } from './lib.js';
 import { AgentAvatar, Icon, Menu, Segmented, StatusDot } from './ui.jsx';
 import { useApp } from './app.jsx';

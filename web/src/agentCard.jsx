@@ -1,4 +1,4 @@
-import { BorderBeam } from 'border-beam';
+import { BorderBeam } from './fx/BorderBeam.jsx';
 import { go, useDark, stepLabel } from './lib.js';
 import { AgentAvatar, Icon, Menu, MenuItem, StatusDot, useConfirm } from './ui.jsx';
 import { AutonomySemaphore } from './autonomy.jsx';

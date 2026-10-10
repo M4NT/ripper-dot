@@ -209,6 +209,10 @@ code { font: .88em var(--mono); }
 .toolbar.wrap { flex-wrap: wrap; }
 .page-loading, .boot { display: grid; place-items: center; min-height: 40vh; }
 .boot { min-height: 100dvh; align-content: center; gap: 12px; text-align: center; padding: 24px; }
+.fx-orb-fallback { display: inline-block; border-radius: 50%; background: color-mix(in srgb, var(--ink) 18%, transparent); animation: fx-orb-pulse 1.2s ease-in-out infinite; }
+@keyframes fx-orb-pulse { 50% { opacity: .4; transform: scale(.92); } }
+@media (prefers-reduced-motion: reduce) { .fx-orb-fallback { animation: none; } }
+.fx-avatar-fallback { display: inline-block; border-radius: 50%; background: var(--ink-2); }
 .login { place-items: stretch; width: min(360px, 100%); margin: 0 auto; text-align: left; }
 .login h1 { display: flex; align-items: center; justify-content: center; gap: 10px; font: 600 28px/1 var(--font); letter-spacing: -.02em; margin-bottom: 4px; }
 .login > p.muted { text-align: center; margin-bottom: 12px; }

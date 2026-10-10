@@ -1,15 +1,13 @@
 import { createContext, lazy as reactLazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { ThinkingOrb } from 'thinking-orbs';
+import { ThinkingOrb } from './fx/ThinkingOrb.jsx';
 import { api, go, useRoute, useTheme, useMediaQuery, fmtAgo, local, brandLogoSrc, brandTitle, stepLabel } from './lib.js';
 import { Icon, AgentAvatar, ToastProvider, useToast, Dialog, Menu, MenuItem } from './ui.jsx';
-import Home from './pages/Home.jsx';
 import { OverlayProvider } from './overlay.jsx';
 import ChatAvatar, { isGroupChat } from './chatAvatar.jsx';
 import { useChatMenu } from './actions.jsx';
 import { ApprovalTray } from './approvals.jsx';
 import { FirstRunWizard } from './firstRunWizard.jsx';
 import { ResizeHandle } from './resize.jsx';
-import Chat from './pages/Chat.jsx';
 import { useSidebarDrag, useFlip } from './agentDrag.jsx';
 import UiModeToggle from './uiModeToggle.jsx';
 import { getUiMode, isEnterpriseMode, isRouteAllowed, brandForChrome } from './uiMode.js';
@@ -23,6 +21,8 @@ const lazy = load => reactLazy(() => load().catch(err => {
   if (Date.now() - last > 30_000) { sessionStorage.setItem('ripper.reloaded', Date.now()); location.reload(); return new Promise(() => {}); }
   throw err;
 }));
+const Home = lazy(() => import('./pages/Home.jsx'));
+const Chat = lazy(() => import('./pages/Chat.jsx'));
 const Agents = lazy(() => import('./pages/Agents.jsx'));
 const Inbox = lazy(() => import('./pages/Inbox.jsx'));
 const ExternalLog = lazy(() => import('./pages/ExternalLog.jsx'));

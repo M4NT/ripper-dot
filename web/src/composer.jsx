@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { VoiceBeam, useMicrophone } from 'voice-glow';
+import { VoiceBeam, useMicrophone } from './fx/voiceGlow.jsx';
 import { api, fmtSize, go, local, useDark, canSpeak } from './lib.js';
 import { AgentAvatar, Icon, useToast } from './ui.jsx';
 import { useApp } from './app.jsx';
