@@ -51,6 +51,38 @@ test('cancelCascade: para stream, cancela inbox e tarefas, aborta entregas', () 
   _resetDeliveryAbortForTests();
 });
 
+test('cancelCascade cancela aprovações pendentes da árvore', () => {
+  const db = {
+    chats: [
+      { id: 'p', agentId: 'a' },
+      { id: 'child', agentId: 'a', parentChatId: 'p' }
+    ],
+    messages: [],
+    teamTasks: [],
+    approvals: [
+      { id: 'ap1', chatId: 'p', status: 'pending', kind: 'exec', command: 'ls' },
+      { id: 'ap2', chatId: 'p', sourceChatId: 'child', status: 'pending', kind: 'exec', command: 'rm' },
+      { id: 'ap3', chatId: 'outro', status: 'pending', kind: 'exec', command: 'pwd' },
+      { id: 'ap4', chatId: 'p', status: 'approved', kind: 'exec', command: 'ok' }
+    ]
+  };
+  const decided = [];
+  const out = cancelCascade({
+    chatId: 'p',
+    db,
+    now: 80,
+    reason: 'Tempo da árvore de delegação esgotado.',
+    decideApproval: aid => { decided.push(aid); return aid === 'ap1'; }
+  });
+  assert.ok(out.approvals.includes('ap1'));
+  assert.ok(out.approvals.includes('ap2'));
+  assert.ok(!out.approvals.includes('ap3'));
+  assert.ok(!out.approvals.includes('ap4'));
+  assert.deepEqual(decided, ['ap1', 'ap2']);
+  assert.equal(db.approvals.find(a => a.id === 'ap2').status, 'cancelled');
+  assert.equal(db.approvals.find(a => a.id === 'ap3').status, 'pending');
+});
+
 test('cancelCascade sem nada aberto não toca', () => {
   const db = { chats: [{ id: 'z' }], messages: [], teamTasks: [] };
   const out = cancelCascade({ chatId: 'z', db, cancelChatStream: () => false });

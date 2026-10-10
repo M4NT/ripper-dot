@@ -41,7 +41,9 @@ const STOP_REASON = {
   user: 'Você interrompeu a resposta.',
   connection: 'A conexão caiu antes do fim (aba fechada ou rede).',
   tool_loop: 'Parada automática: o agente repetiu a mesma ferramenta em loop.',
-  budget: 'Parada pelo orçamento de tokens.'
+  budget: 'Parada pelo orçamento de tokens.',
+  tree: 'A delegação desta conversa esgotou o tempo ou o orçamento.',
+  cascade: 'A delegação foi interrompida.'
 };
 const ORB = { route: 'connecting', WebSearch: 'searching', WebFetch: 'searching', computer_exec: 'working', computer_share: 'working', remember: 'weaving', schedule_routine: 'shaping', think: 'solving', text: 'composing' };
 
@@ -262,11 +264,11 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, on
           {m.content ? (live ? <LiveText text={m.content} /> : <Recolhivel><Markdown text={m.content} skipGenui /></Recolhivel>)
             : live ? <div className="typing" role="status" aria-live="polite"><span className="typing-dots" aria-hidden="true"><i /><i /><i /></span><span>{typingLabel(phase)}</span></div>
             : m.error ? <ErrorNote raw={m.error} onRetry={onRetry} contexto={contextoDoErro(m)} />
-            : m.stopped ? <p className="muted">{STOP_REASON[m.stopReason] || 'Resposta interrompida.'}</p> : null}
+            : m.stopped ? <p className="muted">{m.stopMessage || STOP_REASON[m.stopReason] || 'Resposta interrompida.'}</p> : null}
           {!live && <Fontes steps={m.steps} />}
           {(m.stopped || m.truncated) && !live && onContinue && (
             <div className="continuar-resposta">
-              <p>{m.truncated ? 'A resposta parou no limite de tamanho.' : 'Você interrompeu a resposta.'}</p>
+              <p>{m.truncated ? 'A resposta parou no limite de tamanho.' : (m.stopMessage || STOP_REASON[m.stopReason] || 'Você interrompeu a resposta.')}</p>
               <button type="button" className="btn btn-sm" onClick={onContinue}>Continuar de onde parou</button>
             </div>
           )}

@@ -34,6 +34,10 @@ test('pedido aguarda decisão, expira e é cancelado com a conversa', async () =
   ac.abort();
   assert.equal((await c).status, 'cancelled');
   assert.equal(gate.decide('zzz', true), false);
+  const d = gate.request({ id: 'd' });
+  assert.equal(gate.cancel('d'), true);
+  assert.equal((await d).status, 'cancelled');
+  assert.equal(gate.cancel('missing'), false);
 });
 
 import { browserRisk } from '../lib/browser.mjs';

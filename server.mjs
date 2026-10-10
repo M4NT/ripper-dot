@@ -513,7 +513,8 @@ async function streamChatResponse(req, c, { text, fileIds, mcpSession, resume = 
   };
   try {
     await chat({
-      chat: c, text, fileIds, signal: streamSignal, mcpSession, skipUserPush: resume, credentialRefs, voice
+      chat: c, text, fileIds, signal: streamSignal, mcpSession, skipUserPush: resume, credentialRefs, voice,
+      fromChatScreen: !resume
     }, chatEmit);
     completed = !streamSignal.aborted;
   } finally {
@@ -1041,7 +1042,8 @@ function teamDispatchCtx(originChatId, hops = 0) {
     }),
     busyToIds: inboxBusy,
     settings: db.settings,
-    cancelChatStream
+    cancelChatStream,
+    decideApproval: aid => gate.cancel(aid)
   };
 }
 
@@ -1058,7 +1060,8 @@ function spawnIsolatedSubagent({ task, worker, prompt, parentChat, hops = 0, own
     settings: db.settings,
     isolated: true,
     exceptTaskId: task?.id,
-    cancelChatStream
+    cancelChatStream,
+    decideApproval: aid => gate.cancel(aid)
   });
   if (gate.error) return gate;
 
@@ -1731,7 +1734,8 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
         const limits = { maxPerHour: 20, maxHops: 3, ...(s.inbox || {}) };
         const gate = assertTeamDispatch({
           db, from: agent, to, parentChat: chat, hops, limits, busyToIds: inboxBusy,
-          accessControl: db.accessControl, settings: s, isolated: false, cancelChatStream
+          accessControl: db.accessControl, settings: s, isolated: false, cancelChatStream,
+          decideApproval: aid => gate.cancel(aid)
         });
         if (gate.error) return gate.error;
         const m = { id: id(), from: agent.id, to: to.id, body: String(a.message).slice(0, 4000), priority: a.priority || 'normal', status: 'queued', hops: hops + 1, originChatId: chat.id, createdAt: Date.now() };
@@ -1754,7 +1758,8 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
         const limits = { maxPerHour: 20, maxHops: 3, ...(s.inbox || {}) };
         const gate = assertTeamDispatch({
           db, from: agent, to, parentChat: chat, hops, limits, busyToIds: inboxBusy,
-          accessControl: db.accessControl, settings: s, isolated: false, cancelChatStream
+          accessControl: db.accessControl, settings: s, isolated: false, cancelChatStream,
+          decideApproval: aid => gate.cancel(aid)
         });
         if (gate.error) return formatCallAgentResult({ ok: false, error: gate.error });
         const timeoutMs = Math.min(clampCallTimeoutMs(a.timeout_seconds, s.inbox || {}), gate.timeoutMs || Infinity);
@@ -2192,7 +2197,8 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
         spawnIsolated: ({ task, worker, prompt, owner }) => spawnIsolatedSubagent({
           task, worker, prompt, parentChat: chat, hops, owner: owner || agent
         }),
-        cancelChatStream
+        cancelChatStream,
+        decideApproval: aid => gate.cancel(aid)
       })
     };
   }
@@ -2361,11 +2367,18 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
       });
       const rid = teamTreeRootForChat(db, chat);
       if (rid && (chat.isolated || chat.parentChatId || chat.originChatId)) {
-        applyTeamTreeUsage(db, rid, {
+        const used = applyTeamTreeUsage(db, rid, {
           charsIn: (text?.length || 0) + (prompt?.length || 0),
           charsOut: out.length,
           usd: turnCost
-        }, { settings: db.settings, cancelChatStream });
+        }, { settings: db.settings, cancelChatStream, decideApproval: aid => gate.cancel(aid), id });
+        if (used?.exhausted) {
+          if (used.note) emitTeamLive(rid, { warn: used.error, stopped: true });
+          publishUserEvent('owner', {
+            type: 'approvals',
+            approvals: db.approvals.filter(a => a.status === 'pending').map(approvalView)
+          });
+        }
       }
       if (canUseSemanticCache) {
         storeSemanticCacheEntry({
@@ -2383,7 +2396,15 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
       }
     },
     onAttemptFailed: async ({ model: m, error: e, aborted, canFallback, out, steps }) => {
-      if (aborted) { push(out, steps, { model: m, stopped: true, stopReason: typeof signal?.reason === 'string' ? signal.reason : 'user' }); return; }
+      if (aborted) {
+        const stopReason = typeof signal?.reason === 'string' ? signal.reason : 'user';
+        const tree = db.teamTrees?.[teamTreeRootForChat(db, chat)];
+        const stopMessage = (stopReason === 'tree' || stopReason === 'cascade') && tree?.exhaustedReason
+          ? tree.exhaustedReason
+          : undefined;
+        push(out, steps, { model: m, stopped: true, stopReason, ...(stopMessage ? { stopMessage } : {}) });
+        return;
+      }
       const prov = MODELS[m].provider;
       const limitSig = parseProviderLimitFromError(e);
       if (limitSig) {
@@ -2410,7 +2431,7 @@ async function chat(args, emit) {
   activeTurns++;
   try { return await chatTurn(args, emit); } finally { activeTurns--; forgetUiParts(args.chat?.id); }
 }
-async function chatTurn({ chat, text, fileIds, signal, mcpSession, skipUserPush = false, credentialRefs, voice }, emit) {
+async function chatTurn({ chat, text, fileIds, signal, mcpSession, skipUserPush = false, credentialRefs, voice, fromChatScreen = false }, emit) {
   logger.info('chat.turn.start', { chatId: chat.id, resume: skipUserPush });
   const refs = (credentialRefs || []).filter(isVaultRef);
   try {
@@ -2425,7 +2446,7 @@ async function chatTurn({ chat, text, fileIds, signal, mcpSession, skipUserPush 
     if (chat.run?.status === 'running' && !chat.run.userMessageId) chat.run.userMessageId = uid;
     // Você respondeu na conversa: o "<Agente> precisa de você" desta conversa sai da Caixa.
     for (const a of db.systemAlerts || []) if (!a.done && a.key?.startsWith(`blocked:${chat.id}:`)) a.done = true;
-    beginRootUserTurn(db, chat, { settings: db.settings });
+    if (fromChatScreen) beginRootUserTurn(db, chat, { settings: db.settings });
   }
   // @Nome de quem não está na conversa (ex.: 1:1) traz o agente para esta rodada, sem virar grupo.
   const base = groupMembers(chat, db.agents);
@@ -4025,7 +4046,7 @@ const routes = [
       db, from: owner, to: worker, parentChat: origin, hops: 0,
       limits: inboxLimits(), busyToIds: inboxBusy,
       accessControl: db.accessControl, settings: db.settings, isolated,
-      cancelChatStream
+      cancelChatStream, decideApproval: aid => gate.cancel(aid)
     });
     if (gate.error) throw new HttpError(400, gate.error);
     const title = String(b.title || b.prompt || 'Subtarefa').slice(0, 200);
@@ -4258,7 +4279,7 @@ const routes = [
   ['POST', /^\/api\/chats\/([\w-]+)\/cancel$/, (req, [cid]) => {
     db.chats.find(c => c.id === cid) || (() => { throw new HttpError(404, 'Conversa não encontrada.'); })();
     const hadStream = isChatStreaming(cid);
-    const cascade = cancelCascade({ chatId: cid, db, cancelChatStream, now: Date.now() });
+    const cascade = cancelCascade({ chatId: cid, db, cancelChatStream, decideApproval: aid => gate.cancel(aid), now: Date.now() });
     if (!hadStream && !cascadeTouched(cascade)) throw new HttpError(404, 'Nenhuma resposta em andamento.');
     save();
     return { ok: true, cascade: { chats: cascade.chats.length, messages: cascade.messages.length, tasks: cascade.tasks.length } };
