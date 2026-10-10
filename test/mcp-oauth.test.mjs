@@ -576,27 +576,37 @@ test('cookie OAuth por fluxo: nome inclui o state e dois fluxos convivem', async
 });
 
 test('pinnedRequest recusa corpo acima do teto e valida todos os IPs do DNS', async () => {
+  assert.equal(OAUTH_FETCH_MAX_BODY, 256 * 1024);
   const srv = createServer((req, res) => {
+    res.writeHead(200, { 'content-type': 'application/json' });
     if (req.url === '/big') {
-      res.writeHead(200, { 'content-type': 'application/json' });
-      res.end('x'.repeat(OAUTH_FETCH_MAX_BODY + 1));
+      const write = () => {
+        if (res.destroyed || res.writableEnded) return;
+        if (!res.write('x'.repeat(32))) res.once('drain', write);
+        else setImmediate(write);
+      };
+      req.on('close', () => res.destroy());
+      write();
       return;
     }
-    res.writeHead(200, { 'content-type': 'application/json' });
     res.end('{"ok":true}');
   });
   const port = await new Promise((resolve, reject) => {
     srv.listen(0, '127.0.0.1', () => resolve(srv.address().port));
     srv.on('error', reject);
   });
-  await assert.rejects(
-    () => safeFetch(`http://127.0.0.1:${port}/big`, {}, { allowPrivate: true }),
-    /grande demais/
-  );
-  const ok = await safeFetch(`http://127.0.0.1:${port}/ok`, {}, { allowPrivate: true });
-  assert.equal(ok.status, 200);
-  assert.deepEqual(await ok.json(), { ok: true });
-  srv.close();
+  try {
+    await assert.rejects(
+      () => safeFetch(`http://127.0.0.1:${port}/big`, { maxBody: 64, timeout: 2000 }, { allowPrivate: true }),
+      /grande demais/
+    );
+    const ok = await safeFetch(`http://127.0.0.1:${port}/ok`, { timeout: 2000 }, { allowPrivate: true });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(await ok.json(), { ok: true });
+  } finally {
+    if (typeof srv.closeAllConnections === 'function') srv.closeAllConnections();
+    await new Promise(resolve => srv.close(resolve));
+  }
 
   await assert.rejects(
     () => resolvePublicAddresses('mixed.example', {
