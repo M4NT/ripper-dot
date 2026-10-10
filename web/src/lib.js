@@ -115,6 +115,11 @@ export const STEP_LABEL = {
   ask_owner: 'Perguntando a você', notify_owner: 'Avisando você', github_read: 'Lendo o GitHub', github_clone: 'Clonando o repositório', github_open_pr: 'Abrindo PR', github_comment: 'Comentando no GitHub', github_issue: 'Abrindo issue', email_list: 'Vendo e-mails', email_read: 'Lendo e-mail', email_attachment: 'Baixando anexo', email_send: 'Enviando e-mail', whatsapp_send: 'Enviando WhatsApp', whatsapp_chats: 'Vendo conversas do WhatsApp', whatsapp_read: 'Lendo conversa do WhatsApp', whatsapp_contacts: 'Buscando contato',
   list_skills: 'Listando skills', x9_context: 'Coletando dados', x9_checklist: 'Rodando checklist',
   offer_setting: 'Sugerindo uma configuração', parallel_tasks: 'Rodando tarefas em paralelo', computer_screenshot: 'Tirando foto da tela',
+  show_approval: 'Mostrando aprovação', show_question: 'Mostrando pergunta', show_connect_app: 'Mostrando conectar app',
+  show_draft_message: 'Mostrando rascunho', show_data_table: 'Mostrando tabela',
+  show_chart: 'Mostrando gráfico', show_progress: 'Mostrando progresso', show_link_preview: 'Mostrando link',
+  show_pr_card: 'Mostrando PR', show_file_card: 'Mostrando arquivo', show_media_gallery: 'Mostrando galeria',
+  show_html_preview: 'Mostrando prévia HTML', show_slides: 'Mostrando slides', show_setting: 'Mostrando configuração',
   dfe_listar_notas_recebidas: 'Listando notas recebidas', dfe_sincronizar: 'Buscando notas na Receita', nfse_listar_notas_recebidas: 'Listando notas de serviço recebidas',
   nfse_sincronizar: 'Buscando notas de serviço na prefeitura', compras_fechar_elo: 'Montando o elo de compras', mostrar_documento: 'Mostrando o cartão da nota', nfe_manifestar_ciencia: 'Registrando a ciência da nota'
 };
@@ -152,6 +157,10 @@ export function stallLabel(label, ms, slowAfterMs = 20_000) {
 /** Rótulo humano de uma ferramenta; conectores (mcp__claude_ai_Google_Calendar__list_events) viram "Google Calendar: list events". */
 export function stepLabel(tool) {
   if (STEP_LABEL[tool]) return STEP_LABEL[tool];
+  if (/^show_/.test(String(tool || ''))) {
+    const n = String(tool).slice(5).replace(/_/g, ' ');
+    return `Mostrando ${n}`;
+  }
   if (/^omie_/.test(String(tool || ''))) return rotuloOmie(tool);
   const m = /^mcp__(?:claude_ai_)?(.+?)__(.+)$/.exec(String(tool || ''));
   if (m) {

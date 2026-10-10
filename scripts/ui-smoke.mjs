@@ -56,6 +56,23 @@ try {
     await page.locator('text=comando aprovado').last().waitFor({ timeout: 15_000 });
   });
 
+  // 2b) Cartão de pergunta do catálogo: a escolha vira a próxima mensagem
+  await step('cartão genui', async () => {
+    await send('[[ripper:test:genui]]');
+    await page.getByRole('radio', { name: 'Ana Ltda' }).click({ timeout: 15_000 });
+    await page.getByRole('group', { name: 'Qual cliente devo usar?' }).getByRole('button', { name: 'Enviar' }).click({ timeout: 10_000 });
+    await page.locator('text=Escolhi: Ana Ltda').last().waitFor({ timeout: 15_000 });
+  });
+
+  await step('rascunho genui', async () => {
+    await send('[[ripper:test:genui_draft]]');
+    const group = page.getByRole('group', { name: 'Rascunho' });
+    await group.locator('textarea').waitFor({ timeout: 15_000 });
+    await group.locator('textarea').fill('Texto editado no smoke.');
+    await group.getByRole('button', { name: 'Enviar' }).click({ timeout: 10_000 });
+    await page.locator('text=Texto editado no smoke.').last().waitFor({ timeout: 15_000 });
+  });
+
   // 3) Criar agente pela tela /new
   await step('criar agente', async () => {
     await page.goto(base + '/#/new', { waitUntil: 'domcontentloaded' });

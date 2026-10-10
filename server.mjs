@@ -73,6 +73,7 @@ import { gh, githubReady, normalizeRepo, repoChanges, describeChange, prBranch, 
 import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './lib/event-triggers.mjs';
 import { isPaidModel, paidBlockReason, addSpend, spendToday, spendLimits, normalizeBilling, useSpendStore, closeSpendStore } from './lib/paid-usage.mjs';
 import { runTestProvider } from './lib/test-provider.mjs';
+import { presentGenui, findUiPart, applyUiAction, rememberUiPart, forgetUiParts, collectFenceParts, mergeUiSteps, slimUiPart, registerUiPart, fenceInAssistantMessages, allowedGenuiFileIds, lockGenuiSettingIfChannel } from './lib/genui.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
 import { memoryContext, isDuplicateMemory, canUseFile, selectSpeakers, mentionOrder, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, ambiguousMentions, isAck, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent, turnPlanIds, delegationTasks, oneLineTask, ownerBlockedReason } from './lib/agent-flow.mjs';
 import { providerAttemptOrder, runProviderAttemptLoop, needsUsageCredits } from './lib/provider-turn.mjs';
@@ -432,6 +433,7 @@ function trackLive(chatId, e) {
   if (e.approval) cur.steps.push({ kind: 'approval', rec: e.approval, status: 'pending' });
   if (e.warn) cur.steps.push({ kind: 'warn', label: e.warn });
   if (e.campaign) cur.steps.push({ kind: 'campaign', rec: e.campaign });
+  if (e.ui) cur.steps.push(slimUiPart({ ...e.ui, kind: 'ui' }));
   if (e.passed) liveByChat.set(chatId, { agentId: null, content: '', steps: [], at: Date.now() });
 }
 
@@ -478,6 +480,7 @@ async function streamChatResponse(req, c, { text, fileIds, mcpSession, resume = 
       if (last?.role === 'assistant' && (last.stopped || last.error)) status = 'done';
     }
     finishChatRun(c, status);
+    forgetUiParts(c.id);
     if (!turnMetricRecorded && status === 'interrupted') recordChatTurn('interrupted');
     save();
   }
@@ -1106,6 +1109,47 @@ async function offerSetting({ agent, chat, emit, signal }, { key, on, reason }) 
   return `Pronto: "${view.label}" ${on ? 'ligado' : 'desligado'} pelo usuário.`;
 }
 
+/** Clique no cartão show_setting: aplica de verdade, como offer_setting. Sensível só depois da Caixa. */
+function applyGenuiSetting(key, on) {
+  const view = settingCardView(db.settings, key, on);
+  if (!view) throw new HttpError(400, 'Configuração desconhecida.');
+  const before = structuredClone(db.settings);
+  const patch = settingPatch(key, on);
+  patchSettings(db.settings, patch, { mergePluginAuth });
+  recordCorporateAudit(db.settings, auditSettingsPatch(before, db.settings, patch));
+  return { view };
+}
+
+function enqueueGenuiSettingApproval(chat, part, view) {
+  const pending = db.approvals.find(a => a.genuiPartId === part.id && a.status === 'pending');
+  if (pending) return pending;
+  const rec = {
+    id: id(),
+    agentId: chat.agentId,
+    chatId: chat.id,
+    kind: 'setting',
+    command: view.label,
+    reason: view.desc,
+    setting: view,
+    genuiPartId: part.id,
+    status: 'pending',
+    createdAt: Date.now(),
+    timeoutMs: 2 * 3600_000
+  };
+  db.approvals.push(rec);
+  if (db.approvals.length > 300) db.approvals.splice(0, db.approvals.length - 300);
+  return rec;
+}
+
+function patchGenuiSettingPart(chat, partId, patch) {
+  const found = findUiPart(chat, partId);
+  if (!found) return null;
+  Object.assign(found.step, patch);
+  if (found.live) rememberUiPart(chat.id, found.step);
+  else chat.updatedAt = Date.now();
+  return found.step;
+}
+
 function guarded(computer, { agent, chat, emit, signal }) {
   const ask = async (kind, command, reason, rememberKey = command, meta = {}) => {
     const rememberable = meta.rememberable !== false && rememberKey != null && rememberKey !== '';
@@ -1309,6 +1353,18 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
     // Só o provedor de teste usa: pede aprovação de um comando como o computador faria.
     askApproval: (command, reason) => askApproval({ agent, chat, emit, signal }, 'command', command, reason),
     offerSetting: chat.channel ? null : a => offerSetting({ agent, chat, emit, signal }, a),
+    showUi: (component, props) => {
+      const shown = presentGenui({ component, props, chatId: chat.id, allowedFileIds: allowedGenuiFileIds(db.files, chat) });
+      if (shown.part) {
+        if (chat.channel && shown.part.component === 'setting') Object.assign(shown.part, lockGenuiSettingIfChannel(shown.part, chat));
+        cardSteps.push(shown.part);
+        rememberUiPart(chat.id, shown.part);
+        emit({ ui: (shown.part.component === 'html_preview' || shown.part.component === 'data_table' || shown.part.component === 'media_gallery') ? slimUiPart(shown.part) : shown.part });
+      } else if (shown.warning) emit({ warn: shown.warning });
+      if (chat.channel && component === 'setting') return 'Configurações do Ripper não se oferecem em conversas de canal. Peça no app.';
+      if (!shown.ok && shown.text) return shown.text;
+      return shown.ok ? `Mostrado: ${component}.` : (shown.warning || 'não mostrado');
+    },
     // Entrega um arquivo do computador do agente na conversa (Abrir / Baixar / Mostrar na pasta).
     deliverFile: async a => {
       const rel = vmPathToData(a.path, agent.id);
@@ -1888,11 +1944,15 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
   // Reserva fora do Claude (Codex, OpenRouter) com o Sonnet desligado: cai no primeiro Claude liberado.
   const claudeBackup = enabledModels(s).find(m => MODELS[m].provider === 'claude' && m !== pick.model);
   if (!testProvider && order.length === 1 && MODELS[pick.model]?.provider !== 'claude' && claudeBackup) order.push(claudeBackup);
-  const push = (out, steps, extra) => chat.messages.push({
-    id: id(), role: 'assistant', agentId: agent.id, content: out, at: Date.now(),
-    ...(steps.length || subtaskSteps.length || cardSteps.length ? { steps: [...subtaskSteps, ...cardSteps, ...steps] } : {}),
-    ...(sentDelegations.length ? { delegations: [...sentDelegations] } : {}), ...extra
-  });
+  const push = (out, steps, extra) => {
+    const fences = collectFenceParts(chat.id, out, chat, { allowedFileIds: allowedGenuiFileIds(db.files, chat) });
+    const merged = mergeUiSteps([...subtaskSteps, ...cardSteps, ...fences, ...steps]);
+    chat.messages.push({
+      id: id(), role: 'assistant', agentId: agent.id, content: out, at: Date.now(),
+      ...(merged.length ? { steps: merged } : {}),
+      ...(sentDelegations.length ? { delegations: [...sentDelegations] } : {}), ...extra
+    });
+  };
 
   const semanticCacheCfg = resolveSemanticCacheConfig(s);
   const cacheContext = history.join('\n').slice(-2000);
@@ -2030,7 +2090,7 @@ ${a.text}`, 'O e-mail sai da sua conta em seu nome.', false);
 let activeTurns = 0;
 async function chat(args, emit) {
   activeTurns++;
-  try { return await chatTurn(args, emit); } finally { activeTurns--; }
+  try { return await chatTurn(args, emit); } finally { activeTurns--; forgetUiParts(args.chat?.id); }
 }
 async function chatTurn({ chat, text, fileIds, signal, mcpSession, skipUserPush = false, credentialRefs, voice }, emit) {
   logger.info('chat.turn.start', { chatId: chat.id, resume: skipUserPush });
@@ -3199,6 +3259,27 @@ const routes = [
       save();
       return { ok: true };
     }
+    // show_setting sensível: sem gate.request — aplica ou recusa e atualiza o cartão.
+    const genuiSetting = db.approvals.find(a => a.id === aid && a.kind === 'setting' && a.genuiPartId);
+    if (genuiSetting) {
+      if (genuiSetting.status !== 'pending') throw new HttpError(409, 'Este pedido não está mais aguardando.');
+      const approve = !!b.approve;
+      Object.assign(genuiSetting, { status: approve ? 'approved' : 'denied', decidedAt: Date.now() });
+      if (approve) applyGenuiSetting(genuiSetting.setting.key, genuiSetting.setting.proposed);
+      const chat = db.chats.find(c => c.id === genuiSetting.chatId);
+      if (chat) {
+        patchGenuiSettingPart(chat, genuiSetting.genuiPartId, {
+          state: approve ? 'approved' : 'denied',
+          action: approve ? 'apply' : 'dismiss',
+          decidedAt: Date.now(),
+          props: { ...(findUiPart(chat, genuiSetting.genuiPartId)?.step?.props || {}), pendingApproval: false }
+        });
+      }
+      appendAudit(db, auditFromApproval(genuiSetting));
+      recordCorporateAudit(db.settings, auditFromApprovalRecord(genuiSetting));
+      save();
+      return { ok: true };
+    }
     // Pedido que já não está esperando (servidor reiniciou, expirou): fecha no histórico.
     const answer = typeof b.answer === 'string' ? b.answer.trim().slice(0, 4000) : '';
     if (!gate.decide(aid, answer ? true : !!b.approve, answer ? { answer } : { remember: !!b.remember })) {
@@ -3635,6 +3716,66 @@ const routes = [
     return testAccount(aid, CLAUDE_FAST_ENV);
   }],
   ['GET', /^\/api\/chats\/([\w-]+)\/live$/, (req, [cid]) => ({ streaming: isChatStreaming(cid), live: liveByChat.get(cid) || null })],
+  ['POST', /^\/api\/chats\/([\w-]+)\/ui-parts$/, async (req, [cid]) => {
+    const c = db.chats.find(x => x.id === cid);
+    if (!c) throw new HttpError(404, 'Conversa não encontrada.');
+    const b = await body(req);
+    if (!b.fence) throw new HttpError(400, 'Informe a cerca genui.');
+    const live = liveByChat.get(cid)?.content || '';
+    if (!fenceInAssistantMessages(c, b.fence, live)) throw new HttpError(404, 'Cerca não encontrada nesta conversa.');
+    const r = registerUiPart(c, { fence: b.fence, allowedFileIds: allowedGenuiFileIds(db.files, c) });
+    if (!r.ok) throw new HttpError(400, r.error);
+    return { ok: true, part: r.part };
+  }],
+  ['POST', /^\/api\/chats\/([\w-]+)\/ui-actions$/, async (req, [cid]) => {
+    const c = db.chats.find(x => x.id === cid);
+    if (!c) throw new HttpError(404, 'Conversa não encontrada.');
+    const b = await body(req);
+    const found = findUiPart(c, b.partId);
+    if (!found) throw new HttpError(404, 'Cartão não encontrado.');
+    if (found.step.component === 'setting' && c.channel) throw new HttpError(400, 'Configurações não se aplicam em conversas de canal.');
+    const r = applyUiAction(found.step, { action: b.action, payload: b.payload });
+    if (!r.ok) throw new HttpError(400, r.error);
+    Object.assign(found.step, r.part);
+    if (found.live) rememberUiPart(cid, found.step);
+    if (r.needsApproval && r.applySetting?.sensitive) {
+      const view = settingCardView(db.settings, r.applySetting.key, r.applySetting.on);
+      if (!view) throw new HttpError(400, 'Configuração desconhecida.');
+      const rec = enqueueGenuiSettingApproval(c, found.step, view);
+      found.step.props = {
+        ...found.step.props,
+        key: view.key,
+        label: view.label,
+        description: view.desc,
+        proposed: view.proposed,
+        sensitive: view.sensitive,
+        pendingApproval: true
+      };
+      found.step.state = 'input-available';
+      delete found.step.action;
+      save();
+      return { ok: true, text: null, part: found.step, continue: false, pendingApproval: true, approval: approvalView(rec) };
+    }
+    if (r.applySetting) {
+      const applied = applyGenuiSetting(r.applySetting.key, r.applySetting.on);
+      found.step.props = {
+        ...found.step.props,
+        key: applied.view.key,
+        label: applied.view.label,
+        description: applied.view.desc,
+        proposed: applied.view.proposed,
+        sensitive: applied.view.sensitive,
+        pendingApproval: false
+      };
+    }
+    if (found.step.component === 'setting' && r.part.state === 'denied') {
+      const pending = db.approvals.find(a => a.genuiPartId === found.step.id && a.status === 'pending');
+      if (pending) { pending.status = 'denied'; pending.decidedAt = Date.now(); }
+    }
+    if (!found.live) c.updatedAt = Date.now();
+    save();
+    return { ok: true, text: r.userText, part: found.step, continue: !!r.continue };
+  }],
   // Seletor de pasta de trabalho: só quem está nesta máquina navega pelas pastas dela.
   ['GET', /^\/api\/fs\/dirs$/, (req, _, url) => {
     if (!isLocalRequest(req)) throw new HttpError(403, 'Só dá para escolher pastas na própria máquina do Ripper.');

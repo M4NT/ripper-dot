@@ -117,6 +117,7 @@ export default function ActionLine({ steps, live, onStop }) {
   for (const raw of steps || []) {
     const s = normStep(raw);
     if (s.kind === 'approval' || s.kind === 'campaign' || s.kind === 'documento') approvals.push(s);
+    else if (s.kind === 'ui') continue; // cartão do catálogo: o Chat desenha em GenUiSteps
     else if (s.kind === 'subtask') subtasks.push(s);
     else activity.push(s);
   }

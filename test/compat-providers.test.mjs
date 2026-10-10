@@ -100,5 +100,7 @@ test('sem a habilidade Plugins, nenhum plugin é conectado', async () => {
     for await (const _ of runOpenRouter({ agent: { tools: [] }, model: 'ol:qwen3', prompt: 'oi', history: [], system: 's', ctx: {},
       settings: { ollama: { models: [{ id: 'qwen3' }] }, plugins: [{ name: 'x', type: 'stdio', command: 'nao-deveria-rodar' }] } })) {}
   } finally { globalThis.fetch = orig; }
-  assert.equal(bodies[0].tools, undefined);
+  const names = (bodies[0].tools || []).map(t => t.function.name);
+  assert.ok(names.every(n => n.startsWith('show_')), names.join(','));
+  assert.ok(!names.some(n => n.startsWith('mcp__') || n === 'x'));
 });

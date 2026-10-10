@@ -109,6 +109,6 @@ if (process.argv[1] && self === process.argv[1]) {
   const dist = join(dirname(self), '..', 'dist');
   let ok = report('JS inicial (index.html)', measureInitialJs(dist), INITIAL_JS_GZIP_BUDGET);
   ok = report('caminho app+Home', measureRoutePath(dist, ['index.html', 'src/app.jsx', 'src/pages/Home.jsx']), HOME_PATH_GZIP_BUDGET) && ok;
-  ok = report('caminho app+Chat', measureRoutePath(dist, ['index.html', 'src/app.jsx', 'src/pages/Chat.jsx'], { includeOpenUi: true }), CHAT_PATH_GZIP_BUDGET) && ok;
+  ok = report('caminho app+Chat', measureRoutePath(dist, ['index.html', 'src/app.jsx', 'src/pages/Chat.jsx']), CHAT_PATH_GZIP_BUDGET) && ok;
   if (!ok) process.exit(1);
 }
