@@ -28,9 +28,25 @@ import {
   resourceMatchesMcpUrl,
   isSafeOutboundUrl,
   isPrivateOrInternalHost,
+  isBlockedIp,
+  resolvePublicAddresses,
+  safeFetch,
   refreshPluginOAuthToken,
+  oauthBindingCookie,
+  OAUTH_COOKIE_NAME,
+  OAUTH_CALLBACK_PATH,
   OAUTH_FLOW_TTL_MS
 } from '../lib/mcp-oauth.mjs';
+
+function setCookieLines(res) {
+  return typeof res.headers.getSetCookie === 'function'
+    ? res.headers.getSetCookie()
+    : [res.headers.get('set-cookie')].filter(Boolean);
+}
+
+function oauthCookieHeader(res) {
+  return setCookieLines(res).find(c => c.startsWith(`${OAUTH_COOKIE_NAME}=`)) || '';
+}
 
 function publicDiscovery(overrides = {}) {
   return {
@@ -117,8 +133,8 @@ test('fluxo OAuth feliz com IdP falso', async () => {
   });
   const plugin = { name: 'demo', type: 'http', url: `https://127.0.0.1:${port}/mcp`, auth: { oauthClient: 'custom', clientId: 'cid', clientSecret: '' } };
   const redirectUri = `http://127.0.0.1:${port}/cb`;
-  const { flowId, authorizeUrl, state } = await startMcpOAuthFlow({ plugin, discovery, redirectUri });
-  const flow = findOAuthFlowByState(state);
+  const { flowId, authorizeUrl, state, cookieRaw } = await startMcpOAuthFlow({ plugin, discovery, redirectUri });
+  const flow = findOAuthFlowByState(state, { cookie: cookieRaw });
   assert.ok(flow);
   const r = await fetch(authorizeUrl.replace('https://', 'http://'), { redirect: 'manual' });
   assert.equal(r.status, 302);
@@ -222,7 +238,7 @@ test('callback OAuth via servidor Ripper', async () => {
     })
   });
 
-  const started = await fetch(`${base}/api/mcp/oauth/start`, {
+  const startRes = await fetch(`${base}/api/mcp/oauth/start`, {
     method: 'POST',
     headers: { ...auth, 'content-type': 'application/json' },
     body: JSON.stringify({
@@ -236,11 +252,20 @@ test('callback OAuth via servidor Ripper', async () => {
         }
       }
     })
-  }).then(r => r.json());
+  });
+  const startedCookie = oauthCookieHeader(startRes);
+  assert.match(startedCookie, /HttpOnly/);
+  assert.match(startedCookie, /SameSite=Lax/);
+  assert.match(startedCookie, new RegExp(`Path=${OAUTH_CALLBACK_PATH.replace(/\//g, '\\/')}`));
+  assert.doesNotMatch(startedCookie, /ripper_session|SameSite=Strict/);
+  const started = await startRes.json();
+  assert.equal(started.cookieRaw, undefined);
   assert.match(started.authorizeUrl, new RegExp(`127\\.0\\.0\\.1:${idpPort}`));
   assert.doesNotMatch(started.authorizeUrl, /evil\.example/);
 
-  const denied = await fetch(`${base}/api/mcp/oauth/callback?error=access_denied&error_description=${encodeURIComponent('</script><script>alert(1)</script>')}&state=${started.state}`);
+  const denied = await fetch(`${base}/api/mcp/oauth/callback?error=access_denied&error_description=${encodeURIComponent('</script><script>alert(1)</script>')}&state=${started.state}`, {
+    headers: { cookie: startedCookie.split(';')[0] }
+  });
   assert.equal(denied.status, 400);
   const deniedHtml = await denied.text();
   assert.match(denied.headers.get('content-security-policy') || '', /script-src 'self'/);
@@ -257,18 +282,25 @@ test('callback OAuth via servidor Ripper', async () => {
   assert.match(js, /postMessage/);
   assert.equal(js, oauthCallbackScript());
 
-  const sessionStart = await fetch(`${base}/api/mcp/oauth/start`, {
+  const bindRes = await fetch(`${base}/api/mcp/oauth/start`, {
     method: 'POST',
-    headers: { ...auth, 'content-type': 'application/json', cookie: 'ripper_session=dono-1' },
+    headers: { ...auth, 'content-type': 'application/json' },
     body: JSON.stringify({ pluginName: 'oauth-demo' })
-  }).then(r => r.json());
-  const stolen = await fetch(`${base}/api/mcp/oauth/callback?code=abc&state=${sessionStart.state}`);
+  });
+  const bindCookie = oauthCookieHeader(bindRes);
+  const bound = await bindRes.json();
+  const stolen = await fetch(`${base}/api/mcp/oauth/callback?code=abc&state=${bound.state}`);
   assert.equal(stolen.status, 400);
-  const owned = await fetch(`${base}/api/mcp/oauth/callback?code=abc&state=${sessionStart.state}`, {
-    headers: { cookie: 'ripper_session=dono-1' }
+  const owned = await fetch(`${base}/api/mcp/oauth/callback?code=abc&state=${bound.state}`, {
+    headers: { cookie: bindCookie.split(';')[0] }
   });
   assert.equal(owned.status, 200);
-  const st = await fetch(`${base}/api/mcp/oauth/status/${sessionStart.flowId}`, { headers: auth }).then(r => r.json());
+  assert.match(owned.headers.get('set-cookie') || '', /Max-Age=0/);
+  const replay = await fetch(`${base}/api/mcp/oauth/callback?code=abc&state=${bound.state}`, {
+    headers: { cookie: bindCookie.split(';')[0] }
+  });
+  assert.equal(replay.status, 400);
+  const st = await fetch(`${base}/api/mcp/oauth/status/${bound.flowId}`, { headers: auth }).then(r => r.json());
   assert.equal(st.status, 'complete');
 
   const bad = await fetch(`${base}/api/mcp/oauth/callback?code=x&state=bad-state`);
@@ -310,6 +342,58 @@ test('SSRF: descoberta e DCR não seguem endereço interno', async () => {
   assert.equal(isPrivateOrInternalHost('10.1.2.3'), true);
   assert.equal(isSafeOutboundUrl('http://169.254.169.254/x'), false);
   assert.equal(isSafeOutboundUrl('https://mcp.example.com/mcp'), true);
+  assert.equal(isBlockedIp('::ffff:7f00:1'), true);
+  assert.equal(isBlockedIp('::ffff:a9fe:a9fe'), true);
+  assert.equal(isBlockedIp('::ffff:169.254.169.254'), true);
+  assert.equal(isBlockedIp('fe90::1'), true);
+  assert.equal(isBlockedIp('fe80::1'), true);
+  assert.equal(isBlockedIp('8.8.8.8'), false);
+
+  await assert.rejects(
+    () => resolvePublicAddresses('127.0.0.1.nip.io', {
+      lookupFn: async () => [{ address: '127.0.0.1', family: 4 }]
+    }),
+    /bloqueada/
+  );
+  await assert.rejects(
+    () => resolvePublicAddresses('ok.example', {
+      lookupFn: async () => [
+        { address: '8.8.8.8', family: 4 },
+        { address: '::ffff:a9fe:a9fe', family: 6 }
+      ]
+    }),
+    /bloqueada/
+  );
+
+  const nipHits = [];
+  await discoverMcpOAuth('https://127.0.0.1.nip.io/mcp', {
+    fetch: async url => { nipHits.push(String(url)); return { ok: false, json: async () => null }; },
+    lookupFn: async () => [{ address: '127.0.0.1', family: 4 }]
+  });
+  assert.equal(nipHits.length, 0);
+
+  const hops = [];
+  await assert.rejects(
+    () => safeFetch('https://cdn.example/meta', {}, {
+      lookupFn: async host => (host === 'cdn.example'
+        ? [{ address: '203.0.113.10', family: 4 }]
+        : [{ address: '169.254.169.254', family: 4 }]),
+      fetch: async url => {
+        hops.push(String(url));
+        if (String(url).includes('cdn.example')) {
+          return {
+            ok: false,
+            status: 302,
+            headers: new Headers({ location: 'https://169.254.169.254/latest' }),
+            arrayBuffer: async () => new ArrayBuffer(0)
+          };
+        }
+        return { ok: true, status: 200, json: async () => ({ pwned: true }) };
+      }
+    }),
+    /bloqueada/
+  );
+  assert.deepEqual(hops, ['https://cdn.example/meta']);
 
   _clearOAuthFlows();
   await assert.rejects(
@@ -322,21 +406,25 @@ test('SSRF: descoberta e DCR não seguem endereço interno', async () => {
   );
 });
 
-test('state expirado não vale; sessão do dono é exigida', async () => {
+test('state expirado não vale; cookie OAuth é exigido e de uso único', async () => {
   _clearOAuthFlows();
   const plugin = { name: 'demo', url: 'https://mcp.example.com/mcp', auth: { oauthClient: 'custom', clientId: 'cid' } };
-  const { state, flowId } = await startMcpOAuthFlow({
+  const { state, cookieRaw } = await startMcpOAuthFlow({
     plugin,
     discovery: publicDiscovery(),
-    redirectUri: 'https://ripper.example/cb',
-    sessionKey: 's:abc'
+    redirectUri: 'https://ripper.example/cb'
   });
+  assert.match(oauthBindingCookie(cookieRaw), /SameSite=Lax/);
+  assert.match(oauthBindingCookie(cookieRaw), new RegExp(`Path=${OAUTH_CALLBACK_PATH.replace(/\//g, '\\/')}`));
   assert.equal(findOAuthFlowByState(state), null);
-  assert.equal(findOAuthFlowByState(state, { sessionKey: 's:other' }), null);
-  assert.ok(findOAuthFlowByState(state, { sessionKey: 's:abc' }));
-  const flow = getOAuthFlow(flowId);
+  assert.equal(findOAuthFlowByState(state, { cookie: 'errado' }), null);
+  assert.ok(findOAuthFlowByState(state, { cookie: cookieRaw }));
+  assert.equal(findOAuthFlowByState(state, { cookie: cookieRaw }), null);
+
+  const again = await startMcpOAuthFlow({ plugin, discovery: publicDiscovery(), redirectUri: 'https://ripper.example/cb' });
+  const flow = getOAuthFlow(again.flowId);
   flow.createdAt = Date.now() - OAUTH_FLOW_TTL_MS - 1000;
-  assert.equal(findOAuthFlowByState(state, { sessionKey: 's:abc' }), null);
+  assert.equal(findOAuthFlowByState(again.state, { cookie: again.cookieRaw }), null);
   _clearOAuthFlows();
 });
 

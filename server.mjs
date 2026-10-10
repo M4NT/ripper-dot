@@ -159,7 +159,10 @@ import {
   oauthCallbackScript,
   pluginOAuthStatus,
   startMcpOAuthFlow,
-  isSafeOutboundUrl
+  isSafeOutboundUrl,
+  safeFetch,
+  oauthBindingCookie,
+  readOAuthBindingCookie
 } from './lib/mcp-oauth.mjs';
 import {
   persistArtifactContent,
@@ -398,13 +401,8 @@ function publicBaseUrl(req) {
   return `${proto}://${host}`;
 }
 
-/** Liga o state OAuth à sessão/cookie do dono que iniciou o login. */
-function oauthCallerSessionKey(req) {
-  const s = sessionCookie(req);
-  if (s) return `s:${s}`;
-  const d = deviceCookie(req);
-  if (d) return `d:${d}`;
-  return '';
+function oauthCookieSecure(req) {
+  return !!(req.socket?.encrypted || req.headers['x-forwarded-proto'] === 'https');
 }
 // Prévias em texto puro: nada de ** ou # aparecendo nas listas.
 const plain = s => String(s || '').replace(/```[\s\S]*?```/g, ' ').replace(/[*_`#>]+/g, '').replace(/\s+/g, ' ').trim();
@@ -2469,7 +2467,7 @@ const routes = [
       throw new HttpError(400, e.message || 'Falha ao atualizar OAuth.');
     }
   }],
-  ['POST', /^\/api\/mcp\/oauth\/start$/, async req => {
+  ['POST', /^\/api\/mcp\/oauth\/start$/, async (req, _, _url, res) => {
     const b = await body(req);
     const name = String(b.pluginName || '').trim();
     if (!name) throw new HttpError(400, 'Informe pluginName.');
@@ -2479,20 +2477,19 @@ const routes = [
     if (!isSafeOutboundUrl(mcpUrl)) throw new HttpError(400, 'URL MCP inválida para OAuth.');
     let discovery;
     try {
-      const probe = await fetch(mcpUrl, { method: 'GET', headers: { accept: 'application/json' } }).catch(() => null);
+      const probe = await safeFetch(mcpUrl, { method: 'GET', headers: { accept: 'application/json' } }).catch(() => null);
       discovery = await discoverMcpOAuth(mcpUrl, { probeHeaders: probe?.headers });
     } catch (e) {
       throw new HttpError(400, e.message || 'Não foi possível obter metadados OAuth deste servidor.');
     }
     if (!discovery?.authorizationServer) throw new HttpError(400, 'Não foi possível obter metadados OAuth deste servidor.');
     const redirectUri = oauthRedirectUri(publicBaseUrl(req));
-    const started = await startMcpOAuthFlow({
-      plugin,
-      discovery,
-      redirectUri,
-      sessionKey: oauthCallerSessionKey(req)
-    });
-    return { ...started, redirectUri };
+    const started = await startMcpOAuthFlow({ plugin, discovery, redirectUri });
+    const { cookieRaw, ...pub } = started;
+    json(res, { ...pub, redirectUri }, 200, {
+      'set-cookie': oauthBindingCookie(cookieRaw, { secure: oauthCookieSecure(req) })
+    }, req);
+    return undefined;
   }],
   ['GET', /^\/api\/mcp\/oauth\/status\/([\w-]+)$/, (req, [flowId]) => {
     const flow = getOAuthFlow(flowId);
@@ -4047,10 +4044,13 @@ const server = createServer(async (req, res) => {
       const err = url.searchParams.get('error');
       const origin = publicBaseUrl(req);
       const html = (status, message, code) => {
-        res.writeHead(code, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
+        res.writeHead(code, hdr(req, {
+          'content-type': 'text/html; charset=utf-8',
+          'set-cookie': oauthBindingCookie('', { clear: true, secure: oauthCookieSecure(req) })
+        }));
         res.end(oauthCallbackHtml({ status, message, origin }));
       };
-      const flow = findOAuthFlowByState(state, { sessionKey: oauthCallerSessionKey(req) });
+      const flow = findOAuthFlowByState(state, { cookie: readOAuthBindingCookie(req) });
       if (!flow) {
         html('error', 'Fluxo inválido ou expirado. Feche esta janela e tente de novo no Ripper.', 400);
         return;
