@@ -303,26 +303,24 @@ function refuseCli(cmd, extraEnv, cwd = ROOT) {
 }
 
 test('up/seed/reset recusam RIPPER_STAGING_DATA=. e $HOME', () => {
-  const home = mkdtempSync(join(tmpdir(), 'ripper-stg-fakehome-'));
+  const realHome = homedir();
+  const homeHadDb = existsSync(join(realHome, 'db.json'));
   for (const cmd of [['up', '--local'], ['seed'], ['reset']]) {
     const atRoot = refuseCli(cmd, {
       RIPPER_STAGING_DATA: '.',
-      RIPPER_ENV: 'staging',
-      HOME: process.env.HOME || homedir()
+      RIPPER_ENV: 'staging'
     }, ROOT);
     assert.notEqual(atRoot.status, 0, `${cmd.join(' ')} . deveria recusar`);
     assert.match((atRoot.stderr || atRoot.stdout), /produção|raiz|HOME|recusad/i);
     assert.equal(existsSync(join(ROOT, 'db.json')), false);
 
     const atHome = refuseCli(cmd, {
-      RIPPER_STAGING_DATA: home,
-      RIPPER_ENV: 'staging',
-      HOME: home,
-      USERPROFILE: home
+      RIPPER_STAGING_DATA: realHome,
+      RIPPER_ENV: 'staging'
     });
     assert.notEqual(atHome.status, 0, `${cmd.join(' ')} $HOME deveria recusar`);
     assert.match((atHome.stderr || atHome.stdout), /produção|raiz|HOME|recusad/i);
-    assert.deepEqual(readdirSync(home), []);
+    assert.equal(existsSync(join(realHome, 'db.json')), homeHadDb);
   }
 });
 

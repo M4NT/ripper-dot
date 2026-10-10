@@ -236,16 +236,14 @@ export function isProductionDataDir(dataDir, processEnv = process.env) {
   return false;
 }
 
-export function homeDirs(processEnv = process.env) {
-  const out = [];
-  for (const h of [processEnv.HOME, processEnv.USERPROFILE]) {
-    if (h) out.push(resolve(h));
-  }
+/** Só o HOME real do SO. HOME=pasta-temp (isolamento do smoke) não conta. */
+export function homeDirs(_processEnv = process.env) {
   try {
     const osHome = homedir();
-    if (osHome) out.push(resolve(osHome));
-  } catch { /* sem HOME */ }
-  return [...new Set(out)];
+    return osHome ? [resolve(osHome)] : [];
+  } catch {
+    return [];
+  }
 }
 
 export const FORBIDDEN_STAGING_MSG = 'Recusado: pasta contém ou está dentro da produção (data/ ou RIPPER_DATA), ou é a raiz do repo, $HOME ou /.';
