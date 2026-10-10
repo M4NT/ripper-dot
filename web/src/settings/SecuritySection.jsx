@@ -76,7 +76,7 @@ export default function SecuritySection({ s, set }) {
         </Card>
         {s.flags?.socialWebhooks && (
           <Card title="Publicação social" desc="Webhooks HTTP para posts externos. Tokens na URL são armazenados localmente; publicar pede aprovação nas políticas acima (exceto “Nunca pedir” ou autonomia total no Enterprise).">
-            <div className="set-actions"><button type="button" className="btn btn-sm" onClick={() => go('/connectors')}><Icon name="share" size={16} />Gerenciar webhooks sociais</button></div>
+            <div className="set-actions"><button type="button" className="btn btn-sm" onClick={() => go('/marketplace?tab=webhooks')}><Icon name="share" size={16} />Gerenciar webhooks sociais</button></div>
           </Card>
         )}
         <AdvancedBlock settings={s} hint="Limite de taxa">

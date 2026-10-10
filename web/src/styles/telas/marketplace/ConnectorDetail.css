@@ -25,3 +25,5 @@
 .mp-detail-meta-label { display: block; font-size: var(--fs-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--faint); margin-bottom: 4px; }
 
 .mp-detail-url code { font-size: var(--fs-xs); word-break: break-all; }
+
+.mp-detail-manage { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 24px; }

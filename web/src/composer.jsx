@@ -178,8 +178,8 @@ export default function Composer({ agent, chatId, projectId, mentions, streaming
 
   function teachTask() {
     if (!isEnterpriseMode(S.settings)) {
-      toast('Criar skills fica no modo Enterprise — use o Marketplace para plugins.');
-      go('/marketplace/discover');
+      toast('Criar skills fica no modo Enterprise — use Conectar aplicativos.');
+      go('/marketplace');
       return;
     }
     local.set('skills.openCreate', true);

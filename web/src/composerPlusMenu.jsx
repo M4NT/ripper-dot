@@ -80,21 +80,18 @@ export default function ComposerPlusMenu({ open, onClose, anchorRef, onFiles, on
   const pluginRows = connectors.filter(r => r.kind === 'plugin');
   const connectorRows = connectors.filter(r => r.kind === 'connector');
 
-  function submenuItems(rows, type) {
+  function submenuItems(rows) {
     return <>
-      <button type="button" className="menu-item" onClick={() => { onClose(); go('/marketplace/discover'); }}>
-        <Icon name="compass" size={16} />Explorar {type === 'plugin' ? 'plugins' : 'conectores'}
+      <button type="button" className="menu-item" onClick={() => { onClose(); go('/marketplace'); }}>
+        <Icon name="compass" size={16} />Conectar aplicativos
       </button>
-      <button type="button" className="menu-item" onClick={() => { onClose(); go(type === 'plugin' || simple ? '/marketplace/manage' : '/connectors'); }}>
-        <Icon name="folder" size={16} />Gerenciar {type === 'plugin' ? 'plugins' : 'conectores'}
-      </button>
-      {type === 'connector' && isEnterpriseMode(S.settings) && S.settings.flags?.socialWebhooks && (
-        <button type="button" className="menu-item" onClick={() => { onClose(); go('/connectors'); }}>
+      {isEnterpriseMode(S.settings) && S.settings.flags?.socialWebhooks && (
+        <button type="button" className="menu-item" onClick={() => { onClose(); go('/marketplace?tab=webhooks'); }}>
           <Icon name="share" size={16} />Webhooks sociais
         </button>
       )}
       <hr className="menu-sep" />
-      {rows.length === 0 && <p className="muted small pad">Nenhum ativo. Instale no Marketplace.</p>}
+      {rows.length === 0 && <p className="muted small pad">Nenhum ativo. Conecte em Conectar aplicativos.</p>}
       {rows.map(r => (
         <div key={r.id} className="menu-item composer-toggle-row" role="menuitem">
           <Icon name="grid" size={16} /><span className="grow">{r.label}</span>
@@ -131,14 +128,10 @@ export default function ComposerPlusMenu({ open, onClose, anchorRef, onFiles, on
         </button>
       )}
       <hr className="menu-sep" />
-      <button type="button" className="menu-item" onMouseEnter={e => setSub({ type: 'connectors', el: e.currentTarget })} onClick={e => setSub({ type: 'connectors', el: e.currentTarget })}>
-        <Icon name="grid" size={16} />Conectores<Icon name="arrowR" size={14} className="menu-chevron" />
+      <button type="button" className="menu-item" onMouseEnter={e => setSub({ type: 'apps', el: e.currentTarget })} onClick={e => setSub({ type: 'apps', el: e.currentTarget })}>
+        <Icon name="grid" size={16} />Aplicativos<Icon name="arrowR" size={14} className="menu-chevron" />
       </button>
-      <button type="button" className="menu-item" onMouseEnter={e => setSub({ type: 'plugins', el: e.currentTarget })} onClick={e => setSub({ type: 'plugins', el: e.currentTarget })}>
-        <Icon name="sparkles" size={16} />Plugins<Icon name="arrowR" size={14} className="menu-chevron" />
-      </button>
-      {sub?.type === 'connectors' && <SubMenu anchor={sub.el} onClose={() => setSub(null)} items={submenuItems(connectorRows, 'connector')} />}
-      {sub?.type === 'plugins' && <SubMenu anchor={sub.el} onClose={() => setSub(null)} items={submenuItems(pluginRows, 'plugin')} />}
+      {sub?.type === 'apps' && <SubMenu anchor={sub.el} onClose={() => setSub(null)} items={submenuItems([...connectorRows, ...pluginRows])} />}
     </div>,
     document.body
   );

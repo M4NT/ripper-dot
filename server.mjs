@@ -155,8 +155,14 @@ import {
   mergePluginAuth,
   oauthRedirectUri,
   escapeHtml,
+  oauthCallbackHtml,
+  oauthCallbackScript,
   pluginOAuthStatus,
-  startMcpOAuthFlow
+  startMcpOAuthFlow,
+  isSafeOutboundUrl,
+  safeFetch,
+  oauthBindingCookie,
+  readOAuthBindingCookie
 } from './lib/mcp-oauth.mjs';
 import {
   persistArtifactContent,
@@ -393,6 +399,10 @@ function publicBaseUrl(req) {
   const host = req.headers.host || `127.0.0.1:${PORT}`;
   const proto = req.headers['x-forwarded-proto'] || (HOST === '0.0.0.0' ? 'http' : 'http');
   return `${proto}://${host}`;
+}
+
+function oauthCookieSecure(req) {
+  return !!(req.socket?.encrypted || req.headers['x-forwarded-proto'] === 'https');
 }
 // Prévias em texto puro: nada de ** ou # aparecendo nas listas.
 const plain = s => String(s || '').replace(/```[\s\S]*?```/g, ' ').replace(/[*_`#>]+/g, '').replace(/\s+/g, ' ').trim();
@@ -864,7 +874,7 @@ async function pluginsForTurn(s, agent) {
     if (pl.type === 'http' && o?.refreshToken && o.expiresAt && o.expiresAt < Date.now() + 120_000) {
       const r = await refreshPluginOAuthToken(pl).catch(e => ({ ok: false, error: e.message }));
       if (r.ok && r.tokens?.accessToken) {
-        const flow = { clientId: pl.auth.clientId, clientSecret: pl.auth.clientSecret, tokenEndpoint: pl.auth.tokenEndpoint };
+        const flow = { clientId: pl.auth.clientId, clientSecret: pl.auth.clientSecret, tokenEndpoint: pl.auth.tokenEndpoint, resource: pl.auth.resource };
         const idx = db.settings.plugins.findIndex(x => x.name === orig.name);
         if (idx >= 0) { db.settings.plugins[idx] = persistOAuthTokensInVault(db.settings.plugins[idx], r.tokens, flow); save(); }
         pl = applyOAuthTokensToPlugin(pl, r.tokens, flow);
@@ -2457,23 +2467,29 @@ const routes = [
       throw new HttpError(400, e.message || 'Falha ao atualizar OAuth.');
     }
   }],
-  ['POST', /^\/api\/mcp\/oauth\/start$/, async (req, _, url) => {
+  ['POST', /^\/api\/mcp\/oauth\/start$/, async (req, _, _url, res) => {
     const b = await body(req);
     const name = String(b.pluginName || '').trim();
     if (!name) throw new HttpError(400, 'Informe pluginName.');
     const plugin = (db.settings.plugins || []).find(p => p.name === name && p.type === 'http');
     if (!plugin) throw new HttpError(404, 'Conector HTTP não encontrado.');
-    const mcpUrl = String(b.url || plugin.url || '');
-    if (!/^https:\/\//.test(mcpUrl)) throw new HttpError(400, 'URL MCP HTTPS inválida.');
-    let discovery = b.discovery;
-    if (!discovery?.authorizationServer) {
-      const probe = await fetch(mcpUrl, { method: 'GET', headers: { accept: 'application/json' } }).catch(() => null);
+    const mcpUrl = String(plugin.url || '');
+    if (!isSafeOutboundUrl(mcpUrl)) throw new HttpError(400, 'URL MCP inválida para OAuth.');
+    let discovery;
+    try {
+      const probe = await safeFetch(mcpUrl, { method: 'GET', headers: { accept: 'application/json' } }).catch(() => null);
       discovery = await discoverMcpOAuth(mcpUrl, { probeHeaders: probe?.headers });
+    } catch (e) {
+      throw new HttpError(400, e.message || 'Não foi possível obter metadados OAuth deste servidor.');
     }
     if (!discovery?.authorizationServer) throw new HttpError(400, 'Não foi possível obter metadados OAuth deste servidor.');
     const redirectUri = oauthRedirectUri(publicBaseUrl(req));
     const started = await startMcpOAuthFlow({ plugin, discovery, redirectUri });
-    return { ...started, redirectUri };
+    const { cookieRaw, ...pub } = started;
+    json(res, { ...pub, redirectUri }, 200, {
+      'set-cookie': oauthBindingCookie(cookieRaw, { state: started.state, secure: oauthCookieSecure(req) })
+    }, req);
+    return undefined;
   }],
   ['GET', /^\/api\/mcp\/oauth\/status\/([\w-]+)$/, (req, [flowId]) => {
     const flow = getOAuthFlow(flowId);
@@ -3871,6 +3887,10 @@ const server = createServer(async (req, res) => {
       res.writeHead(302, { 'set-cookie': `ripper_token=${encodeURIComponent(TOKEN)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`, location: '/' });
       return res.end();
     }
+    if (req.method === 'GET' && p === '/oauth-callback.js') {
+      res.writeHead(200, hdr(req, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-cache' }));
+      return res.end(oauthCallbackScript());
+    }
     if (req.method === 'GET' && p === '/metrics') {
       if (!metricsAccessAllowed(signedIn(req))) throw new HttpError(401, 'Entre com a senha do Ripper.');
       const metricsBody = formatPrometheusExposition();
@@ -4022,22 +4042,30 @@ const server = createServer(async (req, res) => {
       const code = url.searchParams.get('code');
       const state = url.searchParams.get('state') || '';
       const err = url.searchParams.get('error');
-      const flow = findOAuthFlowByState(state);
+      const origin = publicBaseUrl(req);
+      const html = (status, message, code) => {
+        const headers = { 'content-type': 'text/html; charset=utf-8' };
+        try {
+          headers['set-cookie'] = oauthBindingCookie('', { state, clear: true, secure: oauthCookieSecure(req) });
+        } catch { /* state inválido — sem cookie para apagar */ }
+        res.writeHead(code, hdr(req, headers));
+        res.end(oauthCallbackHtml({ status, message, origin }));
+      };
+      let cookie = '';
+      try { cookie = readOAuthBindingCookie(req, state); } catch { cookie = ''; }
+      const flow = findOAuthFlowByState(state, { cookie });
       if (!flow) {
-        res.writeHead(400, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
-        res.end('<!doctype html><meta charset=utf-8><title>Ripper OAuth</title><p>Fluxo inválido ou expirado. Feche esta janela e tente de novo no Ripper.</p>');
+        html('error', 'Fluxo inválido ou expirado. Feche esta janela e tente de novo no Ripper.', 400);
         return;
       }
       if (err) {
         flow.status = 'error';
         flow.error = url.searchParams.get('error_description') || err;
-        res.writeHead(400, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
-        res.end(`<!doctype html><meta charset=utf-8><title>Ripper OAuth</title><p>Login negado: ${escapeHtml(flow.error)}</p><script>setTimeout(()=>window.close(),1200)</script>`);
+        html('error', `Login negado: ${flow.error}`, 400);
         return;
       }
       if (!code) {
-        res.writeHead(400, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
-        res.end('<!doctype html><meta charset=utf-8><title>Ripper OAuth</title><p>Código OAuth ausente.</p>');
+        html('error', 'Código OAuth ausente.', 400);
         return;
       }
       try {
@@ -4049,13 +4077,11 @@ const server = createServer(async (req, res) => {
           save();
         }
         flow.status = 'complete';
-        res.writeHead(200, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
-        res.end('<!doctype html><meta charset=utf-8><title>Ripper OAuth</title><p>Login concluído. Você pode fechar esta janela.</p><script>setTimeout(()=>window.close(),800)</script>');
+        html('complete', 'Login concluído. Você pode fechar esta janela.', 200);
       } catch (e) {
         flow.status = 'error';
         flow.error = e.message;
-        res.writeHead(500, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
-        res.end('<!doctype html><meta charset=utf-8><title>Ripper OAuth</title><p>Falha ao trocar o código por token. Veja o Ripper e tente novamente.</p>');
+        html('error', 'Falha ao trocar o código por token. Veja o Ripper e tente novamente.', 500);
       }
       return;
     }

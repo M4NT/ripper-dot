@@ -3,43 +3,33 @@ import { useApp } from '../app.jsx';
 import { api, go, useRoute } from '../lib.js';
 import { Icon } from '../ui.jsx';
 import HubShell from '../marketplace/HubShell.jsx';
-import BrandIcon from '../marketplace/BrandIcon.jsx';
+import ConnectorCard, { MpIcon } from '../marketplace/ConnectorCard.jsx';
 import ConnectorDetail from '../marketplace/ConnectorDetail.jsx';
-import { CONNECTOR_DISCOVER, PLUGIN_CATALOG, CLAUDE_CONNECTORS_URL, marketplaceDetail } from '../marketplace/catalog.js';
-import { installPlugin, installedCount, isPluginInstalled, listInstalledPlugins, uninstallPlugin } from '../marketplace/state.js';
-import { runMcpOAuthLogin } from '../marketplace/mcpOAuth.js';
+import CustomConnectorModal from '../marketplace/CustomConnectorModal.jsx';
+import SocialWebhooksPanel from '../marketplace/SocialWebhooksPanel.jsx';
+import {
+  AUTH_KINDS, CATEGORIES, CLAUDE_CONNECTORS_URL, CONNECTORS,
+  filterCatalog, marketplaceDetail
+} from '../marketplace/catalog.js';
+import {
+  STATUS, filterByStatus, installedCount, installPlugin, isAttention, isPresent,
+  listInstalledPlugins, resolveConnectorStatus, setPluginEnabled, uninstallPlugin
+} from '../marketplace/state.js';
+import { refreshMcpOAuth, runMcpOAuthLogin } from '../marketplace/mcpOAuth.js';
 import { useOv } from '../overlay.jsx';
+import { isEnterpriseMode } from '../uiMode.js';
 import '../styles/telas/pages/Marketplace.css';
 
 /** Conectores reais da conta claude.ai (Google, Slack…). */
 export function useClaudeConnectors() {
   const [list, setList] = useState([]);
-  useEffect(() => { api('/api/claude/connectors').then(r => setList(r.connectors || [])).catch(() => setList([])); }, []);
-  return list;
-}
-
-function MpIcon({ id, size = 40 }) {
-  if (id === 'plug') return <span className="mp-icon"><Icon name="plug" size={size * 0.45} /></span>;
-  return <BrandIcon id={id} size={size} />;
-}
-
-function PluginRow({ item, settings, onChange, onOpen, claudeList }) {
-  const installed = isPluginInstalled(item.id, settings, claudeList);
-  return (
-    <div className="mp-row">
-      <MpIcon id={item.icon} />
-      <div className="mp-row-text">
-        <b>{item.name}</b>
-        <small>{item.connectors ? `${item.connectors} conector${item.connectors > 1 ? 'es' : ''}` : ''}{item.skills ? `${item.connectors ? ' e ' : ''}${item.skills} habilidade${item.skills > 1 ? 's' : ''}` : ''}{!item.connectors && !item.skills ? item.desc : ''}</small>
-        {(item.connectors || item.skills) && <small className="mp-desc">{item.desc}</small>}
-      </div>
-      {installed ? (
-        <span className="mp-status ok">Conectado</span>
-      ) : (
-        <button type="button" className="btn btn-sm" onClick={() => onOpen(item.id)}>Adicionar</button>
-      )}
-    </div>
-  );
+  const reload = () => api('/api/claude/connectors').then(r => setList(r.connectors || [])).catch(() => setList([]));
+  useEffect(() => {
+    reload();
+    addEventListener('focus', reload);
+    return () => removeEventListener('focus', reload);
+  }, []);
+  return [list, reload];
 }
 
 /** Skills de terceiros: o Ripper baixa do GitHub do autor ao adicionar e mostra a licença antes. */
@@ -61,7 +51,7 @@ function MarketSkills({ filter }) {
   if (!shown.length) return null;
   return (
     <section className="mp-section">
-      <div className="mp-section-head"><h2>Skills</h2><span className="muted small">Gratuitas, de autores da comunidade</span></div>
+      <div className="mp-section-head"><h2>Habilidades</h2><span className="muted small">Gratuitas, de autores da comunidade</span></div>
       <div className="mp-grid two">{shown.map(s => (
         <div key={s.id} className="mp-card">
           <span className="mp-icon"><Icon name="image" size={18} /></span>
@@ -73,207 +63,321 @@ function MarketSkills({ filter }) {
   );
 }
 
-function Browse({ settings, refresh, onOpenDetail, claudeList }) {
-  const [q, setQ] = useState('');
-  const t = q.trim().toLowerCase();
-  const filter = x => !t || (x.name + x.desc + (x.author || '')).toLowerCase().includes(t);
-  const forYou = PLUGIN_CATALOG.filter(p => p.forYou).filter(filter);
-  const featured = PLUGIN_CATALOG.filter(p => p.featured).filter(filter);
-  const count = installedCount(settings, claudeList);
-
-  return (
-    <HubShell
-      title="Conectar aplicativos"
-      search={q}
-      onSearch={setQ}
-      searchPlaceholder="Buscar aplicativos"
-      actions={
-        <button type="button" className="mp-installed" onClick={() => go('/marketplace/manage')}>
-          <span className="mp-installed-icons">
-            {listInstalledPlugins(settings, claudeList).slice(0, 4).map(p => <MpIcon key={p.id} id={p.icon} size={22} />)}
-          </span>
-          Instalados: {count} <Icon name="arrowR" size={14} />
-        </button>
-      }
-    >
-      {forYou.length > 0 && (
-        <section className="mp-section">
-          <h2>Para você</h2>
-          <div className="mp-grid two">{forYou.map(p => (
-            <div key={p.id} className="mp-card">
-              <MpIcon id={p.icon} />
-              <div><b>{p.name}</b><small>{p.desc}</small></div>
-              <button type="button" className="btn btn-sm" onClick={() => onOpenDetail(p.id)} disabled={isPluginInstalled(p.id, settings, claudeList)}>{isPluginInstalled(p.id, settings, claudeList) ? 'Instalado' : 'Adicionar'}</button>
-            </div>
-          ))}</div>
-        </section>
-      )}
-      {featured.length > 0 && (
-        <section className="mp-section">
-          <div className="mp-section-head"><h2>Em destaque</h2><button type="button" className="link-btn" onClick={() => go('/marketplace/discover')}>Ver tudo</button></div>
-          <div className="mp-grid two">{featured.map(p => (
-            <div key={p.id} className="mp-card">
-              <MpIcon id={p.icon} />
-              <div><b>{p.name}</b><small>{p.desc}</small></div>
-              <button type="button" className="btn btn-sm" onClick={() => onOpenDetail(p.id)} disabled={isPluginInstalled(p.id, settings, claudeList)}>{isPluginInstalled(p.id, settings, claudeList) ? 'Instalado' : 'Adicionar'}</button>
-            </div>
-          ))}</div>
-        </section>
-      )}
-      <MarketSkills filter={filter} />
-    </HubShell>
-  );
-}
-
-function Manage({ settings, refresh, onOpenDetail, claudeList }) {
-  const installed = listInstalledPlugins(settings, claudeList);
-  const [showAll, setShowAll] = useState(false);
-  const visible = showAll ? installed : installed.slice(0, 6);
-
-  async function toggle(id, remove) {
-    const plugins = remove ? uninstallPlugin(id, settings) : installPlugin(id, settings);
-    await api('/api/settings', { method: 'PUT', body: { plugins } });
-    await refresh();
-  }
-
-  return (
-    <HubShell
-      title="Gerenciar plugins e habilidades"
-      actions={<button type="button" className="link-btn muted" onClick={() => go('/marketplace')}><Icon name="arrowL" size={14} /> Conectar aplicativos</button>}
-    >
-      <section className="mp-section">
-        <h2 className="mp-sub">Instalado</h2>
-        <div className="mp-grid two manage">{visible.map(p => (
-          <PluginRow key={p.id} item={p} settings={settings} claudeList={claudeList} onChange={id => (id ? toggle(id, false) : refresh())} onOpen={onOpenDetail} />
-        ))}</div>
-        {installed.length > 6 && !showAll && (
-          <button type="button" className="link-btn mp-show-all" onClick={() => setShowAll(true)}>Mostrar todos os {installed.length} plugins</button>
-        )}
-      </section>
-      <section className="mp-section">
-        <h2>Habilidades privadas</h2>
-        <p className="muted">Nenhuma habilidade privada ainda. Peça ao seu Bot para criar uma para você.</p>
-      </section>
-    </HubShell>
-  );
-}
-
-function Discover({ settings, refresh, onOpenDetail }) {
-  const [q, setQ] = useState('');
-  const t = q.trim().toLowerCase();
-  const list = useMemo(() => CONNECTOR_DISCOVER.filter(c => !t || (c.name + c.desc + c.author).toLowerCase().includes(t)), [t]);
-  const trending = list.slice(0, 4);
-
-  return (
-    <HubShell
-      title="Conectar aplicativos"
-      search={q}
-      onSearch={setQ}
-      searchPlaceholder="Buscar aplicativos"
-      actions={<button type="button" className="link-btn" onClick={() => go('/marketplace')}><Icon name="arrowL" size={14} /> Voltar</button>}
-    >
-      <section className="mp-section">
-        <div className="mp-section-head">
-          <h2>Conectores mais usados <span className="tag">{list.length}</span></h2>
-        </div>
-        <div className="mp-discover-grid">{list.map(c => (
-          <article key={c.id} className="mp-discover-card">
-            <button type="button" className="mp-plus" aria-label={`Ver ${c.name}`} onClick={() => onOpenDetail(c.id)}><Icon name="plus" size={16} /></button>
-            <button type="button" className="mp-discover-hit" onClick={() => onOpenDetail(c.id)}>
-              <MpIcon id={c.icon} size={36} />
-              <h3>{c.name}{c.verified && <Icon name="check" size={12} className="mp-verified" />}</h3>
-              <p>{c.desc}</p>
-              <small>por {c.author}</small>
-            </button>
-          </article>
-        ))}</div>
-      </section>
-      {trending.length > 0 && (
-        <section className="mp-section">
-          <div className="mp-section-head"><h2>Conectores em alta <span className="tag">{trending.length}</span></h2></div>
-          <div className="mp-discover-grid">{trending.map(c => (
-            <article key={`t-${c.id}`} className="mp-discover-card">
-              <button type="button" className="mp-plus" aria-label={`Ver ${c.name}`} onClick={() => onOpenDetail(c.id)}><Icon name="plus" size={16} /></button>
-              <MpIcon id={c.icon} size={36} />
-              <h3>{c.name}</h3>
-              <p>{c.desc}</p>
-              <small>por {c.author}</small>
-            </article>
-          ))}</div>
-        </section>
-      )}
-    </HubShell>
-  );
+function chipOn(cur, id) {
+  return cur === id ? '' : id;
 }
 
 export default function Marketplace() {
   const { S, refresh, toast } = useApp();
   const ov = useOv();
-  const claudeList = useClaudeConnectors();
-  const { parts } = useRoute();
-  const view = parts[1] || 'browse';
+  const [claudeList] = useClaudeConnectors();
+  const { parts, query } = useRoute();
   const settings = S.settings;
-  const [detailId, setDetailId] = useState(null);
-  const [connecting, setConnecting] = useState(false);
+  const deepId = query.get('app') || (CONNECTORS.some(c => c.id === parts[1]) ? parts[1] : null);
+  const wantInstalled = parts[1] === 'manage' || query.get('tab') === 'installed' || parts[0] === 'connectors' && parts[1] === 'mine';
+  const wantWebhooks = query.get('tab') === 'webhooks';
+
+  const [q, setQ] = useState(query.get('q') || '');
+  const [category, setCategory] = useState('');
+  const [auth, setAuth] = useState('');
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
+  const [installedOnly, setInstalledOnly] = useState(!!wantInstalled);
+  const [detailId, setDetailId] = useState(deepId);
+  const [connecting, setConnecting] = useState('');
+  const [errors, setErrors] = useState({});
+  const [logs, setLogs] = useState({});
+  const [authByName, setAuthByName] = useState({});
+  const [stdioByName, setStdioByName] = useState({});
+  const [omieCompanies, setOmieCompanies] = useState(null);
+  const [customOpen, setCustomOpen] = useState(false);
   const detail = detailId ? marketplaceDetail(detailId) : null;
 
-  /**
-   * Conectar de verdade, conforme o tipo:
-   * oauth  → salva o servidor e abre o login (popup); token → pede o token; claude → leva para claude.ai.
-   * Depois oferece liberar conectores para os agentes que ainda não têm a ferramenta "Plugins MCP".
-   */
-  async function confirmInstall() {
-    if (!detail) return;
-    const type = detail.connect?.type;
-    if (type === 'claude') {
-      window.open(CLAUDE_CONNECTORS_URL, '_blank', 'noopener');
-      toast(`Conecte o ${detail.name} na sua conta claude.ai. Os agentes passam a usar na hora.`);
-      return;
-    }
-    setConnecting(true);
-    try {
-      let extra = {};
-      if (type === 'token') {
-        const token = await ov.ask({ title: `Token do ${detail.name}`, body: detail.connect.tokenHelp, action: 'Conectar', placeholder: 'cole o token aqui', secret: true });
-        if (!token) return;
-        extra = { auth: { apiKey: token.trim() } };
+  function loadLive() {
+    api('/api/mcp/connectors').then(r => {
+      const authMap = {}, stdioMap = {};
+      for (const c of r.connectors || []) {
+        authMap[c.name] = c.authStatus;
+        if (c.stdioSupervisor) stdioMap[c.name] = c.stdioSupervisor;
       }
-      if (type === 'local') {
-        const env = {};
-        for (const f of detail.connect.fields || []) {
-          const v = await ov.ask({ title: f.label, body: f.hint, action: 'Continuar', placeholder: f.placeholder });
-          if (!v?.trim()) return;
-          env[f.key] = v.trim();
-        }
-        extra = { env };
-      }
-      await api('/api/settings', { method: 'PUT', body: { plugins: installPlugin(detail.id, settings, extra) } });
-      if (type === 'oauth') await runMcpOAuthLogin({ pluginName: detail.id });
+      setAuthByName(authMap);
+      setStdioByName(stdioMap);
+    }).catch(() => {});
+    api('/api/omie').then(r => setOmieCompanies(r.companies || [])).catch(() => setOmieCompanies([]));
+  }
+  useEffect(() => { loadLive(); }, [S.settings.plugins]);
+  useEffect(() => { if (deepId) setDetailId(deepId); }, [deepId]);
+  useEffect(() => {
+    if (wantWebhooks) document.getElementById('mp-webhooks')?.scrollIntoView({ block: 'start' });
+  }, [wantWebhooks]);
+
+  const extras = useMemo(() => {
+    return (settings.plugins || [])
+      .filter(p => !CONNECTORS.some(c => c.id === p.name))
+      .map(p => ({
+        id: p.name, name: p.name, icon: 'plug', author: 'Você', desc: p.type === 'http' ? 'Endereço personalizado' : 'Programa nesta máquina',
+        connect: { type: p.type === 'stdio' ? 'local' : 'oauth', url: p.url }, custom: true, verified: false
+      }));
+  }, [settings.plugins]);
+
+  const statusOf = (item, installing) => resolveConnectorStatus({
+    cat: item,
+    settings,
+    claudeList,
+    authByName,
+    liveError: errors[item.id],
+    installing: installing || connecting === item.id,
+    omieCompanies,
+    stdioByName
+  });
+
+  const statusMap = useMemo(() => {
+    const map = {};
+    for (const c of [...CONNECTORS, ...extras]) map[c.id] = statusOf(c);
+    return map;
+  }, [settings, claudeList, authByName, errors, connecting, omieCompanies, stdioByName, extras]);
+
+  const filtered = useMemo(() => {
+    const base = filterCatalog([...CONNECTORS, ...extras], { q, category, auth, verified: verifiedOnly });
+    return filterByStatus(base, statusMap, installedOnly);
+  }, [q, category, auth, verifiedOnly, installedOnly, extras, statusMap]);
+
+  const attention = filtered.filter(c => isAttention(statusMap[c.id]));
+  const connected = filtered.filter(c => statusMap[c.id]?.id === STATUS.connected || statusMap[c.id]?.id === STATUS.off);
+  const rest = filtered.filter(c => !isPresent(statusMap[c.id]));
+  const searching = !!q.trim() || !!category || !!auth || verifiedOnly || installedOnly;
+  const count = installedCount(settings, claudeList);
+
+  async function enableAgentsIfNeeded(name) {
+    const off = S.agents.filter(a => !a.tools.includes('plugins'));
+    if (off.length && await ov.confirm({ title: `${name} conectado`, body: `${off.map(a => a.name).join(', ')} ainda não pode(m) usar aplicativos. Ligar para ${off.length === 1 ? 'ele' : 'eles'}?`, action: 'Liberar' })) {
+      await Promise.all(off.map(a => api(`/api/agents/${a.id}`, { method: 'PUT', body: { tools: [...a.tools, 'plugins'] } })));
       await refresh();
-      const off = S.agents.filter(a => !a.tools.includes('plugins'));
-      if (off.length && await ov.confirm({ title: `${detail.name} conectado`, body: `${off.map(a => a.name).join(', ')} ainda não pode(m) usar conectores. Ligar "Conectores" para ${off.length === 1 ? 'ele' : 'eles'}?`, action: 'Liberar' })) {
-        await Promise.all(off.map(a => api(`/api/agents/${a.id}`, { method: 'PUT', body: { tools: [...a.tools, 'plugins'] } })));
-        await refresh();
-      }
-      toast(`${detail.name} conectado`);
-      setDetailId(null);
-    } catch (e) {
-      toast(`Não conectou: ${e.message}`, 'error');
-      await refresh();
-    } finally {
-      setConnecting(false);
     }
   }
 
+  async function connectItem(item, fields = {}) {
+    const type = item.connect?.type;
+    if (type === 'claude') {
+      window.open(CLAUDE_CONNECTORS_URL, '_blank', 'noopener');
+      toast(`Conecte o ${item.name} na sua conta claude.ai e volte aqui.`);
+      return;
+    }
+    if (type === 'native') {
+      setDetailId(item.id);
+      return;
+    }
+    setConnecting(item.id);
+    setErrors(e => ({ ...e, [item.id]: undefined }));
+    try {
+      let extra = {};
+      if (type === 'token') {
+        const token = fields.token?.trim();
+        if (!token) throw new Error('Informe o token.');
+        extra = { auth: { apiKey: token } };
+      }
+      if (type === 'local') {
+        const env = {};
+        for (const f of item.connect.fields || []) {
+          const v = String(fields[f.key] || '').trim();
+          if (!v) throw new Error(`Informe ${f.label}.`);
+          env[f.key] = v;
+        }
+        extra = { env };
+      }
+      if (type === 'oauth') extra = { auth: { mode: 'oauth_now' } };
+      await api('/api/settings', { method: 'PUT', body: { plugins: installPlugin(item.id, settings, extra) } });
+      if (type === 'oauth') await runMcpOAuthLogin({ pluginName: item.id });
+      await refresh();
+      loadLive();
+      await enableAgentsIfNeeded(item.name);
+      toast(`${item.name} conectado`);
+      setDetailId(null);
+    } catch (e) {
+      setErrors(er => ({ ...er, [item.id]: e.message }));
+      setLogs(l => ({ ...l, [item.id]: e.message }));
+      toast(`Não conectou: ${e.message}`, 'error');
+      await refresh();
+      loadLive();
+    } finally {
+      setConnecting('');
+    }
+  }
+
+  async function retryItem(item) {
+    setConnecting(item.id);
+    setErrors(e => ({ ...e, [item.id]: undefined }));
+    try {
+      const plugin = (settings.plugins || []).find(p => p.name === item.id);
+      if (item.connect?.type === 'oauth' || plugin?.type === 'http') {
+        const st = authByName[item.id];
+        if (st?.state === 'expired_refreshable') {
+          await refreshMcpOAuth(item.id);
+        } else {
+          await runMcpOAuthLogin({ pluginName: item.id });
+        }
+      }
+      const probe = await api('/api/mcp/verify', {
+        method: 'POST',
+        body: plugin?.type === 'stdio'
+          ? { type: 'stdio', name: item.id, command: plugin.command, args: plugin.args }
+          : { url: plugin?.url || item.connect.url, pluginName: item.id }
+      });
+      if (!probe.ok && !probe.oauthRequired) {
+        const detail = probe.failureReason || probe.warning || probe.steps?.find(s => s.status === 'error')?.detail || 'Falha ao contactar o aplicativo.';
+        throw new Error(detail);
+      }
+      await refresh();
+      loadLive();
+      toast(`${item.name} ok`);
+    } catch (e) {
+      setErrors(er => ({ ...er, [item.id]: e.message }));
+      setLogs(l => ({ ...l, [item.id]: e.message }));
+      toast(e.message, 'error');
+    } finally {
+      setConnecting('');
+    }
+  }
+
+  async function toggleEnabled(item, enabled) {
+    await api('/api/settings', { method: 'PUT', body: { plugins: setPluginEnabled(item.id, settings, enabled) } });
+    await refresh();
+  }
+
+  async function removeItem(item) {
+    if (!(await ov.confirm({ title: `Remover ${item.name}?`, body: 'Os agentes deixam de usar este aplicativo. O acesso salvo é apagado.', action: 'Remover', danger: true }))) return;
+    await api('/api/settings', { method: 'PUT', body: { plugins: uninstallPlugin(item.id, settings) } });
+    await refresh();
+    loadLive();
+  }
+
+  function card(item) {
+    const st = statusMap[item.id] || statusOf(item);
+    return (
+      <ConnectorCard
+        key={item.id}
+        item={item}
+        status={st}
+        busy={connecting === item.id}
+        error={errors[item.id]}
+        logs={logs[item.id]}
+        onOpen={id => setDetailId(id)}
+        onConnect={fields => connectItem(item, fields)}
+        onRetry={() => retryItem(item)}
+        onRefresh={async () => {
+          setConnecting(item.id);
+          try {
+            if (authByName[item.id]?.state === 'expired_refreshable') await refreshMcpOAuth(item.id);
+            else await runMcpOAuthLogin({ pluginName: item.id });
+            await refresh();
+            loadLive();
+          } catch (e) {
+            setErrors(er => ({ ...er, [item.id]: e.message }));
+            toast(e.message, 'error');
+          }
+          setConnecting('');
+        }}
+        onEnable={() => toggleEnabled(item, true)}
+      />
+    );
+  }
+
   if (detail) {
+    const st = statusMap[detail.id] || statusOf(detail);
     return (
       <div className="mp-page">
-        <ConnectorDetail item={detail} onBack={() => setDetailId(null)} onConnect={confirmInstall} connecting={connecting} connected={isPluginInstalled(detail.id, settings, claudeList)} />
+        <ConnectorDetail
+          item={detail}
+          onBack={() => setDetailId(null)}
+          onConnect={() => connectItem(detail)}
+          connecting={connecting === detail.id}
+          connected={st.id === STATUS.connected}
+          status={st}
+          onRemove={detail.connect?.type !== 'claude' && detail.connect?.type !== 'native' ? () => removeItem(detail) : undefined}
+          onDisable={st.id === STATUS.connected && detail.connect?.type !== 'claude' && detail.connect?.type !== 'native' ? () => toggleEnabled(detail, false) : undefined}
+        />
       </div>
     );
   }
 
-  if (view === 'manage') return <Manage settings={settings} refresh={refresh} onOpenDetail={setDetailId} claudeList={claudeList} />;
-  if (view === 'discover') return <Discover settings={settings} refresh={refresh} onOpenDetail={setDetailId} />;
-  return <Browse settings={settings} refresh={refresh} onOpenDetail={setDetailId} claudeList={claudeList} />;
+  return (
+    <>
+      <HubShell
+        title="Conectar aplicativos"
+        search={q}
+        onSearch={setQ}
+        searchPlaceholder="Buscar Notion, Gmail, GitHub…"
+        actions={
+          <>
+            <button type="button" className="btn btn-sm" onClick={() => setCustomOpen(true)} aria-label="Adicionar por endereço">
+              <Icon name="plus" size={14} /> <span className="mp-add-label">Adicionar por endereço</span>
+            </button>
+            <button type="button" className={`mp-installed ${installedOnly ? 'on' : ''}`} onClick={() => setInstalledOnly(v => !v)}>
+              <span className="mp-installed-icons">
+                {listInstalledPlugins(settings, claudeList).slice(0, 4).map(p => <MpIcon key={p.id} id={p.icon} size={22} />)}
+              </span>
+              Conectados: {count}
+            </button>
+          </>
+        }
+      >
+        <div className="mp-filters" role="toolbar" aria-label="Filtros">
+          <div className="pills">
+            {CATEGORIES.map(([id, label]) => (
+              <button key={id} type="button" className={`chip ${category === id ? 'on' : ''}`} onClick={() => setCategory(c => chipOn(c, id))}>{label}</button>
+            ))}
+          </div>
+          <div className="pills">
+            {AUTH_KINDS.map(([id, label]) => (
+              <button key={id} type="button" className={`chip ${auth === id ? 'on' : ''}`} onClick={() => setAuth(c => chipOn(c, id))}>{label}</button>
+            ))}
+            <button type="button" className={`chip ${verifiedOnly ? 'on' : ''}`} onClick={() => setVerifiedOnly(v => !v)}>Verificados</button>
+            <button type="button" className={`chip ${installedOnly ? 'on' : ''}`} onClick={() => setInstalledOnly(v => !v)}>Instalados</button>
+          </div>
+        </div>
+
+        {!filtered.length && (
+          <div className="mp-conn-empty">
+            <p><b>Nada encontrado.</b> Tente outro nome ou adicione um aplicativo pelo endereço HTTPS.</p>
+            <div className="row">
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => { setQ(''); setCategory(''); setAuth(''); setVerifiedOnly(false); setInstalledOnly(false); }}>Limpar busca</button>
+              <button type="button" className="btn btn-sm" onClick={() => setCustomOpen(true)}>Adicionar por endereço</button>
+            </div>
+          </div>
+        )}
+
+        {!!attention.length && (
+          <section className="mp-section">
+            <h2>Precisa de você</h2>
+            <div className="mp-grid two">{attention.map(card)}</div>
+          </section>
+        )}
+
+        {!!connected.length && (
+          <section className="mp-section">
+            <h2>{searching ? 'Conectados' : 'Seus aplicativos'}</h2>
+            <div className="mp-grid two">{connected.map(card)}</div>
+          </section>
+        )}
+
+        {!!rest.length && (
+          <section className="mp-section">
+            <div className="mp-section-head">
+              <h2>{searching ? 'Resultados' : 'Todos os aplicativos'} <span className="tag">{rest.length}</span></h2>
+            </div>
+            <div className="mp-grid two">{rest.map(card)}</div>
+          </section>
+        )}
+
+        <MarketSkills filter={x => !q.trim() || (x.name + x.desc + (x.author || '')).toLowerCase().includes(q.trim().toLowerCase())} />
+
+        {isEnterpriseMode(S.settings) && S.settings.flags?.socialWebhooks && (
+          <section className="mp-section" id="mp-webhooks">
+            <h2>Webhooks sociais</h2>
+            <SocialWebhooksPanel />
+          </section>
+        )}
+      </HubShell>
+      <CustomConnectorModal open={customOpen} onClose={() => setCustomOpen(false)} onSaved={() => { refresh(); loadLive(); }} />
+    </>
+  );
 }
