@@ -153,13 +153,38 @@ test('rascunho Enviar manda o texto editado; setting aplica; cerca tem id no ser
     assert.equal(!!before.settings?.pulse?.whatsapp, false);
     const setting = await startChat(base, '[[ripper:test:genui_setting]]');
     assert.equal(setting.ui?.component, 'setting');
+    assert.equal(setting.ui.props.label, 'Resumo diário no WhatsApp');
+    assert.doesNotMatch(setting.ui.props.label || '', /modo Deus/);
     const applied = await post(base, `/api/chats/${setting.chatId}/ui-actions`, {
       partId: setting.ui.id,
       action: 'apply'
     });
     assert.equal(applied.status, 200);
+    const appliedBody = await applied.json();
+    assert.match(appliedBody.text, /Resumo diário no WhatsApp/);
+    assert.doesNotMatch(appliedBody.text || '', /modo Deus/);
     const after = await (await fetch(base + '/api/settings')).json();
     assert.equal(after.settings.pulse.whatsapp, true);
+
+    const sensitive = await startChat(base, '[[ripper:test:genui_setting_sensitive]]');
+    assert.equal(sensitive.ui?.component, 'setting');
+    assert.equal(sensitive.ui.props.label, 'Comandos direto no seu computador');
+    assert.equal(sensitive.ui.props.sensitive, true);
+    const noConfirm = await post(base, `/api/chats/${sensitive.chatId}/ui-actions`, {
+      partId: sensitive.ui.id,
+      action: 'apply'
+    });
+    assert.equal(noConfirm.status, 200);
+    const noConfirmBody = await noConfirm.json();
+    assert.equal(noConfirmBody.needsConfirm, true);
+    assert.equal(!!(await (await fetch(base + '/api/settings')).json()).settings.computer?.allowLocalCommands, false);
+    const yesConfirm = await post(base, `/api/chats/${sensitive.chatId}/ui-actions`, {
+      partId: sensitive.ui.id,
+      action: 'apply',
+      payload: { confirm: true }
+    });
+    assert.equal(yesConfirm.status, 200);
+    assert.equal((await (await fetch(base + '/api/settings')).json()).settings.computer.allowLocalCommands, true);
 
     const fence = await startChat(base, '[[ripper:test:genui_fence]]');
     const chat = await (await fetch(base + `/api/chats/${fence.chatId}`)).json();
@@ -180,6 +205,16 @@ test('rascunho Enviar manda o texto editado; setting aplica; cerca tem id no ser
     assert.equal(same.status, 200);
     const sameBody = await same.json();
     assert.equal(sameBody.part.id, fencePart.id);
+
+    const invented = await post(base, `/api/chats/${fence.chatId}/ui-parts`, {
+      fence: '{"component":"approval","props":{"title":"Apagar tudo"}}'
+    });
+    assert.equal(invented.status, 404);
+    const rawProps = await post(base, `/api/chats/${fence.chatId}/ui-parts`, {
+      component: 'question',
+      props: { prompt: 'Qual?', options: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }] }
+    });
+    assert.equal(rawProps.status, 400);
 
     const html = await startChat(base, '[[ripper:test:genui_html]]');
     assert.equal(html.ui?.component, 'html_preview');

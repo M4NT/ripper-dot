@@ -31,6 +31,10 @@ export function GenUiCard({ part, live }) {
     }
     try {
       const r = await runAction(cur, action, payload);
+      if (r?.needsConfirm) {
+        setLocal(p => ({ ...(p || part), ...(r.part || {}), state: 'input-available' }));
+        return;
+      }
       if (r?.part) setLocal(r.part);
       else setLocal(p => ({ ...(p || part), state: action === 'deny' || action === 'cancel' || action === 'discard' || action === 'dismiss' ? 'denied' : 'answered' }));
     } catch {

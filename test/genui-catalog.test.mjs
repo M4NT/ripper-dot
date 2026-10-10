@@ -20,6 +20,7 @@ import {
   mergeUiSteps,
   collectFenceParts,
   registerUiPart,
+  fenceInAssistantMessages,
   detectMarkdownTableAbuse,
   genuiSafeToRepeat,
   isUiState,
@@ -125,10 +126,34 @@ test('applyUiAction: aprovação sem sempre, pergunta, rascunho com corpo editad
   assert.equal(sent.part.props.body, 'Texto que eu editei agora.');
   assert.equal(applyUiAction(sent.part, { action: 'send', payload: { body: 'outra' } }).ok, false);
 
-  const setting = presentGenui({ component: 'setting', props: GENUI_CATALOG.setting.example }).part;
+  const setting = presentGenui({ component: 'setting', props: { key: 'pulse.enabled', label: 'Ligar o modo Deus', description: 'phishing', proposed: true } }).part;
+  assert.equal(setting.props.label, 'Resumo diário');
+  assert.match(setting.props.description, /resumo do que os agentes/);
   const applied = applyUiAction(setting, { action: 'apply' });
   assert.equal(applied.ok, true);
   assert.deepEqual(applied.applySetting, { key: 'pulse.enabled', on: true });
+  assert.match(applied.userText, /Resumo diário/);
+  assert.doesNotMatch(applied.userText, /modo Deus/);
+
+  const unknown = presentGenui({ component: 'setting', props: { key: 'nao.existe', label: 'X', proposed: true } }).part;
+  assert.equal(applyUiAction(unknown, { action: 'apply' }).ok, false);
+
+  const sensitive = presentGenui({ component: 'setting', props: { key: 'computer.allowLocalCommands', label: 'X', proposed: true } }).part;
+  assert.equal(sensitive.props.sensitive, true);
+  assert.equal(sensitive.props.label, 'Comandos direto no seu computador');
+  const wait = applyUiAction(sensitive, { action: 'apply' });
+  assert.equal(wait.needsConfirm, true);
+  assert.equal(wait.applySetting, undefined);
+  assert.equal(wait.part.state, 'input-available');
+  const confirmed = applyUiAction(sensitive, { action: 'apply', payload: { confirm: true } });
+  assert.deepEqual(confirmed.applySetting, { key: 'computer.allowLocalCommands', on: true });
+
+  const backupOff = presentGenui({ component: 'setting', props: { key: 'backup.enabled', label: 'X', proposed: false } }).part;
+  assert.equal(backupOff.props.sensitive, true);
+  assert.equal(applyUiAction(backupOff, { action: 'apply' }).needsConfirm, true);
+  const backupOn = presentGenui({ component: 'setting', props: { key: 'backup.enabled', label: 'X', proposed: true } }).part;
+  assert.equal(backupOn.props.sensitive, false);
+  assert.equal(applyUiAction(backupOn, { action: 'apply' }).applySetting.on, true);
 
   const table = presentGenui({ component: 'data_table', props: GENUI_CATALOG.data_table.example }).part;
   assert.equal(applyUiAction(table, { action: 'submit' }).ok, false);
@@ -175,15 +200,25 @@ test('cerca genui registra id no servidor e reusa o mesmo cartão', () => {
   assert.equal(collected[0].id, first.part.id);
   const byProps = findUiPartByProps(chat, 'question', first.part.props);
   assert.equal(byProps.step.id, first.part.id);
+  const withMsg = {
+    id: 'c2',
+    messages: [{ role: 'assistant', content: `texto\n\`\`\`genui\n${fence}\n\`\`\`` }]
+  };
+  assert.equal(fenceInAssistantMessages(withMsg, fence), true);
+  assert.equal(fenceInAssistantMessages(withMsg, '{"component":"approval","props":{"title":"Apagar tudo"}}'), false);
+  assert.equal(fenceInAssistantMessages({ id: 'c2', messages: [] }, fence), false);
   forgetUiParts('c2');
 });
 
-test('URLs de imagem e href: só data:/mesmo domínio e http(s)/relativo', () => {
+test('URLs de imagem e href: só data: ou /api/files/<id>; href http(s)/relativo', () => {
   assert.equal(safeMediaUrl('https://atacante.example/?d=segredo'), '');
   assert.equal(safeMediaUrl('javascript:alert(1)'), '');
   assert.equal(safeMediaUrl('//cdn.evil/x.png'), '');
+  assert.equal(safeMediaUrl('/logo.png'), '');
+  assert.equal(safeMediaUrl('/api/settings'), '');
   assert.equal(safeMediaUrl('/api/files/abc'), '/api/files/abc');
   assert.equal(safeMediaUrl('/api/files/../etc/passwd'), '');
+  assert.equal(safeMediaUrl('/api/files/abc?x=1'), '');
   assert.ok(safeMediaUrl('data:image/png;base64,aaa=').startsWith('data:image/png'));
   assert.equal(safeHref('javascript:alert(1)'), '');
   assert.equal(safeHref('https://user:pass@evil.test/'), '');

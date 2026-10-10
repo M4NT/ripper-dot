@@ -73,7 +73,7 @@ import { gh, githubReady, normalizeRepo, repoChanges, describeChange, prBranch, 
 import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './lib/event-triggers.mjs';
 import { isPaidModel, paidBlockReason, addSpend, spendToday, spendLimits, normalizeBilling, useSpendStore, closeSpendStore } from './lib/paid-usage.mjs';
 import { runTestProvider } from './lib/test-provider.mjs';
-import { presentGenui, findUiPart, applyUiAction, rememberUiPart, forgetUiParts, collectFenceParts, mergeUiSteps, slimUiPart, registerUiPart } from './lib/genui.mjs';
+import { presentGenui, findUiPart, applyUiAction, rememberUiPart, forgetUiParts, collectFenceParts, mergeUiSteps, slimUiPart, registerUiPart, fenceInAssistantMessages } from './lib/genui.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
 import { memoryContext, isDuplicateMemory, canUseFile, selectSpeakers, mentionOrder, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, ambiguousMentions, isAck, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent, turnPlanIds, delegationTasks, oneLineTask, ownerBlockedReason } from './lib/agent-flow.mjs';
 import { providerAttemptOrder, runProviderAttemptLoop, needsUsageCredits } from './lib/provider-turn.mjs';
@@ -1100,14 +1100,15 @@ async function offerSetting({ agent, chat, emit, signal }, { key, on, reason }) 
 }
 
 /** Clique no cartão show_setting: aplica de verdade, como offer_setting. */
-function applyGenuiSetting(key, on) {
+function applyGenuiSetting(key, on, { confirm } = {}) {
   const view = settingCardView(db.settings, key, on);
-  if (!view) return null;
+  if (!view) throw new HttpError(400, 'Configuração desconhecida.');
+  if (view.sensitive && !confirm) return { needsConfirm: true, view };
   const before = structuredClone(db.settings);
   const patch = settingPatch(key, on);
   patchSettings(db.settings, patch, { mergePluginAuth });
   recordCorporateAudit(db.settings, auditSettingsPatch(before, db.settings, patch));
-  return view;
+  return { view };
 }
 
 function guarded(computer, { agent, chat, emit, signal }) {
@@ -3651,7 +3652,10 @@ const routes = [
     const c = db.chats.find(x => x.id === cid);
     if (!c) throw new HttpError(404, 'Conversa não encontrada.');
     const b = await body(req);
-    const r = registerUiPart(c, { fence: b.fence, component: b.component, props: b.props, partId: b.id });
+    if (!b.fence) throw new HttpError(400, 'Informe a cerca genui.');
+    const live = liveByChat.get(cid)?.content || '';
+    if (!fenceInAssistantMessages(c, b.fence, live)) throw new HttpError(404, 'Cerca não encontrada nesta conversa.');
+    const r = registerUiPart(c, { fence: b.fence });
     if (!r.ok) throw new HttpError(400, r.error);
     return { ok: true, part: r.part };
   }],
@@ -3665,13 +3669,30 @@ const routes = [
     if (!r.ok) throw new HttpError(400, r.error);
     Object.assign(found.step, r.part);
     if (found.live) rememberUiPart(cid, found.step);
+    if (r.needsConfirm) {
+      save();
+      return { ok: true, text: null, part: r.part, continue: false, needsConfirm: true };
+    }
     if (r.applySetting) {
-      try { applyGenuiSetting(r.applySetting.key, r.applySetting.on); }
-      catch { /* chave desconhecida: o texto ainda volta ao agente */ }
+      const applied = applyGenuiSetting(r.applySetting.key, r.applySetting.on, { confirm: !!b.payload?.confirm });
+      if (applied.needsConfirm) {
+        found.step.state = 'input-available';
+        delete found.step.action;
+        save();
+        return { ok: true, text: null, part: found.step, continue: false, needsConfirm: true };
+      }
+      found.step.props = {
+        ...found.step.props,
+        key: applied.view.key,
+        label: applied.view.label,
+        description: applied.view.desc,
+        proposed: applied.view.proposed,
+        sensitive: applied.view.sensitive
+      };
     }
     if (!found.live) c.updatedAt = Date.now();
     save();
-    return { ok: true, text: r.userText, part: r.part, continue: !!r.continue };
+    return { ok: true, text: r.userText, part: found.step, continue: !!r.continue };
   }],
   // Seletor de pasta de trabalho: só quem está nesta máquina navega pelas pastas dela.
   ['GET', /^\/api\/fs\/dirs$/, (req, _, url) => {

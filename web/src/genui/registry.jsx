@@ -397,15 +397,29 @@ export function SlidesView({ props, state, onAction }) {
 }
 
 export function SettingView({ props, state, onAction }) {
+  const [confirm, setConfirm] = useState(false);
   const disabled = locked(state);
+  function apply() {
+    if (props.sensitive && !confirm) { setConfirm(true); return; }
+    onAction('apply', { confirm: true });
+  }
   return (
     <Card status={cardStatus(state)} role="group" aria-label={props.label}>
       <Head icon="gear" title="Configuração" />
       <div className="oui-setting">
         <span><b>{props.label}</b>{props.description && <small>{props.description}</small>}</span>
-        <Button variant="default" disabled={disabled} onClick={() => onAction('apply')}>{props.proposed ? 'Ligar' : 'Desligar'}</Button>
+        {!confirm && <Button variant="default" disabled={disabled} onClick={apply}>{props.proposed ? 'Ligar' : 'Desligar'}</Button>}
       </div>
-      {!disabled && <button type="button" className="link" onClick={() => onAction('dismiss')}>Agora não</button>}
+      {confirm && !disabled && (
+        <div className="oui-setting-confirm">
+          <p className="oui-warn">Tem certeza? Isso muda a segurança do Ripper.</p>
+          <Actions>
+            <Button variant="destructive" onClick={apply}>{props.proposed ? 'Ligar mesmo assim' : 'Desligar mesmo assim'}</Button>
+            <Button variant="ghost" onClick={() => setConfirm(false)}>Cancelar</Button>
+          </Actions>
+        </div>
+      )}
+      {!disabled && !confirm && <button type="button" className="link" onClick={() => onAction('dismiss')}>Agora não</button>}
       <Receipt state={state} text={state === 'denied' ? 'Mantida' : 'Aplicada'} />
     </Card>
   );
