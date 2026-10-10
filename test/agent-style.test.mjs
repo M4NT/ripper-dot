@@ -12,13 +12,27 @@ test('resolveAgentStyle herda defaults quando agente não tem style', () => {
   assert.equal(s.customHints, 'Use «você».');
 });
 
-test('agentStyleBlock inclui tom, formalidade e limite de frases', () => {
+test('agentStyleBlock inclui tom, formalidade e limite de frases só quando combinado', () => {
   const block = agentStyleBlock({ tone: 'tecnico', formality: 'formal', maxSentences: 2, language: 'pt-BR', customHints: 'Sem emojis.' });
   assert.match(block, /## Voz e estilo/);
   assert.match(block, /técnico/i);
   assert.match(block, /até 2 frases/);
   assert.match(block, /pt-BR/);
   assert.match(block, /Sem emojis/);
+});
+
+test('agentStyleBlock sem maxSentences pede tamanho proporcional, sem teto de 4 frases', () => {
+  const block = agentStyleBlock({ tone: 'direto', formality: 'neutro' });
+  assert.match(block, /proporcional/);
+  assert.match(block, /raciocin/i);
+  assert.doesNotMatch(block, /até 4 frases/);
+  assert.doesNotMatch(block, /até 5 itens/);
+  assert.doesNotMatch(block, /Só se estenda quando pedirem/);
+});
+
+test('resolveAgentStyle não inventa maxSentences quando ninguém configurou', () => {
+  const s = resolveAgentStyle({ tone: 'amigavel' }, { defaults: { agentStyle: {} } });
+  assert.equal(s.maxSentences, undefined);
 });
 
 test('systemPrompt injeta bloco de voz do agente', () => {
@@ -34,7 +48,9 @@ test('systemPrompt injeta bloco de voz do agente', () => {
   assert.match(sys, /## Voz e estilo/);
   assert.match(sys, /Assine com — Equipe/);
   assert.match(sys, /Faça Y/);
+  assert.match(sys, /proporcional/);
   assert.doesNotMatch(sys, /Tom direto e objetivo/);
+  assert.doesNotMatch(sys, /até 4 frases/);
 });
 
 test('sanitizeStyleFields limita campos', () => {
