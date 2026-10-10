@@ -152,6 +152,10 @@ export function stallLabel(label, ms, slowAfterMs = 20_000) {
 /** Rótulo humano de uma ferramenta; conectores (mcp__claude_ai_Google_Calendar__list_events) viram "Google Calendar: list events". */
 export function stepLabel(tool) {
   if (STEP_LABEL[tool]) return STEP_LABEL[tool];
+  if (/^show_/.test(String(tool || ''))) {
+    const n = String(tool).slice(5).replace(/_/g, ' ');
+    return `Mostrando ${n}`;
+  }
   if (/^omie_/.test(String(tool || ''))) return rotuloOmie(tool);
   const m = /^mcp__(?:claude_ai_)?(.+?)__(.+)$/.exec(String(tool || ''));
   if (m) {

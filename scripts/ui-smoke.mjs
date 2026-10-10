@@ -56,6 +56,14 @@ try {
     await page.locator('text=comando aprovado').last().waitFor({ timeout: 15_000 });
   });
 
+  // 2b) Cartão de pergunta do catálogo: a escolha vira a próxima mensagem
+  await step('cartão genui', async () => {
+    await send('[[ripper:test:genui]]');
+    await page.getByRole('radio', { name: 'Ana Ltda' }).click({ timeout: 15_000 });
+    await page.getByRole('group', { name: 'Qual cliente devo usar?' }).getByRole('button', { name: 'Enviar' }).click({ timeout: 10_000 });
+    await page.locator('text=Escolhi: Ana Ltda').last().waitFor({ timeout: 15_000 });
+  });
+
   // 3) Criar agente pela tela /new
   await step('criar agente', async () => {
     await page.goto(base + '/#/new', { waitUntil: 'domcontentloaded' });

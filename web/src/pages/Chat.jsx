@@ -16,7 +16,10 @@ import ImageGenLoader from '../imageGenLoader.jsx';
 import { AgentThread, ViaLabel } from '../agentThread.jsx';
 import { delegationCardState } from '../../../lib/agent-flow.mjs';
 import { ResizeHandle } from '../resize.jsx';
-import { OpenUIBlock, splitOpenUi } from '../openui/library.jsx';
+import { OpenUIBlock } from '../openui/library.jsx';
+import { splitChatVisual } from '../genui/split.js';
+import { GenUiFence, GenUiSteps } from '../genui/MessageUi.jsx';
+import { setGenUiHost } from '../genui/host.js';
 import ActionLine, { Fontes, StallNote } from '../actionLine.jsx';
 import { useChatMenu } from '../actions.jsx';
 import { useOv } from '../overlay.jsx';
@@ -151,13 +154,15 @@ function MarkdownText({ text, live }) {
   </>;
 }
 
-// Blocos ```openui viram componentes visuais; o resto segue o markdown de sempre.
+// Blocos ```openui e ```genui viram componentes; o resto segue o markdown de sempre.
 function Markdown({ text, live }) {
-  const parts = useMemo(() => splitOpenUi(text), [text]);
+  const parts = useMemo(() => splitChatVisual(text), [text]);
   if (parts.length === 1 && parts[0].t === 'md') return <MarkdownText text={text} live={live} />;
-  return parts.map((p, i) => p.t === 'ui'
+  return parts.map((p, i) => p.t === 'openui'
     ? <OpenUIBlock key={i} code={p.code} live={live && p.open} />
-    : <MarkdownText key={i} text={p.text} live={live} />);
+    : p.t === 'genui'
+      ? <GenUiFence key={i} code={p.code} live={live && p.open} />
+      : <MarkdownText key={i} text={p.text} live={live} />);
 }
 
 function LiveText({ text }) {
@@ -239,6 +244,7 @@ const BotMessage = memo(function BotMessage({ m, agent, live, phase, onRetry, on
         {group && <span className="speaker" style={{ color: agentColor(agent) }}>{agent.name}</span>}
         <div className="bubble bot-bubble" tabIndex={-1}>
           <ActionLine steps={m.steps} live={live} onStop={live ? onStop : undefined} />
+          <GenUiSteps steps={m.steps} live={live} />
           {live && phase === 'approval' && <p className="action-status" role="status"><Icon name="clock" size={13} />Esperando você responder acima</p>}
           {(m.steps || []).filter(s => s.tool === 'send_message' && s.detail).map((s, i) => <span key={i} className="enviada-a">Enviada a {String(s.detail).replace(/^→\s*/, '')}</span>)}
           {live && phase === 'generate_image' && <ImageGenLoader />}
@@ -545,6 +551,9 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
     }
     queueRef.current.enqueue(payload, { immediate });
   }
+  useEffect(() => {
+    setGenUiHost({ chatId, send: text => queueSend({ text }, { immediate: true }) });
+  }, [chatId]);
   // Ctrl+. recolhe/mostra o painel da direita.
   useEffect(() => {
     const k = e => { if ((e.ctrlKey || e.metaKey) && e.key === '.') { e.preventDefault(); setPanel(p => { local.set('panel.v2', !p); return !p; }); } };
@@ -677,6 +686,7 @@ export default function Chat({ chatId: initialId, agentId: initialAgent, project
           if (e.approval) { building.steps.push({ kind: 'approval', rec: e.approval, status: 'pending' }); setPhase('approval'); }
           if (e.campaign) building.steps.push({ kind: 'campaign', rec: e.campaign });
           if (e.documento) building.steps.push({ kind: 'documento', rec: e.documento });
+          if (e.ui) building.steps.push({ ...e.ui, kind: 'ui' });
           if (e.approvalDone) { const st = building.steps.find(x => x.kind === 'approval' && x.rec.id === e.approvalDone.id); if (st) { st.status = e.approvalDone.status; st.rec = { ...st.rec, decidedAt: Date.now() }; } }
           if (e.sent) building.steps.push({ kind: 'done', label: `Mensagem enviada para ${e.sent.to}`, detail: e.sent.priority === 'now' ? 'urgente' : e.sent.priority === 'low' ? 'sem pressa' : 'normal' });
           if (e.artifact) building.steps.push({ kind: 'done', label: `Artefato salvo (v${e.artifact.version})`, detail: e.artifact.title });

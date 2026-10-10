@@ -73,6 +73,7 @@ import { gh, githubReady, normalizeRepo, repoChanges, describeChange, prBranch, 
 import { whatsappTriggerMatches, emailTriggerMatches, parseKeywords } from './lib/event-triggers.mjs';
 import { isPaidModel, paidBlockReason, addSpend, spendToday, spendLimits, normalizeBilling, useSpendStore, closeSpendStore } from './lib/paid-usage.mjs';
 import { runTestProvider } from './lib/test-provider.mjs';
+import { presentGenui, findUiPart, applyUiAction, rememberUiPart } from './lib/genui.mjs';
 import { TEMPLATES, CATEGORIES } from './lib/templates.mjs';
 import { memoryContext, isDuplicateMemory, canUseFile, selectSpeakers, mentionOrder, routineDue, Floor, isPass, heuristicSpeaker, groupMembers, ambiguousMentions, isAck, trimHistory, isNothingNew, routinePrompt, summarizeEvent, lastUserTurnIndex, labelMessageForAgent, turnPlanIds, delegationTasks, oneLineTask, ownerBlockedReason } from './lib/agent-flow.mjs';
 import { providerAttemptOrder, runProviderAttemptLoop, needsUsageCredits } from './lib/provider-turn.mjs';
@@ -422,6 +423,7 @@ function trackLive(chatId, e) {
   if (e.approval) cur.steps.push({ kind: 'approval', rec: e.approval, status: 'pending' });
   if (e.warn) cur.steps.push({ kind: 'warn', label: e.warn });
   if (e.campaign) cur.steps.push({ kind: 'campaign', rec: e.campaign });
+  if (e.ui) cur.steps.push({ ...e.ui, kind: 'ui' });
   if (e.passed) liveByChat.set(chatId, { agentId: null, content: '', steps: [], at: Date.now() });
 }
 
@@ -1299,6 +1301,16 @@ async function turnInner({ agent, chat, text, prompt, images, signal, group, hop
     // Só o provedor de teste usa: pede aprovação de um comando como o computador faria.
     askApproval: (command, reason) => askApproval({ agent, chat, emit, signal }, 'command', command, reason),
     offerSetting: chat.channel ? null : a => offerSetting({ agent, chat, emit, signal }, a),
+    showUi: (component, props) => {
+      const shown = presentGenui({ component, props, chatId: chat.id });
+      if (shown.part) {
+        cardSteps.push(shown.part);
+        rememberUiPart(chat.id, shown.part);
+        emit({ ui: shown.part });
+      } else if (shown.warning) emit({ warn: shown.warning });
+      if (!shown.ok && shown.text) return shown.text;
+      return shown.ok ? `Mostrado: ${component}.` : (shown.warning || 'não mostrado');
+    },
     // Entrega um arquivo do computador do agente na conversa (Abrir / Baixar / Mostrar na pasta).
     deliverFile: async a => {
       const rel = vmPathToData(a.path, agent.id);
@@ -3619,6 +3631,19 @@ const routes = [
     return testAccount(aid, CLAUDE_FAST_ENV);
   }],
   ['GET', /^\/api\/chats\/([\w-]+)\/live$/, (req, [cid]) => ({ streaming: isChatStreaming(cid), live: liveByChat.get(cid) || null })],
+  ['POST', /^\/api\/chats\/([\w-]+)\/ui-actions$/, async (req, [cid]) => {
+    const c = db.chats.find(x => x.id === cid);
+    if (!c) throw new HttpError(404, 'Conversa não encontrada.');
+    const b = await body(req);
+    const found = findUiPart(c, b.partId);
+    if (!found) throw new HttpError(404, 'Cartão não encontrado.');
+    const r = applyUiAction(found.step, { action: b.action, payload: b.payload });
+    if (!r.ok) throw new HttpError(400, r.error);
+    Object.assign(found.step, r.part);
+    c.updatedAt = Date.now();
+    save();
+    return { ok: true, text: r.userText, part: r.part, continue: !!r.continue };
+  }],
   // Seletor de pasta de trabalho: só quem está nesta máquina navega pelas pastas dela.
   ['GET', /^\/api\/fs\/dirs$/, (req, _, url) => {
     if (!isLocalRequest(req)) throw new HttpError(403, 'Só dá para escolher pastas na própria máquina do Ripper.');
