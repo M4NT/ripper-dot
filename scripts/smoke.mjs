@@ -31,7 +31,7 @@ const api = async (path, opts) => {
 };
 /** Manda no chat e lê o SSE até o fim; `onEvent` recebe cada evento. */
 async function chat(payload, onEvent = () => {}) {
-  const r = await req('/api/chat', { method: 'POST', body: { model: 'claude-haiku-4-5', effort: 'low', ...payload } });
+  const r = await req('/api/chat', { method: 'POST', body: { model: 'claude-haiku-5-5', effort: 'low', ...payload } });
   if (!r.ok) throw new Error(`chat → ${r.status} ${(await r.text()).slice(0, 160)}`);
   let text = '', chatId = null, buf = '';
   const dec = new TextDecoder();
