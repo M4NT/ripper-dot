@@ -17,16 +17,17 @@ mkdir -p /work/.ripper/chromium && rm -f /work/.ripper/chromium/Singleton*
       --window-position=0,0 --window-size="$W,$H" about:blank >/tmp/chromium.log 2>&1
     sleep 1
   done ) &
-# Senha do VNC em /work (volume do agente): o proxy autenticado do Ripper lê e o noVNC usa.
-# x11vnc só escuta localhost — a rede Docker não alcança a porta 5900.
-mkdir -p /work/.ripper
-if [ ! -s /work/.ripper/vnc.pass ]; then
-  tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24 > /work/.ripper/vnc.pass
+# Senha do x11vnc em /run (não no /work do agente). O Ripper guarda a senha fora do
+# contêiner e reaplica ao abrir a tela. Imagens antigas sem senha são recusadas pelo proxy.
+if [ -n "$RIPPER_VNC_PASSWORD" ]; then
+  printf '%s' "$RIPPER_VNC_PASSWORD" > /run/ripper-vnc.pass
+elif [ ! -s /run/ripper-vnc.pass ]; then
+  tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24 > /run/ripper-vnc.pass
 fi
-chmod 600 /work/.ripper/vnc.pass
-PASS=$(cat /work/.ripper/vnc.pass)
-x11vnc -storepasswd "$PASS" /work/.ripper/vnc.rfb >/dev/null 2>&1
-chmod 600 /work/.ripper/vnc.rfb
-x11vnc -display :99 -forever -shared -rfbauth /work/.ripper/vnc.rfb -localhost -quiet -rfbport 5900 >/tmp/x11vnc.log 2>&1 &
+chmod 600 /run/ripper-vnc.pass
+PASS=$(cat /run/ripper-vnc.pass)
+x11vnc -storepasswd "$PASS" /run/ripper-vnc.rfb >/dev/null 2>&1
+chmod 600 /run/ripper-vnc.rfb
+x11vnc -display :99 -forever -shared -rfbauth /run/ripper-vnc.rfb -localhost -quiet -rfbport 5900 >/tmp/x11vnc.log 2>&1 &
 websockify --web /usr/share/novnc 6080 localhost:5900 >/tmp/novnc.log 2>&1 &
 exec sleep infinity

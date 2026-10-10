@@ -12,62 +12,74 @@ import {
   vncClientUrl,
   vncWsPath,
   matchVncProxy,
-  readVncPassword,
-  injectVncPassword,
+  vncSecretPath,
+  ensureVncSecret,
+  parseVncPassword,
+  generateVncPassword,
   createCachedLoader,
-  proxyVncHttp,
+  serveVncStatic,
+  resolveVncStatic,
+  vncStaticHeaders,
+  pickWsHeaders,
+  filterUpgradeHeaders,
+  vncOriginAllowed,
+  vncEncryptChallenge,
+  createRfbAuthFilter,
+  writeWsFrame,
+  readWsFrame,
+  applyVncPasswordForAgent,
   attachVncUpgrade,
   handleVncUpgrade,
-  forwardUpgrade
+  forwardUpgrade,
+  proxyVncWebSocket,
+  VncError
 } from '../lib/vnc-proxy.mjs';
 
 const serverPath = fileURLToPath(new URL('../server.mjs', import.meta.url));
 
-test('vncClientUrl é same-origin e aponta o WebSocket para o proxy', () => {
-  const url = vncClientUrl('ag-1', { password: 's3cret' });
+test('vncClientUrl é same-origin, sem senha e sem 127.0.0.1', () => {
+  const url = vncClientUrl('ag-1');
   assert.equal(url.startsWith('/api/agents/ag-1/vnc/vnc.html?'), true);
   assert.doesNotMatch(url, /127\.0\.0\.1/);
   assert.doesNotMatch(url, /localhost/);
+  assert.doesNotMatch(url, /password=/i);
   const q = new URL(url, 'http://ripper.local').searchParams;
-  assert.equal(q.get('autoconnect'), '1');
-  assert.equal(q.get('resize'), 'scale');
-  assert.equal(q.get('reconnect'), '1');
-  assert.equal(q.get('show_dot'), '1');
   assert.equal(q.get('path'), vncWsPath('ag-1'));
-  assert.equal(q.get('password'), 's3cret');
-  assert.equal(vncClientUrl('ag-1').includes('password='), false);
+  assert.equal(q.get('autoconnect'), '1');
 });
 
 test('matchVncProxy distingue meta, estáticos, websocket e path traversal', () => {
   assert.deepEqual(matchVncProxy('/api/agents/a1/vnc'), { agentId: 'a1', kind: 'meta' });
-  assert.deepEqual(matchVncProxy('/api/agents/a1/vnc/vnc.html'), { agentId: 'a1', kind: 'http', backendPath: '/vnc.html' });
-  assert.deepEqual(matchVncProxy('/api/agents/a1/vnc/app/ui.js'), { agentId: 'a1', kind: 'http', backendPath: '/app/ui.js' });
-  assert.deepEqual(matchVncProxy('/api/agents/a1/vnc/websockify'), { agentId: 'a1', kind: 'ws', backendPath: '/websockify' });
+  assert.deepEqual(matchVncProxy('/api/agents/a1/vnc/vnc.html'), { agentId: 'a1', kind: 'static', rest: 'vnc.html' });
+  assert.equal(matchVncProxy('/api/agents/a1/vnc/websockify').kind, 'ws');
   assert.equal(matchVncProxy('/api/agents/a1/vnc/foo/../bar').kind, 'invalid');
   assert.equal(matchVncProxy('/api/health'), null);
 });
 
-test('readVncPassword lê o arquivo do sandbox e ignora ausência', () => {
-  const dataDir = mkdtempSync(join(tmpdir(), 'ripper-vnc-pw-'));
+test('senha do VNC fica fora do /work e rejeita XSS / lixo', () => {
+  const dataDir = mkdtempSync(join(tmpdir(), 'ripper-vnc-sec-'));
   const prev = process.env.RIPPER_DATA;
   process.env.RIPPER_DATA = dataDir;
   try {
-    assert.equal(readVncPassword('agente-x'), null);
-    mkdirSync(join(dataDir, 'sandbox/agente-x/.ripper'), { recursive: true });
-    writeFileSync(join(dataDir, 'sandbox/agente-x/.ripper/vnc.pass'), 'abc123\n');
-    assert.equal(readVncPassword('agente-x'), 'abc123');
-    assert.equal(readVncPassword('agente-x', { readFile: () => '  injetada  ' }), 'injetada');
+    const p = ensureVncSecret('agente-x');
+    assert.equal(parseVncPassword(p), p);
+    assert.doesNotMatch(vncSecretPath('agente-x'), /sandbox/);
+    assert.match(vncSecretPath('agente-x'), /vnc-secrets/);
+    assert.equal(readFileSync(vncSecretPath('agente-x'), 'utf8'), p);
+    assert.equal(ensureVncSecret('agente-x'), p);
+
+    writeFileSync(vncSecretPath('agente-x'), '</script><script>alert(1)</script>');
+    const again = ensureVncSecret('agente-x');
+    assert.notEqual(again, '</script><script>alert(1)</script>');
+    assert.equal(parseVncPassword(again), again);
+
+    assert.equal(parseVncPassword('curta'), null);
+    assert.equal(parseVncPassword('abc</script>'), null);
+    assert.match(generateVncPassword(), /^[A-Za-z0-9]{24}$/);
   } finally {
     if (prev === undefined) delete process.env.RIPPER_DATA;
     else process.env.RIPPER_DATA = prev;
   }
-});
-
-test('injectVncPassword recarrega uma vez se a query não tem senha', () => {
-  const out = injectVncPassword('<html><head></head><body>x</body></html>', 'pw"1');
-  assert.match(out, /<head><script>/);
-  assert.match(out, /p\.set\("password","pw\\"1"\)/);
-  assert.equal(injectVncPassword('<html><body></body></html>', 'pw'), '<html><body></body></html>');
 });
 
 test('createCachedLoader reusa o valor dentro do TTL', async () => {
@@ -75,9 +87,198 @@ test('createCachedLoader reusa o valor dentro do TTL', async () => {
   const load = createCachedLoader(async () => ++n, { ttlMs: 80 });
   assert.equal(await load('a'), 1);
   assert.equal(await load('a'), 1);
-  assert.equal(await load('b'), 2);
   await new Promise(r => setTimeout(r, 90));
-  assert.equal(await load('a'), 3);
+  assert.equal(await load('a'), 2);
+});
+
+test('estáticos vêm do Ripper, com X-Frame-Options e CSP', async () => {
+  assert.ok(resolveVncStatic('vnc.html').endsWith('vnc.html'));
+  assert.equal(resolveVncStatic('../package.json'), null);
+  assert.equal(resolveVncStatic('app/ui.js'), null);
+  const headers = vncStaticHeaders('vnc.html');
+  assert.equal(headers['x-frame-options'], 'SAMEORIGIN');
+  assert.match(headers['content-security-policy'], /frame-ancestors 'self'/);
+
+  const server = createServer((req, res) => {
+    const rest = new URL(req.url, 'http://x').pathname.replace(/^.*\/vnc\//, '');
+    serveVncStatic(req, res, rest);
+  });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  server.unref();
+  const port = server.address().port;
+  try {
+    const html = await fetch(`http://127.0.0.1:${port}/api/agents/ag1/vnc/vnc.html`);
+    assert.equal(html.status, 200);
+    assert.equal(html.headers.get('x-frame-options'), 'SAMEORIGIN');
+    assert.match(html.headers.get('content-security-policy'), /script-src 'self'/);
+    const body = await html.text();
+    assert.match(body, /viewer\.js/);
+    assert.doesNotMatch(body, /<script>.*password/i);
+    assert.doesNotMatch(body, /password=/);
+
+    const js = await fetch(`http://127.0.0.1:${port}/api/agents/ag1/vnc/viewer.js`);
+    assert.equal(js.status, 200);
+    assert.doesNotMatch(await js.text(), /password/);
+
+    const miss = await fetch(`http://127.0.0.1:${port}/api/agents/ag1/vnc/core/rfb.js`);
+    assert.equal(miss.status, 404);
+  } finally {
+    server.close();
+  }
+});
+
+test('pickWsHeaders não repassa cookie, Authorization, Origin nem Referer', () => {
+  const h = pickWsHeaders({
+    cookie: 'ripper_session=secreto',
+    authorization: 'Bearer RIPPER_TOKEN',
+    origin: 'https://evil.example',
+    referer: 'https://evil.example/x',
+    'x-forwarded-for': '1.2.3.4',
+    'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==',
+    'sec-websocket-version': '13',
+    'user-agent': 'Evil'
+  }, 6080);
+  assert.equal(h.host, '127.0.0.1:6080');
+  assert.equal(h['sec-websocket-key'], 'dGhlIHNhbXBsZSBub25jZQ==');
+  assert.equal(h.cookie, undefined);
+  assert.equal(h.authorization, undefined);
+  assert.equal(h.origin, undefined);
+  assert.equal(h.referer, undefined);
+  assert.equal(h['x-forwarded-for'], undefined);
+  assert.equal(h['user-agent'], undefined);
+});
+
+test('filterUpgradeHeaders tira set-cookie da resposta 101', () => {
+  const h = filterUpgradeHeaders({
+    upgrade: 'websocket',
+    connection: 'Upgrade',
+    'sec-websocket-accept': 'ok',
+    'set-cookie': 'stolen=1',
+    'Set-Cookie': 'other=2'
+  });
+  assert.equal(h.upgrade, 'websocket');
+  assert.equal(h['set-cookie'], undefined);
+  assert.equal(h['Set-Cookie'], undefined);
+});
+
+test('vncOriginAllowed recusa origem cruzada', () => {
+  const allow = new Set(['https://ok.example']);
+  assert.equal(vncOriginAllowed({ headers: { host: '127.0.0.1:3000', origin: 'http://127.0.0.1:3000' } }, allow), true);
+  assert.equal(vncOriginAllowed({ headers: { host: '127.0.0.1:3000', origin: 'https://ok.example' } }, allow), true);
+  assert.equal(vncOriginAllowed({ headers: { host: '127.0.0.1:3000', origin: 'https://evil.example' } }, allow), false);
+  assert.equal(vncOriginAllowed({ headers: { host: '127.0.0.1:3000' } }, allow), true);
+});
+
+test('vncEncryptChallenge é determinístico e 16 bytes', () => {
+  const ch = Buffer.alloc(16, 7);
+  const a = vncEncryptChallenge(ch, 'abcdefgh');
+  assert.equal(a.length, 16);
+  assert.deepEqual(a, vncEncryptChallenge(ch, 'abcdefgh'));
+  assert.notDeepEqual(a, vncEncryptChallenge(ch, 'aaaaaaaa'));
+});
+
+test('filtro RFB autentica no servidor e oferece None ao cliente', () => {
+  const password = 'Abcdefgh1234';
+  const f = createRfbAuthFilter(password);
+  const challenge = Buffer.alloc(16, 3);
+  let r = f.pushFromServer(Buffer.from('RFB 003.008\n'));
+  assert.equal(r.client.toString(), 'RFB 003.008\n');
+  r = f.pushFromClient(Buffer.from('RFB 003.008\n'));
+  assert.equal(r.server.toString(), 'RFB 003.008\n');
+  r = f.pushFromServer(Buffer.from([2, 1, 2]));
+  assert.deepEqual([...r.client], [1, 1]);
+  assert.deepEqual([...r.server], [2]);
+  r = f.pushFromClient(Buffer.from([1]));
+  r = f.pushFromServer(challenge);
+  assert.deepEqual(r.server, vncEncryptChallenge(challenge, password));
+  r = f.pushFromServer(Buffer.from([0, 0, 0, 0]));
+  assert.deepEqual([...r.client], [0, 0, 0, 0]);
+  assert.equal(r.done, true);
+});
+
+test('filtro RFB recusa servidor só com -nopw', () => {
+  const f = createRfbAuthFilter('Abcdefgh1234');
+  f.pushFromServer(Buffer.from('RFB 003.008\n'));
+  f.pushFromClient(Buffer.from('RFB 003.008\n'));
+  const r = f.pushFromServer(Buffer.from([1, 1]));
+  assert.equal(r.fail, 'nopw');
+});
+
+test('filtro RFB descarta o tipo None do cliente e não espera ele para autenticar', () => {
+  const password = 'Abcdefgh1234';
+  const f = createRfbAuthFilter(password);
+  const challenge = Buffer.alloc(16, 4);
+  f.pushFromServer(Buffer.from('RFB 003.008\n'));
+  f.pushFromClient(Buffer.from('RFB 003.008\n'));
+  f.pushFromServer(Buffer.from([2, 1, 2]));
+  const auth = f.pushFromServer(challenge);
+  assert.deepEqual(auth.server, vncEncryptChallenge(challenge, password));
+  const latePick = f.pushFromClient(Buffer.from([1]));
+  assert.equal(latePick.server.length, 0);
+  const done = f.pushFromServer(Buffer.from([0, 0, 0, 0]));
+  assert.equal(done.done, true);
+  assert.equal(done.server.length, 0);
+});
+
+test('filtro RFB recusa handshake acima do limite', () => {
+  const f = createRfbAuthFilter('Abcdefgh1234');
+  const r = f.pushFromServer(Buffer.alloc(70_000, 1));
+  assert.equal(r.fail, 'limit');
+});
+
+test('applyVncPasswordForAgent recusa contêiner que continua com -nopw', async () => {
+  const calls = [];
+  const docker = async (args) => {
+    calls.push(args);
+    if (args[0] === 'ps') return { code: 0, out: 'abc123\n', err: '' };
+    if (args.includes('pgrep')) return { code: 0, out: '99 x11vnc -display :99 -nopw -rfbport 5900\n', err: '' };
+    return { code: 1, out: '', err: 'fail' };
+  };
+  await assert.rejects(
+    () => applyVncPasswordForAgent('ag1', 'Abcdefgh1234', { docker }),
+    e => e instanceof VncError && e.code === 409 && /sem senha/.test(e.message)
+  );
+});
+
+test('handleVncUpgrade recusa sem sessão, origem cruzada e caminho alheio', async () => {
+  const collect = () => {
+    let written = '';
+    return {
+      written: () => written,
+      socket: {
+        destroyed: false,
+        write(s) { written += s; return true; },
+        end(s) { written += s || ''; this.destroyed = true; },
+        destroy() { this.destroyed = true; },
+        on() {}
+      }
+    };
+  };
+
+  const denied = collect();
+  assert.equal(await handleVncUpgrade(
+    { url: '/api/agents/a1/vnc/websockify', headers: {} },
+    denied.socket, Buffer.alloc(0),
+    { isSignedIn: () => false, resolvePort: async () => 1, resolvePassword: async () => 'Abcdefgh1234' }
+  ), true);
+  assert.match(denied.written(), /401/);
+
+  const origin = collect();
+  assert.equal(await handleVncUpgrade(
+    { url: '/api/agents/a1/vnc/websockify', headers: { host: '127.0.0.1:3000', origin: 'https://evil.example' } },
+    origin.socket, Buffer.alloc(0),
+    { isSignedIn: () => true, resolvePort: async () => 1, resolvePassword: async () => 'Abcdefgh1234' }
+  ), true);
+  assert.match(origin.written(), /403/);
+  assert.match(origin.written(), /Origem não permitida/);
+
+  const other = collect();
+  assert.equal(await handleVncUpgrade(
+    { url: '/api/health', headers: {} },
+    other.socket, Buffer.alloc(0),
+    { isSignedIn: () => true, resolvePort: async () => 1 }
+  ), true);
+  assert.match(other.written(), /404/);
 });
 
 async function listen(server) {
@@ -91,84 +292,106 @@ function closeServer(server) {
   try { server.close(); } catch {}
 }
 
-function mockNovncBackend() {
-  const seen = [];
-  const server = createServer((req, res) => {
-    seen.push({ method: req.method, url: req.url });
-    if (req.url.startsWith('/vnc.html')) {
-      res.writeHead(200, {
-        'content-type': 'text/html; charset=utf-8',
-        'x-frame-options': 'DENY',
-        'content-security-policy': "frame-ancestors 'none'"
-      });
-      res.end('<html><head></head><body>novnc</body></html>');
-      return;
-    }
-    if (req.url === '/app/ui.js') {
-      res.writeHead(200, { 'content-type': 'text/javascript' });
-      res.end('/* ui */');
-      return;
-    }
-    res.writeHead(404);
-    res.end('nope');
-  });
-  server.on('upgrade', (req, socket, head) => {
-    seen.push({ method: 'UPGRADE', url: req.url });
+function rfbBackend({ password, setCookie = false } = {}) {
+  const seen = { headers: null, frames: [] };
+  const server = createServer();
+  server.on('upgrade', (req, socket) => {
+    seen.headers = { ...req.headers };
+    const extra = setCookie ? 'Set-Cookie: stolen=1\r\n' : '';
+    socket.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: dummy\r\n${extra}\r\n`);
     socket.unref();
-    socket.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: dummy\r\n\r\n');
-    if (head?.length) socket.write(head);
-    socket.on('data', d => socket.write(d));
+    let phase = 'ver';
+    let buf = Buffer.alloc(0);
+    const challenge = Buffer.alloc(16, 9);
+    socket.write(writeWsFrame(Buffer.from('RFB 003.008\n'), { opcode: 2 }));
+    socket.on('data', chunk => {
+      buf = Buffer.concat([buf, chunk]);
+      while (buf.length) {
+        const frame = readWsFrame(buf);
+        if (!frame) break;
+        buf = frame.rest;
+        if (frame.opcode !== 2) continue;
+        const p = frame.payload;
+        seen.frames.push(p);
+        if (phase === 'ver' && p.length >= 12) {
+          phase = 'sec';
+          socket.write(writeWsFrame(Buffer.from([2, 1, 2]), { opcode: 2 }));
+        } else if (phase === 'sec' && p[0] === 2) {
+          phase = 'ch';
+          socket.write(writeWsFrame(challenge, { opcode: 2 }));
+        } else if (phase === 'ch') {
+          assert.deepEqual(p, vncEncryptChallenge(challenge, password));
+          phase = 'ok';
+          socket.write(writeWsFrame(Buffer.from([0, 0, 0, 0, ...Buffer.from('pong')]), { opcode: 2 }));
+        } else if (phase === 'ok') {
+          socket.write(writeWsFrame(p, { opcode: 2 }));
+        }
+      }
+    });
   });
   return { server, seen };
 }
 
-test('proxy HTTP: same-origin, sem X-Frame-Options, injeta senha e serve assets', async () => {
-  const backend = mockNovncBackend();
+test('WebSocket autentica RFB, não vaza set-cookie e ecoa depois do handshake', async () => {
+  const password = 'Abcdefgh1234';
+  const backend = rfbBackend({ password, setCookie: true });
   const bport = await listen(backend.server);
-  const proxy = createServer((req, res) => {
-    const url = new URL(req.url, 'http://x');
-    const m = matchVncProxy(url.pathname);
-    if (!m?.backendPath) { res.writeHead(404); res.end(); return; }
-    proxyVncHttp(req, res, { port: bport, backendPath: m.backendPath, search: url.search, password: 's3cret' })
-      .catch(() => { if (!res.headersSent) { res.writeHead(502); res.end(); } });
+  const proxy = createServer();
+  attachVncUpgrade(proxy, {
+    isSignedIn: () => true,
+    resolvePort: async () => bport,
+    resolvePassword: async () => password
   });
   const pport = await listen(proxy);
   try {
-    const html = await fetch(`http://127.0.0.1:${pport}/api/agents/ag1/vnc/vnc.html?autoconnect=1`);
-    assert.equal(html.status, 200);
-    assert.equal(html.headers.get('x-frame-options'), null);
-    assert.equal(html.headers.get('content-security-policy'), null);
-    const body = await html.text();
-    assert.match(body, /novnc/);
-    assert.match(body, /s3cret/);
+    const ok = request({
+      hostname: '127.0.0.1', port: pport, path: '/api/agents/ag1/vnc/websockify',
+      headers: {
+        connection: 'Upgrade', upgrade: 'websocket',
+        'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==',
+        'sec-websocket-version': '13',
+        cookie: 'ripper_session=NAO',
+        authorization: 'Bearer NAO'
+      }
+    });
+    const upgradeP = once(ok, 'upgrade');
+    ok.end();
+    const [res, socket] = await upgradeP;
+    assert.equal(res.statusCode, 101);
+    assert.equal(res.headers['set-cookie'], undefined);
+    assert.equal(backend.seen.headers.cookie, undefined);
+    assert.equal(backend.seen.headers.authorization, undefined);
 
-    const js = await fetch(`http://127.0.0.1:${pport}/api/agents/ag1/vnc/app/ui.js`);
-    assert.equal(js.status, 200);
-    assert.equal(await js.text(), '/* ui */');
-
-    const miss = await fetch(`http://127.0.0.1:${pport}/api/agents/ag1/vnc/missing`);
-    assert.equal(miss.status, 404);
+    socket.write(writeWsFrame(Buffer.from('RFB 003.008\n'), { opcode: 2, mask: true }));
+    const first = [];
+    await new Promise((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error('handshake lento')), 2000);
+      socket.on('data', chunk => {
+        first.push(chunk);
+        const buf = Buffer.concat(first);
+        let rest = buf, texts = [];
+        while (rest.length) {
+          const f = readWsFrame(rest);
+          if (!f) break;
+          rest = f.rest;
+          if (f.opcode === 2) texts.push(f.payload);
+        }
+        const all = Buffer.concat(texts);
+        if (all.includes(Buffer.from([0, 0, 0, 0]))) { clearTimeout(t); resolve(); }
+      });
+    });
+    socket.write(writeWsFrame(Buffer.from('ping'), { opcode: 2, mask: true }));
+    socket.destroy();
   } finally {
     closeServer(proxy);
     closeServer(backend.server);
   }
 });
 
-test('proxy HTTP: backend morto responde 502 em português', async () => {
-  const proxy = createServer((req, res) => {
-    proxyVncHttp(req, res, { port: 1, backendPath: '/vnc.html' });
-  });
-  const pport = await listen(proxy);
-  try {
-    const r = await fetch(`http://127.0.0.1:${pport}/x`);
-    assert.equal(r.status, 502);
-    assert.match((await r.json()).error, /tela ao vivo/);
-  } finally {
-    closeServer(proxy);
-  }
-});
-
-test('handleVncUpgrade recusa sem sessão com 401', async () => {
+test('proxyVncWebSocket estoura timeout se o backend não faz upgrade', async () => {
+  const stuck = createServer();
+  stuck.on('upgrade', () => {});
+  const bport = await listen(stuck);
   let written = '';
   const socket = {
     destroyed: false,
@@ -177,51 +400,31 @@ test('handleVncUpgrade recusa sem sessão com 401', async () => {
     destroy() { this.destroyed = true; },
     on() {}
   };
-  const ok = await handleVncUpgrade(
-    { url: '/api/agents/a1/vnc/websockify', headers: {} },
-    socket,
-    Buffer.alloc(0),
-    { isSignedIn: () => false, resolvePort: async () => 1 }
-  );
-  assert.equal(ok, true);
-  assert.match(written, /401/);
-  assert.match(written, /Entre com a senha/);
-});
-
-test('WebSocket autenticado atravessa o proxy', async () => {
-  const backend = mockNovncBackend();
-  const bport = await listen(backend.server);
-  const proxy = createServer();
-  attachVncUpgrade(proxy, { isSignedIn: () => true, resolvePort: async () => bport });
-  const pport = await listen(proxy);
   try {
-    const ok = request({
-      hostname: '127.0.0.1', port: pport, path: '/api/agents/ag1/vnc/websockify',
-      headers: {
-        connection: 'Upgrade', upgrade: 'websocket',
-        'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==', 'sec-websocket-version': '13'
-      }
-    });
-    const upgradeP = once(ok, 'upgrade');
-    ok.end();
-    const [res, socket] = await upgradeP;
-    assert.equal(res.statusCode, 101);
-    socket.write('ping');
-    const [chunk] = await once(socket, 'data');
-    assert.equal(chunk.toString(), 'ping');
-    socket.destroy();
-    assert.ok(backend.seen.some(s => s.method === 'UPGRADE' && s.url.startsWith('/websockify')));
+    await assert.rejects(
+      () => proxyVncWebSocket(
+        { headers: { 'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==', 'sec-websocket-version': '13' } },
+        socket, Buffer.alloc(0),
+        { port: bport, password: 'Abcdefgh1234', connectTimeoutMs: 200 }
+      ),
+      /timeout/
+    );
+    assert.match(written, /502/);
   } finally {
-    closeServer(proxy);
-    closeServer(backend.server);
+    closeServer(stuck);
   }
 });
 
 test('forwardUpgrade: ouvinte secundário (LAN/Tailscale) repassa o WebSocket', async () => {
-  const backend = mockNovncBackend();
+  const password = 'Abcdefgh1234';
+  const backend = rfbBackend({ password });
   const bport = await listen(backend.server);
   const main = createServer();
-  attachVncUpgrade(main, { isSignedIn: () => true, resolvePort: async () => bport });
+  attachVncUpgrade(main, {
+    isSignedIn: () => true,
+    resolvePort: async () => bport,
+    resolvePassword: async () => password
+  });
   const side = createServer((req, res) => main.emit('request', req, res));
   forwardUpgrade(side, main);
   const sport = await listen(side);
@@ -242,21 +445,16 @@ test('forwardUpgrade: ouvinte secundário (LAN/Tailscale) repassa o WebSocket', 
   }
 });
 
-test('handleVncUpgrade ignora URL que não é o WS do noVNC', async () => {
-  const req = { url: '/api/health', headers: {} };
-  const socket = { destroyed: false, write() {}, destroy() {}, on() {} };
-  assert.equal(await handleVncUpgrade(req, socket, Buffer.alloc(0), { isSignedIn: () => true, resolvePort: async () => 1 }), false);
-});
-
-test('imagem do agente: xdotool e VNC com senha só em localhost', () => {
+test('imagem do agente: xdotool, VNC com senha em /run, sem -nopw no /work', () => {
   const df = readFileSync(new URL('../docker/agent/Dockerfile', import.meta.url), 'utf8');
   const sh = readFileSync(new URL('../docker/agent/start.sh', import.meta.url), 'utf8');
   assert.match(df, /\bxdotool\b/);
-  assert.doesNotMatch(sh, /-nopw/);
-  assert.match(sh, /vnc\.pass/);
+  const x11 = sh.split('\n').filter(l => /^\s*x11vnc\b/.test(l));
+  assert.ok(x11.length && x11.every(l => !l.includes('-nopw')));
+  assert.doesNotMatch(sh, /\/work\/\.ripper\/vnc\.pass/);
+  assert.match(sh, /\/run\/ripper-vnc\.pass/);
   assert.match(sh, /-rfbauth/);
   assert.match(sh, /-localhost/);
-  assert.match(sh, /storepasswd/);
 });
 
 async function withServer(fn) {
@@ -299,7 +497,7 @@ async function withServer(fn) {
   }
 }
 
-test('rota /vnc: login obrigatório, 409 fora do Docker, URL nunca é 127.0.0.1', async () => {
+test('rota /vnc: login, 409 fora do Docker, estáticos próprios sem senha na URL', async () => {
   await withServer(async (base, auth) => {
     const created = await fetch(base + '/api/agents', {
       method: 'POST',
@@ -311,10 +509,17 @@ test('rota /vnc: login obrigatório, 409 fora do Docker, URL nunca é 127.0.0.1'
     assert.equal((await fetch(`${base}/api/agents/${aid}/vnc`)).status, 401);
     assert.equal((await fetch(`${base}/api/agents/${aid}/vnc/vnc.html`)).status, 401);
 
+    const page = await fetch(`${base}/api/agents/${aid}/vnc/vnc.html`, { headers: auth });
+    assert.equal(page.status, 200);
+    assert.equal(page.headers.get('x-frame-options'), 'SAMEORIGIN');
+    assert.match(page.headers.get('content-security-policy'), /frame-ancestors 'self'/);
+    assert.doesNotMatch(await page.text(), /password=/);
+
     const r = await fetch(`${base}/api/agents/${aid}/vnc`, { headers: auth });
     assert.equal(r.status, 409);
     const body = await r.json();
     assert.match(body.error, /Docker/);
     assert.equal(JSON.stringify(body).includes('127.0.0.1'), false);
+    assert.equal(JSON.stringify(body).includes('password'), false);
   });
 });

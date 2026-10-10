@@ -1,0 +1,11 @@
+html, body, #screen {
+  margin: 0;
+  height: 100%;
+  width: 100%;
+  background: #000;
+  overflow: hidden;
+}
+#screen > div {
+  width: 100% !important;
+  height: 100% !important;
+}

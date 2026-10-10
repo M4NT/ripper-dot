@@ -243,7 +243,7 @@ import {
   mutatingOriginError
 } from './lib/security-headers.mjs';
 import { resolveHttpBudget, rejectOversizeBody, attachHttpTimeout } from './lib/http-budget.mjs';
-import { vncClientUrl, readVncPassword, proxyVncHttp, attachVncUpgrade, createCachedLoader, forwardUpgrade } from './lib/vnc-proxy.mjs';
+import { vncClientUrl, ensureVncSecret, applyVncPasswordForAgent, serveVncStatic, attachVncUpgrade, createCachedLoader, forwardUpgrade } from './lib/vnc-proxy.mjs';
 import {
   chatIdempotencyContext,
   replayIdempotentResponse,
@@ -488,13 +488,16 @@ async function vncTarget(aid) {
   const pc = computerFor(a, db.settings, save);
   const sc = await pc.screen();
   if (!sc) throw new HttpError(503, 'A tela ainda não subiu. Tente de novo em alguns segundos.');
-  return { port: sc.port, password: readVncPassword(a.id) };
+  const password = ensureVncSecret(a.id);
+  try { await applyVncPasswordForAgent(a.id, password); }
+  catch (e) { throw new HttpError(e.code || 503, e.message); }
+  return { port: sc.port, password };
 }
 const vncTargetCached = createCachedLoader(vncTarget);
 async function serveAgentVncProxy(req, [aid, rest], url, res) {
+  agentOr404(aid);
   if (rest.includes('..')) throw new HttpError(400, 'Caminho inválido.');
-  const t = await vncTargetCached(aid);
-  await proxyVncHttp(req, res, { port: t.port, backendPath: `/${rest}`, search: url.search, password: t.password });
+  await serveVncStatic(req, res, rest);
 }
 const syncedBoatFiles = new Set();
 
@@ -3098,7 +3101,7 @@ const routes = [
   ['POST', /^\/api\/computer\/image$/, async () => { ensureImage().then(() => { resolveSystemAlert('agent-image'); save(); }).catch(e => console.error('imagem', e.message)); return { image: await imageStatus() }; }],
   ['GET', /^\/api\/agents\/([\w-]+)\/vnc$/, async (req, [aid]) => {
     const t = await vncTarget(aid);
-    return { url: vncClientUrl(aid, { password: t.password }), port: t.port };
+    return { url: vncClientUrl(aid), port: t.port };
   }],
   ['GET', /^\/api\/agents\/([\w-]+)\/vnc\/(.+)$/, serveAgentVncProxy],
   ['HEAD', /^\/api\/agents\/([\w-]+)\/vnc\/(.+)$/, serveAgentVncProxy],
@@ -4061,7 +4064,9 @@ const server = createServer(async (req, res) => {
 });
 attachVncUpgrade(server, {
   isSignedIn: signedIn,
-  resolvePort: async aid => (await vncTargetCached(aid)).port
+  resolvePort: async aid => (await vncTargetCached(aid)).port,
+  resolvePassword: async aid => (await vncTargetCached(aid)).password,
+  allowlist: CORS_ALLOWLIST
 });
 
 let activeHttpConnections = 0;
