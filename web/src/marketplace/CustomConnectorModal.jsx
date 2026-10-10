@@ -98,12 +98,12 @@ export default function CustomConnectorModal({ open, onClose, onSaved }) {
   }
 
   return (
-    <Dialog open={open} onClose={close} className="conn-modal" label="Adicionar conector personalizado">
+    <Dialog open={open} onClose={close} className="conn-modal" label="Adicionar por endereço">
       <header className="conn-modal-head">
-        <h2>Adicionar conector personalizado</h2>
+        <h2>Adicionar por endereço</h2>
         <button type="button" className="icon-btn sm" aria-label="Fechar" onClick={close}><Icon name="x" /></button>
       </header>
-      <p className="conn-modal-lede">Conecte o Ripper aos seus dados e ferramentas. <a href="https://modelcontextprotocol.io" target="_blank" rel="noreferrer">Saiba mais sobre conectores</a> ou explore conectores pré-construídos no Marketplace.</p>
+      <p className="conn-modal-lede">Cole o endereço HTTPS do aplicativo. O Ripper confere o servidor e, se precisar, abre o login numa janela.</p>
 
       {(step === 'form' || step === 'verify') && (
         <>

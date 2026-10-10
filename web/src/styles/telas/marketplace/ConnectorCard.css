@@ -1,0 +1,62 @@
+/* Cartão do Marketplace: uma ação primária e cor só para estado. */
+
+.mp-app {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px 14px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: var(--r-xl);
+  background: var(--surface-2);
+  text-align: left;
+}
+
+.mp-app-main { min-width: 0; }
+.mp-app-main b { display: flex; align-items: center; gap: 6px; font-weight: 500; }
+.mp-app-main small { display: block; color: var(--muted); font-size: var(--fs-sm); margin-top: 2px; line-height: 1.4; }
+.mp-app-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
+
+.mp-app-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.mp-app-actions .btn { white-space: nowrap; }
+
+.mp-status { font-size: var(--fs-sm); font-weight: 500; }
+.mp-status.ok { color: var(--ok); }
+.mp-status.warn { color: var(--warn); }
+.mp-status.err { color: var(--err); }
+
+.mp-app.attention { background: color-mix(in srgb, var(--warn) 7%, var(--surface)); }
+.mp-app.errored { background: color-mix(in srgb, var(--err) 7%, var(--surface)); }
+
+.mp-app-form {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+.mp-app-form label { display: grid; gap: 4px; font-size: var(--fs-sm); color: var(--muted); }
+.mp-app-form .input { width: 100%; }
+.mp-app-form-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.mp-app-detail { font-size: var(--fs-sm); color: var(--muted); margin: 0; }
+.mp-app-logs {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--r);
+  background: var(--surface-2);
+  font: var(--fs-xs) var(--mono);
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 160px;
+  overflow: auto;
+}
+
+.mp-app-icon, .mp-app-title { background: none; border: 0; padding: 0; text-align: left; }
+.mp-app-icon { display: grid; place-items: center; }
+.mp-app-title { display: block; min-width: 0; }
+.mp-app-detail, .mp-app-form { grid-column: 1 / -1; }
+
+@media (max-width: 720px) {
+  .mp-app { grid-template-columns: auto minmax(0, 1fr); }
+  .mp-app-actions { grid-column: 1 / -1; flex-direction: row; align-items: center; justify-content: flex-end; }
+}

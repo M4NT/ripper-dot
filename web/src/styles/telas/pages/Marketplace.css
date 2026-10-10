@@ -2,6 +2,18 @@
 
 .mp-installed-icons { display: flex; gap: 2px; }
 
+.mp-installed.on { border-color: var(--ink); color: var(--ink); }
+
+.mp-filters { display: flex; flex-direction: column; gap: 8px; margin: -8px 0 8px; }
+.mp-filters .pills { overflow: visible; }
+
+.mp-filters .chip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+.hub-modal .mp-page .btn-sm.btn-primary {
+  background: var(--ink);
+  color: var(--bg);
+}
+
 .mp-row-text small { display: block; color: var(--muted); font-size: var(--fs-sm); }
 
 .mp-row-text .mp-desc { margin-top: 4px; }

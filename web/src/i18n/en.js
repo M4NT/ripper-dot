@@ -32,7 +32,7 @@ export default {
   'nav.account': 'Account and settings',
   'nav.settings': 'Settings',
   'nav.marketplace': 'Marketplace',
-  'nav.connectors': 'Connectors',
+  'nav.connectors': 'Connect apps',
   'nav.skills': 'Skills',
   'nav.modelsComputer': 'Models and computer',
   'nav.modelsComputerHint': 'Claude, Docker, plugins',

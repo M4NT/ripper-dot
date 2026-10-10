@@ -155,6 +155,7 @@ import {
   mergePluginAuth,
   oauthRedirectUri,
   escapeHtml,
+  oauthCallbackHtml,
   pluginOAuthStatus,
   startMcpOAuthFlow
 } from './lib/mcp-oauth.mjs';
@@ -4022,22 +4023,24 @@ const server = createServer(async (req, res) => {
       const code = url.searchParams.get('code');
       const state = url.searchParams.get('state') || '';
       const err = url.searchParams.get('error');
+      const origin = publicBaseUrl(req);
+      const html = (status, message, code) => {
+        res.writeHead(code, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
+        res.end(oauthCallbackHtml({ status, message, origin }));
+      };
       const flow = findOAuthFlowByState(state);
       if (!flow) {
-        res.writeHead(400, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
-        res.end('<!doctype html><meta charset=utf-8><title>Ripper OAuth</title><p>Fluxo inválido ou expirado. Feche esta janela e tente de novo no Ripper.</p>');
+        html('error', 'Fluxo inválido ou expirado. Feche esta janela e tente de novo no Ripper.', 400);
         return;
       }
       if (err) {
         flow.status = 'error';
         flow.error = url.searchParams.get('error_description') || err;
-        res.writeHead(400, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
-        res.end(`<!doctype html><meta charset=utf-8><title>Ripper OAuth</title><p>Login negado: ${escapeHtml(flow.error)}</p><script>setTimeout(()=>window.close(),1200)</script>`);
+        html('error', `Login negado: ${flow.error}`, 400);
         return;
       }
       if (!code) {
-        res.writeHead(400, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
-        res.end('<!doctype html><meta charset=utf-8><title>Ripper OAuth</title><p>Código OAuth ausente.</p>');
+        html('error', 'Código OAuth ausente.', 400);
         return;
       }
       try {
@@ -4049,13 +4052,11 @@ const server = createServer(async (req, res) => {
           save();
         }
         flow.status = 'complete';
-        res.writeHead(200, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
-        res.end('<!doctype html><meta charset=utf-8><title>Ripper OAuth</title><p>Login concluído. Você pode fechar esta janela.</p><script>setTimeout(()=>window.close(),800)</script>');
+        html('complete', 'Login concluído. Você pode fechar esta janela.', 200);
       } catch (e) {
         flow.status = 'error';
         flow.error = e.message;
-        res.writeHead(500, hdr(req, { 'content-type': 'text/html; charset=utf-8' }));
-        res.end('<!doctype html><meta charset=utf-8><title>Ripper OAuth</title><p>Falha ao trocar o código por token. Veja o Ripper e tente novamente.</p>');
+        html('error', 'Falha ao trocar o código por token. Veja o Ripper e tente novamente.', 500);
       }
       return;
     }

@@ -30,7 +30,7 @@ export default {
   'nav.account': 'Conta e configurações',
   'nav.settings': 'Configurações',
   'nav.marketplace': 'Conectar aplicativos',
-  'nav.connectors': 'Conectores',
+  'nav.connectors': 'Conectar aplicativos',
   'nav.skills': 'Habilidades',
   'nav.modelsComputer': 'Modelos e computador',
   'nav.modelsComputerHint': 'Claude, Docker, plugins',
