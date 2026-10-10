@@ -1,6 +1,7 @@
 node_modules/
 dist/
 data/
+.staging-data/
 .env
 deploy/staging/.env
 deploy/staging/.staging-claim

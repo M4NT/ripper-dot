@@ -251,7 +251,7 @@ RIPPER_ENV=staging node scripts/staging.mjs reset   # apaga só o staging e seme
 
 Atalho npm: `npm run staging -- up` (o `--` passa o comando). Sem Docker: `node scripts/staging.mjs up --local`.
 
-O script **não lê** `RIPPER_DATA`, `RIPPER_TOKEN`, `HOST` nem `PORT` de produção. Só `RIPPER_STAGING_*`. `reset` e `seed --force` exigem `RIPPER_ENV=staging` e a pasta **reivindicada fora de `data/`** (`RIPPER_STAGING_ID` em `deploy/staging/.env` + `.staging-claim`). Recusam a pasta de produção (`data/` padrão e `RIPPER_DATA`), symlink em `data/staging` (com `realpath`) e pasta que já tinha `db.json` sem ter sido criada pelo staging. Sem isso o comando recusa — não apaga a instalação real.
+O script **não lê** `RIPPER_DATA`, `RIPPER_TOKEN`, `HOST` nem `PORT` de produção. Só `RIPPER_STAGING_*`. `reset` e `seed --force` exigem `RIPPER_ENV=staging` e a pasta **reivindicada** (`RIPPER_STAGING_ID` em `deploy/staging/.env` igual ao id de `.staging-claim`). Recusam qualquer pasta que **contenha** a produção (pai de `data/` ou de `RIPPER_DATA`, raiz do repo, `$HOME`, `/`) ou esteja **dentro** dela; symlink (com `realpath`); e pasta que já tinha arquivos — só se marca pasta **nova ou vazia**. Sem isso o comando recusa — não apaga a instalação real.
 
 A porta do Compose é `127.0.0.1:3010` (não escuta na LAN). Token e senha **não têm padrão fixo**: o primeiro `up` gera os dois em `deploy/staging/.env` (fora do Git). O Compose exige `${RIPPER_STAGING_TOKEN:?…}` e `${RIPPER_STAGING_PASSWORD:?…}`. A senha não é impressa.
 
@@ -261,7 +261,7 @@ A porta do Compose é `127.0.0.1:3010` (não escuta na LAN). Token e senha **nã
 | Token | gerado no primeiro `up` | `RIPPER_STAGING_TOKEN` |
 | Senha da UI | gerada no primeiro `up` (não impressa) | `RIPPER_STAGING_PASSWORD` |
 | Provedor | `stream` (`lib/test-provider.mjs`) | `RIPPER_STAGING_PROVIDER` |
-| Dados (local) | `data/staging/` | `RIPPER_STAGING_DATA` |
+| Dados (local) | `.staging-data/` (fora de `data/`, no `.gitignore`) | `RIPPER_STAGING_DATA` |
 | Dados (Docker) | volume `ripper-staging-data` → `/data` | `RIPPER_ENV=staging node scripts/staging.mjs reset` |
 
 Depois do `up`, o comando imprime o token (não a senha). Abra `http://127.0.0.1:3010/?token=<token>`. O seed traz dois agentes (Assistente e Relator), uma memória e uma rotina — o fluxo de grupo do smoke precisa de um segundo agente.

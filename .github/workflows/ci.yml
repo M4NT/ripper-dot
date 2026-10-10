@@ -1,8 +1,10 @@
 name: CI
 
 on:
+  # push em main e cursor/** registra job no SHA do commit (pull_request
+  # usa o merge commit; por isso ce6e55d não aparecia em `gh run list --commit`).
   push:
-    branches: [main]
+    branches: [main, 'cursor/**']
   pull_request:
 
 concurrency:

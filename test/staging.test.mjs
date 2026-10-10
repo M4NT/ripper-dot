@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync, existsSync, symlinkSync, mkdirSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdtempSync, readFileSync, writeFileSync, existsSync, symlinkSync, mkdirSync, readdirSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { freePort } from './helpers/free-port.mjs';
@@ -10,15 +10,19 @@ import {
   COMPOSE_FILE,
   DEFAULT_PRODUCTION_DATA,
   DEFAULT_STAGING_DATA,
+  ROOT,
   assertDestructiveAllowed,
   claimStagingDir,
   ensureStagingSecrets,
   ensureStagingToken,
   environHasExact,
   isAllowedStagingDir,
+  isForbiddenStagingDir,
+  isNewOrEmptyDir,
   isProductionDataDir,
   isStagingServerPid,
   parseArgs,
+  readClaimRecord,
   readSeedDb,
   resolveConfig,
   seedDataDir,
@@ -188,6 +192,10 @@ test('up/serve não reivindicam pasta que já tem db.json; recusam produção', 
   );
   assert.equal(isProductionDataDir(DEFAULT_PRODUCTION_DATA), true);
   assert.equal(isProductionDataDir(DEFAULT_STAGING_DATA), false);
+  assert.match(DEFAULT_STAGING_DATA, /\.staging-data$/);
+  assert.equal(DEFAULT_STAGING_DATA.startsWith(DEFAULT_PRODUCTION_DATA + '/'), false);
+  assert.equal(isForbiddenStagingDir(DEFAULT_STAGING_DATA), false);
+  assert.equal(isForbiddenStagingDir(join(ROOT, 'data', 'staging')), true);
 });
 
 test('reset/seed --force recusam pasta não reivindicada, produção e symlink', async () => {
@@ -209,8 +217,11 @@ test('reset/seed --force recusam pasta não reivindicada, produção e symlink',
 
   const ok = mkdtempSync(join(tmpdir(), 'ripper-stg-ok-'));
   claimStagingDir(ok, { claimFile, envFile });
-  assert.equal(isAllowedStagingDir(ok, { claimFile }), true);
-  assertDestructiveAllowed(ok, { RIPPER_ENV: 'staging' }, { claimFile });
+  assert.equal(isAllowedStagingDir(ok, { claimFile, envFile }), true);
+  assertDestructiveAllowed(ok, { RIPPER_ENV: 'staging' }, { claimFile, envFile });
+  const rec = readClaimRecord(claimFile);
+  assert.ok(rec.id);
+  assert.equal(rec.path, ok);
 
   const parent = mkdtempSync(join(tmpdir(), 'ripper-stg-link-'));
   const real = join(parent, 'real');
@@ -225,6 +236,94 @@ test('reset/seed --force recusam pasta não reivindicada, produção e symlink',
     () => seedDataDir(link, { force: true, password, env: { RIPPER_ENV: 'staging' }, claimFile, envFile }),
     /symlink/
   );
+});
+
+test('recusa pasta que contém ou está dentro da produção, ROOT, $HOME e /', () => {
+  assert.equal(isForbiddenStagingDir(ROOT), true);
+  assert.equal(isForbiddenStagingDir(homedir()), true);
+  assert.equal(isForbiddenStagingDir('/'), true);
+  assert.equal(isForbiddenStagingDir(DEFAULT_PRODUCTION_DATA), true);
+  assert.equal(isForbiddenStagingDir(join(ROOT, 'data', 'staging')), true);
+  assert.equal(isForbiddenStagingDir(DEFAULT_STAGING_DATA), false);
+
+  const prod = mkdtempSync(join(tmpdir(), 'ripper-prod-anc-'));
+  const processEnv = { RIPPER_DATA: prod, HOME: homedir() };
+  assert.equal(isForbiddenStagingDir(prod, processEnv), true);
+  assert.equal(isForbiddenStagingDir(join(prod, 'filho'), processEnv), true);
+  assert.equal(isForbiddenStagingDir(join(prod, '..'), processEnv), true);
+});
+
+test('só marca pasta nova ou vazia; ID do .env tem que conferir', async () => {
+  const { claimFile, envFile, password } = tempClaim();
+  const nonempty = mkdtempSync(join(tmpdir(), 'ripper-stg-full-'));
+  writeFileSync(join(nonempty, 'resto.txt'), 'x');
+  assert.equal(isNewOrEmptyDir(nonempty), false);
+  assert.throws(() => claimStagingDir(nonempty, { claimFile, envFile }), /nova ou vazia/);
+  await assert.rejects(
+    () => seedDataDir(nonempty, { password, claimFile, envFile }),
+    /nova ou vazia|produção/
+  );
+
+  const empty = mkdtempSync(join(tmpdir(), 'ripper-stg-empty-'));
+  assert.equal(isNewOrEmptyDir(empty), true);
+  const claimed = claimStagingDir(empty, { claimFile, envFile });
+  assert.ok(claimed.id);
+  assert.equal(readClaimRecord(claimFile).id, claimed.id);
+
+  const seeded = mkdtempSync(join(tmpdir(), 'ripper-stg-id-'));
+  await seedDataDir(seeded, { password, claimFile, envFile });
+  writeFileSync(envFile, 'RIPPER_STAGING_ID=id-errado\n');
+  assert.throws(
+    () => assertDestructiveAllowed(seeded, { RIPPER_ENV: 'staging' }, { claimFile, envFile }),
+    /ID|confere/
+  );
+  await assert.rejects(
+    () => seedDataDir(seeded, {
+      force: true,
+      password,
+      env: { RIPPER_ENV: 'staging' },
+      claimFile,
+      envFile
+    }),
+    /ID|confere/
+  );
+  assert.equal(JSON.parse(readFileSync(join(seeded, 'db.json'), 'utf8')).agents[0].id, 'stg-assistente');
+});
+
+function refuseCli(cmd, extraEnv, cwd = ROOT) {
+  return spawnSync(process.execPath, [stagingPath, ...cmd], {
+    encoding: 'utf8',
+    cwd,
+    env: {
+      PATH: process.env.PATH,
+      ...extraEnv
+    },
+    timeout: 15_000
+  });
+}
+
+test('up/seed/reset recusam RIPPER_STAGING_DATA=. e $HOME', () => {
+  const home = mkdtempSync(join(tmpdir(), 'ripper-stg-fakehome-'));
+  for (const cmd of [['up', '--local'], ['seed'], ['reset']]) {
+    const atRoot = refuseCli(cmd, {
+      RIPPER_STAGING_DATA: '.',
+      RIPPER_ENV: 'staging',
+      HOME: process.env.HOME || homedir()
+    }, ROOT);
+    assert.notEqual(atRoot.status, 0, `${cmd.join(' ')} . deveria recusar`);
+    assert.match((atRoot.stderr || atRoot.stdout), /produção|raiz|HOME|recusad/i);
+    assert.equal(existsSync(join(ROOT, 'db.json')), false);
+
+    const atHome = refuseCli(cmd, {
+      RIPPER_STAGING_DATA: home,
+      RIPPER_ENV: 'staging',
+      HOME: home,
+      USERPROFILE: home
+    });
+    assert.notEqual(atHome.status, 0, `${cmd.join(' ')} $HOME deveria recusar`);
+    assert.match((atHome.stderr || atHome.stdout), /produção|raiz|HOME|recusad/i);
+    assert.deepEqual(readdirSync(home), []);
+  }
 });
 
 test('compose publica só em 127.0.0.1 e exige token e senha', () => {
